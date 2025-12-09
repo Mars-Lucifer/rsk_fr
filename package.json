@@ -26,7 +26,7 @@
         "@svgr/webpack": "^8.1.0",
         "@tailwindcss/postcss": "^4",
         "eslint": "^9",
-        "eslint-config-next": "16.0.7",
+        "eslint-config-next": "16.0.8",
         "prettier": "^3.7.3",
         "tailwindcss": "^4"
     },
