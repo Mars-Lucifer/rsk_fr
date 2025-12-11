@@ -12,7 +12,7 @@
     "dependencies": {
         "docx": "^9.5.1",
         "file-saver": "^2.0.5",
-        "framer-motion": "^12.23.25",
+        "framer-motion": "^12.23.26",
         "js-cookie": "^3.0.5",
         "next": "^16.0.7",
         "react": "^19.0.0",
