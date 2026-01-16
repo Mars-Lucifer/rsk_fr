@@ -17,7 +17,7 @@
         "next": "^16.1.1",
         "react": "^19.2.3",
         "react-dom": "^19.2.3",
-        "react-hook-form": "^7.68.0",
+        "react-hook-form": "^7.71.1",
         "react-textarea-autosize": "^8.5.9",
         "uuid": "^13.0.0"
     },
