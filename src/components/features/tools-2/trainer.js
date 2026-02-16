@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo, useCallback } from "react";
 import Header from "@/components/layout/Header";
 import Buffer from "./addons/popup";
+import RankingTestPopup from "./addons/RankingTestPopup";
 
 import InfoIcon from "@/assets/general/info.svg";
 import LinkIcon from "@/assets/general/link.svg";
@@ -114,11 +115,34 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
     const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [timerState, setTimerState] = useState({
-        isRunning: false,
-        startTime: null,
-        elapsedTime: 0,
-        readyElapsedTime: null,
+    const [timerState, setTimerState] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem("trainer_v2_taskTimer");
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.isRunning && parsed.startTime) {
+                    const elapsed = Math.floor((Date.now() - parsed.startTime) / 1000);
+                    return {
+                        isRunning: true,
+                        startTime: parsed.startTime,
+                        elapsedTime: elapsed,
+                        readyElapsedTime: null,
+                    };
+                }
+                return {
+                    isRunning: parsed.isRunning || false,
+                    startTime: parsed.startTime || null,
+                    elapsedTime: parsed.elapsedTime || 0,
+                    readyElapsedTime: parsed.readyElapsedTime || null,
+                };
+            }
+        } catch {}
+        return {
+            isRunning: false,
+            startTime: null,
+            elapsedTime: 0,
+            readyElapsedTime: null,
+        };
     });
     const timerRef = useRef(null);
 
@@ -216,18 +240,40 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
     }, [userType, who, taskVersion, isTokenValid, basePath]);
 
     const startTimer = useCallback(() => {
-        setTimerState((prev) => ({ ...prev, isRunning: true, startTime: Date.now(), elapsedTime: 0 }));
+        const now = Date.now();
+        setTimerState({ isRunning: true, startTime: now, elapsedTime: 0, readyElapsedTime: null });
+        try {
+            sessionStorage.setItem("trainer_v2_taskTimer", JSON.stringify({ isRunning: true, startTime: now, elapsedTime: 0 }));
+        } catch {}
         timerRef.current = setInterval(() => {
-            setTimerState((prev) => ({ ...prev, elapsedTime: prev.elapsedTime + 1 }));
+            setTimerState((prev) => {
+                const elapsed = Math.floor((Date.now() - prev.startTime) / 1000);
+                return { ...prev, elapsedTime: elapsed };
+            });
         }, 1000);
     }, []);
 
     const stopTimer = useCallback(() => {
         clearInterval(timerRef.current);
-        setTimerState((prev) => ({ ...prev, isRunning: false, readyElapsedTime: prev.elapsedTime }));
+        setTimerState((prev) => {
+            const final = { ...prev, isRunning: false, readyElapsedTime: prev.elapsedTime };
+            try {
+                sessionStorage.removeItem("trainer_v2_taskTimer");
+            } catch {}
+            return final;
+        });
     }, []);
 
+    // При монтировании: если таймер был запущен (восстановлен из sessionStorage), запускаем интервал
     useEffect(() => {
+        if (timerState.isRunning && timerState.startTime && !timerRef.current) {
+            timerRef.current = setInterval(() => {
+                setTimerState((prev) => {
+                    const elapsed = Math.floor((Date.now() - prev.startTime) / 1000);
+                    return { ...prev, elapsedTime: elapsed };
+                });
+            }, 1000);
+        }
         return () => clearInterval(timerRef.current);
     }, []);
 
@@ -645,12 +691,9 @@ const ThirdQuestionnairePopup = memo(function ThirdQuestionnairePopup({ onClose,
                             Отмена
                         </Button>
                         <Button
-                            as="a"
-                            href={"https://prompt-mastery-trainer-spo.lovable.app/"}
-                            target="_blank"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                window.open("https://prompt-mastery-trainer-spo.lovable.app/", "_blank");
+                            onClick={() => {
+                                if (onClose) onClose();
+                                window.__openRankingTestPopup && window.__openRankingTestPopup();
                             }}
                             className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200 flex-1">
                             Пройти Тестирование
@@ -707,12 +750,9 @@ const SessionCompletionPopup = memo(function SessionCompletionPopup({ onClose, o
 
                 <div className="mt-6 flex justify-end gap-2">
                     <Button
-                        as="a"
-                        href={"https://prompt-mastery-trainer-spo.lovable.app/"}
-                        target="_blank"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            window.open("https://prompt-mastery-trainer-spo.lovable.app/", "_blank");
+                        onClick={() => {
+                            if (onClose) onClose();
+                            window.__openRankingTestPopup && window.__openRankingTestPopup();
                         }}
                         className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200">
                         Пройти Тестирование
@@ -1078,21 +1118,6 @@ const TrainerControls = memo(function TrainerControls({
                     )}
                 </div>
             </div>
-            {showLevelsInput && isTaskRunning && (
-                <div className="flex flex-col gap-[1rem] mt-4">
-                    <h4 className="text-lg font-semibold">Измерения Delta</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Input type="number" placeholder="Уровень 1" value={levels.level1} onChange={(e) => onLevelChange("level1", e.target.value)} />
-                        <Input type="number" placeholder="Уровень 2" value={levels.level2} onChange={(e) => onLevelChange("level2", e.target.value)} />
-                        <Input type="number" placeholder="Уровень 3" value={levels.level3} onChange={(e) => onLevelChange("level3", e.target.value)} />
-                        <Input type="number" placeholder="Уровень 4" value={levels.level4} onChange={(e) => onLevelChange("level4", e.target.value)} />
-                        <Input type="number" placeholder="Уровень 5" value={levels.level5} onChange={(e) => onLevelChange("level5", e.target.value)} />
-                    </div>
-                    <Button onClick={onSaveMeasurements} className="!bg-blue-500 !text-white hover:!bg-blue-600">
-                        Сохранить измерения
-                    </Button>
-                </div>
-            )}
         </div>
     );
 });
@@ -1150,6 +1175,13 @@ export default function TrainerPage({ goTo }) {
 
     const [showLevelsInput, setShowLevelsInput] = useState(false);
     const [showSessionCompletionPopup, setShowSessionCompletionPopup] = useState(false);
+    const [showRankingTestPopup, setShowRankingTestPopup] = useState(false);
+
+    // Глобальный callback для открытия попапа тестирования из дочерних компонентов
+    useEffect(() => {
+        window.__openRankingTestPopup = () => setShowRankingTestPopup(true);
+        return () => { delete window.__openRankingTestPopup; };
+    }, []);
 
     const [completedTasks, setCompletedTasks] = useState({});
 
@@ -1876,7 +1908,10 @@ export default function TrainerPage({ goTo }) {
         onSaveMeasurements: saveMeasurements,
         onToolLink1Click: (e) => {
             if (currentTask?.toolLink1) {
-                if (currentTaskIndex + 1 === 1) {
+                if (currentTask.toolName1 === "Пройти Тестирование") {
+                    e.preventDefault();
+                    setShowRankingTestPopup(true);
+                } else if (currentTaskIndex + 1 === 1) {
                     e.preventDefault();
                     setShowFirstQuestionnaire(true);
                 } else if (currentTaskIndex + 1 === 2) {
@@ -1896,12 +1931,13 @@ export default function TrainerPage({ goTo }) {
                 <Header.Heading>МАЯК ОКО</Header.Heading>
                 <Button
                     icon
+                    disabled={timerState.isRunning}
+                    className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
                     onClick={() => {
                         sessionStorage.setItem("previousPage", "trainer");
                         goTo("history");
                     }}
-                    disabled={timerState.isRunning}
-                    title={timerState.isRunning ? "Завершите задание, чтобы посмотреть историю" : "История запросов"}>
+                    title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
                     <TimeIcon />
                 </Button>
             </Header>
@@ -2115,6 +2151,34 @@ export default function TrainerPage({ goTo }) {
             )}
             {showSessionCompletionPopup && <SessionCompletionPopup onClose={() => setShowSessionCompletionPopup(false)} onSave={handleSaveSessionCompletion} />}
             {showRolePopup && <RoleSelectionPopup onClose={() => setShowRolePopup(false)} onConfirm={handleRoleConfirm} />}
+            {showRankingTestPopup && (
+                <RankingTestPopup
+                    onClose={() => setShowRankingTestPopup(false)}
+                    onSave={async (results) => {
+                        try {
+                            const activeUser =
+                                document.cookie
+                                    .split("; ")
+                                    .find((row) => row.startsWith("active_user="))
+                                    ?.split("=")[1] || "anonymous";
+                            const payload = {
+                                date: new Date().toISOString(),
+                                user: activeUser,
+                                type: "ranking_test",
+                                results,
+                                totalDelta: Object.values(results).reduce((sum, r) => sum + r.delta, 0),
+                            };
+                            await fetch("/api/mayak/saveDeltaTest", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(payload),
+                            });
+                        } catch (err) {
+                            console.error("Ошибка сохранения результатов тестирования:", err);
+                        }
+                    }}
+                />
+            )}
         </>
     );
 }
