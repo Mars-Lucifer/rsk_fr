@@ -40,9 +40,9 @@ export default function ProfileIndexPage({ goTo }) {
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (!response.ok) {
                     // если сессия устарела — чистим куки и редиректим
                     if (response.status === 401 || response.status === 403) {
@@ -50,7 +50,7 @@ export default function ProfileIndexPage({ goTo }) {
                         router.push("/auth");
                         return;
                     }
-                    
+
                     // Обработка других ошибок через errorCode
                     switch (data.errorCode) {
                         case "EMAIL_NOT_CONFIRMED":
@@ -58,16 +58,16 @@ export default function ProfileIndexPage({ goTo }) {
                             clearCookies();
                             router.push("/auth");
                             return;
-                        
+
                         case "UNAUTHORIZED":
                             clearCookies();
                             router.push("/auth");
                             return;
-                        
+
                         case "NOT_FOUND":
                             alert("Профиль не найден");
                             return;
-                        
+
                         default:
                             console.error("Profile fetch error:", data.error);
                             return;
@@ -87,8 +87,6 @@ export default function ProfileIndexPage({ goTo }) {
     const handleLogout = async () => {
         const confirmed = window.confirm("Вы уверены, что хотите выйти?");
         if (!confirmed) return;
-
-
 
         try {
             // Вызываем серверный logout для очистки HttpOnly кук
@@ -162,9 +160,9 @@ export default function ProfileIndexPage({ goTo }) {
                     <div className="block-wrapper col-span-4">
                         <h6>Организация и команда</h6>
                         <div className="flex flex-col gap-[0.75rem]">
-                            <Link href={"/organizations/" + userData.data.Organization_id}>
+                            <Link href={`/organizations/${userData.data.Organization ? userData.data.Organization.id : ""}`}>
                                 <div className="group cursor-pointer flex items-center justify-between w-full">
-                                    <p className="flex-1 link">{userData.data.Organization ? userData.data.Organization : "Отсутсвует"}</p>
+                                    <p className="flex-1 link">{userData.data.Organization ? userData.data.Organization.short_name : "Отсутствует"}</p>
                                     <LinkIcon className="stroke-(--color-gray-white) group-hover:stroke-black" style={{ transition: "stroke .3s ease-in-out" }} />
                                 </div>
                             </Link>

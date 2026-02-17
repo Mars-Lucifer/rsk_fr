@@ -15,7 +15,7 @@ import Notify from "@/assets/general/notify.svg";
 export default function SettingsPage({ goTo }) {
     const [userData, setUserData] = useState(null); // оригинальные данные
     const [orgList, setOrgList] = useState([]); // Изменено на массив по умолчанию
-    const [formData, setFormData] = useState({Organization: "", Region: "",Surname: "",NameIRL: "", Patronymic: "",Description: ""}); // данные для формы
+    const [formData, setFormData] = useState({ Organization: "", Region: "", Surname: "", NameIRL: "", Patronymic: "", Description: "" }); // данные для формы
     const [hydrated, setHydrated] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [region, setRegion] = useState("");
@@ -28,48 +28,50 @@ export default function SettingsPage({ goTo }) {
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
                 });
-
                 const data = await response.json();
                 setUserData(data);
-                setFormData({Organization: data.data.Organization || "",Region: data.data.Region || "",Surname: data.data.Surname || "",NameIRL: data.data.NameIRL || "",Patronymic: data.data.Patronymic || "",Description: data.data.Description || ""});
+
+                // Загружаем регион (строка) и ID организации
                 setRegion(data.data.Region || "");
+
+                setFormData({
+                    Organization_id: data.data.organization_id || "", // ID организации (число/строка)
+                    Region: data.data.Region || "",
+                    Surname: data.data.Surname || "",
+                    NameIRL: data.data.NameIRL || "",
+                    Patronymic: data.data.Patronymic || "",
+                    Description: data.data.Description || "",
+                });
+
                 setHydrated(true);
             } catch (err) {
                 console.error(err);
             }
         };
-
         ProfileInfo();
     }, []);
 
     useEffect(() => {
         console.log("Region changed:", region);
         if (!region) {
-        setOrgList([]);
-        return;
-    }
+            setOrgList([]);
+            return;
+        }
 
         const loadOrgs = async () => {
             try {
-                const res = await fetch(
-                    `/api/org/all?region=${encodeURIComponent(region)}`,
-                    { credentials: "include" }
-                );
+                const res = await fetch(`/api/org/all?region=${encodeURIComponent(region)}`, { credentials: "include" });
                 const data = await res.json();
-
-                console.log("API response:", data); // ← ДОБАВЬ
-
-                setOrgList(
-                    data.success ? data.data.map(o => o.short_name) : []
-                );
+                console.log("API response:", data);
+                setOrgList(data.success ? data.data : []); // ← сохраняем объекты целиком
             } catch (e) {
-                console.error("Error loading orgs:", e); // ← ДОБАВЬ
+                console.error("Error loading orgs:", e);
                 setOrgList([]);
             }
         };
 
-    loadOrgs();
-}, [region]);
+        loadOrgs();
+    }, [region]);
 
     // обработчик изменений полей
     const handleChange = (e) => {
@@ -78,9 +80,18 @@ export default function SettingsPage({ goTo }) {
         setFormData((prev) => {
             const newForm = { ...prev, [name]: value };
             if (userData?.data) {
-                const dirty = Object.keys(newForm).some(
-                    key => newForm[key] !== userData.data[key]
-                );
+                const dirty = Object.keys(newForm).some((key) => newForm[key] !== userData.data[key]);
+                setIsDirty(dirty);
+            }
+            return newForm;
+        });
+    };
+
+    const handleOrgChange = (value) => {
+        setFormData((prev) => {
+            const newForm = { ...prev, Organization_id: value };
+            if (userData?.data) {
+                const dirty = Object.keys(newForm).some((key) => newForm[key] !== (key === "Organization" ? userData.data.organization_id : userData.data[key]));
                 setIsDirty(dirty);
             }
             return newForm;
@@ -88,30 +99,19 @@ export default function SettingsPage({ goTo }) {
     };
 
     const handleRegionChange = (value) => {
-
-        console.log("handleRegionChange called with:", value); // ← ДОБАВЬ
-        console.log("Type:", typeof value); // ← ДОБАВЬ
-        console.log("Is object?", value && typeof value === 'object'); // ← ДОБАВЬ
-
         setRegion(value);
         setFormData((prev) => {
             const newForm = {
                 ...prev,
                 Region: value,
-                Organization: "", // сброс организации
+                Organization_id: "", // сброс ID организации
             };
-
-            // Проверяем все поля на изменения
             if (userData?.data) {
-                const dirty = Object.keys(newForm).some(
-                    key => newForm[key] !== userData.data[key]
-                );
+                const dirty = Object.keys(newForm).some((key) => newForm[key] !== (key === "Organization" ? userData.data.organization_id : userData.data[key]));
                 setIsDirty(dirty);
             }
-
             return newForm;
         });
-        
     };
 
     if (!hydrated || !userData) return null;
@@ -120,10 +120,10 @@ export default function SettingsPage({ goTo }) {
         e.preventDefault();
         if (!isDirty) return;
 
-        // создаём объект только с изменёнными полями
         const changes = { id: userData.data.id };
         Object.keys(formData).forEach((key) => {
-            if (formData[key] !== userData.data[key]) {
+            const oldValue = key === "Organization" ? userData.data.organization_id : userData.data[key];
+            if (formData[key] !== oldValue) {
                 changes[key] = formData[key];
             }
         });
@@ -138,12 +138,19 @@ export default function SettingsPage({ goTo }) {
             const data = await response.json();
 
             if (response.ok) {
-                setUserData((prev) => ({ ...prev, data: formData }));
+                // Обновляем userData, включая organization_id
+                setUserData((prev) => ({
+                    ...prev,
+                    data: {
+                        ...prev.data,
+                        ...formData,
+                        organization_id: formData.Organization, // если бэкенд возвращает поле organization_id
+                    },
+                }));
                 setIsDirty(false);
 
-                // Если организация изменилась - обновляем в cookies
                 if (changes.Organization) {
-                    setCookie("organization", changes.Organization);
+                    setCookie("organization", changes.Organization); // теперь ID
                 }
 
                 window.location.reload();
@@ -186,13 +193,13 @@ export default function SettingsPage({ goTo }) {
                             id="Organization"
                             name="Organization"
                             placeholder="Организация"
-                            value={formData.Organization}
-                            options={orgList}
-                            onChange={(e) => handleChange(e) }
+                            value={formData.Organization} // ← ID
+                            options={orgList} // ← массив объектов { id, short_name, ... }
+                            onChange={(e) => handleOrgChange(e.target.value)}
                             disabled={!region}
                             className={`transition ${!region ? "opacity-60 pointer-events-none" : ""}`}
                         />
-                        <DropdownInput id="region" name="Region" placeholder="Введите регион" value={region || ""}  onChange={(e) =>  handleRegionChange(e.target.value || "")} src="/data/regions.txt"/>
+                        <DropdownInput id="region" name="Region" placeholder="Введите регион" value={region || ""} onChange={(e) => handleRegionChange(e.target.value || "")} src="/data/regions.txt" />
                         <p style={{ color: "var(--color-gray-black)" }}>
                             * Если вашей организации нет в списке, заполните{" "}
                             <Link target="_blank" className="text-(--color-blue)" href="https://forms.yandex.ru/u/690391e1068ff0a3ba625eef">

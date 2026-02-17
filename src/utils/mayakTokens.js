@@ -45,14 +45,20 @@ export function generateId() {
 }
 
 // Создание нового токена
-export function createToken(name, usageLimit, taskRange = null) {
+export function createToken(name, usageLimit, taskRange = null, customToken = null) {
     const tokens = readTokens();
     const now = new Date().toISOString();
+
+    if (customToken) {
+        if (tokens.some((t) => t.token === customToken)) {
+            throw new Error("Токен с таким значением уже существует");
+        }
+    }
 
     const newToken = {
         id: generateId(),
         name: name,
-        token: generateToken(),
+        token: customToken || generateToken(),
         usageLimit: parseInt(usageLimit, 10),
         usedCount: 0,
         taskRange: taskRange, // Диапазон заданий (например, "1-100")

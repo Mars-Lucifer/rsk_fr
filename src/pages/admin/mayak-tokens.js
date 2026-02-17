@@ -24,6 +24,7 @@ export default function AdminMayakTokens() {
     const [newTokenName, setNewTokenName] = useState("");
     const [newTokenLimit, setNewTokenLimit] = useState("");
     const [newTokenRange, setNewTokenRange] = useState(""); // Новый стейт для диапазона
+    const [newCustomToken, setNewCustomToken] = useState(""); // Новый стейт для кастомного токена
     const [creating, setCreating] = useState(false);
 
     // Добавление попыток
@@ -110,6 +111,7 @@ export default function AdminMayakTokens() {
                     name: newTokenName.trim(),
                     usageLimit: parseInt(newTokenLimit, 10),
                     taskRange: newTokenRange.trim() || null, // Отправляем диапазон
+                    customToken: newCustomToken.trim() || null, // Отправляем кастомный токен
                     password: ADMIN_PASSWORD,
                 }),
             });
@@ -122,6 +124,7 @@ export default function AdminMayakTokens() {
             setNewTokenName("");
             setNewTokenLimit("");
             setNewTokenRange(""); // Очищаем поле
+            setNewCustomToken(""); // Очищаем поле
             await fetchTokens();
         } catch (err) {
             console.error("Ошибка создания:", err);
@@ -357,6 +360,17 @@ export default function AdminMayakTokens() {
                                     placeholder="1-100"
                                     value={newTokenRange}
                                     onChange={(e) => setNewTokenRange(e.target.value)}
+                                />
+                            </div>
+                            <div className="w-[200px]">
+                                <label className="link small text-(--color-gray-black) block mb-[.5rem]">
+                                    Свой токен (опц.)
+                                </label>
+                                <Input
+                                    type="text"
+                                    placeholder="my-secret-token"
+                                    value={newCustomToken}
+                                    onChange={(e) => setNewCustomToken(e.target.value)}
                                 />
                             </div>
                             <Button type="submit" disabled={creating} className="!w-fit">

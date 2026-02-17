@@ -127,7 +127,7 @@
     {
         "file": "18.m4a",
         "instruction": "18.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic",
         "photo": "18.png"
     },
@@ -1467,7 +1467,7 @@
     {
         "file": "240.MP3",
         "instruction": "240.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic"
     },
     {
@@ -2061,7 +2061,7 @@
     {
         "file": "339.MP3",
         "instruction": "339.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic",
         "sourceLink": "https://xn--80apfedmab8e4d.xn--p1ai/2021/11/kak-vernut-dengi-za-remont-podezda-esli-delali-ego-svoimi-silami-bez-upravlyayushhej-kompanii/"
     },
@@ -2544,7 +2544,7 @@
     {
         "file": "420.pdf",
         "instruction": "420.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic"
     },
     {
@@ -3126,7 +3126,7 @@
     {
         "file": "520.MP3",
         "instruction": "520.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic",
         "sourceLink": "https://www.ng.ru/politics/2025-12-10/3_9398_kprf.html"
     },
@@ -3689,7 +3689,7 @@
         "sourceLink": "https://rv-ryazan.ru/bolshe-studentov-vyshe-ball-ege/"
     },
     {
-        "file": "613.pdf",
+        "file": "",
         "instruction": "613.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
@@ -3716,7 +3716,7 @@
         "toolName1": ""
     },
     {
-        "file": "617.pdf",
+        "file": "",
         "instruction": "617.pdf",
         "toolLink1": "https://suno.com/",
         "toolName1": "Suno",
@@ -3739,14 +3739,14 @@
         "sourceLink": "https://career.hse.ru"
     },
     {
-        "file": "620.WAV",
+        "file": "620.MP3",
         "instruction": "620.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic",
         "sourceLink": "https://www.nntu.ru/news/detail/partnerstvo/vse-novosti/v-ngtu-pri-podderzhke-industrialnogo-partnera-sozdana"
     },
     {
-        "file": "621.pdf",
+        "file": "",
         "instruction": "621.pdf",
         "toolLink1": "https://suno.com/",
         "toolName1": "Suno",
@@ -3767,14 +3767,14 @@
         "toolName1": ""
     },
     {
-        "file": "624.pdf",
+        "file": "",
         "instruction": "624.pdf",
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "sourceLink": "https://senatinform.ru/news/rossiyskim_studentam_ne_khvataet_mest_v_obshchezhitiyakh/"
     },
     {
-        "file": "625.pdf",
+        "file": "",
         "instruction": "625.pdf",
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
@@ -3784,8 +3784,7 @@
         "file": "626.png",
         "instruction": "626.pdf",
         "toolLink1": "https://lmarena.ai/",
-        "toolName1": "LMArena",
-        "sourceLink": "https://facultetus.ru"
+        "toolName1": "LMArena"
     },
     {
         "file": "627.png",
@@ -3795,7 +3794,7 @@
         "sourceLink": "https://vc.ru/edu/1515689-distancionnaya-magistratura-15-vuzov-dlya-onlain-obucheniya"
     },
     {
-        "file": "628.pdf",
+        "file": "",
         "instruction": "628.pdf",
         "toolLink1": "https://t.me/AIMemeArenaBot",
         "toolName1": "AiMemeArena",
@@ -3805,8 +3804,7 @@
         "file": "629.png",
         "instruction": "629.pdf",
         "toolLink1": "https://lmarena.ai/",
-        "toolName1": "LMArena",
-        "sourceLink": "https://endowment.hse.ru/documents"
+        "toolName1": "LMArena"
     },
     {
         "file": "",
@@ -3822,21 +3820,20 @@
         "sourceLink": "https://kaf42.mephi.ru/project/3"
     },
     {
-        "file": "632.pdf",
+        "file": "632.pptx",
         "instruction": "632.pdf",
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName1": "Gamma",
-        "sourceLink": "https://www.utmn.ru/presse/novosti/obrazovanie/1007968/"
+        "toolName1": "Gamma"
     },
     {
-        "file": "633.pdf",
+        "file": "",
         "instruction": "633.pdf",
         "toolLink1": "https://replit.com/",
         "toolName1": "Replit",
         "sourceLink": "https://campusapp.ru"
     },
     {
-        "file": "634.pdf",
+        "file": "634.pptx",
         "instruction": "634.pdf",
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma"
@@ -3862,28 +3859,27 @@
         "toolName1": ""
     },
     {
-        "file": "638.pdf",
+        "file": "638.png",
         "instruction": "638.pdf",
         "toolLink1": "https://pixverse.ai/",
-        "toolName1": "Pixverse",
-        "sourceLink": "https://endowment.hse.ru/documents"
+        "toolName1": "Pixverse"
     },
     {
-        "file": "639.pdf",
+        "file": "",
         "instruction": "639.pdf",
         "toolLink1": "https://pictory.ai/",
         "toolName1": "Pictory",
         "sourceLink": "https://xn--80aapampemcchfmo7a3c9ehj.xn--p1ai/news/v-yuzhno-sakhalinske-nachalos-zaselenie-v-obshchezhitie-kampusa-sakhalintekh/"
     },
     {
-        "file": "640.pdf",
+        "file": "640.png",
         "instruction": "640.pdf",
         "toolLink1": "https://pixverse.ai/",
         "toolName1": "Pixverse",
         "sourceLink": "https://www.nntu.ru/news/detail/partnerstvo/vse-novosti/v-ngtu-pri-podderzhke-industrialnogo-partnera-sozdana"
     },
     {
-        "file": "641.pdf",
+        "file": "",
         "instruction": "641.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
@@ -3892,13 +3888,13 @@
         "sourceLink": "https://blog.maximumtest.ru/post/postuplenie-v-vuz-celevoe-napravlenie.html"
     },
     {
-        "file": "642.pdf",
+        "file": "",
         "instruction": "642.pdf",
         "toolLink1": "https://pictory.ai/",
         "toolName1": "Pictory"
     },
     {
-        "file": "643.pdf",
+        "file": "643.mp4",
         "instruction": "643.pdf",
         "toolLink1": "https://any2text.ru/",
         "toolName1": "1:Any2text",
@@ -3916,8 +3912,7 @@
         "file": "645.pdf",
         "instruction": "645.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://endowment.hse.ru/documents"
+        "toolName1": "Perplexity"
     },
     {
         "file": "646.pdf",
@@ -3937,8 +3932,7 @@
         "file": "648.pdf",
         "instruction": "648.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.utmn.ru/presse/novosti/obrazovanie/1007968/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "649.pdf",
@@ -3955,94 +3949,84 @@
         "sourceLink": "https://misis.ru/news/9206/"
     },
     {
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": ""
+    },
+    {
         "file": "652.pdf",
-        "instruction": "652.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://www.unkniga.ru/vishee/15526-tsifrovizatsiya-visshego-obrazovaniya-tehnologii-dlya-universiteta-buduschrgo.html"
     },
     {
         "file": "",
-        "instruction": "653.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://misis.ru/news/9203/"
     },
     {
         "file": "",
-        "instruction": "654.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://ncfu.ru/sotrudniku/effektivnyy-kontrakt/"
     },
     {
         "file": "655.pdf",
-        "instruction": "655.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.umj.ru/jour/article/download/1328/1092"
+        "toolName1": "Perplexity"
     },
     {
         "file": "656.pdf",
-        "instruction": "656.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://medvestnik.ru/content/news/Minobrnauki-raskrylo-pokazateli-effektivnosti-celevogo-nabora-v-medvuzy.html"
     },
     {
         "file": "657.pdf",
-        "instruction": "657.pdf",
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName1": "Gamma",
-        "sourceLink": "https://stankin.ru/about/career-center/"
+        "toolName1": "Gamma"
     },
     {
         "file": "",
-        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
         "file": "",
-        "instruction": "659.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://wealthnavigator.ru/savoir-vivre/endaument-mgimo-ot-rozhdeniya-do-sovershennoletiya/"
     },
     {
         "file": "660.pdf",
-        "instruction": "660.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://profile.ru/society/dobavili-prozrachnosti-kak-i-zachem-izmenili-pravila-priema-v-vuzy-na-celevoe-obuchenie-1546117/"
     },
     {
         "file": "661.pdf",
-        "instruction": "661.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://rsr-online.ru/news/2024/5/20/pochti-135-mln-rublej-poluchil-ot-mecenatov-tgu-za-2023-god/"
     },
     {
         "file": "662.pdf",
-        "instruction": "662.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://www.unkniga.ru/vishee/15526-tsifrovizatsiya-visshego-obrazovaniya-tehnologii-dlya-universiteta-buduschrgo.html"
     },
     {
         "file": "663.pdf",
-        "instruction": "663.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://www.rosenergoatom.ru/candidates/shkolnikam-studentam-i-vypusknikam/tselevaya-kontraktnaya-podgotovka/"
     },
     {
         "file": "664.pdf",
-        "instruction": "664.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://stankin.ru/about/career-center/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",
@@ -4052,137 +4036,114 @@
     },
     {
         "file": "",
-        "instruction": "666.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://www.vedomosti.ru/press_releases/2025/10/03/povishaem-kachestvo-obrazovaniya-chem-pomozhet-lms"
     },
     {
         "file": "667.pdf",
-        "instruction": "667.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://technosuveren.ru/effektivnost-vybora-kak-modeus-transformiruet-obuchenie-v-yufu/"
     },
     {
         "file": "668.pdf",
-        "instruction": "668.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://news.itmo.ru/ru/news/13457/"
     },
     {
         "file": "",
-        "instruction": "669.pdf",
         "toolLink1": "https://replit.com/",
         "toolName1": "Replit",
         "sourceLink": "https://trends.rbc.ru/trends/education/62458ef59a7947d261864f4d"
     },
     {
         "file": "670.pdf",
-        "instruction": "670.pdf",
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma"
     },
     {
         "file": "671.pdf",
-        "instruction": "671.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity"
     },
     {
         "file": "",
-        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
         "file": "673.pdf",
-        "instruction": "673.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://news.itmo.ru/ru/news/13457/"
     },
     {
         "file": "674.pdf",
-        "instruction": "674.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity"
     },
     {
         "file": "",
-        "instruction": "675.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://vital.lib.tsu.ru/vital/access/services/Download/vtls:000793647/SOURCE1"
+        "toolName1": "Perplexity"
     },
     {
         "file": "676.pdf",
-        "instruction": "676.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://topfactor.pro/blog/effektivnyy-kontrakt-kak-avtomatizirovat-kpi-upravlenie-v-vuzakh/"
     },
     {
         "file": "677.pdf",
-        "instruction": "677.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://университетздоровья.рф/blog/news/upravlenie-obrazovatelnoy-organizatsiey/tsifrovizatsiya-v-vuzakh/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "678.pdf",
-        "instruction": "678.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://ncfu.ru/sotrudniku/effektivnyy-kontrakt/"
     },
     {
         "file": "",
-        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
         "file": "680.pdf",
-        "instruction": "680.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://trends.rbc.ru/trends/education/62458ef59a7947d261864f4d"
     },
     {
         "file": "681.pdf",
-        "instruction": "681.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://topfactor.pro/blog/effektivnyy-kontrakt-kak-avtomatizirovat-kpi-upravlenie-v-vuzakh/"
     },
     {
         "file": "682.pdf",
-        "instruction": "682.pdf",
         "toolLink1": "https://www.napkin.ai/",
         "toolName1": "1:Napkin",
         "toolLink2": "https://www.perplexity.ai/",
-        "toolName2": "2:Perplexity",
-        "sourceLink": "https://www.umj.ru/jour/article/download/1328/1092"
+        "toolName2": "2:Perplexity"
     },
     {
         "file": "683.pdf",
-        "instruction": "683.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://technosuveren.ru/effektivnost-vybora-kak-modeus-transformiruet-obuchenie-v-yufu/"
     },
     {
         "file": "684.pdf",
-        "instruction": "684.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://www.rosenergoatom.ru/candidates/shkolnikam-studentam-i-vypusknikam/tselevaya-kontraktnaya-podgotovka/"
     },
     {
         "file": "685.pdf",
-        "instruction": "685.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://www.napkin.ai/",
@@ -4191,49 +4152,39 @@
     },
     {
         "file": "",
-        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
         "file": "",
-        "instruction": "687.pdf",
         "toolLink1": "https://replit.com/",
         "toolName1": "Replit",
         "sourceLink": "https://profile.ru/society/dobavili-prozrachnosti-kak-i-zachem-izmenili-pravila-priema-v-vuzy-na-celevoe-obuchenie-1546117/"
     },
     {
         "file": "688.pdf",
-        "instruction": "688.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://www.napkin.ai/",
-        "toolName2": "2:Napkin",
-        "sourceLink": "https://www.umj.ru/jour/article/download/1328/1092"
+        "toolName2": "2:Napkin"
     },
     {
         "file": "689.pdf",
-        "instruction": "689.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://vital.lib.tsu.ru/vital/access/services/Download/vtls:000793647/SOURCE1"
-    },
-    {
-        "file": "",
-        "instruction": "690.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity"
     },
     {
         "file": "",
-        "instruction": "691.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://университетздоровья.рф/blog/news/upravlenie-obrazovatelnoy-organizatsiey/tsifrovizatsiya-v-vuzakh/"
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
     },
     {
         "file": "692.pdf",
-        "instruction": "692.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "sourceLink": "https://www.vedomosti.ru/press_releases/2025/10/03/povishaem-kachestvo-obrazovaniya-chem-pomozhet-lms"
@@ -4983,7 +4934,7 @@
     {
         "file": "820.MP3",
         "instruction": "820.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic",
         "sourceLink": "https://nbj.ru/blogz/aoip/63646/"
     },
@@ -31839,7 +31790,7 @@
     {
         "file": "6122.pdf",
         "instruction": "6122.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic"
     },
     {
@@ -31923,7 +31874,7 @@
     {
         "file": "6136.pdf",
         "instruction": "6136.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic"
     },
     {
@@ -41392,7 +41343,7 @@
     {
         "file": "8020.MP3",
         "instruction": "8020.pdf",
-        "toolLink1": "https://auphonic.com/",
+        "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic"
     },
     {

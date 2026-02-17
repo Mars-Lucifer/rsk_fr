@@ -13,6 +13,7 @@ export default async function ProfileUpdateHandler(req, res) {
         // Формируем тело запроса для API из тела запроса клиента
         const bodyData = req.body; // ожидаем объект с изменёнными полями
         delete bodyData.token;
+        console.log(bodyData);
 
         const response = await fetch("https://api.rosdk.ru/users/profile_interaction/update_my_profile/", {
             method: "PATCH",

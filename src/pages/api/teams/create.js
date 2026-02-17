@@ -15,7 +15,7 @@ export default async function RegHandler(req, res) {
                 name: req.body.name,
                 direction: "Другое",
                 region: req.body.region,
-                organization_name: req.body.organization_name,
+                organization_id: req.body.organization_id,
             }),
             cache: "no-store",
         });

@@ -852,7 +852,7 @@ const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData, onClos
     );
 });
 
-const MayakField = memo(function MayakField({ field, value, isMobile, disabled, onChange, onShowBuffer, onAddToBuffer, onRandom }) {
+const MayakField = memo(function MayakField({ field, value, isMobile, disabled, onChange, onShowBuffer, onAddToBuffer, onRandom, savedField }) {
     const { code, label } = field;
     const placeholder = label.split(" - ")[1];
 
@@ -867,31 +867,75 @@ const MayakField = memo(function MayakField({ field, value, isMobile, disabled, 
             <div className="group flex-1 flex w-full items-start gap-2">
                 {isMobile ? (
                     <>
-                        <div className="flex-1 min-w-0">
-                            <TextareaAutosize minRows={1} className="w-full resize-none rounded-lg border border-gray-300 bg-white p-2" placeholder={placeholder} value={value} onChange={handleChange} disabled={disabled} />
+                        <div className="flex-1 min-w-0 flex flex-col">
+                            <div className="input-wrapper w-full">
+                                <TextareaAutosize
+                                    minRows={1}
+                                    className="w-full resize-none bg-transparent outline-none text-black"
+                                    placeholder={placeholder}
+                                    value={value}
+                                    onChange={handleChange}
+                                    disabled={disabled}
+                                />
+                                {value && (
+                                    <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">
+                                        {label}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-2">
-                            <Button icon type="button" onClick={handleShowBuffer} disabled={disabled}>
+                            <Button icon type="button" onClick={handleShowBuffer} disabled={disabled} title="Сохраненные варианты">
                                 <CopyIcon />
                             </Button>
-                            <Button icon type="button" onClick={handleAddToBuffer} disabled={disabled}>
-                                <Plusicon />
-                            </Button>
-                            <Button icon type="button" onClick={handleRandom} disabled={disabled}>
+                            <div className="relative">
+                                <Button icon type="button" onClick={handleAddToBuffer} disabled={disabled} title="Сохранить">
+                                    <Plusicon />
+                                </Button>
+                                {savedField === code && (
+                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-10 transition-opacity duration-300">
+                                        Сохранено
+                                    </span>
+                                )}
+                            </div>
+                            <Button icon type="button" onClick={handleRandom} disabled={disabled} title="Случайный вариант">
                                 <RandomIcon />
                             </Button>
                         </div>
                     </>
                 ) : (
                     <>
-                        <Input className="w-full" placeholder={placeholder} value={value} onChange={handleChange} disabled={disabled} />
-                        <Button icon className="!hidden group-hover:!flex" onClick={handleShowBuffer} type="button" disabled={disabled}>
+                        <div className="flex-1 min-w-0 flex flex-col">
+                            <div className="input-wrapper w-full">
+                                <TextareaAutosize
+                                    minRows={1}
+                                    className="w-full resize-none bg-transparent outline-none text-black"
+                                    placeholder={placeholder}
+                                    value={value}
+                                    onChange={handleChange}
+                                    disabled={disabled}
+                                />
+                                {value && (
+                                    <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">
+                                        {label}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={handleShowBuffer} type="button" disabled={disabled} title="Сохраненные варианты">
                             <CopyIcon />
                         </Button>
-                        <Button icon className="!hidden group-hover:!flex" onClick={handleAddToBuffer} type="button" disabled={disabled}>
-                            <Plusicon />
-                        </Button>
-                        <Button icon className="!hidden group-hover:!flex" onClick={handleRandom} type="button" disabled={disabled}>
+                        <div className="relative !flex lg:!hidden lg:group-hover:!flex">
+                            <Button icon className="!flex" onClick={handleAddToBuffer} type="button" disabled={disabled} title="Сохранить">
+                                <Plusicon />
+                            </Button>
+                            {savedField === code && (
+                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-50 transition-opacity duration-300 pointer-events-none">
+                                    Сохранено
+                                </span>
+                            )}
+                        </div>
+                        <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={handleRandom} type="button" disabled={disabled} title="Случайный вариант">
                             <RandomIcon />
                         </Button>
                     </>
@@ -1079,6 +1123,8 @@ const TrainerControls = memo(function TrainerControls({
 });
 
 export default function TrainerPage({ goTo }) {
+    const [savedField, setSavedField] = useState(null);
+
     const isMobile = useMediaQuery("(max-width: 1023px)");
 
     const [taskInputValue, setTaskInputValue] = useState("");
@@ -1189,6 +1235,17 @@ export default function TrainerPage({ goTo }) {
     const [history, setHistory] = useState([]);
     const [showBuffer, setShowBuffer] = useState(false);
     const [currentField, setCurrentField] = useState(null);
+
+    useEffect(() => {
+        const buf = getCookie(getStorageKey("buffer"));
+        if (buf) {
+            try {
+                setBuffer(JSON.parse(buf));
+            } catch {
+                setBuffer({});
+            }
+        }
+    }, []);
 
     useEffect(() => {
         // Проверяем, есть ли наш одноразовый флаг
@@ -1590,6 +1647,11 @@ export default function TrainerPage({ goTo }) {
         setCurrentField(null);
     };
 
+    const handleUpdateBuffer = (newBuffer) => {
+        setBuffer(newBuffer);
+        setCookie(getStorageKey("buffer"), JSON.stringify(newBuffer));
+    };
+
     const handleAddToBuffer = (code) => {
         const fieldValue = fields[code];
         if (!fieldValue || fieldValue.trim() === "") return;
@@ -1607,6 +1669,8 @@ export default function TrainerPage({ goTo }) {
             setBuffer(newBuffer);
             setCookie(getStorageKey("buffer"), JSON.stringify(newBuffer));
         }
+        setSavedField(code);
+        setTimeout(() => setSavedField(null), 1000);
     };
 
     const handleInsertFromBuffer = (text) => {
@@ -1619,7 +1683,9 @@ export default function TrainerPage({ goTo }) {
     const handleShowBufferForField = (code) => {
         setCurrentField(code);
 
-        if (!buffer[code] || buffer[code].length === 0) {
+        // Изменено: заполняем только если буфер для этого поля undefined (никогда не инициализировался).
+        // Если там пустой массив (пользователь все удалил) или есть элементы - не вмешиваемся.
+        if (buffer[code] === undefined) {
             const fieldMapping = {
                 m: "mission",
                 a: "audience",
@@ -1647,46 +1713,6 @@ export default function TrainerPage({ goTo }) {
                         newBuffer[code] = randomValues;
                         setBuffer(newBuffer);
                         setCookie(getStorageKey("buffer"), JSON.stringify(newBuffer));
-                    }
-                }
-            }
-        } else {
-            const fieldMapping = {
-                m: "mission",
-                a: "audience",
-                y: "role",
-                k: "criteria",
-                o1: "limitations",
-                k2: "context",
-                o2: "format",
-            };
-
-            const mappedKey = fieldMapping[code];
-            if (mappedKey) {
-                const typeOptions = mayakData.contentTypeOptions[type];
-                if (typeOptions && typeOptions[mappedKey]) {
-                    const options = typeOptions[mappedKey];
-                    if (Array.isArray(options) && options.length > 0) {
-                        const currentBuffer = buffer[code] || [];
-                        const userItemsCount = currentBuffer.length;
-                        const remainingSlots = 6 - userItemsCount;
-
-                        if (remainingSlots > 0) {
-                            const shuffled = [...options].sort(() => 0.5 - Math.random());
-                            const additionalValues = [];
-
-                            for (let i = 0; i < Math.min(remainingSlots, shuffled.length); i++) {
-                                if (!currentBuffer.includes(shuffled[i])) {
-                                    additionalValues.push(shuffled[i]);
-                                }
-                            }
-
-                            const combinedBuffer = [...currentBuffer, ...additionalValues];
-                            const newBuffer = { ...buffer };
-                            newBuffer[code] = combinedBuffer;
-                            setBuffer(newBuffer);
-                            setCookie(getStorageKey("buffer"), JSON.stringify(newBuffer));
-                        }
                     }
                 }
             }
@@ -1748,12 +1774,12 @@ export default function TrainerPage({ goTo }) {
         setHistory(newHist);
     };
 
-    const getCookie = (name) => {
+    function getCookie(name) {
         const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
         return match ? decodeURIComponent(match[2]) : null;
-    };
+    }
 
-    const setCookie = (name, value, days = 365) => {
+    function setCookie(name, value, days = 365) {
         try {
             const expires = new Date(Date.now() + days * 864e5).toUTCString();
             const stringValue = value;
@@ -1903,15 +1929,6 @@ export default function TrainerPage({ goTo }) {
         <>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
-                <select
-					value={taskVersion}
-					onChange={e => setTaskVersion(e.target.value)}
-					disabled={timerState.isRunning}
-					className="bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-				>
-					<option value="v1">v1</option>
-					<option value="v2">v2</option>
-				</select> 
                 <Button
                     icon
                     disabled={timerState.isRunning}
@@ -1922,9 +1939,6 @@ export default function TrainerPage({ goTo }) {
                     }}
                     title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
                     <TimeIcon />
-                </Button>
-                <Button icon onClick={() => goTo("admin")} title="Админ-панель">
-                    <AdminIcon />
                 </Button>
             </Header>
 
@@ -1968,16 +1982,13 @@ export default function TrainerPage({ goTo }) {
                                             setIsMiscAccordionOpen((prev) => !prev);
                                             if (newType !== type) {
                                                 setType(newType);
-                                                // Очищаем буфер, чтобы подтянулись новые варианты для полей
-                                                setBuffer({});
-                                                setCookie(getStorageKey("buffer"), JSON.stringify({}));
+                                                // Убрали очистку буфера, чтобы сохранения пользователя не пропадали
                                             }
                                         } else {
                                             // Логика для всех остальных кнопок
                                             if (newType !== type) {
                                                 setType(newType);
-                                                setBuffer({});
-                                                setCookie(getStorageKey("buffer"), JSON.stringify({}));
+                                                // Убрали очистку буфера, чтобы сохранения пользователя не пропадали
                                             }
                                             setIsMiscAccordionOpen(false); // Закрываем аккордеон, если он был открыт
                                         }
@@ -1998,13 +2009,33 @@ export default function TrainerPage({ goTo }) {
                                     </Button>
                                 </div>
                                 {(mayakData.fieldsList || []).slice(0, 4).map((f) => (
-                                    <MayakField key={f.code} field={f} value={fields[f.code]} isMobile={isMobile} onChange={handleChange} onShowBuffer={handleShowBufferForField} onAddToBuffer={handleAddToBuffer} onRandom={handleRandom} />
+                                    <MayakField
+                                        key={f.code}
+                                        field={f}
+                                        value={fields[f.code]}
+                                        isMobile={isMobile}
+                                        onChange={handleChange}
+                                        onShowBuffer={handleShowBufferForField}
+                                        onAddToBuffer={handleAddToBuffer}
+                                        onRandom={handleRandom}
+                                        savedField={savedField}
+                                    />
                                 ))}
                             </div>
                             <div className="flex flex-col gap-[0.5rem]">
                                 <span className="big">Условия реализации и параметры оформления</span>
                                 {(mayakData.fieldsList || []).slice(4).map((f) => (
-                                    <MayakField key={f.code} field={f} value={fields[f.code]} isMobile={isMobile} onChange={handleChange} onShowBuffer={handleShowBufferForField} onAddToBuffer={handleAddToBuffer} onRandom={handleRandom} />
+                                    <MayakField
+                                        key={f.code}
+                                        field={f}
+                                        value={fields[f.code]}
+                                        isMobile={isMobile}
+                                        onChange={handleChange}
+                                        onShowBuffer={handleShowBufferForField}
+                                        onAddToBuffer={handleAddToBuffer}
+                                        onRandom={handleRandom}
+                                        savedField={savedField}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -2107,7 +2138,7 @@ export default function TrainerPage({ goTo }) {
                     </div>
                 </div>
 
-                {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} buffer={buffer} currentField={currentField} />}
+                {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />}
             </div>
             {showCompletionPopup && (
                 <TaskCompletionPopup

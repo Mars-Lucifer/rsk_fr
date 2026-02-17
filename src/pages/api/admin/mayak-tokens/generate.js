@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { name, usageLimit, taskRange } = req.body;
+        const { name, usageLimit, taskRange, customToken } = req.body;
 
         // Валидация входных данных
         if (!name || typeof name !== "string" || name.trim() === "") {
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ success: false, error: "Лимит использований должен быть положительным числом" });
         }
 
-        const newToken = createToken(name.trim(), usageLimit, taskRange);
+        const newToken = createToken(name.trim(), usageLimit, taskRange, customToken ? customToken.trim() : null);
 
         return res.status(201).json({
             success: true,
@@ -44,6 +44,6 @@ export default async function handler(req, res) {
         });
     } catch (error) {
         console.error("Error generating token:", error);
-        return res.status(500).json({ success: false, error: "Ошибка сервера" });
+        return res.status(500).json({ success: false, error: error.message || "Ошибка сервера" });
     }
 }

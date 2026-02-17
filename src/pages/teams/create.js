@@ -16,6 +16,7 @@ export default function Createteam() {
     const [formData, setFormData] = useState({
         name: "",
         region: "",
+        organization_id: "",
         organization_name: "",
     });
     const [userData, setUserData] = useState(null);
@@ -38,8 +39,9 @@ export default function Createteam() {
                     // Предзаполняем форму данными из профиля
                     setFormData((prev) => ({
                         ...prev,
-                        region: data.data.Region || "",
-                        organization_name: data.data.Organization || "",
+                        region: data.data.Region,
+                        organization_name: data.data?.Organization.short_name,
+                        organization_id: data.data?.Organization.id,
                     }));
                 }
             } catch (err) {
@@ -71,7 +73,7 @@ export default function Createteam() {
                 body: JSON.stringify({
                     name: formData.name.toString(),
                     region: formData.region.toString(),
-                    organization_name: formData.organization_name.toString(),
+                    organization_id: formData.organization_id.toString(),
                 }),
                 credentials: "include",
             });
@@ -116,8 +118,8 @@ export default function Createteam() {
                     <div className=" flex flex-col gap-[1.25rem]">
                         <h6>Организация и регион</h6>
                         <div className="flex flex-col gap-[.75rem]">
-                            <DropdownInput disabled id="organization_name" readOnly name="organization_name" autoComplete="organization_name" placeholder="Организация" value={formData.organization_name} onChange={handleChange} />
-                            <DropdownInput disabled id="region" readOnly name="region" placeholder="Введите регион" value={formData.region} onChange={handleChange} />
+                            <Input type="text" disabled readOnly id="organization_name" name="organization_name" autoComplete="organization_name" placeholder="Организация" value={formData.organization_name} />
+                            <Input type="text" disabled id="region" readOnly name="region" placeholder="Введите регион" value={formData.region} />
                             <p style={{ color: "var(--color-gray-black)" }}>* Данные берутся из профиля, заполните свой профиль если отсутсвуют данные региона или организации</p>
                         </div>
                     </div>

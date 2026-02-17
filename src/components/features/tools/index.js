@@ -862,7 +862,7 @@ export default function IndexPage({ goTo }) {
                                         <div key={f.code} className="group flex w-full items-start gap-2">
                                             {isMobile ? (
                                                 <>
-                                                    <div className="flex-1 min-w-0">
+                                                    <div className="flex-1 min-w-0 flex flex-col">
                                                         <TextareaAutosize
                                                             minRows={1}
                                                             className="w-full resize-none rounded-lg border border-gray-300 bg-white p-2"
@@ -870,6 +870,11 @@ export default function IndexPage({ goTo }) {
                                                             value={fields[f.code]}
                                                             onChange={(e) => handleChange(f.code, e.target.value)}
                                                         />
+                                                        {fields[f.code] && (
+                                                            <p className="text-xs text-gray-500 mt-1 pl-2 opacity-70">
+                                                                {f.label}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <div className="flex flex-shrink-0 items-center gap-2">
                                                         <Button icon onClick={() => handleShowBufferForField(f.code)}>
@@ -885,7 +890,13 @@ export default function IndexPage({ goTo }) {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Input className="w-full" placeholder={f.label} value={fields[f.code]} onChange={(e) => handleChange(f.code, e.target.value)} />
+                                                    <Input className="w-full" placeholder={f.label} value={fields[f.code]} onChange={(e) => handleChange(f.code, e.target.value)}>
+                                                        {fields[f.code] && (
+                                                            <p className="text-xs text-gray-500 mt-1 pl-2 opacity-70">
+                                                                {f.label}
+                                                            </p>
+                                                        )}
+                                                    </Input>
                                                     <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={() => handleShowBufferForField(f.code)}>
                                                         <CopyIcon />
                                                     </Button>
@@ -908,7 +919,7 @@ export default function IndexPage({ goTo }) {
                                         <div key={f.code} className="group flex w-full items-start gap-2">
                                             {isMobile ? (
                                                 <>
-                                                    <div className="flex-1 min-w-0">
+                                                    <div className="flex-1 min-w-0 flex flex-col">
                                                         <TextareaAutosize
                                                             minRows={1}
                                                             className="w-full resize-none rounded-lg border border-gray-300 bg-white p-2"
@@ -916,6 +927,11 @@ export default function IndexPage({ goTo }) {
                                                             value={fields[f.code]}
                                                             onChange={(e) => handleChange(f.code, e.target.value)}
                                                         />
+                                                        {fields[f.code] && (
+                                                            <p className="text-xs text-gray-500 mt-1 pl-2 opacity-70">
+                                                                {f.label}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <div className="flex flex-shrink-0 items-center gap-2">
                                                         <Button icon onClick={() => handleShowBufferForField(f.code)}>
@@ -931,7 +947,13 @@ export default function IndexPage({ goTo }) {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Input className="w-full" placeholder={f.label} value={fields[f.code]} onChange={(e) => handleChange(f.code, e.target.value)} />
+                                                    <Input className="w-full" placeholder={f.label} value={fields[f.code]} onChange={(e) => handleChange(f.code, e.target.value)}>
+                                                        {fields[f.code] && (
+                                                            <p className="text-xs text-gray-500 mt-1 pl-2 opacity-70">
+                                                                {f.label}
+                                                            </p>
+                                                        )}
+                                                    </Input>
                                                     <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={() => handleShowBufferForField(f.code)}>
                                                         <CopyIcon />
                                                     </Button>
