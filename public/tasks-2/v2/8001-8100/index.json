@@ -1,0 +1,1002 @@
+[
+    {
+        "number": "8001",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8002",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8003",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://forms.yandex.ru/u/689197c9eb6146293aca92fa",
+        "toolName1": "Входная анкета",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8004",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://prompt-mastery-trainer-spo.lovable.app/",
+        "toolName1": "Пройти Тестирование",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8005",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8006",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8007",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8008",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8009",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8010",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8011",
+        "title": "",
+        "file": "8010.pdf",
+        "instruction": "8010.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8012",
+        "title": "",
+        "file": "8011.pdf",
+        "instruction": "8011.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8013",
+        "title": "",
+        "file": "8012.pdf",
+        "instruction": "8012.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8014",
+        "title": "",
+        "file": "",
+        "instruction": "8013.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8015",
+        "title": "",
+        "file": "8014.pdf",
+        "instruction": "8014.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8016",
+        "title": "",
+        "file": "8015.pdf",
+        "instruction": "8015.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8017",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8018",
+        "title": "",
+        "file": "",
+        "instruction": "8017.pdf",
+        "toolLink1": "https://suno.com/",
+        "toolName1": "Suno",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8019",
+        "title": "",
+        "file": "8018.wav",
+        "instruction": "8018.pdf",
+        "toolLink1": "https://any2text.ru/",
+        "toolName1": "1:Any2text",
+        "toolLink2": "https://www.perplexity.ai/",
+        "toolName2": "2:Perplexity"
+    },
+    {
+        "number": "8020",
+        "title": "",
+        "file": "8019.pdf",
+        "instruction": "8019.pdf",
+        "toolLink1": "https://suno.com/",
+        "toolName1": "Suno",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8021",
+        "title": "",
+        "file": "8020.MP3",
+        "instruction": "8020.pdf",
+        "toolLink1": "https://auphonic.com/landing",
+        "toolName1": "Auphonic",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8022",
+        "title": "",
+        "file": "",
+        "instruction": "8021.pdf",
+        "toolLink1": "https://suno.com/",
+        "toolName1": "Suno",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8023",
+        "title": "",
+        "file": "8022.pdf",
+        "instruction": "8022.pdf",
+        "toolLink1": "https://suno.com/",
+        "toolName1": "Suno",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8024",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8025",
+        "title": "",
+        "file": "",
+        "instruction": "8024.pdf",
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8026",
+        "title": "",
+        "file": "",
+        "instruction": "8025.pdf",
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8027",
+        "title": "",
+        "file": "8026.png",
+        "instruction": "8026.pdf",
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8028",
+        "title": "",
+        "file": "8027.png",
+        "instruction": "8027.pdf",
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8029",
+        "title": "",
+        "file": "",
+        "instruction": "8028.pdf",
+        "toolLink1": "https://t.me/AIMemeArenaBot",
+        "toolName1": "AiMemeArena",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8030",
+        "title": "",
+        "file": "8029.jpg",
+        "instruction": "8029.pdf",
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8031",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8032",
+        "title": "",
+        "file": "8031.pdf",
+        "instruction": "8031.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName2": "2:Gamma"
+    },
+    {
+        "number": "8033",
+        "title": "",
+        "file": "8032.pptx",
+        "instruction": "8032.pdf",
+        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName1": "Gamma",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8034",
+        "title": "",
+        "file": "",
+        "instruction": "8033.pdf",
+        "toolLink1": "https://replit.com/",
+        "toolName1": "Replit",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8035",
+        "title": "",
+        "file": "",
+        "instruction": "8034.pdf",
+        "toolLink1": "https://replit.com/",
+        "toolName1": "Replit",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8036",
+        "title": "",
+        "file": "8035.pptx",
+        "instruction": "8035.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName2": "2:Gamma"
+    },
+    {
+        "number": "8037",
+        "title": "",
+        "file": "8036.pdf",
+        "instruction": "8036.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://www.napkin.ai/",
+        "toolName2": "2:Napkin"
+    },
+    {
+        "number": "8038",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8039",
+        "title": "",
+        "file": "8038.jpg",
+        "instruction": "8038.pdf",
+        "toolLink1": "https://pixverse.ai/",
+        "toolName1": "Pixverse",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8040",
+        "title": "",
+        "file": "",
+        "instruction": "8039.pdf",
+        "toolLink1": "https://pictory.ai/",
+        "toolName1": "Pictory",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8041",
+        "title": "",
+        "file": "8040.jpg",
+        "instruction": "8040.pdf",
+        "toolLink1": "https://pixverse.ai/",
+        "toolName1": "Pixverse",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8042",
+        "title": "",
+        "file": "",
+        "instruction": "8041.pdf",
+        "toolLink1": "https://pixverse.ai/",
+        "toolName1": "Pixverse",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8043",
+        "title": "",
+        "file": "",
+        "instruction": "8042.pdf",
+        "toolLink1": "https://pictory.ai/",
+        "toolName1": "Pictory",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8044",
+        "title": "",
+        "file": "8043.mp4",
+        "instruction": "8043.pdf",
+        "toolLink1": "https://any2text.ru/",
+        "toolName1": "Any2text",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8045",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8046",
+        "title": "",
+        "file": "8045.pdf",
+        "instruction": "8045.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8047",
+        "title": "",
+        "file": "8046.pdf",
+        "instruction": "8046.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8048",
+        "title": "",
+        "file": "8047.pdf",
+        "instruction": "8047.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8049",
+        "title": "",
+        "file": "8048.pdf",
+        "instruction": "8048.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8050",
+        "title": "",
+        "file": "8049.pdf",
+        "instruction": "8049.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8051",
+        "title": "",
+        "file": "8050.pdf",
+        "instruction": "8050.pdf",
+        "toolLink1": "https://www.napkin.ai/",
+        "toolName1": "Napkin",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8052",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8053",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName2": "2:Gamma"
+    },
+    {
+        "number": "8054",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8055",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8056",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://www.napkin.ai/",
+        "toolName2": "2:Napkin"
+    },
+    {
+        "number": "8057",
+        "title": "",
+        "file": "8056.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8058",
+        "title": "",
+        "file": "8057.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName2": "2:Gamma"
+    },
+    {
+        "number": "8059",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8060",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8061",
+        "title": "",
+        "file": "8060.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8062",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8063",
+        "title": "",
+        "file": "8062.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8064",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8065",
+        "title": "",
+        "file": "8064.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8066",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8067",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8068",
+        "title": "",
+        "file": "8067.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8069",
+        "title": "",
+        "file": "8068.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8070",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://replit.com/",
+        "toolName2": "2:Replit"
+    },
+    {
+        "number": "8071",
+        "title": "",
+        "file": "8070.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8072",
+        "title": "",
+        "file": "8071.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8073",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8074",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8075",
+        "title": "",
+        "file": "8074.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8076",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://replit.com/",
+        "toolName2": "2:Replit"
+    },
+    {
+        "number": "8077",
+        "title": "",
+        "file": "8076.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8078",
+        "title": "",
+        "file": "8077.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8079",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8080",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8081",
+        "title": "",
+        "file": "8080.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8082",
+        "title": "",
+        "file": "8081.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://www.napkin.ai/",
+        "toolName2": "2:Napkin"
+    },
+    {
+        "number": "8083",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://www.napkin.ai/",
+        "toolName2": "2:Napkin"
+    },
+    {
+        "number": "8084",
+        "title": "",
+        "file": "8083.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8085",
+        "title": "",
+        "file": "8084.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8086",
+        "title": "",
+        "file": "8085.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8087",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8088",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://replit.com/",
+        "toolName1": "Replit",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8089",
+        "title": "",
+        "file": "8088.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://www.napkin.ai/",
+        "toolName2": "2:Napkin"
+    },
+    {
+        "number": "8090",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8091",
+        "title": "",
+        "file": "8090.pdf",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8092",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://www.napkin.ai/",
+        "toolName2": "2:Napkin"
+    },
+    {
+        "number": "8093",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8094",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8095",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8096",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8097",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8098",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8099",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    },
+    {
+        "number": "8100",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": ""
+    }
+]

@@ -82,10 +82,10 @@
       "name": "ВУЗЫ",
       "token": "1eb2c9604eb12ac655c57efbbd0a02228ef72db7cb379396a7e1206eed8eb6cd",
       "usageLimit": 30,
-      "usedCount": 1,
+      "usedCount": 2,
       "taskRange": "600-700",
       "createdAt": "2026-02-12T08:58:11.787Z",
-      "updatedAt": "2026-02-12T08:58:31.669Z",
+      "updatedAt": "2026-02-18T15:30:43.406Z",
       "isActive": true
     }
   ]

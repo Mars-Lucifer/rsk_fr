@@ -45,7 +45,7 @@ export function generateId() {
 }
 
 // Создание нового токена
-export function createToken(name, usageLimit, taskRange = null, customToken = null) {
+export function createToken(name, usageLimit, taskRange = null, customToken = null, sectionId = null) {
     const tokens = readTokens();
     const now = new Date().toISOString();
 
@@ -61,7 +61,8 @@ export function createToken(name, usageLimit, taskRange = null, customToken = nu
         token: customToken || generateToken(),
         usageLimit: parseInt(usageLimit, 10),
         usedCount: 0,
-        taskRange: taskRange, // Диапазон заданий (например, "1-100")
+        sectionId: sectionId || null, // Slug папки (например, "101-200-2")
+        taskRange: taskRange, // Диапазон заданий (например, "101-200")
         createdAt: now,
         updatedAt: now,
         isActive: true,

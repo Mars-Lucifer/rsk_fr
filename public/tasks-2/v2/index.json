@@ -1790,73 +1790,55 @@
     },
     {
         "file": "",
-        "instruction": "",
-        "toolLink1": "",
-        "toolName1": "",
-        "photo": "301.png"
+        "instruction": "301.pdf"
     },
     {
         "file": "",
-        "instruction": "",
-        "toolLink1": "https://forms.yandex.ru/u/689197c9eb6146293aca92fa/",
-        "toolName1": "Входная анкета",
-        "photo": "302.png"
+        "instruction": "302.pdf",
+        "toolLink1": "https://forms.yandex.ru/u/680cdb32eb614693f6dd4487",
+        "toolName1": "Входная анкета"
     },
     {
         "file": "",
-        "instruction": "",
+        "instruction": "303.pdf",
         "toolLink1": "https://prompt-mastery-trainer-spo.lovable.app/",
-        "toolName1": "Пройти Тестирование",
-        "photo": "303.png"
+        "toolName1": "Пройти Тестирование"
     },
     {
         "file": "",
-        "instruction": "",
-        "toolLink1": "",
-        "toolName1": "",
-        "photo": "304.png"
+        "instruction": "304.pdf"
     },
     {
         "file": "",
-        "instruction": "",
-        "toolLink1": "",
-        "toolName1": "",
-        "photo": "305.png"
+        "instruction": "305.pdf"
     },
     {
         "file": "",
-        "instruction": "",
-        "toolLink1": "",
-        "toolName1": "",
-        "photo": "306.png"
+        "instruction": "306.pdf"
     },
     {
         "file": "307.pdf",
         "instruction": "307.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://regions.ru/serpuhov/stroitelstvo/v-serpuhove-snosyat-rynok-truba"
+        "toolName1": "Perplexity"
     },
     {
         "file": "308.pdf",
         "instruction": "308.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://xn--80apfedmab8e4d.xn--p1ai/2021/11/kak-vernut-dengi-za-remont-podezda-esli-delali-ego-svoimi-silami-bez-upravlyayushhej-kompanii/"
+        "toolName1": "Perplexity"
     },
     {
-        "file": "309.pdf",
+        "file": "",
         "instruction": "309.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://eos.ru/press-center/news/medo-2-7-1-metod-postepennyh-priblizhenij/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",
         "instruction": "310.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://xn--80aapampemcchfmo7a3c9ehj.xn--p1ai/news/v-rostovskoy-oblasti-poyavitsya-novaya-mera-podderzhki-selskikh-uchiteley/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "311.pdf",
@@ -1868,213 +1850,185 @@
         "file": "312.pdf",
         "instruction": "312.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://precedent.tv/v-novosibirske-tysyachu-detej-zachislili-v-detsady-po-tsifrovym-dogovoram"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",
+        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
-        "file": "314.png",
+        "file": "",
         "instruction": "314.pdf",
-        "toolLink1": "https://lmarena.ai/",
-        "toolName1": "LMArena",
-        "sourceLink": "https://xn--80aapampemcchfmo7a3c9ehj.xn--p1ai/news/v-rostovskoy-oblasti-poyavitsya-novaya-mera-podderzhki-selskikh-uchiteley/"
+        "toolLink1": "https://suno.com/",
+        "toolName1": "Suno"
+    },
+    {
+        "file": "315.pdf",
+        "instruction": "315.pdf",
+        "toolLink1": "https://any2text.ru/",
+        "toolName1": "1:Any2text",
+        "toolLink2": "https://www.perplexity.ai/",
+        "toolName2": "2:Perplexity"
     },
     {
         "file": "",
-        "instruction": "315.pdf",
-        "toolLink1": "https://lmarena.ai/",
-        "toolName1": "LMArena"
-    },
-    {
-        "file": "316.pdf",
         "instruction": "316.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://lmarena.ai/",
-        "toolName2": "2: LMArena",
-        "sourceLink": "https://regions.ru/serpuhov/stroitelstvo/v-serpuhove-snosyat-rynok-truba"
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://suno.com/",
+        "toolName2": "2:Suno"
     },
     {
-        "file": "",
+        "file": "317.pdf",
         "instruction": "317.pdf",
-        "toolLink1": "https://t.me/AIMemeArenaBot",
-        "toolName1": "AiMemeArena"
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://suno.com/",
+        "toolName2": "2:Suno"
     },
     {
-        "file": "",
+        "file": "318.MP3",
         "instruction": "318.pdf",
-        "toolLink1": "https://lmarena.ai/",
-        "toolName1": "LMArena"
+        "toolLink1": "https://audiocleaner.ai/ru",
+        "toolName1": "AudioCleaner"
     },
     {
-        "file": "319.png",
+        "file": "319.MP3",
         "instruction": "319.pdf",
-        "toolLink1": "https://lmarena.ai/",
-        "toolName1": "LMArena",
-        "sourceLink": "https://precedent.tv/v-novosibirske-tysyachu-detej-zachislili-v-detsady-po-tsifrovym-dogovoram"
+        "toolLink1": "https://audiocleaner.ai/ru",
+        "toolName1": "AudioCleaner"
     },
     {
         "file": "",
+        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
-        "file": "321.pdf",
+        "file": "",
         "instruction": "321.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2: Gamma",
-        "sourceLink": "https://www.amic.ru/news/vyyasnilos-skolko-zemskih-uchiteley-v-altayskom-krae-vernuli-million-rubley-570788"
-    },
-    {
-        "file": "322.pptx",
-        "instruction": "322.pdf",
-        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName1": "Gamma",
-        "sourceLink": "https://digitalocean.ru/n/deepfake-zefir"
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena"
     },
     {
         "file": "",
+        "instruction": "322.pdf",
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena"
+    },
+    {
+        "file": "323.png",
         "instruction": "323.pdf",
-        "toolLink1": "https://lovable.dev/",
-        "toolName1": "Lovable",
-        "sourceLink": "https://eos.ru/press-center/news/medo-2-7-1-metod-postepennyh-priblizhenij/"
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena"
     },
     {
         "file": "",
         "instruction": "324.pdf",
-        "toolLink1": "https://lovable.dev/",
-        "toolName1": "Lovable"
-    },
-    {
-        "file": "325.pdf",
-        "instruction": "325.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2: Gamma"
-    },
-    {
-        "file": "326.pdf",
-        "instruction": "326.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2: Gamma",
-        "sourceLink": "https://regions.ru/serpuhov/stroitelstvo/v-serpuhove-snosyat-rynok-truba"
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena"
     },
     {
         "file": "",
+        "instruction": "325.pdf",
+        "toolLink1": "https://t.me/AIMemeArenaBot",
+        "toolName1": "AiMemeArena"
+    },
+    {
+        "file": "326.png",
+        "instruction": "326.pdf",
+        "toolLink1": "https://lmarena.ai/",
+        "toolName1": "LMArena"
+    },
+    {
+        "file": "",
+        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
-        "file": "328.png",
-        "instruction": "328.pdf",
-        "toolLink1": "https://pixverse.ai/",
-        "toolName1": "Pixverse",
-        "sourceLink": "https://regions.ru/serpuhov/stroitelstvo/v-serpuhove-snosyat-rynok-truba"
-    },
-    {
         "file": "",
-        "instruction": "329.pdf",
-        "toolLink1": "https://pictory.ai/",
-        "toolName1": "Pictory",
-        "sourceLink": "https://www.amic.ru/news/vyyasnilos-skolko-zemskih-uchiteley-v-altayskom-krae-vernuli-million-rubley-570788"
+        "instruction": "328.pdf",
+        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName1": "Gamma"
     },
     {
-        "file": "330.pdf",
+        "file": "329.pdf",
+        "instruction": "329.pdf",
+        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName1": "Gamma"
+    },
+    {
+        "file": "330.pptx",
         "instruction": "330.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://pictory.ai/",
-        "toolName2": "2: Pictory",
-        "sourceLink": "https://xn--80aapampemcchfmo7a3c9ehj.xn--p1ai/news/v-rostovskoy-oblasti-poyavitsya-novaya-mera-podderzhki-selskikh-uchiteley/"
+        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName1": "Gamma"
     },
     {
         "file": "",
         "instruction": "331.pdf",
-        "toolLink1": "https://t.me/AIMemeArenaBot",
-        "toolName1": "AiMemeArena",
-        "sourceLink": "https://digitalocean.ru/n/deepfake-zefir"
-    },
-    {
-        "file": "332.pdf",
-        "instruction": "332.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://pictory.ai/",
-        "toolName2": "2: Pictory",
-        "sourceLink": "https://xn--80apfedmab8e4d.xn--p1ai/2021/11/kak-vernut-dengi-za-remont-podezda-esli-delali-ego-svoimi-silami-bez-upravlyayushhej-kompanii/"
-    },
-    {
-        "file": "333.mp4",
-        "instruction": "333.pdf",
-        "toolLink1": "https://any2text.com/",
-        "toolName1": "Any2text",
-        "sourceLink": "https://ura.news/news/1052596537"
+        "toolLink1": "https://chat.z.ai/",
+        "toolName1": "Z.ai"
     },
     {
         "file": "",
+        "instruction": "332.pdf",
+        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName1": "Gamma"
+    },
+    {
+        "file": "",
+        "instruction": "333.pdf",
+        "toolLink1": "https://chat.z.ai/",
+        "toolName1": "Z.ai"
+    },
+    {
+        "file": "",
+        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
     {
         "file": "",
         "instruction": "335.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://suno.com/",
-        "toolName2": "2: Suno",
-        "sourceLink": "https://eos.ru/press-center/news/medo-2-7-1-metod-postepennyh-priblizhenij/"
+        "toolLink1": "https://app.pixverse.ai/",
+        "toolName1": "Pixverse"
     },
     {
-        "file": "336.wav",
+        "file": "",
         "instruction": "336.pdf",
-        "toolLink1": "https://any2text.com/",
-        "toolName1": "Any2text",
-        "sourceLink": "https://precedent.tv/v-novosibirske-tysyachu-detej-zachislili-v-detsady-po-tsifrovym-dogovoram"
+        "toolLink1": "https://chat.qwen.ai/",
+        "toolName1": "Qwen"
     },
     {
-        "file": "337.pdf",
+        "file": "337.png",
         "instruction": "337.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://suno.com/",
-        "toolName2": "2: Suno",
-        "sourceLink": "https://xn--80aapampemcchfmo7a3c9ehj.xn--p1ai/news/v-rostovskoy-oblasti-poyavitsya-novaya-mera-podderzhki-selskikh-uchiteley/"
+        "toolLink1": "https://app.pixverse.ai/",
+        "toolName1": "Pixverse"
     },
     {
-        "file": "338.pdf",
+        "file": "",
         "instruction": "338.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://suno.com/",
-        "toolName2": "2: Suno",
-        "sourceLink": "https://digitalocean.ru/n/deepfake-zefir"
+        "toolLink1": "https://t.me/AIMemeArenaBot",
+        "toolName1": "AiMemeArena"
     },
     {
-        "file": "339.MP3",
+        "file": "",
         "instruction": "339.pdf",
-        "toolLink1": "https://auphonic.com/landing",
-        "toolName1": "Auphonic",
-        "sourceLink": "https://xn--80apfedmab8e4d.xn--p1ai/2021/11/kak-vernut-dengi-za-remont-podezda-esli-delali-ego-svoimi-silami-bez-upravlyayushhej-kompanii/"
+        "toolLink1": "https://chat.qwen.ai/",
+        "toolName1": "Qwen"
     },
     {
         "file": "",
         "instruction": "340.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
-        "toolLink2": "https://suno.com/",
-        "toolName2": "2: Suno"
+        "toolLink1": "https://chat.qwen.ai/",
+        "toolName1": "Qwen"
     },
     {
         "file": "",
+        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
@@ -2082,15 +2036,13 @@
         "file": "342.pdf",
         "instruction": "342.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://precedent.tv/v-novosibirske-tysyachu-detej-zachislili-v-detsady-po-tsifrovym-dogovoram"
+        "toolName1": "Perplexity"
     },
     {
         "file": "343.pdf",
         "instruction": "343.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.amic.ru/news/vyyasnilos-skolko-zemskih-uchiteley-v-altayskom-krae-vernuli-million-rubley-570788"
+        "toolName1": "Perplexity"
     },
     {
         "file": "344.pdf",
@@ -2102,27 +2054,26 @@
         "file": "345.pdf",
         "instruction": "345.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://ura.news/news/1052596537"
+        "toolName1": "Perplexity"
     },
     {
         "file": "346.pdf",
         "instruction": "346.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://digitalocean.ru/n/deepfake-zefir"
+        "toolName1": "Perplexity"
     },
     {
         "file": "347.pdf",
         "instruction": "347.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "1: Perplexity",
+        "toolName1": "1:Perplexity",
         "toolLink2": "https://www.napkin.ai/",
-        "toolName2": "2: Napkin",
-        "sourceLink": "https://regions.ru/serpuhov/stroitelstvo/v-serpuhove-snosyat-rynok-truba"
+        "toolName2": "2:Napkin"
+        
     },
     {
         "file": "",
+        "instruction": "",
         "toolLink1": "",
         "toolName1": ""
     },
@@ -2132,121 +2083,110 @@
         "toolName1": ""
     },
     {
-        "file": "350.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://rt-online.ru/news/v-skolax-tatarstana-ne-xvataet-37-tys-pedagogov-528817"
-    },
-    {
         "file": "",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://xn--80adbkc3aefnffc4ahj.xn--p1ai/novosti/prokuratura-informiruet/po-materialam-prokurorskoj-proverki-vozbuzhdeno-ugolovnoe-delo-o-moshennichestve-pri-provedenii-kapitalnogo-remonta/"
-    },
-    {
-        "file": "352.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://bft.ru/expert-bft/40329/"
-    },
-    {
-        "file": "353.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://gkgz.ru/fas-i-sudy-uzkij-kriterij-sopostavimosti-opyta-ogranichivaet-konkurentsiyu/"
-    },
-    {
-        "file": "354.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.livekuban.ru/news/zhizn/stalo-izvestno-skolko-socialnykh-obektov-stroitsya-v-krasnodare"
-    },
-    {
-        "file": "355.pdf",
-        "toolLink1": "https://t.me/prezaprobot",
-        "toolName1": "Prezapro",
-        "sourceLink": "https://m.asninfo.ru/news/113988-v-2024-godu-peterburg-poraduyet-otkrytiyem-36-novykh-shkol-i-38-detskikh-sadov"
-    },
-    {
-        "file": "",
-        "toolLink1": "",
-        "toolName1": ""
-    },
-    {
-        "file": "",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://rt-online.ru/news/v-skolax-tatarstana-ne-xvataet-37-tys-pedagogov-528817"
-    },
-    {
-        "file": "358.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://lenobl.ru/ru/dlya-smi/news/83656/"
-    },
-    {
-        "file": "359.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.livekuban.ru/news/zhizn/stalo-izvestno-skolko-socialnykh-obektov-stroitsya-v-krasnodare"
-    },
-    {
-        "file": "360.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.vedomosti.ru/strana/ural/news/2025/11/07/1152962-demontazh-nto-ekaterinburge"
-    },
-    {
-        "file": "361.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.vedomosti.ru/strana/ural/news/2025/11/07/1152962-demontazh-nto-ekaterinburge"
-    },
-    {
-        "file": "362.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://bft.ru/expert-bft/40329/"
-    },
-    {
-        "file": "",
-        "toolLink1": "",
-        "toolName1": ""
-    },
-    {
-        "file": "364.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://lenobl.ru/ru/dlya-smi/news/83656/"
-    },
-    {
-        "file": "365.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://xn--80adbkc3aefnffc4ahj.xn--p1ai/novosti/prokuratura-informiruet/po-materialam-prokurorskoj-proverki-vozbuzhdeno-ugolovnoe-delo-o-moshennichestve-pri-provedenii-kapitalnogo-remonta/"
-    },
-    {
-        "file": "",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "http://newhq.b-edu.ru/deyatelnost/snizhenie-byurokraticheskoj-nagruzki/"
-    },
-    {
-        "file": "367.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://gkhnews.ru/news/uk-obyazala-fond-kapitalnogo-remonta-ustranit/"
-    },
-    {
-        "file": "368.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity"
     },
     {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "",
+        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName1": "Gamma"
+    },
+    {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "355.pdf",
+        "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName1": "Gamma"
+    },
+    {
+        "file": "",
+        "toolLink1": "",
+        "toolName1": ""
+    },
+    {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName2": "2:Gamma"
+    },
+    {
+        "file": "358.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "359.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "360.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "361.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName2": "2:Gamma"
+    },
+    {
+        "file": "362.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "",
+        "toolLink1": "",
+        "toolName1": ""
+    },
+    {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "365.pdf",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
+    },
+    {
+        "file": "",
+        "toolLink1": "https://chat.z.ai/",
+        "toolName1": "Z.ai"
+    },
+    {
+        "file": "",
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
+        "toolName2": "2:Gamma"
+    },
+    {
         "file": "369.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://gkgz.ru/fas-i-sudy-uzkij-kriterij-sopostavimosti-opyta-ogranichivaet-konkurentsiyu/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",
@@ -2256,38 +2196,34 @@
     {
         "file": "371.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "http://newhq.b-edu.ru/deyatelnost/snizhenie-byurokraticheskoj-nagruzki/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "372.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://m.asninfo.ru/news/113988-v-2024-godu-peterburg-poraduyet-otkrytiyem-36-novykh-shkol-i-38-detskikh-sadov"
+        "toolName1": "Perplexity"
     },
     {
         "file": "373.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.kommersant.ru/doc/8117534"
+        "toolName1": "1:Perplexity",
+        "toolLink2": "https://chat.z.ai/",
+        "toolName2": "2:Z.ai"
     },
     {
         "file": "374.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.vedomosti.ru/strana/ural/news/2025/11/07/1152962-demontazh-nto-ekaterinburge"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",
-        "toolLink1": "https://lovable.dev/",
-        "toolName1": "Lovable",
-        "sourceLink": "https://lenobl.ru/ru/dlya-smi/news/83656/"
+        "toolLink1": "https://www.perplexity.ai/",
+        "toolName1": "Perplexity"
     },
     {
         "file": "376.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://gkgz.ru/fas-i-sudy-uzkij-kriterij-sopostavimosti-opyta-ogranichivaet-konkurentsiyu/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",
@@ -2297,38 +2233,32 @@
     {
         "file": "378.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://m.asninfo.ru/news/113988-v-2024-godu-peterburg-poraduyet-otkrytiyem-36-novykh-shkol-i-38-detskikh-sadov"
+        "toolName1": "Perplexity"
     },
     {
         "file": "379.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://rt-online.ru/news/v-skolax-tatarstana-ne-xvataet-37-tys-pedagogov-528817"
+        "toolName1": "Perplexity"
     },
     {
         "file": "380.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "http://newhq.b-edu.ru/deyatelnost/snizhenie-byurokraticheskoj-nagruzki/"
+        "toolLink1": "https://chat.z.ai/",
+        "toolName1": "Z.ai"
     },
     {
         "file": "381.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.vedomosti.ru/strana/ural/news/2025/11/07/1152962-demontazh-nto-ekaterinburge"
+        "toolName1": "Perplexity"
     },
     {
         "file": "382.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://lenobl.ru/ru/dlya-smi/news/83656/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "383.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.livekuban.ru/news/zhizn/stalo-izvestno-skolko-socialnykh-obektov-stroitsya-v-krasnodare"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",
@@ -2337,39 +2267,33 @@
     },
     {
         "file": "",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://gkgz.ru/fas-i-sudy-uzkij-kriterij-sopostavimosti-opyta-ogranichivaet-konkurentsiyu/"
+        "toolLink1": "https://chat.z.ai/",
+        "toolName1": "Z.ai"
     },
     {
         "file": "386.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.livekuban.ru/news/zhizn/stalo-izvestno-skolko-socialnykh-obektov-stroitsya-v-krasnodare"
+        "toolName1": "Perplexity"
     },
     {
         "file": "387.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://rt-online.ru/news/v-skolax-tatarstana-ne-xvataet-37-tys-pedagogov-528817"
+        "toolName1": "Perplexity"
     },
     {
         "file": "388.pdf",
-        "toolLink1": "https://lovable.dev/",
-        "toolName1": "Lovable",
-        "sourceLink": "https://bft.ru/expert-bft/40329/"
+        "toolLink1": "https://chat.z.ai/",
+        "toolName1": "Z.ai"
     },
     {
         "file": "389.pdf",
-        "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://www.kommersant.ru/doc/8117534"
+        "toolLink1": "https://chat.z.ai/",
+        "toolName1": "Z.ai"
     },
     {
         "file": "390.pdf",
         "toolLink1": "https://www.perplexity.ai/",
-        "toolName1": "Perplexity",
-        "sourceLink": "https://gkhnews.ru/news/uk-obyazala-fond-kapitalnogo-remonta-ustranit/"
+        "toolName1": "Perplexity"
     },
     {
         "file": "",

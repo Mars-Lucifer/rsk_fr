@@ -127,19 +127,18 @@ export default function HistoryPage({ goTo }) {
                         <div className="flex flex-col gap-[0.75rem] w-full">
                             {filteredHistory.length > 0 ? (
                                 filteredHistory.map((item, index) => (
-                                    <Block key={index} className="flex flex-col gap-2 relative group pr-20">
-                                        <div className="absolute top-4 right-4">
+                                    <Block key={index} className="flex flex-col gap-2 relative group">
+                                        <div className="flex items-start gap-2">
+                                            <p className="flex-1 min-w-0 whitespace-pre-wrap break-words">{item.prompt}</p>
                                             <Button
                                                 icon
-                                                className="!w-9 !h-9 !p-0 !bg-transparent !text-black hover:!bg-black/5 flex items-center justify-center"
+                                                className="!w-9 !h-9 !p-0 !bg-transparent !text-black hover:!bg-black/5 flex items-center justify-center flex-shrink-0"
                                                 onClick={() => handleDelete(index)}
                                                 title="Удалить из истории"
                                             >
-                                                <CloseIcon className="w-6,5 h-5,5" />
+                                                <CloseIcon className="w-5 h-5" />
                                             </Button>
                                         </div>
-
-                                        <p className="w-full whitespace-pre-wrap">{item.prompt}</p>
 
                                         <div className="flex justify-between items-center w-full border-t border-gray-100 pt-2 mt-1">
                                             <span className="text-sm text-gray-400">{formatDate(item.date)}</span>

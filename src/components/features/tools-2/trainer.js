@@ -34,6 +34,12 @@ import { STATIC_MAYAK_DATA } from "../../../../data/mayakDataConst";
 const TRAINER_PREFIX = "trainer_v2"; // Уникальный префикс для этого тренажера
 const getStorageKey = (key) => `${TRAINER_PREFIX}_${key}`;
 
+const getRange = (taskNumber) => {
+    const start = Math.floor((taskNumber - 1) / 100) * 100 + 1;
+    const end = start + 99;
+    return `${start}-${end}`;
+};
+
 const CONSTANTS = {
     STORAGE_KEYS: {
         USER_ROLE: "userRole",
@@ -109,10 +115,16 @@ const usePopups = () => {
 /**
  * Хук для управления задачами тренажера
  */
-const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRange }) => {
+const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRange, tokenSectionId }) => {
     const [tasks, setTasks] = useState([]);
     const [tasksTexts, setTasksTexts] = useState([]);
-    const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+    const [currentTaskIndex, setCurrentTaskIndex] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem(getStorageKey("currentTaskIndex"));
+            if (saved !== null) return parseInt(saved, 10);
+        } catch {}
+        return 0;
+    });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [timerState, setTimerState] = useState(() => {
@@ -122,6 +134,17 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
                 const parsed = JSON.parse(saved);
                 if (parsed.isRunning && parsed.startTime) {
                     const elapsed = Math.floor((Date.now() - parsed.startTime) / 1000);
+                    const MAX_TIMER_SECONDS = 3 * 60 * 60; // 3 часа
+                    // Если таймер "висит" дольше 3 часов — сбрасываем
+                    if (elapsed > MAX_TIMER_SECONDS) {
+                        sessionStorage.removeItem("trainer_v2_taskTimer");
+                        return {
+                            isRunning: false,
+                            startTime: null,
+                            elapsedTime: 0,
+                            readyElapsedTime: null,
+                        };
+                    }
                     return {
                         isRunning: true,
                         startTime: parsed.startTime,
@@ -172,9 +195,11 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
 
     const basePath = taskVersion === "v2" ? `/tasks-2/${taskVersion}` : `/tasks-2/${taskVersion}/${userType}/${who}`;
 
-    const instructionFileUrl = currentTask?.instruction ? `${basePath}/Instructions/${currentTask.instruction}` : "";
-    const taskFileUrl = currentTask?.file ? `${basePath}/Files/${currentTask.file}` : "";
-    const currentImage = currentTask?.photo ? `${basePath}/${currentTask.photo}` : "";
+    const taskRange = currentTask?._range || (taskVersion === "v2" ? getRange(currentTaskIndex + 1) : null);
+    const rangePath = taskVersion === "v2" && taskRange ? `${basePath}/${taskRange}` : basePath;
+
+    const instructionFileUrl = currentTask?.instruction ? `${rangePath}/Instructions/${currentTask.instruction}` : "";
+    const taskFileUrl = currentTask?.file ? `${rangePath}/Files/${currentTask.file}` : "";
 
     // --- НОВАЯ ЛОГИКА: ССЫЛКА ИЛИ ФАЙЛ В ПАПКЕ SOURCE ---
     let sourceUrl = "";
@@ -184,10 +209,17 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
             sourceUrl = currentTask.sourceLink;
         } else {
             // Это файл, ищем его в папке 'source' (как на скриншоте)
-            sourceUrl = `${basePath}/source/${currentTask.sourceLink}`; 
+            sourceUrl = `${basePath}/source/${currentTask.sourceLink}`;
         }
     }
     // ---------------------------------------------------
+
+    // Сохраняем currentTaskIndex в sessionStorage при каждом изменении
+    useEffect(() => {
+        try {
+            sessionStorage.setItem(getStorageKey("currentTaskIndex"), currentTaskIndex.toString());
+        } catch {}
+    }, [currentTaskIndex]);
 
     useEffect(() => {
         const loadTasks = async () => {
@@ -195,39 +227,119 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
             setIsLoading(true);
             setError(null);
             try {
-                // Загружаем основной список заданий
-                const tasksResponse = await fetch(`${basePath}/index.json`);
-                if (!tasksResponse.ok) throw new Error(`Не удалось загрузить задания: ${tasksResponse.status}`);
-                let tasksData = await tasksResponse.json();
+                let tasksData;
+                let tasksTextsData;
 
-                // Убрали фильтрацию, теперь просто находим нужный индекс для старта
+                if (taskVersion === "v2") {
+                    if (tokenSectionId) {
+                        // Загружаем ТОЛЬКО одну папку по sectionId вместо всего manifest
+                        const indexRes = await fetch(`${basePath}/${tokenSectionId}/index.json`);
+                        if (!indexRes.ok) throw new Error(`Не удалось загрузить index.json для раздела ${tokenSectionId}: ${indexRes.status}`);
+                        const data = await indexRes.json();
+
+                        // Берём rangeStart/rangeEnd из meta.json
+                        const metaRes = await fetch(`${basePath}/${tokenSectionId}/meta.json`);
+                        let rangeStart = 1;
+                        let rangeEnd = 100;
+                        if (metaRes.ok) {
+                            const meta = await metaRes.json();
+                            rangeStart = meta.rangeStart || 1;
+                            rangeEnd = meta.rangeEnd || (rangeStart + data.length - 1);
+                        }
+
+                        const startPos = rangeStart - 1;
+                        tasksData = new Array(rangeEnd).fill(null).map(() => ({ file: "", instruction: "", toolLink1: "", toolName1: "" }));
+                        for (let i = 0; i < data.length; i++) {
+                            tasksData[startPos + i] = { ...data[i], _range: tokenSectionId };
+                        }
+
+                        // TaskText.json — тоже из одной папки
+                        const textRes = await fetch(`${basePath}/${tokenSectionId}/TaskText.json`);
+                        tasksTextsData = textRes.ok ? await textRes.json() : [];
+                    } else {
+                    // Загружаем manifest со списком диапазонов
+                    const manifestRes = await fetch(`${basePath}/manifest.json`);
+                    if (!manifestRes.ok) throw new Error(`Не удалось загрузить manifest: ${manifestRes.status}`);
+                    const ranges = await manifestRes.json();
+
+                    // Определяем максимальную позицию, чтобы создать массив правильного размера
+                    const maxEnd = Math.max(...ranges.map((r) => parseInt(r.split("-")[1], 10)));
+
+                    // Параллельно загружаем index.json из каждого диапазона
+                    const indexPromises = ranges.map((range) =>
+                        fetch(`${basePath}/${range}/index.json`)
+                            .then((r) => (r.ok ? r.json() : []))
+                            .then((data) => ({ range, data }))
+                    );
+                    const allIndexResults = await Promise.all(indexPromises);
+
+                    // Собираем массив с правильными позициями (заполняем пропуски пустышками)
+                    tasksData = new Array(maxEnd).fill(null).map(() => ({ file: "", instruction: "", toolLink1: "", toolName1: "" }));
+                    for (const { range, data } of allIndexResults) {
+                        const startPos = parseInt(range.split("-")[0], 10) - 1; // "201-300" → индекс 200
+                        for (let i = 0; i < data.length; i++) {
+                            tasksData[startPos + i] = { ...data[i], _range: range };
+                        }
+                    }
+
+                    // Параллельно загружаем TaskText.json из каждого диапазона
+                    const textPromises = ranges.map((range) =>
+                        fetch(`${basePath}/${range}/TaskText.json`)
+                            .then((r) => (r.ok ? r.json() : []))
+                    );
+                    const allTextArrays = await Promise.all(textPromises);
+                    tasksTextsData = allTextArrays.flat();
+                    }
+                } else {
+                    // Старая логика для не-v2 версий
+                    const tasksResponse = await fetch(`${basePath}/index.json`);
+                    if (!tasksResponse.ok) throw new Error(`Не удалось загрузить задания: ${tasksResponse.status}`);
+                    tasksData = await tasksResponse.json();
+
+                    const textsResponse = await fetch(`${basePath}/TaskText.json`);
+                    if (!textsResponse.ok) throw new Error("Не удалось загрузить тексты заданий");
+                    tasksTextsData = await textsResponse.json();
+                }
+
                 setTasks(tasksData);
+                setTasksTexts(tasksTextsData);
 
-                // Если диапазон задан, попробуем найти первое задание из диапазона и встать на него
-                if (tokenTaskRange) {
-                    const [startStr, endStr] = tokenTaskRange.split("-");
-                    const start = parseInt(startStr, 10);
-                    if (!isNaN(start)) {
-                        const startIndex = tasksData.findIndex((t) => parseInt(t.number, 10) >= start);
-                        if (startIndex !== -1) {
-                            setCurrentTaskIndex(startIndex);
+                // Восстанавливаем сохранённый индекс из sessionStorage
+                try {
+                    const saved = sessionStorage.getItem(getStorageKey("currentTaskIndex"));
+                    if (saved !== null) {
+                        const savedIdx = parseInt(saved, 10);
+                        if (!isNaN(savedIdx) && savedIdx >= 0 && savedIdx < tasksData.length) {
+                            setCurrentTaskIndex(savedIdx);
+                        } else if (tokenTaskRange) {
+                            // Сохранённый индекс невалиден — ставим на начало диапазона
+                            const [startStr] = tokenTaskRange.split("-");
+                            const start = parseInt(startStr, 10);
+                            if (!isNaN(start)) {
+                                const startIndex = tasksData.findIndex((t) => parseInt(t.number, 10) >= start);
+                                setCurrentTaskIndex(startIndex !== -1 ? startIndex : 0);
+                            } else {
+                                setCurrentTaskIndex(0);
+                            }
                         } else {
                             setCurrentTaskIndex(0);
                         }
+                    } else if (tokenTaskRange) {
+                        // Нет сохранённого индекса — первый вход, ставим на начало диапазона
+                        const [startStr] = tokenTaskRange.split("-");
+                        const start = parseInt(startStr, 10);
+                        if (!isNaN(start)) {
+                            const startIndex = tasksData.findIndex((t) => parseInt(t.number, 10) >= start);
+                            setCurrentTaskIndex(startIndex !== -1 ? startIndex : 0);
+                        }
                     }
-                } else {
+                } catch {
                     setCurrentTaskIndex(0);
                 }
 
                 if (tasksData.length === 0) {
                     setError("Нет доступных заданий");
                 }
-
-                // Одновременно загружаем тексты для попапов
-                const textsResponse = await fetch(`${basePath}/TaskText.json`);
-                if (!textsResponse.ok) throw new Error("Не удалось загрузить тексты заданий");
-                const tasksTextsData = await textsResponse.json();
-                setTasksTexts(tasksTextsData);
             } catch (err) {
                 setError(err.message);
                 setTasks([]);
@@ -237,7 +349,7 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
             }
         };
         loadTasks();
-    }, [userType, who, taskVersion, isTokenValid, basePath]);
+    }, [userType, who, taskVersion, isTokenValid, basePath, tokenSectionId]);
 
     const startTimer = useCallback(() => {
         const now = Date.now();
@@ -274,7 +386,10 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
                 });
             }, 1000);
         }
-        return () => clearInterval(timerRef.current);
+        return () => {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        };
     }, []);
 
     const goToTask = useCallback(
@@ -303,7 +418,6 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
         prevTask,
         instructionFileUrl,
         taskFileUrl,
-        currentImage,
         sourceUrl,
         basePath,
         tasksTexts,
@@ -644,30 +758,6 @@ const SecondQuestionnairePopup = memo(function SecondQuestionnairePopup({ onClos
 });
 
 const ThirdQuestionnairePopup = memo(function ThirdQuestionnairePopup({ onClose, onSave }) {
-    // --- НАЧАЛО ВАЖНОЙ ЛОГИКИ ---
-    // 1. Создаем состояние 'levels', чтобы хранить значения из полей ввода.
-    //    Без этой строки переменной 'levels' просто не существует.
-    const [levels, setLevels] = useState({
-        level1: "",
-        level2: "",
-        level3: "",
-        level4: "",
-        level5: "",
-    });
-
-    // 2. Создаем функцию для обновления состояния при вводе текста.
-    const handleLevelChange = (level, value) => {
-        setLevels((prev) => ({
-            ...prev,
-            [level]: value,
-        }));
-    };
-
-    // 3. Создаем переменную для проверки, можно ли нажимать кнопку "Сохранить".
-    const isSaveDisabled = !Object.values(levels).some((level) => level !== "");
-    // --- КОНЕЦ ВАЖНОЙ ЛОГИКИ ---
-
-    // Теперь в JSX можно без ошибок использовать 'levels', 'handleLevelChange' и 'isSaveDisabled'
     return (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
             <div className="relative bg-white p-6 rounded-lg max-w-md w-full shadow-2xl border border-gray-200 pointer-events-auto">
@@ -675,36 +765,22 @@ const ThirdQuestionnairePopup = memo(function ThirdQuestionnairePopup({ onClose,
                     <h3 className="text-xl font-bold">Завершение сессии</h3>
                 </div>
 
-                <>
-                    <div className="space-y-4">
-                        <p>Пожалуйста, заполните измерения Delta для завершения сессии:</p>
-                        <div className="grid grid-cols-2 gap-2">
-                            <Input type="number" placeholder="Уровень 1" value={levels.level1} onChange={(e) => handleLevelChange("level1", e.target.value)} />
-                            <Input type="number" placeholder="Уровень 2" value={levels.level2} onChange={(e) => handleLevelChange("level2", e.target.value)} />
-                            <Input type="number" placeholder="Уровень 3" value={levels.level3} onChange={(e) => handleLevelChange("level3", e.target.value)} />
-                            <Input type="number" placeholder="Уровень 4" value={levels.level4} onChange={(e) => handleLevelChange("level4", e.target.value)} />
-                            <Input type="number" placeholder="Уровень 5" value={levels.level5} onChange={(e) => handleLevelChange("level5", e.target.value)} />
-                        </div>
-                    </div>
-                    <div className="mt-6 flex justify-center gap-2">
-                        <Button onClick={onClose} className="!bg-gray-200 !text-gray-800 hover:!bg-gray-300 flex-1">
-                            Отмена
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                if (onClose) onClose();
-                                window.__openRankingTestPopup && window.__openRankingTestPopup();
-                            }}
-                            className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200 flex-1">
-                            Пройти Тестирование
-                        </Button>
-                        <span className="flex-1" title={isSaveDisabled ? "Сначала заполните хотя бы одно поле Дельта" : ""}>
-                            <Button onClick={() => onSave(levels)} className="!bg-blue-500 !text-white hover!bg-blue-600 w-full" disabled={isSaveDisabled}>
-                                Сохранить и завершить
-                            </Button>
-                        </span>
-                    </div>
-                </>
+                <div className="mt-6 flex justify-center gap-2">
+                    <Button onClick={onClose} className="!bg-gray-200 !text-gray-800 hover:!bg-gray-300 flex-1">
+                        Отмена
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            if (onClose) onClose();
+                            window.__openRankingTestPopup && window.__openRankingTestPopup();
+                        }}
+                        className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200 flex-1">
+                        Пройти Тестирование
+                    </Button>
+                    <Button onClick={() => onSave({})} className="!bg-blue-500 !text-white hover:!bg-blue-600 flex-1">
+                        Сохранить и завершить
+                    </Button>
+                </div>
             </div>
         </div>
     );
@@ -1023,7 +1099,7 @@ const TrainerControls = memo(function TrainerControls({
                     </div>
                 </div>
                 <div className="flex flex-wrap lg:flex-nowrap gap-[0.5rem] items-center">
-                    {isCurrentTaskAllowed && (
+                    {(isCurrentTaskAllowed || isTaskRunning) && (
                         <Button className={isTaskRunning ? "!bg-(--color-red-noise) !text-(--color-red)" : "!bg-(--color-green-noise) !text-(--color-green-peace)"} onClick={onToggleTaskTimer}>
                             {isTaskRunning ? `Завершить (${formatTaskTime(taskElapsedTime)})` : "Начать задание"}
                         </Button>
@@ -1176,10 +1252,14 @@ export default function TrainerPage({ goTo }) {
     const [showLevelsInput, setShowLevelsInput] = useState(false);
     const [showSessionCompletionPopup, setShowSessionCompletionPopup] = useState(false);
     const [showRankingTestPopup, setShowRankingTestPopup] = useState(false);
+    const [rankingForceRetake, setRankingForceRetake] = useState(false);
 
     // Глобальный callback для открытия попапа тестирования из дочерних компонентов
     useEffect(() => {
-        window.__openRankingTestPopup = () => setShowRankingTestPopup(true);
+        window.__openRankingTestPopup = () => {
+            setRankingForceRetake(true);
+            setShowRankingTestPopup(true);
+        };
         return () => { delete window.__openRankingTestPopup; };
     }, []);
 
@@ -1193,15 +1273,17 @@ export default function TrainerPage({ goTo }) {
     const [who, setWho] = useState("im");
     const [isTokenValid, setIsTokenValid] = useState(false);
     const [tokenTaskRange, setTokenTaskRange] = useState(null); // Состояние для диапазона
+    const [tokenSectionId, setTokenSectionId] = useState(null); // Slug папки раздела
     const [isMiscAccordionOpen, setIsMiscAccordionOpen] = useState(false);
     const [openSubAccordionKey, setOpenSubAccordionKey] = useState(null);
 
-    const { tasks, currentTask, currentTaskIndex, isLoading, error, setError, timerState, startTimer, stopTimer, goToTask, nextTask, prevTask, instructionFileUrl, taskFileUrl,sourceUrl, currentImage, tasksTexts, isCurrentTaskAllowed } = useTaskManager({
+    const { tasks, currentTask, currentTaskIndex, isLoading, error, setError, timerState, startTimer, stopTimer, goToTask, nextTask, prevTask, instructionFileUrl, taskFileUrl, sourceUrl, tasksTexts, isCurrentTaskAllowed } = useTaskManager({
         userType,
         who,
         taskVersion,
         isTokenValid,
         tokenTaskRange, // Передаем в хук
+        tokenSectionId, // Slug папки раздела
     });
 
     useEffect(() => {
@@ -1821,6 +1903,9 @@ export default function TrainerPage({ goTo }) {
                 // Если токен исчерпан (isExhausted), но активен (isActive), и мы уже здесь (с кукой) — тоже пускаем.
                 if (data.valid || (data.isExhausted && data.isActive)) {
                     setIsTokenValid(true);
+                    if (data.sectionId) {
+                        setTokenSectionId(data.sectionId);
+                    }
                     if (data.taskRange) {
                         setTokenTaskRange(data.taskRange); // Сохраняем диапазон
                     }
@@ -2153,7 +2238,8 @@ export default function TrainerPage({ goTo }) {
             {showRolePopup && <RoleSelectionPopup onClose={() => setShowRolePopup(false)} onConfirm={handleRoleConfirm} />}
             {showRankingTestPopup && (
                 <RankingTestPopup
-                    onClose={() => setShowRankingTestPopup(false)}
+                    onClose={() => { setShowRankingTestPopup(false); if (rankingForceRetake) { setShowThirdQuestionnaire(true); } setRankingForceRetake(false); }}
+                    forceRetake={rankingForceRetake}
                     onSave={async (results) => {
                         try {
                             const activeUser =

@@ -38,6 +38,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# claude code
+.claude/
+CLAUDE.md
+
 # vercel
 .vercel
 
@@ -46,5 +50,7 @@ yarn-error.log*
 next-env.d.ts
 
 data/DeltaTest.json
+data/mayakData.json
+data/questionnaires.json
 
 data/results.json

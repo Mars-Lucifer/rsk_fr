@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import Header from "@/components/layout/Header";
 import Layout from "@/components/layout/Layout";
 import Button from "@/components/ui/Button";
@@ -33,6 +34,10 @@ export default function AdminMayakTokens() {
 
     // Статистика
     const [stats, setStats] = useState({ total: 0, activeCount: 0, exhaustedCount: 0 });
+
+    // Названия разделов
+    const [rangeNames, setRangeNames] = useState({});
+    const [rangesList, setRangesList] = useState([]);
 
     // Проверка авторизации при загрузке
     useEffect(() => {
@@ -90,10 +95,30 @@ export default function AdminMayakTokens() {
     useEffect(() => {
         if (isAuthenticated) {
             fetchTokens();
+            fetchRanges();
         }
     }, [isAuthenticated]);
 
+    // Загрузка разделов для выпадающего списка
+    const fetchRanges = async () => {
+        try {
+            const res = await fetch("/api/admin/mayak-content/ranges?password=" + ADMIN_PASSWORD);
+            const data = await res.json();
+            if (data.success && data.data) {
+                setRangesList(data.data);
+                const names = {};
+                data.data.forEach((r) => {
+                    const key = r.sectionId || r.range;
+                    if (r.rangeName) names[key] = r.rangeName;
+                });
+                setRangeNames(names);
+            }
+        } catch (err) { console.error(err); }
+    };
+
     // Создание нового токена
+    const selectedSection = rangesList.find((r) => (r.sectionId || r.range) === newTokenRange) || null;
+
     const handleCreateToken = async (e) => {
         e.preventDefault();
 
@@ -110,7 +135,8 @@ export default function AdminMayakTokens() {
                 body: JSON.stringify({
                     name: newTokenName.trim(),
                     usageLimit: parseInt(newTokenLimit, 10),
-                    taskRange: newTokenRange.trim() || null, // Отправляем диапазон
+                    taskRange: selectedSection ? selectedSection.range : (newTokenRange.trim() || null),
+                    sectionId: selectedSection ? selectedSection.sectionId : null,
                     customToken: newCustomToken.trim() || null, // Отправляем кастомный токен
                     password: ADMIN_PASSWORD,
                 }),
@@ -302,9 +328,14 @@ export default function AdminMayakTokens() {
         <Layout>
             <Header>
                 <Header.Heading>Токены МАЯК</Header.Heading>
-                <Button icon>
-                    <Notify />
-                </Button>
+                <div className="flex items-center gap-[.5rem]">
+                    <Link href="/admin/content" style={{ padding: "6px 14px", borderRadius: 6, background: "#3b82f6", color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+                        Контент
+                    </Link>
+                    <Button icon>
+                        <Notify />
+                    </Button>
+                </div>
             </Header>
             <div className="hero">
                 <div className="col-span-12 flex flex-col gap-[1.5rem]">
@@ -353,14 +384,23 @@ export default function AdminMayakTokens() {
                             </div>
                             <div className="w-[200px]">
                                 <label className="link small text-(--color-gray-black) block mb-[.5rem]">
-                                    Диапазон (опц.)
+                                    Раздел (опц.)
                                 </label>
-                                <Input
-                                    type="text"
-                                    placeholder="1-100"
+                                <select
                                     value={newTokenRange}
                                     onChange={(e) => setNewTokenRange(e.target.value)}
-                                />
+                                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 14, background: "#fff" }}
+                                >
+                                    <option value="">Все разделы</option>
+                                    {rangesList.map((r) => {
+                                        const key = r.sectionId || r.range;
+                                        return (
+                                            <option key={key} value={key}>
+                                                {key}{r.rangeName ? ` — ${r.rangeName}` : ""}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
                             </div>
                             <div className="w-[200px]">
                                 <label className="link small text-(--color-gray-black) block mb-[.5rem]">
@@ -426,7 +466,17 @@ export default function AdminMayakTokens() {
                                                         </div>
                                                     </td>
                                                     <td className="p-[.75rem] text-center">
-                                                        {token.taskRange || "—"}
+                                                        {token.sectionId || token.taskRange ? (
+                                                            <div>
+                                                                <span className="font-medium">{token.sectionId || token.taskRange}</span>
+                                                                {rangeNames[token.sectionId || token.taskRange] && (
+                                                                    <div className="text-[.7rem] text-(--color-gray-black)">{rangeNames[token.sectionId || token.taskRange]}</div>
+                                                                )}
+                                                                {token.sectionId && token.taskRange && token.sectionId !== token.taskRange && (
+                                                                    <div className="text-[.65rem] text-(--color-gray-black)">({token.taskRange})</div>
+                                                                )}
+                                                            </div>
+                                                        ) : "—"}
                                                     </td>
                                                     <td className="p-[.75rem] text-center">
                                                         <span className={token.isExhausted ? "text-[var(--color-red)]" : ""}>

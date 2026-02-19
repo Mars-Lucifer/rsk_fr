@@ -4,6 +4,7 @@ import CloseIcon from "@/assets/general/close.svg";
 import { RANKING_TEST_DATA } from "../../../../../data/rankingTestData";
 
 const STORAGE_KEY = "trainer_v2_rankingTestResults";
+const PREVIOUS_STORAGE_KEY = "trainer_v2_rankingTestResults_previous";
 
 function shuffleArray(arr) {
     const a = [...arr];
@@ -40,6 +41,16 @@ function loadSavedResults() {
     }
 }
 
+function loadPreviousResults() {
+    try {
+        const raw = localStorage.getItem(PREVIOUS_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
 function saveResults(data) {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -54,12 +65,29 @@ function formatTime(seconds) {
     return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function RankingTestPopup({ onClose, onSave }) {
+export default function RankingTestPopup({ onClose, onSave, forceRetake = false }) {
     const { levels, criteria } = RANKING_TEST_DATA;
 
-    const [savedData] = useState(() => loadSavedResults());
+    const [savedData, setSavedData] = useState(() => {
+        if (forceRetake) {
+            // При forceRetake сразу сохраняем старые результаты как предыдущие и очищаем текущие
+            const current = loadSavedResults();
+            if (current) {
+                try {
+                    localStorage.setItem(PREVIOUS_STORAGE_KEY, JSON.stringify(current));
+                } catch (e) {
+                    console.error("Ошибка сохранения предыдущих результатов:", e);
+                }
+                localStorage.removeItem(STORAGE_KEY);
+            }
+            return null;
+        }
+        return loadSavedResults();
+    });
+    const [previousData, setPreviousData] = useState(() => loadPreviousResults());
+    const [isRetakeMode, setIsRetakeMode] = useState(forceRetake);
 
-    const isFullyCompleted = !!savedData && levels.every((_, i) => !!savedData[`level${i + 1}`]);
+    const isFullyCompleted = !isRetakeMode && !!savedData && levels.every((_, i) => !!savedData[`level${i + 1}`]);
 
     const [currentLevel, setCurrentLevel] = useState(() => {
         if (!savedData) return 0;
@@ -104,6 +132,30 @@ export default function RankingTestPopup({ onClose, onSave }) {
         }
         return {};
     });
+
+    // Повторное прохождение: сохраняем текущие результаты как "предыдущие" и сбрасываем
+    const handleRetake = () => {
+        // Сохраняем текущие результаты как предыдущие
+        if (savedData) {
+            try {
+                localStorage.setItem(PREVIOUS_STORAGE_KEY, JSON.stringify(savedData));
+            } catch (e) {
+                console.error("Ошибка сохранения предыдущих результатов:", e);
+            }
+            setPreviousData(savedData);
+        }
+        // Очищаем текущие результаты
+        localStorage.removeItem(STORAGE_KEY);
+        setSavedData(null);
+        setIsRetakeMode(true);
+        setCompletedLevels({});
+        setShowResults({});
+        setCurrentLevel(0);
+        setUserOrders(levels.map((level) => shuffleArray(level.prompts.map((p) => p.id))));
+        const timers = {};
+        for (let i = 0; i < levels.length; i++) { timers[i] = 0; }
+        setLevelTimers(timers);
+    };
 
     // ID перетаскиваемого элемента (не индекс — индекс меняется при reorder)
     const [dragId, setDragId] = useState(null);
@@ -214,86 +266,83 @@ export default function RankingTestPopup({ onClose, onSave }) {
         autoScrollRef.current = null;
     };
 
-    // --- Drag & Drop: живое перемещение ---
+    // --- Mouse Drag: кастомное перетаскивание без HTML5 DnD (убирает 🚫 и призрак) ---
 
-    const handleDragStart = (e, idx) => {
+    const mouseState = useRef({ dragging: false, dragId: null });
+
+    const handleMouseDown = (e, idx) => {
         if (isLevelDone) return;
+        // Игнорируем клики по кнопкам стрелок
+        if (e.target.closest("button")) return;
+        e.preventDefault();
         const id = userOrder[idx];
+        mouseState.current.dragging = true;
+        mouseState.current.dragId = id;
         setDragId(id);
         dragIdRef.current = id;
-        e.dataTransfer.effectAllowed = "move";
-
-        const el = e.currentTarget;
-        const clone = el.cloneNode(true);
-        clone.style.position = "absolute";
-        clone.style.top = "-9999px";
-        clone.style.left = "-9999px";
-        clone.style.width = el.offsetWidth + "px";
-        clone.style.background = "#eef2ff";
-        clone.style.border = "2px solid #6366f1";
-        clone.style.borderRadius = "12px";
-        clone.style.opacity = "0.92";
-        clone.style.boxShadow = "none";
-        clone.style.transform = "rotate(1.5deg) scale(1.02)";
-        document.body.appendChild(clone);
-        e.dataTransfer.setDragImage(clone, el.offsetWidth / 2, 24);
-        setTimeout(() => {
-            if (document.body.contains(clone)) document.body.removeChild(clone);
-        }, 150);
-
         startAutoScroll(e.clientY);
     };
 
-    // При dragOver — сразу переставляем элемент в массиве
-    const handleDragOver = (e, overIdx) => {
+    const handleMouseMove = useCallback((e) => {
+        if (!mouseState.current.dragging || !listRef.current) return;
         e.preventDefault();
         updateAutoScroll(e.clientY);
-        const currentDragId = dragIdRef.current;
+        const currentDragId = mouseState.current.dragId;
         if (currentDragId === null) return;
 
         const lvl = currentLevelRef.current;
-        // Ищем текущий индекс перетаскиваемого элемента
-        const currentIdx = userOrders[lvl].indexOf(currentDragId);
-        if (currentIdx === -1 || currentIdx === overIdx) return;
+        const items = Array.from(listRef.current.querySelectorAll("[data-drag-idx]"));
 
-        // Определяем направление по позиции курсора
-        const el = e.currentTarget;
-        const rect = el.getBoundingClientRect();
-        const centerY = rect.top + rect.height / 2;
+        // Ищем элемент под курсором
+        let targetItem = null;
+        for (const item of items) {
+            const rect = item.getBoundingClientRect();
+            if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                targetItem = item;
+                break;
+            }
+        }
 
-        // Если тащим вниз — перемещаем только когда курсор ниже центра
-        // Если тащим вверх — перемещаем только когда курсор выше центра
-        if (currentIdx < overIdx && e.clientY < centerY) return;
-        if (currentIdx > overIdx && e.clientY > centerY) return;
+        if (!targetItem) return;
 
-        reorderItems(currentIdx, overIdx);
-    };
+        const overIdx = parseInt(targetItem.getAttribute("data-drag-idx"), 10);
+        setUserOrders((prev) => {
+            const order = prev[lvl];
+            const currentIdx = order.indexOf(currentDragId);
+            if (currentIdx === -1 || currentIdx === overIdx) return prev;
 
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+            const rect = targetItem.getBoundingClientRect();
+            const centerY = rect.top + rect.height / 2;
+            if (currentIdx < overIdx && e.clientY < centerY) return prev;
+            if (currentIdx > overIdx && e.clientY > centerY) return prev;
+
+            const newOrders = [...prev];
+            const newOrder = [...order];
+            const [moved] = newOrder.splice(currentIdx, 1);
+            newOrder.splice(overIdx, 0, moved);
+            newOrders[lvl] = newOrder;
+            return newOrders;
+        });
+    }, []);
+
+    const handleMouseUp = useCallback(() => {
+        if (!mouseState.current.dragging) return;
         stopAutoScroll();
+        mouseState.current.dragging = false;
+        mouseState.current.dragId = null;
         setDragId(null);
         dragIdRef.current = null;
-    };
+    }, []);
 
-    const handleContainerDragOver = (e) => {
-        e.preventDefault();
-        updateAutoScroll(e.clientY);
-    };
-
-    const handleContainerDrop = (e) => {
-        e.preventDefault();
-        stopAutoScroll();
-        setDragId(null);
-        dragIdRef.current = null;
-    };
-
-    const handleDragEnd = () => {
-        stopAutoScroll();
-        setDragId(null);
-        dragIdRef.current = null;
-    };
+    // Слушаем mousemove/mouseup на document чтобы drag работал даже за пределами списка
+    useEffect(() => {
+        document.addEventListener("mousemove", handleMouseMove);
+        document.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+    }, [handleMouseMove, handleMouseUp]);
 
     // --- Touch: живое перемещение ---
 
@@ -425,6 +474,8 @@ export default function RankingTestPopup({ onClose, onSave }) {
             }
         }
         saveResults(results);
+        setSavedData(results);
+        setIsRetakeMode(false);
         if (onSave) onSave(results);
         if (onClose) onClose();
     };
@@ -432,7 +483,18 @@ export default function RankingTestPopup({ onClose, onSave }) {
     const allCompleted = Object.keys(completedLevels).length === levels.length;
     const positionDiffs = isShowingResults ? calcPositionDiffs(userOrder, level.correctOrder) : [];
 
-    const canInteract = !isLevelDone && !isFullyCompleted;
+    const canInteract = isRetakeMode ? !completedLevels[currentLevel] : (!isLevelDone && !isFullyCompleted);
+
+    // Нельзя закрыть попап пока не пройдены все 5 уровней (и при первом, и при повторном прохождении)
+    const canClose = isFullyCompleted || allCompleted;
+
+    // Получаем предыдущую дельту для текущего уровня (для сравнения)
+    const getPreviousDelta = (lvlIdx) => {
+        if (previousData && previousData[`level${lvlIdx + 1}`]) {
+            return previousData[`level${lvlIdx + 1}`].delta;
+        }
+        return null;
+    };
 
     const DiffBadge = ({ diff }) => {
         if (diff === 0) {
@@ -467,10 +529,15 @@ export default function RankingTestPopup({ onClose, onSave }) {
                     <h3 className="text-xl font-bold text-[var(--color-black)]">Тестирование МАЯК-ОКО</h3>
                 </div>
                 <div className="flex items-center gap-3">
+                    {!canClose && (
+                        <span className="text-xs text-amber-600 font-medium">Сначала завершите все уровни</span>
+                    )}
                     <Button
                         icon
                         onClick={onClose}
-                        className="!bg-transparent !text-black hover:!bg-black/5">
+                        disabled={!canClose}
+                        className={`!bg-transparent hover:!bg-black/5 ${!canClose ? "!text-gray-300 !cursor-not-allowed" : "!text-black"}`}
+                        title={!canClose ? "Завершите все 5 уровней тестирования" : "Закрыть"}>
                         <CloseIcon />
                     </Button>
                 </div>
@@ -482,6 +549,39 @@ export default function RankingTestPopup({ onClose, onSave }) {
                         <path d="M10 2L12.09 7.26L18 8.27L14 12.14L14.81 18.02L10 15.27L5.19 18.02L6 12.14L2 8.27L7.91 7.26L10 2Z" fill="#f59e0b" stroke="#f59e0b" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <p className="text-sm font-semibold text-amber-800">Тестирование завершено</p>
+                </div>
+            )}
+
+            {/* Баннер сравнения с предыдущими результатами */}
+            {previousData && (isRetakeMode || isFullyCompleted) && (
+                <div className="px-6 py-3 bg-blue-50 border-b border-blue-200">
+                    <p className="text-sm font-semibold text-blue-800 mb-2">Сравнение результатов</p>
+                    <div className="flex flex-wrap gap-3">
+                        {levels.map((_, idx) => {
+                            const prevDelta = previousData[`level${idx + 1}`]?.delta;
+                            const currDelta = completedLevels[idx]?.delta;
+                            const hasPrev = prevDelta !== undefined && prevDelta !== null;
+                            const hasCurr = currDelta !== undefined && currDelta !== null;
+                            const diff = hasPrev && hasCurr ? prevDelta - currDelta : null;
+                            return (
+                                <div key={idx} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-blue-100">
+                                    <span className="text-xs font-medium text-blue-600">Ур. {idx + 1}</span>
+                                    <span className="text-xs text-gray-500">
+                                        {hasPrev ? `Δ${prevDelta}` : "—"}
+                                    </span>
+                                    <span className="text-gray-300">→</span>
+                                    <span className={`text-xs font-bold ${hasCurr ? "text-black" : "text-gray-300"}`}>
+                                        {hasCurr ? `Δ${currDelta}` : "..."}
+                                    </span>
+                                    {diff !== null && (
+                                        <span className={`text-xs font-bold ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-gray-400"}`}>
+                                            {diff > 0 ? `↓${diff}` : diff < 0 ? `↑${Math.abs(diff)}` : "="}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
@@ -588,8 +688,6 @@ export default function RankingTestPopup({ onClose, onSave }) {
                     <div
                         ref={listRef}
                         className="flex-1 px-6 py-2"
-                        onDragOver={handleContainerDragOver}
-                        onDrop={handleContainerDrop}
                     >
                         <div className="flex flex-col gap-1">
                             {userOrder.map((id, idx) => {
@@ -602,11 +700,7 @@ export default function RankingTestPopup({ onClose, onSave }) {
                                     <div
                                         key={id}
                                         data-drag-idx={idx}
-                                        draggable={canInteract}
-                                        onDragStart={canInteract ? (e) => handleDragStart(e, idx) : undefined}
-                                        onDragOver={canInteract ? (e) => handleDragOver(e, idx) : undefined}
-                                        onDrop={canInteract ? (e) => handleDrop(e) : undefined}
-                                        onDragEnd={canInteract ? handleDragEnd : undefined}
+                                        onMouseDown={canInteract ? (e) => handleMouseDown(e, idx) : undefined}
                                         onTouchStart={canInteract ? (e) => handleTouchStart(e, idx) : undefined}
                                         style={{
                                             transition: "transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s ease, border-color 0.2s ease",
@@ -703,16 +797,31 @@ export default function RankingTestPopup({ onClose, onSave }) {
                                     </div>
                                     <div className="text-right">
                                         <p className="text-3xl font-bold text-[var(--color-black)]">Δ {completedLevels[currentLevel]?.delta}</p>
-                                        <p className="text-xs text-[var(--color-gray-black)]">
-                                            {completedLevels[currentLevel]?.delta === 0
-                                                ? "Идеально!"
-                                                : completedLevels[currentLevel]?.delta <= 10
-                                                    ? "Хороший результат"
-                                                    : completedLevels[currentLevel]?.delta <= 20
-                                                        ? "Можно лучше"
-                                                        : "Есть куда расти"
+                                        {(() => {
+                                            const prevDelta = getPreviousDelta(currentLevel);
+                                            const currDelta = completedLevels[currentLevel]?.delta;
+                                            if (prevDelta !== null && currDelta !== undefined) {
+                                                const diff = prevDelta - currDelta;
+                                                return (
+                                                    <p className={`text-sm font-bold mt-1 ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-500" : "text-gray-400"}`}>
+                                                        {diff > 0 ? `↓${diff} улучшение` : diff < 0 ? `↑${Math.abs(diff)} ухудшение` : "= без изменений"}
+                                                        <span className="text-xs font-normal text-gray-400 ml-1">(было Δ{prevDelta})</span>
+                                                    </p>
+                                                );
                                             }
-                                        </p>
+                                            return (
+                                                <p className="text-xs text-[var(--color-gray-black)]">
+                                                    {currDelta === 0
+                                                        ? "Идеально!"
+                                                        : currDelta <= 10
+                                                            ? "Хороший результат"
+                                                            : currDelta <= 20
+                                                                ? "Можно лучше"
+                                                                : "Есть куда расти"
+                                                    }
+                                                </p>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                                 <div className="mt-3 flex items-center gap-4 text-xs text-[var(--color-gray-black)]">
