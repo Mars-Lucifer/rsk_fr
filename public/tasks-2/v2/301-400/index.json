@@ -5,12 +5,14 @@
         "contentType": "",
         "file": "",
         "instruction": "301.pdf",
-        "hasInstruction": false,
+        "hasInstruction": true,
         "hasFile": false,
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "302",
@@ -18,12 +20,14 @@
         "contentType": "",
         "file": "",
         "instruction": "302.pdf",
-        "hasInstruction": false,
+        "hasInstruction": true,
         "hasFile": false,
         "toolLink1": "https://forms.yandex.ru/u/680cdb32eb614693f6dd4487",
         "toolName1": "Входная анкета",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "303",
@@ -31,12 +35,14 @@
         "contentType": "",
         "file": "",
         "instruction": "303.pdf",
-        "hasInstruction": false,
+        "hasInstruction": true,
         "hasFile": false,
         "toolLink1": "https://prompt-mastery-trainer-spo.lovable.app/",
         "toolName1": "Пройти Тестирование",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "304",
@@ -44,12 +50,14 @@
         "contentType": "",
         "file": "",
         "instruction": "304.pdf",
-        "hasInstruction": false,
+        "hasInstruction": true,
         "hasFile": false,
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "305",
@@ -57,25 +65,29 @@
         "contentType": "",
         "file": "",
         "instruction": "305.pdf",
-        "hasInstruction": false,
+        "hasInstruction": true,
         "hasFile": false,
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "306",
         "title": "",
         "contentType": "",
         "file": "",
-        "instruction": "306.pdf",
-        "hasInstruction": false,
+        "instruction": "306.pptx",
+        "hasInstruction": true,
         "hasFile": false,
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "307",
@@ -88,7 +100,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "308",
@@ -101,7 +116,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "309",
@@ -114,7 +132,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "310",
@@ -127,7 +147,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "311",
@@ -140,7 +162,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "312",
@@ -153,7 +178,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "313",
@@ -166,7 +194,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "314",
@@ -179,7 +208,9 @@
         "toolLink1": "https://suno.com/",
         "toolName1": "Suno",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "315",
@@ -192,7 +223,10 @@
         "toolLink1": "https://any2text.ru/",
         "toolName1": "1:Any2text",
         "toolLink2": "https://www.perplexity.ai/",
-        "toolName2": "2:Perplexity"
+        "toolName2": "2:Perplexity",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "316",
@@ -205,7 +239,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://suno.com/",
-        "toolName2": "2:Suno"
+        "toolName2": "2:Suno",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "317",
@@ -218,7 +254,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://suno.com/",
-        "toolName2": "2:Suno"
+        "toolName2": "2:Suno",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "318",
@@ -231,7 +270,10 @@
         "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "319",
@@ -244,7 +286,10 @@
         "toolLink1": "https://auphonic.com/landing",
         "toolName1": "Auphonic",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "320",
@@ -257,7 +302,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "321",
@@ -270,7 +316,9 @@
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "322",
@@ -283,7 +331,9 @@
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "323",
@@ -296,7 +346,10 @@
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "324",
@@ -309,7 +362,9 @@
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "325",
@@ -322,7 +377,9 @@
         "toolLink1": "https://t.me/AIMemeArenaBot",
         "toolName1": "AiMemeArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "326",
@@ -335,7 +392,10 @@
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "327",
@@ -348,7 +408,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "328",
@@ -361,7 +422,9 @@
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "329",
@@ -374,7 +437,10 @@
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "330",
@@ -387,7 +453,10 @@
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "331",
@@ -400,7 +469,9 @@
         "toolLink1": "https://lovable.dev/",
         "toolName1": "Lovable",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "332",
@@ -413,7 +484,9 @@
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "333",
@@ -426,7 +499,9 @@
         "toolLink1": "https://lovable.dev/",
         "toolName1": "Lovable",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "334",
@@ -439,7 +514,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "335",
@@ -452,7 +528,9 @@
         "toolLink1": "https://app.pixverse.ai/",
         "toolName1": "Pixverse",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "336",
@@ -465,7 +543,9 @@
         "toolLink1": "https://pictory.ai",
         "toolName1": "Picrory",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "337",
@@ -478,7 +558,10 @@
         "toolLink1": "https://app.pixverse.ai/",
         "toolName1": "Pixverse",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "338",
@@ -491,7 +574,9 @@
         "toolLink1": "https://t.me/AIMemeArenaBot",
         "toolName1": "AiMemeArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "339",
@@ -504,7 +589,9 @@
         "toolLink1": "https://pictory.ai",
         "toolName1": "Picrory",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "340",
@@ -517,7 +604,9 @@
         "toolLink1": "https://pictory.ai",
         "toolName1": "Picrory",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "hasSource": false
     },
     {
         "number": "341",
@@ -530,7 +619,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "342",
@@ -543,7 +633,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "343",
@@ -556,7 +649,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "344",
@@ -569,7 +665,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "345",
@@ -582,7 +681,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "346",
@@ -595,7 +697,10 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "347",
@@ -608,7 +713,10 @@
         "toolLink1": "https://www.napkin.ai/",
         "toolName1": "Napkin",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "348",
@@ -621,7 +729,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "349",
@@ -634,7 +743,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "350",
@@ -647,7 +757,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "351",
@@ -660,7 +771,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "352",
@@ -673,7 +785,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "353",
@@ -686,7 +799,8 @@
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "354",
@@ -699,7 +813,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "355",
@@ -712,7 +827,9 @@
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "356",
@@ -725,7 +842,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "357",
@@ -738,7 +856,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2:Gamma"
+        "toolName2": "2:Gamma",
+        "hasSource": false
     },
     {
         "number": "358",
@@ -751,7 +870,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "359",
@@ -764,7 +885,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "360",
@@ -777,7 +900,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "361",
@@ -790,7 +915,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2:Gamma"
+        "toolName2": "2:Gamma",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "362",
@@ -803,7 +930,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "363",
@@ -816,7 +945,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "364",
@@ -829,7 +959,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "365",
@@ -842,7 +973,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "366",
@@ -855,7 +988,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "367",
@@ -868,7 +1002,8 @@
         "toolLink1": "https://lovable.dev/",
         "toolName1": "Lovable",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "368",
@@ -881,7 +1016,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2:Gamma"
+        "toolName2": "2:Gamma",
+        "hasSource": false
     },
     {
         "number": "369",
@@ -894,7 +1030,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "370",
@@ -907,7 +1045,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "371",
@@ -920,7 +1059,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "372",
@@ -933,7 +1074,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "373",
@@ -946,7 +1089,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://lovable.dev/",
-        "toolName2": "2:Lovable"
+        "toolName2": "2:Lovable",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "374",
@@ -959,7 +1104,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "375",
@@ -972,7 +1119,8 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "376",
@@ -985,7 +1133,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "377",
@@ -998,7 +1148,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "378",
@@ -1011,7 +1162,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "379",
@@ -1024,7 +1177,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "380",
@@ -1037,7 +1192,9 @@
         "toolLink1": "https://lovable.dev/",
         "toolName1": "Lovable",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "381",
@@ -1050,7 +1207,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "382",
@@ -1063,7 +1222,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "383",
@@ -1076,7 +1237,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "384",
@@ -1089,7 +1252,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "385",
@@ -1102,7 +1266,8 @@
         "toolLink1": "https://lovable.dev/",
         "toolName1": "Lovable",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "386",
@@ -1115,7 +1280,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "387",
@@ -1128,7 +1295,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "388",
@@ -1141,7 +1310,9 @@
         "toolLink1": "https://notebooklm.google.com/",
         "toolName1": "notebooklm",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "389",
@@ -1154,7 +1325,9 @@
         "toolLink1": "https://lovable.dev/",
         "toolName1": "Lovable",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "390",
@@ -1167,7 +1340,9 @@
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
         "number": "391",
@@ -1180,7 +1355,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "392",
@@ -1193,7 +1369,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "393",
@@ -1206,7 +1383,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "394",
@@ -1219,7 +1397,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "395",
@@ -1232,7 +1411,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "396",
@@ -1245,7 +1425,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "397",
@@ -1258,7 +1439,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "398",
@@ -1271,7 +1453,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "399",
@@ -1284,7 +1467,8 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     },
     {
         "number": "400",
@@ -1297,6 +1481,7 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasSource": false
     }
 ]

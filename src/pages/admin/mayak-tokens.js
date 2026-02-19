@@ -32,6 +32,10 @@ export default function AdminMayakTokens() {
     const [addAttemptsId, setAddAttemptsId] = useState(null);
     const [attemptsToAdd, setAttemptsToAdd] = useState("");
 
+    // Перепривязка раздела
+    const [rebindId, setRebindId] = useState(null);
+    const [rebindValue, setRebindValue] = useState("");
+
     // Статистика
     const [stats, setStats] = useState({ total: 0, activeCount: 0, exhaustedCount: 0 });
 
@@ -206,6 +210,32 @@ export default function AdminMayakTokens() {
                 throw new Error(errorData.error || "Ошибка удаления токена");
             }
 
+            await fetchTokens();
+        } catch (err) {
+            console.error("Ошибка:", err);
+            alert(err.message);
+        }
+    };
+
+    // Перепривязка токена к другому разделу
+    const handleRebind = async (tokenId) => {
+        const section = rangesList.find((r) => (r.sectionId || r.range) === rebindValue) || null;
+        try {
+            const res = await fetch(`/api/admin/mayak-tokens/${tokenId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    password: ADMIN_PASSWORD,
+                    sectionId: section ? section.sectionId : (rebindValue || null),
+                    taskRange: section ? section.range : (rebindValue || null),
+                }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Ошибка перепривязки");
+            }
+            setRebindId(null);
+            setRebindValue("");
             await fetchTokens();
         } catch (err) {
             console.error("Ошибка:", err);
@@ -444,6 +474,13 @@ export default function AdminMayakTokens() {
                                     <tbody>
                                         {tokens.map((token) => {
                                             const status = getTokenStatus(token);
+                                            // Проверка валидности привязки к разделу
+                                            const tokenSection = token.sectionId || token.taskRange;
+                                            const matchedRange = tokenSection ? rangesList.find((r) => (r.sectionId || r.range) === tokenSection) : null;
+                                            const hasBinding = !!tokenSection;
+                                            const sectionMissing = hasBinding && !matchedRange;
+                                            const rangeMismatch = hasBinding && matchedRange && token.taskRange && matchedRange.range !== token.taskRange;
+                                            const bindingInvalid = sectionMissing || rangeMismatch;
                                             return (
                                                 <tr key={token.id} className="border-b border-(--color-gray-plus-50) hover:bg-(--color-white-gray)">
                                                     <td className="p-[.75rem]">
@@ -466,17 +503,53 @@ export default function AdminMayakTokens() {
                                                         </div>
                                                     </td>
                                                     <td className="p-[.75rem] text-center">
-                                                        {token.sectionId || token.taskRange ? (
+                                                        {rebindId === token.id ? (
+                                                            <div className="flex flex-col gap-[.25rem] items-center">
+                                                                <select
+                                                                    value={rebindValue}
+                                                                    onChange={(e) => setRebindValue(e.target.value)}
+                                                                    style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 12, background: "#fff" }}
+                                                                >
+                                                                    <option value="">Все разделы</option>
+                                                                    {rangesList.map((r) => {
+                                                                        const key = r.sectionId || r.range;
+                                                                        return (
+                                                                            <option key={key} value={key}>
+                                                                                {key}{r.rangeName ? ` — ${r.rangeName}` : ""}
+                                                                            </option>
+                                                                        );
+                                                                    })}
+                                                                </select>
+                                                                <div className="flex gap-[.25rem]">
+                                                                    <Button small inverted roundeful className="!w-fit approve-button !p-[.25rem_.5rem]" onClick={() => handleRebind(token.id)}>OK</Button>
+                                                                    <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => { setRebindId(null); setRebindValue(""); }}>X</Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : token.sectionId || token.taskRange ? (
                                                             <div>
-                                                                <span className="font-medium">{token.sectionId || token.taskRange}</span>
+                                                                <span className="font-medium" style={bindingInvalid ? { color: "#dc2626" } : undefined}>{token.sectionId || token.taskRange}</span>
                                                                 {rangeNames[token.sectionId || token.taskRange] && (
                                                                     <div className="text-[.7rem] text-(--color-gray-black)">{rangeNames[token.sectionId || token.taskRange]}</div>
                                                                 )}
                                                                 {token.sectionId && token.taskRange && token.sectionId !== token.taskRange && (
                                                                     <div className="text-[.65rem] text-(--color-gray-black)">({token.taskRange})</div>
                                                                 )}
+                                                                {sectionMissing && (
+                                                                    <div style={{ fontSize: 10, color: "#dc2626", fontWeight: 600, marginTop: 2, padding: "1px 6px", background: "#fef2f2", borderRadius: 4, display: "inline-block", cursor: "pointer" }} onClick={() => { setRebindId(token.id); setRebindValue(""); }}>Раздел не найден — перепривязать</div>
+                                                                )}
+                                                                {rangeMismatch && (
+                                                                    <div style={{ fontSize: 10, color: "#dc2626", fontWeight: 600, marginTop: 2, padding: "1px 6px", background: "#fef2f2", borderRadius: 4, display: "inline-block", cursor: "pointer" }} onClick={() => { setRebindId(token.id); setRebindValue(""); }}>Диапазон не совпадает ({matchedRange.range}) — перепривязать</div>
+                                                                )}
+                                                                {!bindingInvalid && (
+                                                                    <div style={{ fontSize: 10, color: "#6366f1", cursor: "pointer", marginTop: 2 }} onClick={() => { setRebindId(token.id); setRebindValue(token.sectionId || token.taskRange || ""); }}>изменить</div>
+                                                                )}
                                                             </div>
-                                                        ) : "—"}
+                                                        ) : (
+                                                            <div>
+                                                                <span>—</span>
+                                                                <div style={{ fontSize: 10, color: "#6366f1", cursor: "pointer", marginTop: 2 }} onClick={() => { setRebindId(token.id); setRebindValue(""); }}>привязать</div>
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="p-[.75rem] text-center">
                                                         <span className={token.isExhausted ? "text-[var(--color-red)]" : ""}>

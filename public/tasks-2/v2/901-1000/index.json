@@ -7,37 +7,49 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "902",
         "title": "",
         "file": "",
         "instruction": "",
-        "toolLink1": "",
-        "toolName1": "",
+        "toolLink1": "https://forms.yandex.ru/u/689197c9eb6146293aca92fa",
+        "toolName1": "Входная анкета",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "903",
         "title": "",
         "file": "",
         "instruction": "",
-        "toolLink1": "https://forms.yandex.ru/u/689197c9eb6146293aca92fa",
-        "toolName1": "Входная анкета",
+        "toolLink1": "https://prompt-mastery-trainer-spo.lovable.app/",
+        "toolName1": "Пройти Тестирование",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "904",
         "title": "",
         "file": "",
         "instruction": "",
-        "toolLink1": "https://prompt-mastery-trainer-spo.lovable.app/",
-        "toolName1": "Пройти Тестирование",
+        "toolLink1": "",
+        "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "905",
@@ -47,7 +59,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "906",
@@ -57,7 +72,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "907",
@@ -67,7 +85,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "908",
@@ -77,7 +98,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "909",
@@ -87,597 +111,849 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "910",
-        "title": "",
-        "file": "",
-        "instruction": "",
-        "toolLink1": "",
-        "toolName1": "",
-        "toolLink2": "",
-        "toolName2": ""
-    },
-    {
-        "number": "911",
         "title": "",
         "file": "910.pdf",
         "instruction": "910.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "912",
+        "number": "911",
         "title": "",
         "file": "911.pdf",
         "instruction": "911.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "913",
+        "number": "912",
         "title": "",
         "file": "912.pdf",
         "instruction": "912.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "914",
+        "number": "913",
         "title": "",
         "file": "913.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "915",
+        "number": "914",
         "title": "",
         "file": "914.pdf",
         "instruction": "914.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "916",
+        "number": "915",
         "title": "",
         "file": "915.pdf",
         "instruction": "915.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "917",
+        "number": "916",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "918",
+        "number": "917",
         "title": "",
         "file": "917.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "919",
+        "number": "918",
         "title": "",
         "file": "918.pdf",
         "instruction": "918.pdf",
         "toolLink1": "https://any2text.ru/",
         "toolName1": "1:Any2text",
         "toolLink2": "https://www.perplexity.ai/",
-        "toolName2": "2:Perplexity"
+        "toolName2": "2:Perplexity",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "920",
+        "number": "919",
         "title": "",
         "file": "919.pdf",
         "instruction": "919.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://suno.com/",
-        "toolName2": "2:Suno"
+        "toolName2": "2:Suno",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "921",
+        "number": "920",
         "title": "",
         "file": "920.pdf",
         "instruction": "920.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "922",
+        "number": "921",
         "title": "",
         "file": "921.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://suno.com/",
-        "toolName2": "2:Suno"
+        "toolName2": "2:Suno",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "923",
+        "number": "922",
         "title": "",
         "file": "922.pdf",
         "instruction": "922.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "924",
+        "number": "923",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "925",
+        "number": "924",
         "title": "",
         "file": "924.pdf",
         "instruction": "",
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "926",
+        "number": "925",
         "title": "",
         "file": "925.pdf",
         "instruction": "",
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "927",
+        "number": "926",
         "title": "",
         "file": "926.pdf",
         "instruction": "926.pdf",
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "928",
+        "number": "927",
         "title": "",
         "file": "927.pdf",
         "instruction": "927.pdf",
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "929",
+        "number": "928",
         "title": "",
         "file": "928.pdf",
         "instruction": "",
         "toolLink1": "https://t.me/AIMemeArenaBot",
         "toolName1": "AiMemeArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "930",
+        "number": "929",
         "title": "",
         "file": "929.pdf",
         "instruction": "929.pdf",
         "toolLink1": "https://lmarena.ai/",
         "toolName1": "LMArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "931",
+        "number": "930",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "932",
+        "number": "931",
         "title": "",
         "file": "931.pdf",
         "instruction": "931.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2:Gamma"
+        "toolName2": "2:Gamma",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "933",
+        "number": "932",
         "title": "",
         "file": "932.pdf",
         "instruction": "932.pdf",
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "934",
+        "number": "933",
         "title": "",
         "file": "933.pdf",
         "instruction": "",
         "toolLink1": "https://replit.com/",
         "toolName1": "Replit",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "935",
+        "number": "934",
         "title": "",
         "file": "934.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://replit.com/",
-        "toolName2": "2:Replit"
+        "toolName2": "2:Replit",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "936",
+        "number": "935",
         "title": "",
         "file": "935.pdf",
         "instruction": "935.pdf",
         "toolLink1": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
         "toolName1": "Gamma",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "937",
+        "number": "936",
         "title": "",
         "file": "936.pdf",
         "instruction": "936.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2:Gamma"
+        "toolName2": "2:Gamma",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "938",
+        "number": "937",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "939",
+        "number": "938",
         "title": "",
         "file": "938.pdf",
         "instruction": "938.pdf",
         "toolLink1": "https://pixverse.ai/",
         "toolName1": "Pixverse",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "940",
+        "number": "939",
         "title": "",
         "file": "939.pdf",
         "instruction": "939.pdf",
         "toolLink1": "https://pixverse.ai/",
         "toolName1": "Pixverse",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "941",
+        "number": "940",
         "title": "",
         "file": "940.pdf",
         "instruction": "940.pdf",
         "toolLink1": "https://pixverse.ai/",
         "toolName1": "Pixverse",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "942",
+        "number": "941",
         "title": "",
         "file": "941.pdf",
         "instruction": "",
         "toolLink1": "https://t.me/AIMemeArenaBot",
         "toolName1": "AiMemeArena",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "943",
+        "number": "942",
         "title": "",
         "file": "942.pdf",
         "instruction": "",
         "toolLink1": "https://pictory.ai/",
         "toolName1": "Pictory",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "944",
+        "number": "943",
         "title": "",
         "file": "943.pdf",
         "instruction": "943.pdf",
         "toolLink1": "https://any2text.ru/",
         "toolName1": "1:Any2text",
         "toolLink2": "https://www.perplexity.ai/",
-        "toolName2": "2:Perplexity"
+        "toolName2": "2:Perplexity",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "945",
+        "number": "944",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "946",
+        "number": "945",
         "title": "",
         "file": "945.pdf",
         "instruction": "945.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "947",
+        "number": "946",
         "title": "",
         "file": "946.pdf",
         "instruction": "946.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "948",
+        "number": "947",
         "title": "",
         "file": "947.pdf",
         "instruction": "947.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "949",
+        "number": "948",
         "title": "",
         "file": "948.pdf",
         "instruction": "948.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "950",
+        "number": "949",
         "title": "",
         "file": "949.pdf",
         "instruction": "949.pdf",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "951",
+        "number": "950",
         "title": "",
         "file": "950.pdf",
         "instruction": "950.pdf",
         "toolLink1": "https://www.napkin.ai/",
         "toolName1": "Napkin",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": true,
+        "hasFile": true,
+        "instructionText": "Инструкция",
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "952",
+        "number": "951",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "953",
+        "number": "952",
         "title": "",
         "file": "952.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "954",
+        "number": "953",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "955",
+        "number": "954",
         "title": "",
         "file": "954.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "956",
+        "number": "955",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "957",
+        "number": "956",
         "title": "",
         "file": "956.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "958",
+        "number": "957",
         "title": "",
         "file": "957.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2:Gamma"
+        "toolName2": "2:Gamma",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
+    },
+    {
+        "number": "958",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "959",
         "title": "",
         "file": "",
         "instruction": "",
-        "toolLink1": "",
-        "toolName1": "",
-        "toolLink2": "",
-        "toolName2": ""
-    },
-    {
-        "number": "960",
-        "title": "",
-        "file": "",
-        "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "961",
+        "number": "960",
         "title": "",
         "file": "960.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "962",
+        "number": "961",
         "title": "",
         "file": "961.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "963",
+        "number": "962",
         "title": "",
         "file": "962.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "964",
+        "number": "963",
         "title": "",
         "file": "963.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "965",
+        "number": "964",
         "title": "",
         "file": "964.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "966",
+        "number": "965",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "967",
+        "number": "966",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "968",
+        "number": "967",
         "title": "",
         "file": "967.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
+    },
+    {
+        "number": "968",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "https://replit.com/",
+        "toolName1": "Replit",
+        "toolLink2": "",
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "969",
@@ -687,247 +963,340 @@
         "toolLink1": "https://replit.com/",
         "toolName1": "Replit",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "970",
-        "title": "",
-        "file": "",
-        "instruction": "",
-        "toolLink1": "https://replit.com/",
-        "toolName1": "Replit",
-        "toolLink2": "",
-        "toolName2": ""
-    },
-    {
-        "number": "971",
         "title": "",
         "file": "970.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "972",
+        "number": "971",
         "title": "",
         "file": "971.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "973",
+        "number": "972",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "974",
+        "number": "973",
         "title": "",
         "file": "973.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "975",
+        "number": "974",
         "title": "",
         "file": "974.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "976",
+        "number": "975",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "https://replit.com/",
         "toolName1": "Replit",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "977",
+        "number": "976",
         "title": "",
         "file": "976.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "978",
+        "number": "977",
         "title": "",
         "file": "977.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "979",
+        "number": "978",
         "title": "",
         "file": "978.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "980",
+        "number": "979",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "981",
+        "number": "980",
         "title": "",
         "file": "980.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "982",
+        "number": "981",
         "title": "",
         "file": "981.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "983",
+        "number": "982",
         "title": "",
         "file": "982.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://gamma.app/signup?r=ffdoazwoqvphhy2",
-        "toolName2": "2:Gamma"
+        "toolName2": "2:Gamma",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "984",
+        "number": "983",
         "title": "",
         "file": "983.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "985",
+        "number": "984",
         "title": "",
         "file": "984.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "986",
+        "number": "985",
         "title": "",
         "file": "985.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "987",
+        "number": "986",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "988",
+        "number": "987",
         "title": "",
         "file": "",
         "instruction": "",
         "toolLink1": "https://replit.com/",
         "toolName1": "Replit",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
-        "number": "989",
+        "number": "988",
         "title": "",
         "file": "988.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "990",
+        "number": "989",
         "title": "",
         "file": "989.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "991",
+        "number": "990",
         "title": "",
         "file": "990.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "992",
+        "number": "991",
         "title": "",
         "file": "991.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "1:Perplexity",
         "toolLink2": "https://www.napkin.ai/",
-        "toolName2": "2:Napkin"
+        "toolName2": "2:Napkin",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
     },
     {
-        "number": "993",
+        "number": "992",
         "title": "",
         "file": "992.pdf",
         "instruction": "",
         "toolLink1": "https://www.perplexity.ai/",
         "toolName1": "Perplexity",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": true,
+        "materialText": "Доп. материал",
+        "hasSource": false
+    },
+    {
+        "number": "993",
+        "title": "",
+        "file": "",
+        "instruction": "",
+        "toolLink1": "",
+        "toolName1": "",
+        "toolLink2": "",
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "994",
@@ -937,7 +1306,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "995",
@@ -947,7 +1319,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "996",
@@ -957,7 +1332,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "997",
@@ -967,7 +1345,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "998",
@@ -977,7 +1358,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "999",
@@ -987,7 +1371,10 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     },
     {
         "number": "1000",
@@ -997,6 +1384,9 @@
         "toolLink1": "",
         "toolName1": "",
         "toolLink2": "",
-        "toolName2": ""
+        "toolName2": "",
+        "hasInstruction": false,
+        "hasFile": false,
+        "hasSource": false
     }
 ]

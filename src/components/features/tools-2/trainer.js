@@ -198,12 +198,12 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
     const taskRange = currentTask?._range || (taskVersion === "v2" ? getRange(currentTaskIndex + 1) : null);
     const rangePath = taskVersion === "v2" && taskRange ? `${basePath}/${taskRange}` : basePath;
 
-    const instructionFileUrl = currentTask?.instruction ? `${rangePath}/Instructions/${currentTask.instruction}` : "";
-    const taskFileUrl = currentTask?.file ? `${rangePath}/Files/${currentTask.file}` : "";
+    const instructionFileUrl = currentTask?.hasInstruction && currentTask?.instruction ? `${rangePath}/Instructions/${currentTask.instruction}` : "";
+    const taskFileUrl = currentTask?.hasFile && currentTask?.file ? `${rangePath}/Files/${currentTask.file}` : "";
 
     // --- НОВАЯ ЛОГИКА: ССЫЛКА ИЛИ ФАЙЛ В ПАПКЕ SOURCE ---
     let sourceUrl = "";
-    if (currentTask?.sourceLink) {
+    if (currentTask?.hasSource && currentTask?.sourceLink) {
         if (currentTask.sourceLink.startsWith("http") || currentTask.sourceLink.startsWith("www")) {
             // Это внешняя ссылка
             sourceUrl = currentTask.sourceLink;
@@ -231,14 +231,16 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
                 let tasksTextsData;
 
                 if (taskVersion === "v2") {
+                    const cacheBust = `?t=${Date.now()}`;
+                    const fetchOpts = { cache: 'no-store' };
                     if (tokenSectionId) {
                         // Загружаем ТОЛЬКО одну папку по sectionId вместо всего manifest
-                        const indexRes = await fetch(`${basePath}/${tokenSectionId}/index.json`);
+                        const indexRes = await fetch(`${basePath}/${tokenSectionId}/index.json${cacheBust}`, fetchOpts);
                         if (!indexRes.ok) throw new Error(`Не удалось загрузить index.json для раздела ${tokenSectionId}: ${indexRes.status}`);
                         const data = await indexRes.json();
 
                         // Берём rangeStart/rangeEnd из meta.json
-                        const metaRes = await fetch(`${basePath}/${tokenSectionId}/meta.json`);
+                        const metaRes = await fetch(`${basePath}/${tokenSectionId}/meta.json${cacheBust}`, fetchOpts);
                         let rangeStart = 1;
                         let rangeEnd = 100;
                         if (metaRes.ok) {
@@ -254,11 +256,11 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
                         }
 
                         // TaskText.json — тоже из одной папки
-                        const textRes = await fetch(`${basePath}/${tokenSectionId}/TaskText.json`);
+                        const textRes = await fetch(`${basePath}/${tokenSectionId}/TaskText.json${cacheBust}`, fetchOpts);
                         tasksTextsData = textRes.ok ? await textRes.json() : [];
                     } else {
                     // Загружаем manifest со списком диапазонов
-                    const manifestRes = await fetch(`${basePath}/manifest.json`);
+                    const manifestRes = await fetch(`${basePath}/manifest.json${cacheBust}`, fetchOpts);
                     if (!manifestRes.ok) throw new Error(`Не удалось загрузить manifest: ${manifestRes.status}`);
                     const ranges = await manifestRes.json();
 
@@ -267,7 +269,7 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
 
                     // Параллельно загружаем index.json из каждого диапазона
                     const indexPromises = ranges.map((range) =>
-                        fetch(`${basePath}/${range}/index.json`)
+                        fetch(`${basePath}/${range}/index.json${cacheBust}`, fetchOpts)
                             .then((r) => (r.ok ? r.json() : []))
                             .then((data) => ({ range, data }))
                     );
@@ -284,7 +286,7 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
 
                     // Параллельно загружаем TaskText.json из каждого диапазона
                     const textPromises = ranges.map((range) =>
-                        fetch(`${basePath}/${range}/TaskText.json`)
+                        fetch(`${basePath}/${range}/TaskText.json${cacheBust}`, fetchOpts)
                             .then((r) => (r.ok ? r.json() : []))
                     );
                     const allTextArrays = await Promise.all(textPromises);

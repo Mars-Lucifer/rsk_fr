@@ -114,32 +114,44 @@ export default async function handler(req, res) {
             const { range, rangeName } = req.body;
 
             // Валидация формата диапазона: "101-200"
-            const match = range?.match(/^(\d+)-(\d+)$/);
+            const trimmedRange = range?.trim().replace(/\s+/g, "");
+            const match = trimmedRange?.match(/^(\d+)-(\d+)$/);
             if (!match) {
-                return res.status(400).json({ success: false, error: "Неверный формат диапазона. Пример: 101-200" });
+                return res.status(400).json({ success: false, error: "Неверный формат диапазона. Пример: 101-200 (без пробелов)" });
             }
 
             const start = parseInt(match[1], 10);
             const end = parseInt(match[2], 10);
-            if (end - start !== 99 || start % 100 !== 1) {
-                return res.status(400).json({ success: false, error: "Диапазон должен быть кратен 100. Пример: 101-200, 201-300" });
+            if (end - start !== 99) {
+                return res.status(400).json({ success: false, error: `Диапазон должен содержать ровно 100 заданий (разница 99). Вы указали ${start}-${end} (разница ${end - start})` });
+            }
+            if (start % 100 !== 1) {
+                return res.status(400).json({ success: false, error: `Начало диапазона должно заканчиваться на 01. Попробуйте: ${start - (start % 100) + 1}-${start - (start % 100) + 100}` });
             }
 
             const slugs = await getManifest();
 
             // Generate unique slug (101-200, 101-200-2, 101-200-3, etc.)
-            const slug = generateSlug(range, slugs);
+            const slug = generateSlug(trimmedRange, slugs);
 
             // Создаём папку с пустыми файлами
             const rangeDir = path.join(V2_DIR, slug);
             await fs.mkdir(path.join(rangeDir, "Files"), { recursive: true });
+            await fs.mkdir(path.join(rangeDir, "Instructions"), { recursive: true });
 
-            // Создаём пустой index.json (100 пустых записей)
-            const emptyTasks = new Array(100).fill(null).map(() => ({
+            // Создаём пустой index.json (100 записей с правильными номерами)
+            const emptyTasks = new Array(end - start + 1).fill(null).map((_, i) => ({
+                number: String(start + i),
+                title: "",
                 file: "",
                 instruction: "",
+                instructionText: "",
+                materialText: "",
+                sourceLink: "",
                 toolLink1: "",
                 toolName1: "",
+                toolLink2: "",
+                toolName2: "",
             }));
             await fs.writeFile(path.join(rangeDir, "index.json"), JSON.stringify(emptyTasks, null, 4), "utf-8");
 
