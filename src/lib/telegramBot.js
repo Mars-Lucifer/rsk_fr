@@ -512,6 +512,7 @@ async function registerWebhook(apiBase, webhookUrl) {
 
 async function registerCommands(apiBase) {
   try {
+    // Команды для всех пользователей
     await fetch(`${apiBase}/setMyCommands`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -519,12 +520,29 @@ async function registerCommands(apiBase) {
         commands: [
           { command: 'start', description: 'Начать работу с ботом' },
           { command: 'token', description: 'Запросить токен доступа' },
-          { command: 'new_session', description: 'Создать prep-сессию' },
-          { command: 'sessions', description: 'Список активных сессий' },
-          { command: 'status', description: 'Статус последней сессии' },
         ],
       }),
     });
+
+    // Дополнительные команды для админов
+    const adminIds = getBotAdminIds();
+    for (const adminId of adminIds) {
+      await fetch(`${apiBase}/setMyCommands`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: { type: 'chat', chat_id: adminId },
+          commands: [
+            { command: 'start', description: 'Начать работу с ботом' },
+            { command: 'token', description: 'Запросить токен доступа' },
+            { command: 'new_session', description: 'Создать prep-сессию' },
+            { command: 'sessions', description: 'Список активных сессий' },
+            { command: 'status', description: 'Статус последней сессии' },
+          ],
+        }),
+      });
+    }
+
     console.log('[TG Bot] Команды зарегистрированы');
   } catch (err) {
     console.error('[TG Bot] Ошибка регистрации команд:', err.message);
