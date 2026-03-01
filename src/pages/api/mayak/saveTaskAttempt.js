@@ -1,19 +1,27 @@
 import fs from "fs";
 import path from "path";
 
+let lockPromise = Promise.resolve();
+
 export default async function handler(req, res) {
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method not allowed" });
     }
 
+    const { user, taskName, taskIndex, timestamp, timeSpent, secondsSpent, completed, taskDetails, sectionId } = req.body;
+
+    // Проверка обязательных полей
+    if (!user || !taskName || timeSpent === undefined) {
+        return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Очередь для предотвращения race condition при записи в файл
+    let release;
+    const prev = lockPromise;
+    lockPromise = new Promise(resolve => { release = resolve; });
+    await prev;
+
     try {
-        const { user, taskName, taskIndex, timestamp, timeSpent, secondsSpent, completed, taskDetails } = req.body;
-
-        // Проверка обязательных полей
-        if (!user || !taskName || timeSpent === undefined) {
-            return res.status(400).json({ error: "Missing required fields" });
-        }
-
         // Путь к файлу данных
         const filePath = path.join(process.cwd(), "data", "taskAttempts.json");
 
@@ -56,6 +64,7 @@ export default async function handler(req, res) {
             taskIndex,
             completed,
             taskDetails,
+            sectionId,
         };
 
         allData[user].tasks[taskName].attempts.push(attemptData);
@@ -90,5 +99,7 @@ export default async function handler(req, res) {
             error: "Internal server error",
             details: error.message,
         });
+    } finally {
+        release();
     }
 }

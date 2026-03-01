@@ -49,10 +49,26 @@ const styles = StyleSheet.create({
     fontSize: 20, // УВЕЛИЧИЛ ШРИФТ (было 14, стало 20)
     color: '#000000',
     fontWeight: 'bold', // Жирный шрифт для даты
-  }
+  },
+  qrWrapper: {
+    position: 'absolute',
+    bottom: 30,
+    left: 40,
+    alignItems: 'center',
+  },
+  qrImage: {
+    width: 80,
+    height: 80,
+  },
+  qrLabel: {
+    fontSize: 7,
+    color: '#666666',
+    marginTop: 2,
+    textAlign: 'center',
+  },
 });
 
-const Certificate = ({ userName }) => {
+const Certificate = ({ userName, qrDataUrl }) => {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const imageSrc = `${origin}/certificat.png`;
 
@@ -89,6 +105,13 @@ const Certificate = ({ userName }) => {
         <View style={styles.dateWrapper}>
            <Text style={styles.dateText}>{fullDateString}</Text>
         </View>
+
+        {qrDataUrl && (
+          <View style={styles.qrWrapper}>
+            <Image src={qrDataUrl} style={styles.qrImage} />
+            <Text style={styles.qrLabel}>Проверить сертификат</Text>
+          </View>
+        )}
 
       </Page>
     </Document>

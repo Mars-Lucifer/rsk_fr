@@ -59,16 +59,8 @@ export const STATIC_MAYAK_DATA = {
         "label": "Разное",
         "subCategories": [
           {
-            "key": "audio-to-text",
-            "label": "Аудио в Текст (Транскрибация)"
-          },
-          {
-            "key": "pdf-tools",
-            "label": "PDF-Инструментарий"
-          },
-          {
-            "key": "ocr-tools",
-            "label": "Изображение/PDF в Текст (OCR)"
+            "key": "services",
+            "label": "Сервисы"
           }
         ]
       }

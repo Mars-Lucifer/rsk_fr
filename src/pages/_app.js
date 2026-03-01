@@ -1,4 +1,5 @@
 import "@/styles/globals.css";
+import "@/styles/prep-session.css";
 import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { isAuthorized, saveUserData } from "@/utils/auth";

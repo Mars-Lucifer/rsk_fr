@@ -59,16 +59,8 @@
             "label": "Разное",
             "subCategories": [
                 {
-                    "key": "audio-to-text",
-                    "label": "Аудио в Текст (Транскрибация)"
-                },
-                {
-                    "key": "pdf-tools",
-                    "label": "PDF-Инструментарий"
-                },
-                {
-                    "key": "ocr-tools",
-                    "label": "Изображение/PDF в Текст (OCR)"
+                    "key": "services",
+                    "label": "Сервисы"
                 }
             ]
         }
@@ -332,6 +324,71 @@
                 "name": "i2OCR",
                 "url": "https://www.i2ocr.com/free-online-russian-ocr",
                 "order": 1
+            }
+        ],
+        "services": [
+            {
+                "name": "Suno",
+                "url": "https://suno.com/",
+                "iconType": "standard",
+                "description": "Генерация музыки и аудио с помощью ИИ",
+                "order": 0,
+                "required": true,
+                "instructionImage": "/service-instructions/suno.jpg"
+            },
+            {
+                "name": "Perplexity",
+                "url": "https://www.perplexity.ai/",
+                "iconType": "standard",
+                "description": "ИИ-поисковик с актуальными источниками",
+                "order": 1,
+                "required": true,
+                "instructionImage": "/service-instructions/perplexity.jpg"
+            },
+            {
+                "name": "PixVerse",
+                "url": "https://pixverse.ai/",
+                "iconType": "standard",
+                "description": "Генерация видео с помощью ИИ",
+                "order": 2,
+                "required": true,
+                "instructionImage": "/service-instructions/pixverse.jpg"
+            },
+            {
+                "name": "Qwen",
+                "url": "https://chat.qwen.ai/",
+                "iconType": "standard",
+                "description": "Мультимодальная модель для текста, кода и изображений",
+                "order": 3,
+                "required": true,
+                "instructionImage": "/service-instructions/qwen.jpg"
+            },
+            {
+                "name": "Gamma",
+                "url": "https://gamma.app/signup?r=4va8xcqw91qowwp",
+                "iconType": "standard",
+                "description": "Создание презентаций и документов с помощью ИИ",
+                "order": 4,
+                "required": true,
+                "instructionImage": "/service-instructions/gamma.jpg"
+            },
+            {
+                "name": "Z.ai",
+                "url": "https://chat.z.ai/",
+                "iconType": "standard",
+                "description": "Платформа для создания веб-приложений и сайтов",
+                "order": 5,
+                "required": true,
+                "instructionImage": "/service-instructions/zai.jpg"
+            },
+            {
+                "name": "Speakly",
+                "url": "https://www.genspark.ai/speakly/invite/N2VlNGU2ZDdMNWIxM0xlZTk0TGFlZTk5N2ZjNjA0OEwxZThk",
+                "iconType": "standard",
+                "description": "Умная голосовая клавиатура",
+                "order": 10,
+                "required": false,
+                "buttonLabel": "Скачать"
             }
         ]
     },

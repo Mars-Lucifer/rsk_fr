@@ -39,9 +39,20 @@ export default function AdminMayakTokens() {
     // Статистика
     const [stats, setStats] = useState({ total: 0, activeCount: 0, exhaustedCount: 0 });
 
+    // Запросы на токены
+    const [tokenRequests, setTokenRequests] = useState([]);
+    const [requestsLoading, setRequestsLoading] = useState(false);
+    const [approveTokenId, setApproveTokenId] = useState({}); // { requestId: tokenId }
+
     // Названия разделов
     const [rangeNames, setRangeNames] = useState({});
     const [rangesList, setRangesList] = useState([]);
+
+    // Бот и админы
+    const [botInfo, setBotInfo] = useState({ username: null, link: null });
+    const [botAdmins, setBotAdmins] = useState([]);
+    const [newAdminId, setNewAdminId] = useState("");
+    const [newAdminName, setNewAdminName] = useState("");
 
     // Проверка авторизации при загрузке
     useEffect(() => {
@@ -100,8 +111,141 @@ export default function AdminMayakTokens() {
         if (isAuthenticated) {
             fetchTokens();
             fetchRanges();
+            fetchRequests();
+            fetchBotAdmins();
         }
     }, [isAuthenticated]);
+
+    // Загрузка запросов на токены
+    const fetchRequests = async () => {
+        try {
+            setRequestsLoading(true);
+            const res = await fetch("/api/admin/mayak-tokens/requests?password=" + ADMIN_PASSWORD);
+            const data = await res.json();
+            if (data.success) {
+                setTokenRequests(data.data || []);
+            }
+        } catch (err) {
+            console.error("Ошибка загрузки запросов:", err);
+        } finally {
+            setRequestsLoading(false);
+        }
+    };
+
+    // Загрузка админов бота
+    const fetchBotAdmins = async () => {
+        try {
+            const res = await fetch("/api/admin/bot-admins?password=" + ADMIN_PASSWORD);
+            const data = await res.json();
+            if (data.success) {
+                setBotAdmins(data.data || []);
+                setBotInfo(data.bot || { username: null, link: null });
+            }
+        } catch (err) {
+            console.error("Ошибка загрузки админов бота:", err);
+        }
+    };
+
+    // Добавление админа бота
+    const handleAddBotAdmin = async () => {
+        if (!newAdminId.trim()) {
+            alert("Укажите Telegram ID");
+            return;
+        }
+        try {
+            const res = await fetch("/api/admin/bot-admins", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ telegramId: newAdminId.trim(), name: newAdminName.trim(), password: ADMIN_PASSWORD }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            setBotAdmins(data.data);
+            setNewAdminId("");
+            setNewAdminName("");
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // Удаление админа бота
+    const handleRemoveBotAdmin = async (telegramId) => {
+        if (!window.confirm("Удалить этого админа бота?")) return;
+        try {
+            const res = await fetch("/api/admin/bot-admins", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ telegramId, password: ADMIN_PASSWORD }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+            setBotAdmins(data.data);
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // Одобрение запроса (привязка токена)
+    const handleApproveRequest = async (requestId) => {
+        const tokenId = approveTokenId[requestId];
+        if (!tokenId) {
+            alert("Выберите токен для привязки");
+            return;
+        }
+        try {
+            const res = await fetch("/api/admin/mayak-tokens/requests", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ requestId, action: "approve", tokenId, password: ADMIN_PASSWORD }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Ошибка одобрения");
+            }
+            setApproveTokenId((prev) => { const n = { ...prev }; delete n[requestId]; return n; });
+            await fetchRequests();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // Отклонение запроса
+    const handleRejectRequest = async (requestId) => {
+        if (!window.confirm("Отклонить запрос? Пользователь получит уведомление.")) return;
+        try {
+            const res = await fetch("/api/admin/mayak-tokens/requests", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ requestId, action: "reject", password: ADMIN_PASSWORD }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Ошибка отклонения");
+            }
+            await fetchRequests();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // Удаление запроса
+    const handleDeleteRequest = async (requestId) => {
+        if (!window.confirm("Удалить запрос навсегда?")) return;
+        try {
+            const res = await fetch("/api/admin/mayak-tokens/requests", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ requestId, action: "delete", password: ADMIN_PASSWORD }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Ошибка удаления");
+            }
+            await fetchRequests();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
 
     // Загрузка разделов для выпадающего списка
     const fetchRanges = async () => {
@@ -384,6 +528,233 @@ export default function AdminMayakTokens() {
                             <p className="text-[1.5rem] font-bold text-[var(--color-orange)]">{stats.exhaustedCount}</p>
                         </div>
                     </div>
+
+                    {/* Telegram-бот */}
+                    <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
+                        <h5 className="mb-[1rem]">Telegram-бот</h5>
+                        <div className="flex flex-col gap-[1rem]">
+                            {/* Ссылка на бота */}
+                            <div className="flex items-center gap-[.75rem] flex-wrap">
+                                <span className="link small text-(--color-gray-black)">Бот:</span>
+                                {botInfo.username ? (
+                                    <a href={botInfo.link} target="_blank" rel="noopener noreferrer" style={{ color: "#0088cc", fontWeight: 600, fontSize: 14 }}>
+                                        @{botInfo.username}
+                                    </a>
+                                ) : (
+                                    <span className="text-(--color-gray-black)" style={{ fontSize: 13 }}>Не настроен (задайте TELEGRAM_BOT_USERNAME в .env)</span>
+                                )}
+                            </div>
+
+                            {/* Список админов */}
+                            <div>
+                                <span className="link small text-(--color-gray-black)" style={{ display: "block", marginBottom: 8 }}>Админы бота (могут создавать prep-сессии):</span>
+                                {botAdmins.length === 0 ? (
+                                    <p className="text-(--color-gray-black)" style={{ fontSize: 13 }}>Нет админов</p>
+                                ) : (
+                                    <div className="flex flex-col gap-[.5rem]">
+                                        {botAdmins.map((admin) => (
+                                            <div key={admin.telegramId} className="flex items-center justify-between gap-[.75rem] p-[.5rem_.75rem] rounded-[.5rem] bg-(--color-white-gray)">
+                                                <div>
+                                                    <span className="font-medium" style={{ fontSize: 14 }}>{admin.name || "Без имени"}</span>
+                                                    <span className="text-(--color-gray-black)" style={{ fontSize: 12, marginLeft: 8 }}>ID: {admin.telegramId}</span>
+                                                </div>
+                                                <Button small inverted roundeful className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={() => handleRemoveBotAdmin(admin.telegramId)}>
+                                                    Удалить
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Форма добавления */}
+                            <div className="flex gap-[.5rem] items-end flex-wrap">
+                                <div>
+                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">Telegram ID</label>
+                                    <Input
+                                        type="text"
+                                        placeholder="123456789"
+                                        value={newAdminId}
+                                        onChange={(e) => setNewAdminId(e.target.value)}
+                                        className="!w-[160px]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">Имя (опц.)</label>
+                                    <Input
+                                        type="text"
+                                        placeholder="Имя"
+                                        value={newAdminName}
+                                        onChange={(e) => setNewAdminName(e.target.value)}
+                                        className="!w-[160px]"
+                                    />
+                                </div>
+                                <Button small inverted roundeful className="!w-fit approve-button" onClick={handleAddBotAdmin}>
+                                    Добавить
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Запросы на токены */}
+                    {(() => {
+                        const pendingRequests = tokenRequests.filter((r) => r.status === "pending" || r.status === "awaiting_code");
+                        const historyRequests = tokenRequests.filter((r) => r.status === "approved" || r.status === "rejected");
+                        if (tokenRequests.length === 0 && !requestsLoading) return null;
+                        return (
+                            <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
+                                <div className="flex items-center justify-between mb-[1rem]">
+                                    <h5>
+                                        Запросы на токены
+                                        {pendingRequests.length > 0 && (
+                                            <span style={{ marginLeft: 8, background: "#ef4444", color: "#fff", borderRadius: 999, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>
+                                                {pendingRequests.length}
+                                            </span>
+                                        )}
+                                    </h5>
+                                    <Button small inverted roundeful className="!w-fit" onClick={fetchRequests} disabled={requestsLoading}>
+                                        {requestsLoading ? "..." : "Обновить"}
+                                    </Button>
+                                </div>
+
+                                {pendingRequests.length === 0 && historyRequests.length === 0 && (
+                                    <p className="text-(--color-gray-black) text-center py-[1rem]">Нет запросов</p>
+                                )}
+
+                                {pendingRequests.length > 0 && (
+                                    <div className="overflow-x-auto mb-[1rem]">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="border-b border-(--color-gray-plus-50)">
+                                                    <th className="text-left p-[.75rem] link small">Пользователь</th>
+                                                    <th className="text-left p-[.75rem] link small">Статус</th>
+                                                    <th className="text-left p-[.75rem] link small">Секретный код</th>
+                                                    <th className="text-left p-[.75rem] link small">Дата</th>
+                                                    <th className="text-right p-[.75rem] link small">Действия</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {pendingRequests.map((req) => (
+                                                    <tr key={req.id} className="border-b border-(--color-gray-plus-50) hover:bg-(--color-white-gray)">
+                                                        <td className="p-[.75rem]">
+                                                            <span className="font-medium">{req.firstName || "—"}</span>
+                                                            {req.username && (
+                                                                <div className="text-[.75rem] text-(--color-gray-black)">@{req.username}</div>
+                                                            )}
+                                                            <div className="text-[.7rem] text-(--color-gray-black)">ID: {req.telegramId}</div>
+                                                        </td>
+                                                        <td className="p-[.75rem]">
+                                                            {req.status === "awaiting_code" ? (
+                                                                <span style={{ color: "#f59e0b", fontWeight: 600, fontSize: 13 }}>Ждёт код</span>
+                                                            ) : (
+                                                                <span style={{ color: "#3b82f6", fontWeight: 600, fontSize: 13 }}>Ожидает</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-[.75rem]">
+                                                            {req.secretCode ? (
+                                                                <code className="text-[.85rem] bg-(--color-white-gray) px-[.5rem] py-[.25rem] rounded">{req.secretCode}</code>
+                                                            ) : (
+                                                                <span className="text-(--color-gray-black)">—</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-[.75rem] text-[.875rem] text-(--color-gray-black)">
+                                                            {formatDate(req.createdAt)}
+                                                        </td>
+                                                        <td className="p-[.75rem]">
+                                                            {req.status === "pending" ? (
+                                                                <div className="flex flex-col gap-[.5rem] items-end">
+                                                                    <div className="flex gap-[.5rem] items-center">
+                                                                        <select
+                                                                            value={approveTokenId[req.id] || ""}
+                                                                            onChange={(e) => setApproveTokenId((prev) => ({ ...prev, [req.id]: e.target.value }))}
+                                                                            style={{ padding: "4px 6px", borderRadius: 6, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 12, background: "#fff", maxWidth: 180 }}
+                                                                        >
+                                                                            <option value="">Выберите токен</option>
+                                                                            {tokens.filter((t) => t.isActive && !t.isExhausted).map((t) => (
+                                                                                <option key={t.id} value={t.id}>
+                                                                                    {t.name} ({t.remainingAttempts} ост.)
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                        <Button small inverted roundeful className="!w-fit approve-button !p-[.25rem_.5rem]" onClick={() => handleApproveRequest(req.id)}>
+                                                                            Одобрить
+                                                                        </Button>
+                                                                    </div>
+                                                                    <div className="flex gap-[.5rem]">
+                                                                        <Button small inverted roundeful className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={() => handleRejectRequest(req.id)}>
+                                                                            Отклонить
+                                                                        </Button>
+                                                                        <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => handleDeleteRequest(req.id)}>
+                                                                            Удалить
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex justify-end">
+                                                                    <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => handleDeleteRequest(req.id)}>
+                                                                        Удалить
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {historyRequests.length > 0 && (
+                                    <details style={{ marginTop: pendingRequests.length > 0 ? 8 : 0 }}>
+                                        <summary className="link small text-(--color-gray-black)" style={{ cursor: "pointer", userSelect: "none" }}>
+                                            История ({historyRequests.length})
+                                        </summary>
+                                        <div className="overflow-x-auto" style={{ marginTop: 8 }}>
+                                            <table className="w-full">
+                                                <thead>
+                                                    <tr className="border-b border-(--color-gray-plus-50)">
+                                                        <th className="text-left p-[.5rem] link small">Пользователь</th>
+                                                        <th className="text-left p-[.5rem] link small">Код</th>
+                                                        <th className="text-center p-[.5rem] link small">Статус</th>
+                                                        <th className="text-left p-[.5rem] link small">Дата</th>
+                                                        <th className="text-right p-[.5rem] link small"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {historyRequests.map((req) => (
+                                                        <tr key={req.id} className="border-b border-(--color-gray-plus-50)">
+                                                            <td className="p-[.5rem]">
+                                                                <span className="text-[.85rem]">{req.firstName || "—"}</span>
+                                                                {req.username && <span className="text-[.75rem] text-(--color-gray-black)"> @{req.username}</span>}
+                                                            </td>
+                                                            <td className="p-[.5rem]">
+                                                                <code className="text-[.75rem]">{req.secretCode || "—"}</code>
+                                                            </td>
+                                                            <td className="p-[.5rem] text-center">
+                                                                {req.status === "approved" ? (
+                                                                    <span style={{ color: "#22c55e", fontWeight: 600, fontSize: 12 }}>Одобрен</span>
+                                                                ) : (
+                                                                    <span style={{ color: "#ef4444", fontWeight: 600, fontSize: 12 }}>Отклонён</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-[.5rem] text-[.8rem] text-(--color-gray-black)">
+                                                                {formatDate(req.updatedAt)}
+                                                            </td>
+                                                            <td className="p-[.5rem] text-right">
+                                                                <Button small inverted roundeful className="!w-fit !p-[.15rem_.4rem]" style={{ fontSize: 11 }} onClick={() => handleDeleteRequest(req.id)}>
+                                                                    ×
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </details>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Форма создания токена */}
                     <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">

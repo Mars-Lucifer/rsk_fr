@@ -53,7 +53,10 @@ export default async function handler(req, res) {
             }
 
             const { sectionId, taskRange } = req.body;
-            const updated = updateToken(id, { sectionId: sectionId || null, taskRange: taskRange || null });
+            const updates = {};
+            if (sectionId !== undefined) updates.sectionId = sectionId || null;
+            if (taskRange !== undefined) updates.taskRange = taskRange || null;
+            const updated = updateToken(id, updates);
 
             if (!updated) {
                 return res.status(500).json({ success: false, error: "Ошибка обновления токена" });

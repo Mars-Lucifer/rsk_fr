@@ -27,6 +27,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: "Укажите sectionId или range" });
     }
 
+    // Защита от path traversal
+    if (sectionId.includes("..") || sectionId.includes("/") || sectionId.includes("\\") || path.basename(sectionId) !== sectionId) {
+        return res.status(400).json({ success: false, error: "Недопустимый sectionId" });
+    }
+
     const rangeDir = path.join(V2_DIR, sectionId);
 
     // GET — список файлов по типу (files или instructions)

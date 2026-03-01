@@ -1,0 +1,352 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Colors imported from Mayak project */
+  --color-black: #08090a;
+  --color-white: #ffffff;
+  --color-gray-white: #c9ccd1;
+  --color-gray-black: #909399;
+  --color-white-gray: #fafbfc;
+  --color-gray-plus: #ebedf0;
+  --color-gray-plus-50: #f3f4f5;
+  --color-black-gray: #101214;
+  --color-blue: #3a6bff;
+  --color-blue-noise: #e0e8ff;
+
+  --success: #10b981;
+  --warning: #ff9500;
+  
+  --bg-color: var(--color-white-gray);
+  --text-main: var(--color-black);
+  --text-hint: var(--color-gray-black);
+  
+  --card-bg: var(--color-white);
+  --card-border: var(--color-gray-plus-50);
+  --card-radius: 16px;
+  
+  --font-family: "Manrope", sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: 16px;
+  background: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+/* Typography Enhancements */
+h1, h2, h3, h4 {
+  color: var(--color-black);
+}
+
+h2 { font: 700 2.125rem var(--font-family); }
+h3 { font: 600 1.75rem var(--font-family); }
+
+/* Layout Containers */
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.panel-header {
+  padding: 20px 32px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+}
+
+.panel-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.user-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-hint);
+  background: var(--color-gray-plus-50);
+  padding: 6px 16px;
+  border-radius: 8px;
+}
+
+.panel-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar / Task Nav */
+.task-list {
+  width: 250px;
+  background: var(--card-bg);
+  border-right: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+
+.task-list-item {
+  padding: 16px 20px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  text-align: left;
+}
+
+.task-list-item:hover {
+  background: var(--color-white-gray);
+}
+
+.task-list-item.selected {
+  background: var(--color-blue-noise);
+}
+
+.task-list-item.selected::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background: var(--color-blue);
+}
+
+.task-icon {
+  font-size: 24px;
+}
+
+.task-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-hint);
+}
+
+.task-list-item.selected .task-title {
+  color: var(--color-blue);
+}
+
+/* Task Details */
+.task-detail-area {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.task-content h3 {
+  margin-bottom: 24px;
+}
+
+.instruction {
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--card-radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
+.instruction:hover {
+  border-color: var(--color-gray-white);
+}
+
+.instruction p {
+  margin-bottom: 12px;
+  font-size: 1.125rem;
+}
+
+.instruction ul {
+  list-style: none;
+  margin: 16px 0;
+}
+
+.instruction li {
+  position: relative;
+  padding-left: 24px;
+  margin-bottom: 12px;
+  font-size: 1.125rem;
+  color: var(--text-hint);
+}
+
+.instruction li strong {
+  color: var(--text-main);
+}
+
+.instruction li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-blue);
+}
+
+/* Specialized Boxes */
+.warning-box {
+  background: #fff8e1 !important;
+  border: 1.5px solid #ffe082 !important;
+  color: #d84315 !important;
+  padding: 16px 24px !important;
+  border-radius: var(--card-radius) !important;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.requirements {
+  background: var(--color-gray-plus-50);
+  border: 1.5px solid var(--card-border);
+  border-radius: var(--card-radius);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.requirements h4 {
+  font-size: 1.125rem;
+  margin-bottom: 16px;
+  color: var(--color-black);
+}
+
+/* Actions */
+.btn {
+  width: 100%;
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 0.875rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.875rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  border: none;
+  transition: all 0.3s ease-in-out;
+  font-family: var(--font-family);
+  background: var(--color-black);
+  color: var(--color-white);
+}
+
+.btn:hover {
+  box-shadow: 0px 4px 16px -2px #08090a40;
+}
+
+.btn-done {
+  /* Using approve button styles from Mayak */
+  background: var(--color-blue);
+  color: var(--color-white);
+}
+
+.btn-done:hover {
+  background: var(--color-blue-plus);
+  box-shadow: 0px 4px 16px -2px #3a6bff40;
+}
+
+.btn-done:active {
+  transform: translateY(2px);
+}
+
+.btn-done:disabled {
+  background: var(--color-gray-plus);
+  color: var(--color-gray-black);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-inverted {
+  background: var(--color-gray-plus-50);
+  color: var(--color-black);
+}
+
+.btn-inverted:hover {
+  background: var(--color-gray-plus);
+  box-shadow: 0px 4px 16px -2px #ebedf040;
+}
+
+/* Photo Cards */
+.photo-preview {
+  background: var(--card-bg);
+  border: 1.5px solid var(--card-border);
+  padding: 8px;
+  border-radius: var(--card-radius);
+  margin-bottom: 24px;
+}
+
+.photo-preview img {
+  width: 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 16px;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.125rem;
+  background: #e8f5e9;
+  color: var(--success);
+  border: 1.5px solid #c8e6c9;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+  .panel-body {
+    flex-direction: column;
+  }
+  
+  .task-list {
+    width: 100%;
+    flex-direction: row;
+    padding: 0;
+    overflow-x: auto;
+  }
+  
+  .task-list-item {
+    flex: 1;
+    flex-direction: column;
+    text-align: center;
+    padding: 12px;
+  }
+  
+  .task-list-item.selected::before {
+    left: 0;
+    top: auto;
+    bottom: 0;
+    height: 4px;
+    width: 100%;
+  }
+  
+  .task-detail-area {
+    padding: 20px;
+  }
+}
+
+
+

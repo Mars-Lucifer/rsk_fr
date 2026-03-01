@@ -32,7 +32,7 @@ export default async function handler(req, res) {
             success: true,
             data: tokens,
             total: tokens.length,
-            activeCount: tokens.filter(t => t.isActive).length,
+            activeCount: tokens.filter(t => t.isActive && !t.isExhausted).length,
             exhaustedCount: tokens.filter(t => t.isExhausted).length,
         });
     } catch (error) {

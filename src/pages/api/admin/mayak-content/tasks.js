@@ -19,6 +19,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: "Укажите sectionId или range" });
     }
 
+    // Защита от path traversal
+    if (sectionId.includes("..") || sectionId.includes("/") || sectionId.includes("\\") || path.basename(sectionId) !== sectionId) {
+        return res.status(400).json({ success: false, error: "Недопустимый sectionId" });
+    }
+
     const rangeDir = path.join(V2_DIR, sectionId);
     const indexPath = path.join(rangeDir, "index.json");
     const textPath = path.join(rangeDir, "TaskText.json");
@@ -33,11 +38,20 @@ export default async function handler(req, res) {
             let existingInstructions = [];
             let rangeName = "";
 
-            try { tasks = JSON.parse(await fs.readFile(indexPath, "utf-8")); } catch {}
-            try { texts = JSON.parse(await fs.readFile(textPath, "utf-8")); } catch {}
+            try {
+                const parsed = JSON.parse(await fs.readFile(indexPath, "utf-8"));
+                if (Array.isArray(parsed)) tasks = parsed;
+            } catch {}
+            try {
+                const parsed = JSON.parse(await fs.readFile(textPath, "utf-8"));
+                if (Array.isArray(parsed)) texts = parsed;
+            } catch {}
             try { existingFiles = await fs.readdir(path.join(rangeDir, "Files")); } catch {}
             try { existingInstructions = await fs.readdir(path.join(rangeDir, "Instructions")); } catch {}
-            try { const meta = JSON.parse(await fs.readFile(metaPath, "utf-8")); rangeName = meta.rangeName || ""; } catch {}
+            try {
+                const meta = JSON.parse(await fs.readFile(metaPath, "utf-8"));
+                if (meta && typeof meta === "object") rangeName = meta.rangeName || "";
+            } catch {}
 
             // Собираем размеры файлов
             let fileSizes = {};
@@ -105,8 +119,8 @@ export default async function handler(req, res) {
                     number: String(t.number || ""),
                     title: t.title || "",
                     contentType: t.contentType || "",
-                    file: t.file || "",
-                    instruction: t.instruction || "",
+                    file: (t.file && existingFiles.includes((t.file || "").trim())) ? t.file : "",
+                    instruction: (t.instruction && existingInstructions.includes((t.instruction || "").trim())) ? t.instruction : "",
                     instructionText: t.instructionText || "",
                     materialText: t.materialText || "",
                     hasInstruction: !!(t.instructionText || "").trim(),
@@ -117,6 +131,7 @@ export default async function handler(req, res) {
                     toolName1: t.toolName1 || "",
                     toolLink2: t.toolLink2 || "",
                     toolName2: t.toolName2 || "",
+                    services: t.services || "",
                 };
                 return clean;
             });

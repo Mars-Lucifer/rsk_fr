@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import Link from "next/link";
 import Header from "@/components/layout/Header";
 
@@ -55,6 +55,7 @@ const COLUMNS = [
     { key: "toolLink1", label: "Ссылка 1", width: 180, source: "task" },
     { key: "toolName2", label: "Инструмент 2", width: 130, source: "task" },
     { key: "toolLink2", label: "Ссылка 2", width: 180, source: "task" },
+    { key: "services", label: "Сервисы", width: 200, source: "task" },
     { key: "instructionText", label: "Инструкция", width: 160, source: "task" },
     { key: "materialText", label: "Доп.материал", width: 160, source: "task" },
     { key: "sourceLink", label: "Источник", width: 180, source: "task" },
@@ -70,13 +71,16 @@ function useAutoResize(ref, value) {
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
-        el.style.height = "auto";
-        el.style.height = Math.max(28, el.scrollHeight) + "px";
+        requestAnimationFrame(() => {
+            if (!el.isConnected) return;
+            el.style.height = "auto";
+            el.style.height = Math.max(28, el.scrollHeight) + "px";
+        });
     }, [ref, value]);
 }
 
 // ============ Ячейка таблицы ============
-const Cell = memo(function Cell({ value, onChange, readOnly, multiline, error, colIdx, rowIdx, onPasteMulti, fileCol, fileExists, fileSize, onUploadFile, onDeleteFile, taskNumber, checkbox, autoCheckbox, autoCheckboxState, checkboxEnabled, fileLabel, range, selected, isActive, onMouseDownCell, onMouseEnterCell }) {
+const Cell = memo(function Cell({ value, onChange, onCellChange, readOnly, multiline, error, colIdx, rowIdx, onPasteMulti, fileCol, fileExists, fileSize, onUploadFile, onDeleteFile, taskNumber, checkbox, autoCheckbox, autoCheckboxState, checkboxEnabled, fileLabel, range, selected, isActive, onMouseDownCell, onMouseEnterCell }) {
     const ref = useRef(null);
     const fileRef = useRef(null);
     const [uploading, setUploading] = useState(false);
@@ -92,7 +96,11 @@ const Cell = memo(function Cell({ value, onChange, readOnly, multiline, error, c
     };
 
     const handleChange = (e) => {
-        onChange(e.target.value);
+        if (onCellChange) {
+            onCellChange(rowIdx, colIdx, e.target.value);
+        } else if (onChange) {
+            onChange(e.target.value);
+        }
     };
 
     // Проверка: номер файла совпадает с номером задания
@@ -138,7 +146,7 @@ const Cell = memo(function Cell({ value, onChange, readOnly, multiline, error, c
         return (
             <td style={{ ...cellStyle, borderLeft: cellBorder, borderBottom: cellBorder, borderRight, width: col?.width, textAlign: "center", verticalAlign: "middle", background: checked ? "#f0fdf4" : "#fff" }}>
                 <div
-                    onClick={() => onChange(!checked)}
+                    onClick={() => onCellChange ? onCellChange(rowIdx, colIdx, !checked) : onChange(!checked)}
                     style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, border: checked ? "2px solid #22c55e" : "2px solid #cbd5e1", borderRadius: 4, cursor: "pointer", background: checked ? "#22c55e" : "#fff", transition: "all 0.15s", marginTop: 3 }}
                 >
                     {checked && (
@@ -170,7 +178,8 @@ const Cell = memo(function Cell({ value, onChange, readOnly, multiline, error, c
             const oldName = value || "";
             setUploading(true);
             await onUploadFile(file, fileCol, originalName, oldName);
-            onChange(originalName);
+            if (onCellChange) onCellChange(rowIdx, colIdx, originalName);
+            else if (onChange) onChange(originalName);
             setUploading(false);
         };
 
@@ -268,6 +277,8 @@ const Cell = memo(function Cell({ value, onChange, readOnly, multiline, error, c
                     value={value || ""}
                     onChange={handleChange}
                     onPaste={handlePaste}
+                    spellCheck
+                    lang="ru"
                     style={{ ...inputStyle, overflow: "hidden", display: "block" }}
                 />
             ) : (
@@ -276,6 +287,8 @@ const Cell = memo(function Cell({ value, onChange, readOnly, multiline, error, c
                     value={value || ""}
                     onChange={handleChange}
                     onPaste={handlePaste}
+                    spellCheck
+                    lang="ru"
                     style={{ ...inputStyle, height: 28 }}
                 />
             )}
@@ -360,6 +373,10 @@ function RangeEditor({ range, password, onBack }) {
     const [rangeName, setRangeName] = useState("");
     const [editingName, setEditingName] = useState(false);
     const isDirty = useRef(false);
+    const tasksRef = useRef(tasks);
+    tasksRef.current = tasks;
+    const textsRef = useRef(texts);
+    textsRef.current = texts;
     const [boundTokens, setBoundTokens] = useState([]);
     const [fileSizes, setFileSizes] = useState({});
 
@@ -373,8 +390,9 @@ function RangeEditor({ range, password, onBack }) {
     const [selStart, setSelStart] = useState(null); // {row, col}
     const [selEnd, setSelEnd] = useState(null);     // {row, col}
     const isSelecting = useRef(false);
+    const noop = useCallback(() => {}, []);
 
-    const getSelectionRange = () => {
+    const selectionRange = useMemo(() => {
         if (!selStart || !selEnd) return null;
         return {
             r1: Math.min(selStart.row, selEnd.row),
@@ -382,30 +400,31 @@ function RangeEditor({ range, password, onBack }) {
             c1: Math.min(selStart.col, selEnd.col),
             c2: Math.max(selStart.col, selEnd.col),
         };
-    };
+    }, [selStart, selEnd]);
+
+    const getSelectionRange = () => selectionRange;
 
     const isCellSelected = (row, col) => {
-        const sel = getSelectionRange();
-        if (!sel) return false;
-        return row >= sel.r1 && row <= sel.r2 && col >= sel.c1 && col <= sel.c2;
+        if (!selectionRange) return false;
+        return row >= selectionRange.r1 && row <= selectionRange.r2 && col >= selectionRange.c1 && col <= selectionRange.c2;
     };
 
-    const handleMouseDownCell = (row, col, e) => {
+    const handleMouseDownCell = useCallback((row, col, e) => {
         setActiveCell({ row, col });
-        if (e.shiftKey && selStart) {
+        if (e.shiftKey) {
             setSelEnd({ row, col });
         } else {
             setSelStart({ row, col });
             setSelEnd({ row, col });
         }
         isSelecting.current = true;
-    };
+    }, []);
 
-    const handleMouseEnterCell = (row, col) => {
+    const handleMouseEnterCell = useCallback((row, col) => {
         if (isSelecting.current) {
             setSelEnd({ row, col });
         }
-    };
+    }, []);
 
     useEffect(() => {
         const handleMouseUp = () => { isSelecting.current = false; };
@@ -625,7 +644,13 @@ function RangeEditor({ range, password, onBack }) {
     useEffect(() => { loadData(); loadBoundTokens(); }, [loadData, loadBoundTokens]);
 
     // --- Геттеры/сеттеры для unified доступа ---
-    const getTextForTask = (taskNum) => texts.find((t) => String(t.number) === String(taskNum)) || null;
+    const textsMap = useMemo(() => {
+        const map = {};
+        texts.forEach(t => { map[String(t.number)] = t; });
+        return map;
+    }, [texts]);
+
+    const getTextForTask = (taskNum) => textsMap[String(taskNum)] || null;
 
     const getCellValue = (rowIdx, col) => {
         const task = tasks[rowIdx];
@@ -636,6 +661,14 @@ function RangeEditor({ range, password, onBack }) {
         }
         return task[col.key] || "";
     };
+
+    // Мемоизированные счётчики для тулбара
+    const toolbarCounts = useMemo(() => ({
+        instrNeeded: tasks.filter((t) => (t.instructionText || "").trim()).length,
+        instrLoaded: tasks.filter((t) => (t.instructionText || "").trim() && (t.instruction || "").trim() && existingInstructions.includes((t.instruction || "").trim())).length,
+        matNeeded: tasks.filter((t) => (t.materialText || "").trim()).length,
+        matLoaded: tasks.filter((t) => (t.materialText || "").trim() && (t.file || "").trim() && existingFiles.includes((t.file || "").trim())).length,
+    }), [tasks, existingInstructions, existingFiles]);
 
     // Сохранить снимок состояния перед групповой операцией (для Ctrl+Z)
     const saveSnapshot = () => {
@@ -654,8 +687,8 @@ function RangeEditor({ range, password, onBack }) {
         isDirty.current = true;
     };
 
-    const setCellValue = (rowIdx, col, value) => {
-        const task = tasks[rowIdx];
+    const setCellValue = useCallback((rowIdx, col, value) => {
+        const task = tasksRef.current[rowIdx];
         if (!task) return;
         isDirty.current = true;
         if (col.source === "text") {
@@ -677,10 +710,37 @@ function RangeEditor({ range, password, onBack }) {
         }
         // Очищаем ошибки для этой строки
         setValidationErrors((prev) => prev.filter((e) => e.index !== rowIdx));
-    };
+    }, []);
+
+    // Стабильный коллбэк для Cell — принимает (rowIdx, colIdx, value)
+    const handleCellChange = useCallback((rowIdx, colIdx, value) => {
+        const col = COLUMNS[colIdx];
+        if (!col) return;
+        const task = tasksRef.current[rowIdx];
+        if (!task) return;
+        isDirty.current = true;
+        if (col.source === "text") {
+            setTexts((prev) => {
+                const idx = prev.findIndex((t) => String(t.number) === String(task.number));
+                if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = { ...copy[idx], [col.key]: value };
+                    return copy;
+                }
+                return [...prev, { number: String(task.number), description: col.key === "description" ? value : "", task: col.key === "task" ? value : "" }];
+            });
+        } else {
+            setTasks((prev) => {
+                const copy = [...prev];
+                copy[rowIdx] = { ...copy[rowIdx], [col.key]: value };
+                return copy;
+            });
+        }
+        setValidationErrors((prev) => prev.filter((e) => e.index !== rowIdx));
+    }, []);
 
     // --- Вставка из Google Sheets (Tab + Enter) ---
-    const handlePasteMulti = (startRow, startCol, text) => {
+    const handlePasteMulti = useCallback((startRow, startCol, text) => {
         const rows = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
         if (rows.length > 1 && rows[rows.length - 1].trim() === "") rows.pop();
 
@@ -697,19 +757,25 @@ function RangeEditor({ range, password, onBack }) {
             const cells = rows[r].split("\t");
             for (let c = 0; c < cells.length; c++) {
                 const targetRow = startRow + r;
-                if (targetRow >= tasks.length) continue;
+                if (targetRow >= tasksRef.current.length) continue;
                 if (c >= editableColIndices.length) break;
                 const colIdx = editableColIndices[c];
                 setCellValue(targetRow, COLUMNS[colIdx], cells[c]);
             }
         }
-    };
+    }, []);
 
     // --- Загрузка файла ---
-    const handleUploadFile = async (file, type, renamedFilename, oldFilename) => {
+    const handleUploadFile = useCallback(async (file, type, renamedFilename, oldFilename) => {
         const finalName = renamedFilename || file.name;
         try {
-            // Если заменяем файл — удаляем старый с диска
+            const base64 = await fileToBase64(file);
+            await fetch("/api/admin/mayak-content/upload", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password, range, type, filename: finalName, data: base64 }),
+            });
+            // Загрузка успешна — теперь безопасно удалить старый файл
             if (oldFilename && oldFilename !== finalName) {
                 try {
                     await fetch("/api/admin/mayak-content/upload", {
@@ -725,12 +791,6 @@ function RangeEditor({ range, password, onBack }) {
                 }
                 setFileSizes((prev) => { const copy = { ...prev }; delete copy[oldFilename]; return copy; });
             }
-            const base64 = await fileToBase64(file);
-            await fetch("/api/admin/mayak-content/upload", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password, range, type, filename: finalName, data: base64 }),
-            });
             if (type === "files") {
                 setExistingFiles((prev) => prev.includes(finalName) ? prev : [...prev, finalName]);
             } else {
@@ -739,10 +799,10 @@ function RangeEditor({ range, password, onBack }) {
             // Обновляем размер файла в state
             setFileSizes((prev) => ({ ...prev, [finalName]: file.size }));
         } catch (err) { console.error(err); }
-    };
+    }, [password, range]);
 
     // --- Удаление файла ---
-    const handleDeleteFile = async (type, filename) => {
+    const handleDeleteFile = useCallback(async (type, filename) => {
         try {
             await fetch("/api/admin/mayak-content/upload", {
                 method: "DELETE",
@@ -767,7 +827,7 @@ function RangeEditor({ range, password, onBack }) {
             return t;
         }));
         isDirty.current = true;
-    };
+    }, [password, range]);
 
     // --- Массовая загрузка ---
     const handleBulkUpload = async (files, type) => {
@@ -793,16 +853,16 @@ function RangeEditor({ range, password, onBack }) {
                     setExistingInstructions((prev) => prev.includes(file.name) ? prev : [...prev, file.name]);
                 }
                 const field = type === "files" ? "file" : "instruction";
-                const checkField = type === "files" ? "hasFile" : "hasInstruction";
                 setTasks((prev) => {
                     const copy = [...prev];
-                    copy[taskIdx] = { ...copy[taskIdx], [field]: file.name, [checkField]: true };
+                    copy[taskIdx] = { ...copy[taskIdx], [field]: file.name };
                     return copy;
                 });
                 matched++;
             } catch (err) { console.error(err); }
         }
         setBulkUploading(false);
+        if (matched > 0) isDirty.current = true;
         let msg = `Загружено: ${uploaded}, привязано: ${matched}`;
         if (skipped.length > 0) {
             msg += `. Пропущено (нет задания с таким номером): ${skipped.join(", ")}`;
@@ -937,14 +997,10 @@ function RangeEditor({ range, password, onBack }) {
                         </span>
                     )}
                     {(() => {
-                        const instrNeeded = tasks.filter((t) => (t.instructionText || "").trim()).length;
-                        const instrLoaded = tasks.filter((t) => (t.instructionText || "").trim() && (t.instruction || "").trim() && existingInstructions.includes((t.instruction || "").trim())).length;
-                        const matNeeded = tasks.filter((t) => (t.materialText || "").trim()).length;
-                        const matLoaded = tasks.filter((t) => (t.materialText || "").trim() && (t.file || "").trim() && existingFiles.includes((t.file || "").trim())).length;
                         return (
                             <span style={{ fontSize: 12, color: "#64748b", display: "flex", gap: 12 }}>
-                                <span>Инструкций: <b style={{ color: instrLoaded === instrNeeded && instrNeeded > 0 ? "#16a34a" : instrNeeded > 0 ? "#dc2626" : "#64748b" }}>{instrLoaded}/{instrNeeded}</b></span>
-                                <span>Доп.материалов: <b style={{ color: matLoaded === matNeeded && matNeeded > 0 ? "#16a34a" : matNeeded > 0 ? "#dc2626" : "#64748b" }}>{matLoaded}/{matNeeded}</b></span>
+                                <span>Инструкций: <b style={{ color: toolbarCounts.instrLoaded === toolbarCounts.instrNeeded && toolbarCounts.instrNeeded > 0 ? "#16a34a" : toolbarCounts.instrNeeded > 0 ? "#dc2626" : "#64748b" }}>{toolbarCounts.instrLoaded}/{toolbarCounts.instrNeeded}</b></span>
+                                <span>Доп.материалов: <b style={{ color: toolbarCounts.matLoaded === toolbarCounts.matNeeded && toolbarCounts.matNeeded > 0 ? "#16a34a" : toolbarCounts.matNeeded > 0 ? "#dc2626" : "#64748b" }}>{toolbarCounts.matLoaded}/{toolbarCounts.matNeeded}</b></span>
                             </span>
                         );
                     })()}
@@ -1020,7 +1076,7 @@ function RangeEditor({ range, password, onBack }) {
                         {tasks.map((task, ri) => {
                             const rowErrors = validationErrors.filter((e) => e.index === ri);
                             return (
-                                <tr key={ri} style={{ background: ri % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                                <tr key={ri} style={{ background: ri % 2 === 0 ? "#fff" : "#f9fafb", contentVisibility: "auto", containIntrinsicSize: "auto 35px" }}>
                                     {COLUMNS.map((col, ci) => {
                                         const cellError = rowErrors.find((e) => e.field === col.key);
                                         const val = getCellValue(ri, col);
@@ -1046,7 +1102,7 @@ function RangeEditor({ range, password, onBack }) {
                                                 <Cell
                                                     key={ci}
                                                     value={val}
-                                                    onChange={() => {}}
+                                                    onChange={noop}
                                                     colIdx={ci}
                                                     rowIdx={ri}
                                                     onPasteMulti={handlePasteMulti}
@@ -1064,7 +1120,7 @@ function RangeEditor({ range, password, onBack }) {
                                                 <Cell
                                                     key={ci}
                                                     value={val}
-                                                    onChange={(v) => setCellValue(ri, col, v)}
+                                                    onCellChange={handleCellChange}
                                                     colIdx={ci}
                                                     rowIdx={ri}
                                                     onPasteMulti={handlePasteMulti}
@@ -1087,7 +1143,7 @@ function RangeEditor({ range, password, onBack }) {
                                                 <Cell
                                                     key={ci}
                                                     value={val}
-                                                    onChange={(v) => setCellValue(ri, col, v)}
+                                                    onCellChange={handleCellChange}
                                                     colIdx={ci}
                                                     rowIdx={ri}
                                                     onPasteMulti={handlePasteMulti}
@@ -1110,7 +1166,7 @@ function RangeEditor({ range, password, onBack }) {
                                             <Cell
                                                 key={ci}
                                                 value={val}
-                                                onChange={(v) => setCellValue(ri, col, v)}
+                                                onCellChange={handleCellChange}
                                                 readOnly={col.readOnly}
                                                 multiline={col.multiline}
                                                 colIdx={ci}

@@ -1,0 +1,237 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
+
+:root {
+  /* Colors imported from Mayak project */
+  --color-black: #08090a;
+  --color-white: #ffffff;
+  --color-gray-white: #c9ccd1;
+  --color-gray-black: #909399;
+  --color-white-gray: #fafbfc;
+  --color-gray-plus: #ebedf0;
+  --color-gray-plus-50: #f3f4f5;
+  --color-black-gray: #101214;
+  --color-blue: #3a6bff;
+  --color-blue-noise: #e0e8ff;
+
+  --success: #10b981;
+  --warning: #ff9500;
+  
+  --bg-color: var(--color-white-gray);
+  --text-main: var(--color-black);
+  --text-hint: var(--color-gray-black);
+  
+  --card-bg: var(--color-white);
+  --card-border: var(--color-gray-plus-50);
+  --card-radius: 16px;
+  
+  --font-family: "Manrope", sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: 16px;
+  background: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.5;
+  text-wrap: balance;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* Typography Enhancements */
+h1, h2, h3, h4 {
+  color: var(--color-black);
+  margin-bottom: 0.5em;
+}
+
+h1 { font: 700 2.5rem var(--font-family); text-align: center; }
+h2 { font: 700 2.125rem var(--font-family); }
+h3 { font: 600 1.75rem var(--font-family); }
+
+/* Layout Containers */
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Role Select Screen */
+.role-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.session-name {
+  font-size: 1.25rem;
+  color: var(--text-hint);
+  margin-bottom: 2rem;
+  background: var(--color-gray-plus-50);
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+
+.role-prompt {
+  font-size: 1.125rem;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.role-cards {
+  display: flex;
+  gap: 24px;
+  max-width: 800px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: var(--card-radius);
+  padding: 32px 24px;
+  width: 320px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+
+.role-card:hover {
+  border-color: var(--color-blue);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(58, 107, 255, 0.1);
+}
+
+.role-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  width: 80px;
+  background: var(--color-gray-plus-50);
+  border-radius: 50%;
+}
+
+.role-card:hover .role-icon {
+  background: var(--color-blue-noise);
+}
+
+.role-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-black);
+  margin-bottom: 8px;
+}
+
+.role-desc {
+  font-size: 0.875rem;
+  color: var(--text-hint);
+}
+
+/* Screens */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 1.25rem;
+  color: var(--text-hint);
+}
+
+.error-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+/* Buttons */
+button {
+  font-family: var(--font-family);
+}
+
+.btn {
+  width: 100%;
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1rem;
+  border: none;
+  transition: all 0.2s ease-in-out;
+  background: var(--color-blue);
+  color: var(--color-white);
+  box-shadow: 0 2px 8px rgba(58, 107, 255, 0.2);
+}
+
+.btn:hover {
+  background: #2a55e6;
+  box-shadow: 0 4px 12px rgba(58, 107, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 4px rgba(58, 107, 255, 0.2);
+}
+
+.btn:disabled {
+  background: var(--color-gray-white);
+  color: var(--color-white);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Mobile Adjustments for Role Cards */
+@media (max-width: 768px) {
+  .role-cards {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .role-card {
+    width: 100%;
+    max-width: 320px;
+    padding: 24px 16px;
+  }
+  h1 {
+    font-size: 2rem;
+  }
+}

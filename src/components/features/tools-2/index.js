@@ -99,6 +99,7 @@ export default function IndexPage({ goTo }) {
 
     const [isMiscAccordionOpen, setIsMiscAccordionOpen] = useState(false);
     const [openSubAccordionKey, setOpenSubAccordionKey] = useState(null);
+    const [instructionModal, setInstructionModal] = useState(null);
 
     useEffect(() => {
         const completionKey = "trainer_v2_sessionCompletionPending";
@@ -678,9 +679,48 @@ export default function IndexPage({ goTo }) {
                                                     className={`${openSubAccordionKey === subItem.key ? "!bg-gray-100 !text-black" : ""}`}>
                                                     {subItem.label}
                                                 </Button>
-                                                {openSubAccordionKey === subItem.key && (
+                                                {openSubAccordionKey === subItem.key && subItem.key === 'services' && (() => {
+                                                    const allServices = (defaultLinks[subItem.key] || []).slice().sort(sortByOrder);
+                                                    const requiredServices = allServices.filter(s => s.required !== false);
+                                                    const optionalServices = allServices.filter(s => s.required === false);
+                                                    const renderServiceCard = (link, linkIndex) => (
+                                                        <div key={linkIndex} className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="font-semibold text-sm text-gray-900">{link.name}</span>
+                                                                {link.description && <span className="text-xs text-gray-500 truncate">{link.description}</span>}
+                                                            </div>
+                                                            <div className="flex gap-2 flex-shrink-0">
+                                                                <Button inverted className="!px-3 !py-1.5 !text-xs" disabled={!link.url} onClick={() => link.url && window.open(link.url, "_blank")}>
+                                                                    {link.buttonLabel || (link.url ? "Регистрация" : "Скачать")}
+                                                                </Button>
+                                                                {link.instructionImage && (
+                                                                    <Button inverted className="!px-3 !py-1.5 !text-xs" onClick={() => setInstructionModal({ name: link.name, image: link.instructionImage })}>
+                                                                        Инструкция
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                    return (
+                                                        <div className="flex flex-col gap-4 pt-2">
+                                                            {requiredServices.length > 0 && (
+                                                                <div className="flex flex-col gap-2">
+                                                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Обязательные</span>
+                                                                    {requiredServices.map(renderServiceCard)}
+                                                                </div>
+                                                            )}
+                                                            {optionalServices.length > 0 && (
+                                                                <div className="flex flex-col gap-2">
+                                                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Необязательные</span>
+                                                                    {optionalServices.map(renderServiceCard)}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                                {openSubAccordionKey === subItem.key && subItem.key !== 'services' && (
                                                     <div className="flex flex-nowrap gap-2 pt-2 overflow-x-auto">
-                                                        {(defaultLinks[subItem.key] || [])
+                                                        {(subItem.links || defaultLinks[subItem.key] || [])
                                                             .slice()
                                                             .sort(sortByOrder)
                                                             .map((link, linkIndex) => (
@@ -700,6 +740,30 @@ export default function IndexPage({ goTo }) {
                 </div>
 
                 {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />}
+
+                {instructionModal && (
+                    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60" onClick={() => setInstructionModal(null)}>
+                        <div className="relative bg-white rounded-2xl shadow-2xl max-w-[95vw] max-h-[95vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                            <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-3 bg-white border-b border-gray-100 rounded-t-2xl">
+                                <h3 className="text-base font-semibold text-gray-900">Инструкция: {instructionModal.name}</h3>
+                                <Button
+                                    icon
+                                    className="!bg-transparent !text-black hover:!bg-black/5"
+                                    onClick={() => setInstructionModal(null)}
+                                >
+                                    ✕
+                                </Button>
+                            </div>
+                            <div className="p-4">
+                                <img
+                                    src={instructionModal.image}
+                                    alt={`Инструкция ${instructionModal.name}`}
+                                    className="w-full max-w-[900px] rounded-xl"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );

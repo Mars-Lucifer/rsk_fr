@@ -1,0 +1,150 @@
+{
+  "id": "bd747f60",
+  "name": "123",
+  "created": "2026-02-25T11:23:33.086Z",
+  "createdBy": 804636463,
+  "techSpecialists": {
+    "test_4ft3np": {
+      "name": "Тестовый пользователь",
+      "tasks": {
+        "internet": {
+          "status": "pending",
+          "screenshot": null
+        },
+        "workspace": {
+          "status": "pending",
+          "photo": null
+        },
+        "multimedia": {
+          "status": "pending",
+          "photo": null
+        }
+      }
+    },
+    "test_8u7ft5": {
+      "name": "Тестовый пользователь",
+      "tasks": {
+        "internet": {
+          "status": "pending",
+          "screenshot": null
+        },
+        "workspace": {
+          "status": "pending",
+          "photo": null
+        },
+        "multimedia": {
+          "status": "pending",
+          "photo": null
+        }
+      }
+    },
+    "test_ht8sng": {
+      "name": "Тестовый пользователь",
+      "tasks": {
+        "internet": {
+          "status": "pending",
+          "screenshot": null
+        },
+        "workspace": {
+          "status": "pending",
+          "photo": null
+        },
+        "multimedia": {
+          "status": "pending",
+          "photo": null
+        }
+      }
+    },
+    "test_9thell": {
+      "name": "Тестовый пользователь",
+      "tasks": {
+        "internet": {
+          "status": "pending",
+          "screenshot": null
+        },
+        "workspace": {
+          "status": "pending",
+          "photo": null
+        },
+        "multimedia": {
+          "status": "pending",
+          "photo": null
+        }
+      }
+    }
+  },
+  "participants": {
+    "test_dtyrv1": {
+      "name": "Тестовый пользователь",
+      "laptopType": "personal",
+      "tasks": {
+        "laptop": {
+          "status": "in_progress"
+        },
+        "chrome": {
+          "status": "pending"
+        },
+        "services": {
+          "status": "done",
+          "completed": [
+            "suno",
+            "perplexity"
+          ],
+          "pending": []
+        }
+      },
+      "overallStatus": "in_progress"
+    },
+    "test_rkyd2c": {
+      "name": "Тестовый пользователь",
+      "laptopType": null,
+      "tasks": {
+        "laptop": {
+          "status": "pending"
+        },
+        "chrome": {
+          "status": "pending"
+        },
+        "services": {
+          "status": "in_progress",
+          "completed": [],
+          "pending": [
+            "suno",
+            "perplexity"
+          ]
+        }
+      },
+      "overallStatus": "pending"
+    },
+    "test_7blszb": {
+      "name": "Тестовый пользователь",
+      "laptopType": "personal",
+      "tasks": {
+        "laptop": {
+          "status": "done",
+          "specs": {
+            "ram": 8,
+            "cpus": 16,
+            "os": "Windows 10/11",
+            "browser": "Chrome",
+            "isChrome": true,
+            "isValid": true,
+            "errors": []
+          }
+        },
+        "chrome": {
+          "status": "pending"
+        },
+        "services": {
+          "status": "pending",
+          "completed": [],
+          "pending": [
+            "suno",
+            "perplexity"
+          ]
+        }
+      },
+      "overallStatus": "in_progress"
+    }
+  }
+}

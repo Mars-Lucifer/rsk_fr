@@ -54,3 +54,8 @@ data/mayakData.json
 data/questionnaires.json
 
 data/results.json
+data/telegram-sessions/
+data/prep-sessions/
+data/botAdmins.json
+data/tokenRequests.json
+public/prep-uploads/
