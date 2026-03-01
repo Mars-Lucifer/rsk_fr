@@ -9,10 +9,10 @@ export default function Document(props) {
             display: none;
           }
           @media (max-width: 900px) {
-            body:not([data-pathname^="/tools"]):not([data-pathname^="/prep-session"]) .desktop {
+            body:not([data-pathname^="/tools"]):not([data-pathname^="/prep-session"]):not([data-pathname^="/results"]) .desktop {
               display: none;
             }
-            body:not([data-pathname^="/tools"]):not([data-pathname^="/prep-session"]) .mobile {
+            body:not([data-pathname^="/tools"]):not([data-pathname^="/prep-session"]):not([data-pathname^="/results"]) .mobile {
               display: flex;
               padding: 40px;
             }
