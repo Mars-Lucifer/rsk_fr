@@ -1928,11 +1928,7 @@ export default function TrainerPage({ goTo }) {
             await handleDownloadCertificate();
             await handleDownloadLogs();
 
-            // Отправляем в Telegram и получаем deep link
-            await handleSendToTelegram();
-
-            // Если есть telegramLink — откроется по клику, а мы очищаем состояние
-            await new Promise((resolve) => setTimeout(resolve, 3000));
+            await new Promise((resolve) => setTimeout(resolve, 5000));
 
             // Очистка состояния
             setShowSessionCompletionPopup(false);
