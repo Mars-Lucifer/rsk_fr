@@ -44,6 +44,11 @@ export default function AdminMayakTokens() {
     const [requestsLoading, setRequestsLoading] = useState(false);
     const [approveTokenId, setApproveTokenId] = useState({}); // { requestId: tokenId }
 
+    // Ручное назначение токена
+    const [manualTelegramId, setManualTelegramId] = useState("");
+    const [manualName, setManualName] = useState("");
+    const [manualTokenId, setManualTokenId] = useState("");
+
     // Названия разделов
     const [rangeNames, setRangeNames] = useState({});
     const [rangesList, setRangesList] = useState([]);
@@ -53,6 +58,15 @@ export default function AdminMayakTokens() {
     const [botAdmins, setBotAdmins] = useState([]);
     const [newAdminId, setNewAdminId] = useState("");
     const [newAdminName, setNewAdminName] = useState("");
+
+    // Настройки API-ключей
+    const [settingsTgToken, setSettingsTgToken] = useState("");
+    const [settingsOrKey, setSettingsOrKey] = useState("");
+    const [settingsBotUsername, setSettingsBotUsername] = useState("");
+    const [settingsWebhookUrl, setSettingsWebhookUrl] = useState("");
+    const [settingsBaseUrl, setSettingsBaseUrl] = useState("");
+    const [settingsInfo, setSettingsInfo] = useState({ telegramBotToken: null, telegramBotTokenIsSet: false, openrouterApiKey: null, openrouterApiKeyIsSet: false, telegramBotUsername: "", telegramBotUsernameIsSet: false, telegramWebhookUrl: "", telegramWebhookUrlIsSet: false, baseUrl: "", baseUrlIsSet: false });
+    const [settingsSaving, setSettingsSaving] = useState(false);
 
     // Проверка авторизации при загрузке
     useEffect(() => {
@@ -113,6 +127,7 @@ export default function AdminMayakTokens() {
             fetchRanges();
             fetchRequests();
             fetchBotAdmins();
+            fetchSettings();
         }
     }, [isAuthenticated]);
 
@@ -143,6 +158,55 @@ export default function AdminMayakTokens() {
             }
         } catch (err) {
             console.error("Ошибка загрузки админов бота:", err);
+        }
+    };
+
+    // Загрузка настроек API-ключей
+    const fetchSettings = async () => {
+        try {
+            const res = await fetch("/api/admin/mayak-settings?password=" + ADMIN_PASSWORD);
+            if (!res.ok) return;
+            const text = await res.text();
+            if (!text.startsWith("{")) return;
+            const data = JSON.parse(text);
+            if (data.success) {
+                setSettingsInfo(data.data);
+            }
+        } catch (err) {
+            console.error("Ошибка загрузки настроек:", err);
+        }
+    };
+
+    // Сохранение настройки
+    const handleSaveSettings = async (field) => {
+        const body = { password: ADMIN_PASSWORD };
+        const fieldMap = {
+            telegramBotToken: { value: settingsTgToken, clear: () => setSettingsTgToken(""), emptyMsg: "Введите токен бота", successMsg: (d) => d.botRestarted ? "Токен сохранён, бот перезапущен" : "Токен сохранён" },
+            openrouterApiKey: { value: settingsOrKey, clear: () => setSettingsOrKey(""), emptyMsg: "Введите API-ключ", successMsg: () => "API-ключ сохранён" },
+            telegramBotUsername: { value: settingsBotUsername, clear: () => setSettingsBotUsername(""), emptyMsg: "Введите username бота", successMsg: () => "Username бота сохранён" },
+            telegramWebhookUrl: { value: settingsWebhookUrl, clear: () => setSettingsWebhookUrl(""), emptyMsg: null, successMsg: () => "Webhook URL сохранён" },
+            baseUrl: { value: settingsBaseUrl, clear: () => setSettingsBaseUrl(""), emptyMsg: null, successMsg: () => "Base URL сохранён" },
+        };
+        const f = fieldMap[field];
+        if (!f) return;
+        if (f.emptyMsg && !f.value.trim()) { alert(f.emptyMsg); return; }
+        body[field] = f.value.trim();
+        try {
+            setSettingsSaving(true);
+            const res = await fetch("/api/admin/mayak-settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || "Ошибка сохранения");
+            f.clear();
+            alert(f.successMsg(data));
+            await fetchSettings();
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setSettingsSaving(false);
         }
     };
 
@@ -203,6 +267,30 @@ export default function AdminMayakTokens() {
                 throw new Error(errorData.error || "Ошибка одобрения");
             }
             setApproveTokenId((prev) => { const n = { ...prev }; delete n[requestId]; return n; });
+            await fetchRequests();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // Ручное назначение токена по Telegram ID
+    const handleManualAssign = async () => {
+        if (!manualTelegramId.trim()) { alert("Укажите Telegram ID"); return; }
+        if (!manualTokenId) { alert("Выберите токен"); return; }
+        try {
+            const res = await fetch("/api/admin/mayak-tokens/requests", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "manual_assign", telegramId: manualTelegramId.trim(), tokenId: manualTokenId, name: manualName.trim() || null, password: ADMIN_PASSWORD }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Ошибка назначения");
+            }
+            setManualTelegramId("");
+            setManualName("");
+            setManualTokenId("");
+            alert("Токен назначен, пользователь получит уведомление в Telegram");
             await fetchRequests();
         } catch (err) {
             alert(err.message);
@@ -545,6 +633,123 @@ export default function AdminMayakTokens() {
                                 )}
                             </div>
 
+                            {/* Настройки API-ключей */}
+                            <div className="p-[.75rem] rounded-[.75rem] bg-(--color-white-gray)">
+                                <span className="link small text-(--color-gray-black)" style={{ display: "block", marginBottom: 8 }}>Настройки:</span>
+                                <div className="flex flex-col gap-[.75rem]">
+                                    {/* Токен Telegram-бота */}
+                                    <div className="flex gap-[.5rem] items-end flex-wrap">
+                                        <div className="flex-1 min-w-[200px]">
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
+                                                Токен Telegram-бота
+                                                {settingsInfo.telegramBotTokenIsSet ? (
+                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.telegramBotToken})</span>
+                                                ) : (
+                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
+                                                )}
+                                            </label>
+                                            <Input
+                                                type="password"
+                                                placeholder="Введите новый токен бота"
+                                                value={settingsTgToken}
+                                                onChange={(e) => setSettingsTgToken(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("telegramBotToken")} disabled={settingsSaving}>
+                                            {settingsSaving ? "..." : "Сохранить"}
+                                        </Button>
+                                    </div>
+                                    {/* Username бота */}
+                                    <div className="flex gap-[.5rem] items-end flex-wrap">
+                                        <div className="flex-1 min-w-[200px]">
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
+                                                Username бота (без @)
+                                                {settingsInfo.telegramBotUsernameIsSet ? (
+                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>(@{settingsInfo.telegramBotUsername})</span>
+                                                ) : (
+                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
+                                                )}
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                placeholder="my_bot_username"
+                                                value={settingsBotUsername}
+                                                onChange={(e) => setSettingsBotUsername(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("telegramBotUsername")} disabled={settingsSaving}>
+                                            {settingsSaving ? "..." : "Сохранить"}
+                                        </Button>
+                                    </div>
+                                    {/* OpenRouter API Key */}
+                                    <div className="flex gap-[.5rem] items-end flex-wrap">
+                                        <div className="flex-1 min-w-[200px]">
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
+                                                OpenRouter API Key
+                                                {settingsInfo.openrouterApiKeyIsSet ? (
+                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.openrouterApiKey})</span>
+                                                ) : (
+                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
+                                                )}
+                                            </label>
+                                            <Input
+                                                type="password"
+                                                placeholder="Введите OpenRouter API Key"
+                                                value={settingsOrKey}
+                                                onChange={(e) => setSettingsOrKey(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("openrouterApiKey")} disabled={settingsSaving}>
+                                            {settingsSaving ? "..." : "Сохранить"}
+                                        </Button>
+                                    </div>
+                                    {/* Webhook URL */}
+                                    <div className="flex gap-[.5rem] items-end flex-wrap">
+                                        <div className="flex-1 min-w-[200px]">
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
+                                                Webhook URL (требует перезапуска сервера)
+                                                {settingsInfo.telegramWebhookUrlIsSet ? (
+                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>(задан)</span>
+                                                ) : (
+                                                    <span style={{ color: "#6b7280", marginLeft: 6, fontSize: 11 }}>(polling режим)</span>
+                                                )}
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                placeholder={settingsInfo.telegramWebhookUrl || "https://self.rosdk.ru/api/mayak/telegram-webhook"}
+                                                value={settingsWebhookUrl}
+                                                onChange={(e) => setSettingsWebhookUrl(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("telegramWebhookUrl")} disabled={settingsSaving}>
+                                            {settingsSaving ? "..." : "Сохранить"}
+                                        </Button>
+                                    </div>
+                                    {/* Base URL */}
+                                    <div className="flex gap-[.5rem] items-end flex-wrap">
+                                        <div className="flex-1 min-w-[200px]">
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
+                                                Base URL приложения
+                                                {settingsInfo.baseUrlIsSet ? (
+                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.baseUrl})</span>
+                                                ) : (
+                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
+                                                )}
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                placeholder={settingsInfo.baseUrl || "https://self.rosdk.ru"}
+                                                value={settingsBaseUrl}
+                                                onChange={(e) => setSettingsBaseUrl(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("baseUrl")} disabled={settingsSaving}>
+                                            {settingsSaving ? "..." : "Сохранить"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Список админов */}
                             <div>
                                 <span className="link small text-(--color-gray-black)" style={{ display: "block", marginBottom: 8 }}>Админы бота (могут создавать prep-сессии):</span>
@@ -600,7 +805,6 @@ export default function AdminMayakTokens() {
                     {(() => {
                         const pendingRequests = tokenRequests.filter((r) => r.status === "pending" || r.status === "awaiting_code");
                         const historyRequests = tokenRequests.filter((r) => r.status === "approved" || r.status === "rejected");
-                        if (tokenRequests.length === 0 && !requestsLoading) return null;
                         return (
                             <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
                                 <div className="flex items-center justify-between mb-[1rem]">
@@ -615,6 +819,51 @@ export default function AdminMayakTokens() {
                                     <Button small inverted roundeful className="!w-fit" onClick={fetchRequests} disabled={requestsLoading}>
                                         {requestsLoading ? "..." : "Обновить"}
                                     </Button>
+                                </div>
+
+                                {/* Ручное назначение токена */}
+                                <div className="p-[.75rem] rounded-[.75rem] bg-(--color-white-gray) mb-[1rem]">
+                                    <span className="link small text-(--color-gray-black)" style={{ display: "block", marginBottom: 8 }}>Назначить токен вручную:</span>
+                                    <div className="flex gap-[.5rem] items-end flex-wrap">
+                                        <div>
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">Telegram ID</label>
+                                            <Input
+                                                type="text"
+                                                placeholder="123456789"
+                                                value={manualTelegramId}
+                                                onChange={(e) => setManualTelegramId(e.target.value)}
+                                                className="!w-[140px]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">Имя (опц.)</label>
+                                            <Input
+                                                type="text"
+                                                placeholder="Имя"
+                                                value={manualName}
+                                                onChange={(e) => setManualName(e.target.value)}
+                                                className="!w-[120px]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">Токен</label>
+                                            <select
+                                                value={manualTokenId}
+                                                onChange={(e) => setManualTokenId(e.target.value)}
+                                                style={{ padding: "8px 10px", borderRadius: 8, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 13, background: "#fff", minWidth: 160 }}
+                                            >
+                                                <option value="">Выберите токен</option>
+                                                {tokens.filter((t) => t.isActive && !t.isExhausted).map((t) => (
+                                                    <option key={t.id} value={t.id}>
+                                                        {t.name} ({t.sectionId || t.taskRange || 'Все'})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={handleManualAssign}>
+                                            Назначить
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 {pendingRequests.length === 0 && historyRequests.length === 0 && (
@@ -661,41 +910,33 @@ export default function AdminMayakTokens() {
                                                             {formatDate(req.createdAt)}
                                                         </td>
                                                         <td className="p-[.75rem]">
-                                                            {req.status === "pending" ? (
-                                                                <div className="flex flex-col gap-[.5rem] items-end">
-                                                                    <div className="flex gap-[.5rem] items-center">
-                                                                        <select
-                                                                            value={approveTokenId[req.id] || ""}
-                                                                            onChange={(e) => setApproveTokenId((prev) => ({ ...prev, [req.id]: e.target.value }))}
-                                                                            style={{ padding: "4px 6px", borderRadius: 6, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 12, background: "#fff", maxWidth: 180 }}
-                                                                        >
-                                                                            <option value="">Выберите токен</option>
-                                                                            {tokens.filter((t) => t.isActive && !t.isExhausted).map((t) => (
-                                                                                <option key={t.id} value={t.id}>
-                                                                                    {t.name} ({t.remainingAttempts} ост.)
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
-                                                                        <Button small inverted roundeful className="!w-fit approve-button !p-[.25rem_.5rem]" onClick={() => handleApproveRequest(req.id)}>
-                                                                            Одобрить
-                                                                        </Button>
-                                                                    </div>
-                                                                    <div className="flex gap-[.5rem]">
-                                                                        <Button small inverted roundeful className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={() => handleRejectRequest(req.id)}>
-                                                                            Отклонить
-                                                                        </Button>
-                                                                        <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => handleDeleteRequest(req.id)}>
-                                                                            Удалить
-                                                                        </Button>
-                                                                    </div>
+                                                            <div className="flex flex-col gap-[.5rem] items-end">
+                                                                <div className="flex gap-[.5rem] items-center">
+                                                                    <select
+                                                                        value={approveTokenId[req.id] || ""}
+                                                                        onChange={(e) => setApproveTokenId((prev) => ({ ...prev, [req.id]: e.target.value }))}
+                                                                        style={{ padding: "4px 6px", borderRadius: 6, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 12, background: "#fff", maxWidth: 180 }}
+                                                                    >
+                                                                        <option value="">Выберите токен</option>
+                                                                        {tokens.filter((t) => t.isActive && !t.isExhausted).map((t) => (
+                                                                            <option key={t.id} value={t.id}>
+                                                                                {t.name} ({t.sectionId || t.taskRange || 'Все'})
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <Button small inverted roundeful className="!w-fit approve-button !p-[.25rem_.5rem]" onClick={() => handleApproveRequest(req.id)}>
+                                                                        Одобрить
+                                                                    </Button>
                                                                 </div>
-                                                            ) : (
-                                                                <div className="flex justify-end">
+                                                                <div className="flex gap-[.5rem]">
+                                                                    <Button small inverted roundeful className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={() => handleRejectRequest(req.id)}>
+                                                                        Отклонить
+                                                                    </Button>
                                                                     <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => handleDeleteRequest(req.id)}>
                                                                         Удалить
                                                                     </Button>
                                                                 </div>
-                                                            )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -715,20 +956,35 @@ export default function AdminMayakTokens() {
                                                     <tr className="border-b border-(--color-gray-plus-50)">
                                                         <th className="text-left p-[.5rem] link small">Пользователь</th>
                                                         <th className="text-left p-[.5rem] link small">Код</th>
+                                                        <th className="text-left p-[.5rem] link small">Токен</th>
                                                         <th className="text-center p-[.5rem] link small">Статус</th>
                                                         <th className="text-left p-[.5rem] link small">Дата</th>
                                                         <th className="text-right p-[.5rem] link small"></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {historyRequests.map((req) => (
+                                                    {historyRequests.map((req) => {
+                                                        const assignedToken = req.assignedTokenId ? tokens.find((t) => t.id === req.assignedTokenId) : null;
+                                                        return (
                                                         <tr key={req.id} className="border-b border-(--color-gray-plus-50)">
                                                             <td className="p-[.5rem]">
                                                                 <span className="text-[.85rem]">{req.firstName || "—"}</span>
                                                                 {req.username && <span className="text-[.75rem] text-(--color-gray-black)"> @{req.username}</span>}
+                                                                <div className="text-[.65rem] text-(--color-gray-black)">ID: {req.telegramId}</div>
                                                             </td>
                                                             <td className="p-[.5rem]">
                                                                 <code className="text-[.75rem]">{req.secretCode || "—"}</code>
+                                                            </td>
+                                                            <td className="p-[.5rem]">
+                                                                {assignedToken ? (
+                                                                    <div>
+                                                                        <code className="text-[.7rem] bg-(--color-white-gray) px-[.25rem] py-[.1rem] rounded cursor-pointer" title="Нажмите чтобы скопировать" onClick={() => copyToClipboard(assignedToken.token)}>{assignedToken.token.substring(0, 8)}...</code>
+                                                                        <div className="text-[.65rem] text-(--color-gray-black)">{assignedToken.name}</div>
+                                                                        <div className="text-[.65rem] text-(--color-gray-black)">{assignedToken.sectionId || assignedToken.taskRange || "Все"}</div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-[.75rem] text-(--color-gray-black)">—</span>
+                                                                )}
                                                             </td>
                                                             <td className="p-[.5rem] text-center">
                                                                 {req.status === "approved" ? (
@@ -746,7 +1002,8 @@ export default function AdminMayakTokens() {
                                                                 </Button>
                                                             </td>
                                                         </tr>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -822,7 +1079,11 @@ export default function AdminMayakTokens() {
 
                     {/* Таблица токенов */}
                     <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                        <h5 className="mb-[1rem]">Список токенов</h5>
+                        <details open>
+                            <summary style={{ cursor: "pointer", userSelect: "none", listStyle: "none", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <h5 style={{ margin: 0 }}>Список токенов ({tokens.length})</h5>
+                                <span className="text-(--color-gray-black)" style={{ fontSize: 12 }}>{tokens.length > 0 ? "свернуть/развернуть" : ""}</span>
+                            </summary>
 
                         {tokens.length === 0 ? (
                             <p className="text-(--color-gray-black) text-center py-[2rem]">
@@ -1006,6 +1267,7 @@ export default function AdminMayakTokens() {
                                 </table>
                             </div>
                         )}
+                        </details>
                     </div>
                 </div>
             </div>

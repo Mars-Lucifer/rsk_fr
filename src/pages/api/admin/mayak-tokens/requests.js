@@ -1,4 +1,4 @@
-import { getAllRequests, updateRequest, deleteRequest } from '../../../../utils/tokenRequests.js';
+import { getAllRequests, updateRequest, deleteRequest, createRequest, submitCode } from '../../../../utils/tokenRequests.js';
 import { getTokenById } from '../../../../utils/mayakTokens.js';
 
 const ADMIN_PASSWORD = 'a12345';
@@ -27,7 +27,36 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-        const { requestId, action, tokenId } = req.body;
+        const { requestId, action, tokenId, telegramId, name } = req.body;
+
+        // Ручное назначение токена по Telegram ID (без запроса из бота)
+        if (action === 'manual_assign') {
+            if (!telegramId || !tokenId) {
+                return res.status(400).json({ error: 'telegramId and tokenId are required' });
+            }
+            const token = getTokenById(tokenId);
+            if (!token) {
+                return res.status(404).json({ error: 'Token not found' });
+            }
+            // Создаём запрос и сразу одобряем
+            const result = createRequest(telegramId, null, name || null);
+            const reqObj = result.request;
+            // Если запрос в awaiting_code — ставим код чтобы перевести в pending
+            if (reqObj.status === 'awaiting_code') {
+                submitCode(telegramId, 'admin-assigned');
+            }
+            const updated = updateRequest(reqObj.id, {
+                status: 'approved',
+                assignedTokenId: tokenId,
+            });
+            // Уведомляем пользователя в Telegram
+            await notifyUser(telegramId,
+                `\u2705 \u0412\u0430\u043c \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d \u0442\u043e\u043a\u0435\u043d \u0434\u043e\u0441\u0442\u0443\u043f\u0430!\n\n\ud83d\udd11 \u0412\u0430\u0448 \u0442\u043e\u043a\u0435\u043d:\n<code>${token.token}</code>\n\n` +
+                `\ud83d\udccc \u0420\u0430\u0437\u0434\u0435\u043b: ${token.sectionId || token.taskRange || '\u0412\u0441\u0435'}\n` +
+                `\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 /token \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430 \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u0438.`
+            );
+            return res.json({ success: true, data: updated });
+        }
 
         if (!requestId || !action) {
             return res.status(400).json({ error: 'requestId and action are required' });
@@ -50,9 +79,9 @@ export default async function handler(req, res) {
             }
             // Уведомляем пользователя в Telegram
             await notifyUser(updated.chatId,
-                `✅ Ваш запрос одобрен!\n\n🔑 Ваш токен:\n<code>${token.token}</code>\n\n` +
-                `📌 Раздел: ${token.sectionId || token.taskRange || 'Все'}\n` +
-                `Используйте /token для просмотра информации.`
+                `\u2705 \u0412\u0430\u0448 \u0437\u0430\u043f\u0440\u043e\u0441 \u043e\u0434\u043e\u0431\u0440\u0435\u043d!\n\n\ud83d\udd11 \u0412\u0430\u0448 \u0442\u043e\u043a\u0435\u043d:\n<code>${token.token}</code>\n\n` +
+                `\ud83d\udccc \u0420\u0430\u0437\u0434\u0435\u043b: ${token.sectionId || token.taskRange || '\u0412\u0441\u0435'}\n` +
+                `\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 /token \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430 \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u0438.`
             );
             return res.json({ success: true, data: updated });
         }
@@ -64,10 +93,9 @@ export default async function handler(req, res) {
             if (!updated) {
                 return res.status(404).json({ error: 'Request not found' });
             }
-            // Уведомляем пользователя
             if (request?.chatId) {
                 await notifyUser(request.chatId,
-                    '❌ Ваш запрос на получение токена был отклонён.\n\nЕсли считаете, что это ошибка, отправьте /token для нового запроса.'
+                    '\u274c \u0412\u0430\u0448 \u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u0435 \u0442\u043e\u043a\u0435\u043d\u0430 \u0431\u044b\u043b \u043e\u0442\u043a\u043b\u043e\u043d\u0451\u043d.\n\n\u0415\u0441\u043b\u0438 \u0441\u0447\u0438\u0442\u0430\u0435\u0442\u0435, \u0447\u0442\u043e \u044d\u0442\u043e \u043e\u0448\u0438\u0431\u043a\u0430, \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 /token \u0434\u043b\u044f \u043d\u043e\u0432\u043e\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u0430.'
                 );
             }
             return res.json({ success: true, data: updated });
@@ -81,7 +109,7 @@ export default async function handler(req, res) {
             return res.json({ success: true, data: deleted });
         }
 
-        return res.status(400).json({ error: 'Unknown action. Use: approve, reject, delete' });
+        return res.status(400).json({ error: 'Unknown action. Use: approve, reject, delete, manual_assign' });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });

@@ -199,6 +199,24 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
         return taskNum >= start && taskNum <= end;
     })();
 
+    // Вычисляем допустимые границы навигации по tokenTaskRange
+    let allowedMinIndex = 0;
+    let allowedMaxIndex = Math.max(0, tasks.length - 1);
+    if (tokenTaskRange && tasks.length > 0) {
+        const [startStr, endStr] = tokenTaskRange.split("-");
+        const start = parseInt(startStr, 10);
+        const end = parseInt(endStr, 10);
+        if (!isNaN(start)) {
+            const idx = tasks.findIndex(t => parseInt(t.number, 10) >= start);
+            if (idx !== -1) allowedMinIndex = idx;
+        }
+        if (!isNaN(end)) {
+            for (let i = tasks.length - 1; i >= 0; i--) {
+                if (parseInt(tasks[i].number, 10) <= end) { allowedMaxIndex = i; break; }
+            }
+        }
+    }
+
     const basePath = taskVersion === "v2" ? `/tasks-2/${taskVersion}` : `/tasks-2/${taskVersion}/${userType}/${who}`;
 
     const taskRange = currentTask?._range || (taskVersion === "v2" ? getRange(currentTaskIndex + 1) : null);
@@ -402,11 +420,11 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
 
     const goToTask = useCallback(
         (index) => {
-            if (index >= 0 && index < tasks.length) {
+            if (index >= allowedMinIndex && index <= allowedMaxIndex && index < tasks.length) {
                 setCurrentTaskIndex(index);
             }
         },
-        [tasks.length, setCurrentTaskIndex]
+        [tasks.length, allowedMinIndex, allowedMaxIndex, setCurrentTaskIndex]
     );
 
     const nextTask = useCallback(() => goToTask(currentTaskIndex + 1), [currentTaskIndex, goToTask]);
@@ -431,6 +449,8 @@ const useTaskManager = ({ userType, who, taskVersion, isTokenValid, tokenTaskRan
         tasksTexts,
         setError,
         isCurrentTaskAllowed,
+        allowedMinIndex,
+        allowedMaxIndex,
     };
 };
 
@@ -1084,6 +1104,8 @@ const TrainerControls = memo(function TrainerControls({
     sourceUrl,
     currentTask,
     isCurrentTaskAllowed,
+    allowedMinIndex,
+    allowedMaxIndex,
     levels,
     showLevelsInput,
     selectedRole,
@@ -1094,7 +1116,6 @@ const TrainerControls = memo(function TrainerControls({
     onPrevTask,
     onNextTask,
     onTaskInputChange,
-    onTaskInputCommit,
     onToggleTaskTimer,
     onCompleteSession,
     onShowRolePopup,
@@ -1151,14 +1172,14 @@ const TrainerControls = memo(function TrainerControls({
             <div className="flex flex-col gap-[0.75rem]">
                 <div className="flex flex-col gap-[0.75rem]">
                     <div className="flex items-center gap-[0.5rem]">
-                        <span className="text-sm text-gray-500">Задание №{tasks.length > 0 ? currentTaskIndex + 1 : 0}</span>
+                        <span className="text-sm text-gray-500">Задание №{tasks.length > 0 && tasks[currentTaskIndex] ? tasks[currentTaskIndex].number : 0}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button className="!w-10 !h-10 !p-0 flex items-center justify-center" onClick={onPrevTask} disabled={currentTaskIndex === 0 || isTaskRunning}>
+                        <Button className="!w-10 !h-10 !p-0 flex items-center justify-center" onClick={onPrevTask} disabled={currentTaskIndex <= allowedMinIndex || isTaskRunning}>
                             ←
                         </Button>
                         <Input type="text" inputMode="numeric" min="1" max={tasks.length || 1} value={taskInputValue} onChange={onTaskInputChange} className="text-center !w-15 !h-10" disabled={isTaskRunning} />
-                        <Button className="!w-10 !h-10 !p-0 flex items-center justify-center" onClick={onNextTask} disabled={currentTaskIndex >= tasks.length - 1 || isTaskRunning}>
+                        <Button className="!w-10 !h-10 !p-0 flex items-center justify-center" onClick={onNextTask} disabled={currentTaskIndex >= allowedMaxIndex || isTaskRunning}>
                             →
                         </Button>
                     </div>
@@ -1393,7 +1414,7 @@ export default function TrainerPage({ goTo }) {
     const [openSubAccordionKey, setOpenSubAccordionKey] = useState(null);
     const [instructionModal, setInstructionModal] = useState(null);
 
-    const { tasks, currentTask, currentTaskIndex, isLoading, error, setError, timerState, startTimer, stopTimer, goToTask, nextTask, prevTask, instructionFileUrl, taskFileUrl, sourceUrl, tasksTexts, isCurrentTaskAllowed } = useTaskManager({
+    const { tasks, currentTask, currentTaskIndex, isLoading, error, setError, timerState, startTimer, stopTimer, goToTask, nextTask, prevTask, instructionFileUrl, taskFileUrl, sourceUrl, tasksTexts, isCurrentTaskAllowed, allowedMinIndex, allowedMaxIndex } = useTaskManager({
         userType,
         who,
         taskVersion,
@@ -1465,10 +1486,9 @@ export default function TrainerPage({ goTo }) {
     }, [currentTask]);
 
     useEffect(() => {
-        // Этот хук синхронизирует значение в поле ввода с реальным индексом задания.
-        // Он сработает, когда задание меняется по клику на стрелки.
-        if (tasks.length > 0) {
-            setTaskInputValue((currentTaskIndex + 1).toString());
+        // Синхронизируем поле ввода с номером задания (task.number), а не индексом
+        if (tasks.length > 0 && tasks[currentTaskIndex]) {
+            setTaskInputValue(tasks[currentTaskIndex].number?.toString() || (currentTaskIndex + 1).toString());
         }
     }, [currentTaskIndex, tasks]);
 
@@ -1928,6 +1948,13 @@ export default function TrainerPage({ goTo }) {
             await handleDownloadCertificate();
             await handleDownloadLogs();
 
+            // Отправляем в Telegram (фоном, не блокируя)
+            try {
+                await handleSendToTelegram();
+            } catch (e) {
+                console.error("Telegram отправка не удалась (не критично):", e);
+            }
+
             await new Promise((resolve) => setTimeout(resolve, 5000));
 
             // Очистка состояния
@@ -2332,6 +2359,8 @@ export default function TrainerPage({ goTo }) {
         sourceUrl,
         currentTask,
         isCurrentTaskAllowed,
+        allowedMinIndex,
+        allowedMaxIndex,
         levels,
         showLevelsInput,
         selectedRole,
@@ -2368,18 +2397,17 @@ export default function TrainerPage({ goTo }) {
 
             // Устанавливаем новый таймер
             debounceTimeoutRef.current = setTimeout(() => {
-                const newIndex = parseInt(value, 10) - 1;
+                const taskNumber = parseInt(value, 10);
 
-                // Если номер корректен, переключаем задание
-                if (newIndex >= 0 && newIndex < tasks.length) {
+                // Ищем задание по номеру (task.number), а не по индексу
+                const newIndex = tasks.findIndex(t => parseInt(t.number, 10) === taskNumber);
+
+                // Если задание найдено и в пределах допустимого диапазона — переключаем
+                if (newIndex !== -1 && newIndex >= allowedMinIndex && newIndex <= allowedMaxIndex) {
                     goToTask(newIndex);
-                } else {
-                    // Если введен невалидный номер (например 999), можно просто сбросить
-                    // поле обратно к текущему активному заданию для ясности.
-                    // Но лучше дать пользователю исправить ошибку.
-                    // Поле само синхронизируется при клике на стрелки.
                 }
-            }, 250); // Уменьшил задержку до 250ms, будет еще быстрее
+                // Если не найдено — просто не переключаем, даём пользователю исправить
+            }, 600);
         },
         onToggleTaskTimer: toggleTaskTimer,
         onCompleteSession: () => setShowThirdQuestionnaire(true),

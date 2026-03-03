@@ -58,4 +58,5 @@ data/telegram-sessions/
 data/prep-sessions/
 data/botAdmins.json
 data/tokenRequests.json
+data/mayak-settings.json
 public/prep-uploads/

@@ -175,7 +175,7 @@ async function handleNewSession(apiBase, chatId, name, fromId) {
   };
   savePrepSession(session);
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://rosdk.ru';
   const webappLink = `${baseUrl}/prep-session?session=${id}`;
   await sendMessage(apiBase, chatId,
     `✅ Сессия "<b>${name}</b>" создана!\n\n🆔 ID: <code>${id}</code>\n\n🔗 Ссылка на подготовку:\n<code>${webappLink}</code>\n\nОтправьте эту ссылку тех. специалисту.`
@@ -224,10 +224,10 @@ async function handleTokenRequest(apiBase, chatId, fromId, username, firstName) 
   if (approved && approved.assignedTokenId) {
     const token = getTokenById(approved.assignedTokenId);
     if (token) {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://self.rosdk.ru';
       await sendMessage(apiBase, chatId,
         `🔑 Ваш токен:\n<code>${token.token}</code>\n\n` +
-        `📌 Раздел: ${token.sectionId || token.taskRange || 'Все'}\n` +
-        `📊 Использований: ${token.usedCount} / ${token.usageLimit}`
+        `🎯 Перейти в тренажёр МАЯК:\n${baseUrl}/tools/mayak-oko`
       );
       return;
     }
@@ -262,17 +262,13 @@ async function handleTokenRequest(apiBase, chatId, fromId, username, firstName) 
 
 async function handleStart(apiBase, chatId, sessionId, firstName) {
   if (!sessionId) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://self.rosdk.ru';
     await sendMessage(apiBase, chatId,
       `Привет, ${firstName}!\n\n` +
-      `<b>🎯 МАЯК — тренажёр</b>\n` +
-      `Завершите сессию в тренажёре и нажмите "Получить сертификат" — я пришлю вам файлы.\n\n` +
+      `<b>🎯 Тренажёр МАЯК</b>\n` +
+      `Перейти в тренажёр: ${baseUrl}/tools/mayak-oko\n\n` +
       `<b>🔑 Доступ</b>\n` +
-      `/token — запросить токен доступа\n\n` +
-      `<b>📋 Prep-сессии</b>\n` +
-      `/new_session &lt;название&gt; — создать сессию\n` +
-      `/sessions — список всех сессий\n` +
-      `/status — сводка по последней сессии\n` +
-      `/status &lt;id&gt; — сводка по конкретной сессии`
+      `/token — получить токен для входа в тренажёр`
     );
     return;
   }
@@ -467,8 +463,10 @@ export async function processUpdate(update) {
 async function pollOnce(apiBase) {
   try {
     const offset = globalThis.__tgBotLastUpdateId || 0;
+    // Используем глобальный AbortController для возможности отмены при restartBot
+    globalThis.__tgBotAbortController = new AbortController();
     const res = await fetch(`${apiBase}/getUpdates?offset=${offset + 1}&timeout=25`, {
-      signal: AbortSignal.timeout(35000),
+      signal: globalThis.__tgBotAbortController.signal,
     });
     const data = await res.json();
 
@@ -547,6 +545,36 @@ async function registerCommands(apiBase) {
   } catch (err) {
     console.error('[TG Bot] Ошибка регистрации команд:', err.message);
   }
+}
+
+// --- Остановка и перезапуск бота ---
+
+export function stopBot() {
+  globalThis.__tgBotRunning = false;
+  // Прерываем текущий polling-запрос если он активен
+  if (globalThis.__tgBotAbortController) {
+    globalThis.__tgBotAbortController.abort();
+    globalThis.__tgBotAbortController = null;
+  }
+}
+
+export async function restartBot() {
+  const wasRunning = globalThis.__tgBotRunning;
+  stopBot();
+
+  // В webhook-режиме удаляем старый webhook перед перезапуском
+  if (wasRunning) {
+    try {
+      const oldApiBase = getApiBase();
+      if (oldApiBase) {
+        await fetch(`${oldApiBase}/deleteWebhook`);
+      }
+    } catch {}
+  }
+
+  // Даём время polling-циклу завершиться после abort
+  await new Promise(r => setTimeout(r, 500));
+  startBot();
 }
 
 // --- Запуск бота ---
