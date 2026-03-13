@@ -1,9 +1,11 @@
+﻿import { readMayakActiveUser } from "./readMayakActiveUser";
+
 export function buildMayakSessionCompletionPayload({ activeUser, elapsedTime, levels }) {
-    const decodedUser = decodeURIComponent(activeUser || "anonymous");
+    const userId = activeUser?.id || "anonymous";
     const timestamp = new Date().toISOString();
 
     return {
-        [decodedUser]: {
+        [userId]: {
             [timestamp]: {
                 taskNumber: "session-completion",
                 elapsedTime,
@@ -36,26 +38,9 @@ export function clearMayakSessionCompletionState({ getStorageKey, removeKeyCooki
     localStorage.setItem("trainer_v2_sessionCompletionPending", "true");
 }
 
-
-export async function executeMayakSessionCompletion({
-    elapsedTime,
-    levels,
-    onDownloadCertificate,
-    onDownloadLogs,
-    onSendToTelegram,
-    onClearState,
-}) {
-    const activeUser =
-        document.cookie
-            .split("; ")
-            .find((row) => row.startsWith("active_user="))
-            ?.split("=")[1] || "anonymous";
-
-    const payload = buildMayakSessionCompletionPayload({
-        activeUser,
-        elapsedTime,
-        levels,
-    });
+export async function executeMayakSessionCompletion({ elapsedTime, levels, onDownloadCertificate, onDownloadLogs, onSendToTelegram, onClearState }) {
+    const activeUser = readMayakActiveUser();
+    const payload = buildMayakSessionCompletionPayload({ activeUser, elapsedTime, levels });
 
     fetch("/api/mayak/saveDeltaTest", {
         method: "POST",

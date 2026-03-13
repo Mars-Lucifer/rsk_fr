@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 export async function getServerSideProps() {
     return { props: {} };
@@ -702,6 +702,9 @@ export default function AdminMayakTokens() {
                 <div className="flex items-center gap-[.5rem]">
                     <Link href="/admin/content" style={{ padding: "6px 14px", borderRadius: 6, background: "#3b82f6", color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
                         Контент
+                    </Link>
+                    <Link href="/admin/mayak-sessions" style={{ padding: "6px 14px", borderRadius: 6, background: "#0f766e", color: "#fff", fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
+                        Сессии
                     </Link>
                     <Button icon>
                         <Notify />

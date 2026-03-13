@@ -18,10 +18,14 @@ export function useMayakSessionActions({
     setSelectedRole,
     setShowRolePopup,
     stopTimer,
+    syncRole,
     timerIsRunning,
 }) {
     const handleRoleConfirm = useCallback(
-        (role) => {
+        async (role) => {
+            if (typeof syncRole === "function") {
+                await syncRole(role);
+            }
             setSelectedRole(role);
             localStorage.setItem(getStorageKey("userRole"), role);
             setShowRolePopup(false);
@@ -29,12 +33,12 @@ export function useMayakSessionActions({
                 autoCompleteIntroTask();
             }
         },
-        [autoCompleteIntroTask, currentTaskIndex, getStorageKey, isIntroTask, setSelectedRole, setShowRolePopup]
+        [autoCompleteIntroTask, currentTaskIndex, getStorageKey, isIntroTask, setSelectedRole, setShowRolePopup, syncRole]
     );
 
     const handleAdminResetSession = useCallback(() => {
         if (!isAdmin) return;
-        if (!confirm("???????? ??????? ??? ?????? ??????? ?????? ????? ???????.")) return;
+        if (!confirm("Это действие очистит текущую сессию тренажера для этого браузера.")) return;
 
         if (timerIsRunning) stopTimer();
 

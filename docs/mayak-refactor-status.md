@@ -151,3 +151,58 @@ Stop this stage when:
 - Switched localhost bypass flow from plain `fffff` to `fffff + MAYAK admin password` through `/api/admin/mayak-auth`.
 - Added automatic cleanup of legacy `ADMIN-BYPASS-TOKEN` from `activated_key` cookie on MAYAK settings load.
 - Tightened `useMayakAccessGate` so bypass token access requires an authenticated MAYAK admin cookie before opening the trainer.
+
+### Server rollout follow-up on 2026-03-11
+
+- Confirmed the active production Next.js app is running under `systemd` as `nextjs.service`, not under the old ad-hoc process/pm2 path.
+- Confirmed MAYAK service env must be provided through `systemd` override, not shell `export`.
+- Added/required service env values:
+  - `MAYAK_ADMIN_PASSWORD`
+  - `MAYAK_CONTENT_DIR`
+  - optional `MAYAK_ENABLE_SERVER_BYPASS=true` when `fffff` should work on server
+- Diagnosed MAYAK section-token loading bug where `content-bundle?sectionId=301-400` returned `200` but the trainer still opened empty task `1`.
+- Root cause: trainer restored old saved `currentTaskIndex=0` from session storage without checking whether that index belonged to the active section.
+- Fix prepared in `useMayakTaskManager.js`: section-scoped restore must validate saved index against the task `_range` / active `sectionId`.
+- Server verification for that specific fix should include searching for `isSavedIndexInActiveSection` in `src/components/features/tools-2/hooks/useMayakTaskManager.js` after deploy.
+
+### Inspector session flow on 2026-03-12
+
+- Added server-side MAYAK session storage in `src/lib/mayakSessions.js` for table-based trainer runs.
+- Added admin session APIs and page:
+  - `/api/admin/mayak-sessions`
+  - `/admin/mayak-sessions`
+- Session creation now generates a linked MAYAK token and stores:
+  - deck binding (`sectionId` / `taskRange`),
+  - tables,
+  - inspector table assignments.
+- Token validation now returns lightweight session metadata when a token belongs to a session.
+- Registration flow in `tools-2/settings.js` now supports `Номер стола` and registers the participant into the server session.
+- Added trainer-side session polling and inspector workflow:
+  - role sync to server,
+  - task start/submission tracking,
+  - inspector approve/reject actions,
+  - 2-minute server-side auto-approval.
+- Added `MayakInspectorPanel` and session-aware trainer controls that block navigation while a task is waiting for inspection or was rejected.
+- Normalized active-user cookie reads into structured parsing so trainer/session utilities use stable `userId` instead of raw JSON cookie text.
+
+### Remaining validation after 2026-03-12 changes
+
+- Smoke-check the new session path end to end in browser:
+  - create session in admin,
+  - copy generated token,
+  - register two or more users on different tables,
+  - assign one user as inspector,
+  - verify pending/reject/approve/auto-approve behavior.
+- Verify existing non-session token flow still works unchanged.
+- Verify no regression in certificate/log/questionnaire flows after active-user cookie parsing changes.
+
+### Session file attachments on 2026-03-12
+
+- Added mandatory session task-result upload before a participant can send a task to inspection.
+- Added filesystem-backed MAYAK session attachment storage in `src/lib/mayakSessionFiles.js`.
+- Added multipart upload endpoint `/api/mayak/session/task-submit-upload`.
+- Added task review/details endpoint `/api/mayak/session/task-details` and protected file-serving endpoint `/api/mayak/session/file`.
+- Inspector review popup now shows the original task text plus the attached result file.
+- Browser-friendly formats preview inline; office-like formats are downloaded instead of rendered inline.
+- Session completion now deletes uploaded files for that session and trainer clients return to token entry after the completed session state is observed.
+- Remaining validation: browser smoke-check upload, inspector preview/download, and forced exit after admin-completed session.

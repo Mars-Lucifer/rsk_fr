@@ -1,42 +1,25 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Header from "@/components/layout/Header";
-
-// ИЗМЕНЕНИЕ 1: Импортируем иконку крестика и убираем ненужные
-import CloseIcon from "@/assets/general/close.svg";
 import CopyIcon from "@/assets/general/copy.svg";
-
 import Button from "@/components/ui/Button";
 import Switcher from "@/components/ui/Switcher";
 import Block from "@/components/features/public/Block";
 
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return decodeURIComponent(parts.pop().split(";").shift());
-}
-
-function getLocalStorage(key) {
-    try {
-        const value = localStorage.getItem(key);
-        return value ? JSON.parse(value) : null; // или return [] если нужно гарантированно массив
-    } catch (error) {
-        console.error("Ошибка чтения из localStorage:", error);
-        return null; // или return [] если нужно гарантированно массив
-    }
-}
-
 const TRAINER_PREFIX = "trainer_v2";
 const getStorageKey = (key) => `${TRAINER_PREFIX}_${key}`;
+const CLOSE_BUTTON_STYLE = { width: "2.25rem", height: "2.25rem", flex: "0 0 2.25rem" };
+const CLOSE_BUTTON_CLASSNAME = "inline-flex appearance-none items-center justify-center rounded-full border-0 bg-transparent p-0 text-black shadow-none outline-none transition hover:bg-black/5";
+const ACTION_BUTTON_CLASSNAME = "!px-3 !py-2 !text-sm !whitespace-nowrap !border-2 !border-black !bg-white !text-black hover:!bg-slate-50";
 
-function parseHistoryCookie() {
-    const cookie = localStorage.getItem(getStorageKey("history")) || "";
-    if (!cookie) return [];
+function parseHistoryStorage() {
+    const raw = localStorage.getItem(getStorageKey("history")) || "";
+    if (!raw) return [];
 
     try {
-        return JSON.parse(cookie);
-    } catch (e) {
-        console.error("Failed to parse history cookie", e);
+        return JSON.parse(raw);
+    } catch (error) {
+        console.error("Failed to parse history storage", error);
         return [];
     }
 }
@@ -50,123 +33,122 @@ function formatDate(dateString) {
     });
 }
 
+function getHistoryItemKey(item) {
+    return item.id || `${item.date || ""}_${item.type || ""}_${item.prompt || ""}`;
+}
+
 export default function HistoryPage({ goTo }) {
     const [type, setType] = useState("text");
     const [history, setHistory] = useState([]);
-    const [copiedId, setCopiedId] = useState(null);
+    const [copiedKey, setCopiedKey] = useState(null);
 
     useEffect(() => {
-        const historyData = parseHistoryCookie();
-        setHistory(historyData);
+        setHistory(parseHistoryStorage());
     }, []);
 
-    // ИЗМЕНЕНИЕ 2: Обновляем логику фильтрации для объединенной категории "Разное"
-    const filteredHistory = history.filter((item) => {
-        if (type === "misc") {
-            // Показываем все типы "Разное", если выбрана эта категория
-            return item.type === "misc" || item.type === "misc-static" || item.type === "misc-dynamic";
-        }
-        return item.type === type;
-    });
+    const filteredHistory = useMemo(() => {
+        return history.filter((item) => {
+            if (type === "misc") {
+                return item.type === "misc" || item.type === "misc-static" || item.type === "misc-dynamic";
+            }
+            return item.type === type;
+        });
+    }, [history, type]);
 
-    const handleCopy = (text, index) => {
-        navigator.clipboard.writeText(text);
-        setCopiedId(index);
-        setTimeout(() => setCopiedId(null), 1000);
+    const handleCopy = async (text, copyKey) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedKey(copyKey);
+            window.setTimeout(() => setCopiedKey(null), 1200);
+        } catch {
+            alert("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0442\u0435\u043a\u0441\u0442");
+        }
     };
 
-    const handleDelete = (indexToDelete) => {
-        // Создаем новый массив без удаляемого элемента
-        const newHistory = history.filter((_, index) => index !== indexToDelete);
+    const handleDelete = (itemToDelete) => {
+        const deleteKey = getHistoryItemKey(itemToDelete);
+        const nextHistory = history.filter((item) => getHistoryItemKey(item) !== deleteKey);
+        setHistory(nextHistory);
+        localStorage.setItem(getStorageKey("history"), JSON.stringify(nextHistory));
+    };
 
-        // Обновляем состояние
-        setHistory(newHistory);
+    const handleApplyToMayak = (item) => {
+        if (!item?.mayakValues) return;
+        const previousPage = sessionStorage.getItem("previousPage") || "mayakOko";
+        sessionStorage.setItem(getStorageKey("historyApplyFields"), JSON.stringify(item.mayakValues));
+        sessionStorage.setItem("currentPage", previousPage);
+        goTo(previousPage);
+    };
 
-        // Обновляем localStorage
-        // Используем тот же ключ, что и при чтении
-        const TRAINER_PREFIX = "trainer_v2";
-        const storageKey = `${TRAINER_PREFIX}_history`;
-        localStorage.setItem(storageKey, JSON.stringify(newHistory));
+    const handleClose = () => {
+        const previousPage = sessionStorage.getItem("previousPage") || "mayakOko";
+        sessionStorage.setItem("currentPage", previousPage);
+        goTo(previousPage);
     };
 
     return (
         <>
             <Header>
-                <Header.Heading>МАЯК ОКО</Header.Heading>
-                <Button
-                    icon
-                    className="!bg-transparent !text-black hover:!bg-black/5"
-                    onClick={() => {
-                        const previousPage = sessionStorage.getItem("previousPage") || "mayakOko";
-                        sessionStorage.setItem("currentPage", previousPage);
-                        goTo(previousPage);
-                    }}>
-                    <CloseIcon />
-                </Button>
+                <Header.Heading>{"\u041c\u0410\u042f\u041a \u041e\u041a\u041e"}</Header.Heading>
+                <button type="button" onClick={handleClose} aria-label={"\u0412\u044b\u0439\u0442\u0438 \u0438\u0437 \u0438\u0441\u0442\u043e\u0440\u0438\u0438"} className={CLOSE_BUTTON_CLASSNAME} style={CLOSE_BUTTON_STYLE}>
+                    <span className="text-[1.75rem] font-light leading-none text-black">{"\u00D7"}</span>
+                </button>
             </Header>
-            <div className="flex justify-center w-full min-h-screen p-6">
-                <div className="w-full max-w-4xl flex flex-col gap-[1.6rem] h-full">
-                    <div className="flex flex-col gap-[1rem] w-full">
-                        <Switcher value={type} onChange={setType} className="!w-full !flex-nowrap overflow-x-auto scrollbar-hide gap-1">
-                            <Switcher.Option value="text" className="flex-1 text-center whitespace-nowrap">Текст</Switcher.Option>
-                            <Switcher.Option value="audio" className="flex-1 text-center whitespace-nowrap">Аудио</Switcher.Option>
-                            <Switcher.Option value="visual-static" className="flex-1 text-center whitespace-nowrap">Изображение</Switcher.Option>
-                            <Switcher.Option value="visual-dynamic" className="flex-1 text-center whitespace-nowrap">Видео</Switcher.Option>
-                            <Switcher.Option value="interactive" className="flex-1 text-center whitespace-nowrap">Интерактив</Switcher.Option>
-                            <Switcher.Option value="data" className="flex-1 text-center whitespace-nowrap">Данные</Switcher.Option>
-                            <Switcher.Option value="misc" className="flex-1 text-center whitespace-nowrap">Разное</Switcher.Option>
+            <div className="flex min-h-screen w-full justify-center p-6">
+                <div className="flex h-full w-full max-w-4xl flex-col gap-[1.6rem]">
+                    <div className="flex w-full flex-col gap-[1rem]">
+                        <Switcher value={type} onChange={setType} className="!w-full !flex-nowrap gap-1 overflow-x-auto scrollbar-hide">
+                            <Switcher.Option value="text" className="flex-1 whitespace-nowrap text-center">{"\u0422\u0435\u043a\u0441\u0442"}</Switcher.Option>
+                            <Switcher.Option value="audio" className="flex-1 whitespace-nowrap text-center">{"\u0410\u0443\u0434\u0438\u043e"}</Switcher.Option>
+                            <Switcher.Option value="visual-static" className="flex-1 whitespace-nowrap text-center">{"\u0418\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435"}</Switcher.Option>
+                            <Switcher.Option value="visual-dynamic" className="flex-1 whitespace-nowrap text-center">{"\u0412\u0438\u0434\u0435\u043e"}</Switcher.Option>
+                            <Switcher.Option value="interactive" className="flex-1 whitespace-nowrap text-center">{"\u0418\u043d\u0442\u0435\u0440\u0430\u043a\u0442\u0438\u0432"}</Switcher.Option>
+                            <Switcher.Option value="data" className="flex-1 whitespace-nowrap text-center">{"\u0414\u0430\u043d\u043d\u044b\u0435"}</Switcher.Option>
+                            <Switcher.Option value="misc" className="flex-1 whitespace-nowrap text-center">{"\u0420\u0430\u0437\u043d\u043e\u0435"}</Switcher.Option>
                         </Switcher>
                     </div>
 
-                    <div className="w-full flex flex-col gap-[1.6rem]">
+                    <div className="flex w-full flex-col gap-[1.6rem]">
                         <div className="flex flex-col gap-[0.25rem]">
-                            <h3>История создания запросов</h3>
-                            <p className="small text-(--color-gray-black)">Здесь отображается история промтов по выбранной выше категории</p>
+                            <h3>{"\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0441\u043e\u0437\u0434\u0430\u043d\u0438\u044f \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432"}</h3>
+                            <p className="small text-(--color-gray-black)">{"\u0417\u0434\u0435\u0441\u044c \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u0435\u0442\u0441\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f \u043f\u0440\u043e\u043c\u0442\u043e\u0432 \u043f\u043e \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u043e\u0439 \u0432\u044b\u0448\u0435 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438"}</p>
                         </div>
 
-                        <div className="flex flex-col gap-[0.75rem] w-full">
+                        <div className="flex w-full flex-col gap-[0.75rem]">
                             {filteredHistory.length > 0 ? (
-                                filteredHistory.map((item, index) => (
-                                    <Block key={index} className="flex flex-col gap-2 relative group">
-                                        <div className="flex items-start gap-2">
-                                            <p className="flex-1 min-w-0 whitespace-pre-wrap break-words">{item.prompt}</p>
-                                            <Button
-                                                icon
-                                                className="!w-9 !h-9 !p-0 !bg-transparent !text-black hover:!bg-black/5 flex items-center justify-center flex-shrink-0"
-                                                onClick={() => handleDelete(index)}
-                                                title="Удалить из истории"
-                                            >
-                                                <CloseIcon className="w-5 h-5" />
-                                            </Button>
-                                        </div>
-
-                                        <div className="flex justify-between items-center w-full border-t border-gray-100 pt-2 mt-1">
-                                            <span className="text-sm text-gray-400">{formatDate(item.date)}</span>
-                                            <div className="relative">
-                                                <Button
-                                                    inverted
-                                                    className="!w-9 !h-9 !p-0 flex items-center justify-center"
-                                                    onClick={() => handleCopy(item.prompt, index)}
-                                                    title="Скопировать"
-                                                >
-                                                    <CopyIcon className="w-4 h-4" />
-                                                </Button>
-                                                {copiedId === index && (
-                                                    <span className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-10 transition-opacity duration-300">
-                                                        Скопировано
-                                                    </span>
-                                                )}
+                                filteredHistory.map((item) => {
+                                    const itemKey = getHistoryItemKey(item);
+                                    return (
+                                        <Block key={itemKey} className="relative flex flex-col gap-3">
+                                            <div className="flex items-start gap-2">
+                                                <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{item.prompt}</p>
+                                                <button type="button" onClick={() => handleDelete(item)} title={"\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0438\u0437 \u0438\u0441\u0442\u043e\u0440\u0438\u0438"} aria-label={"\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0438\u0437 \u0438\u0441\u0442\u043e\u0440\u0438\u0438"} className={CLOSE_BUTTON_CLASSNAME} style={CLOSE_BUTTON_STYLE}>
+                                                    <span className="text-[1.75rem] font-light leading-none text-black">{"\u00D7"}</span>
+                                                </button>
                                             </div>
-                                        </div>
-                                    </Block>
-                                ))
+
+                                            <div className="mt-1 flex w-full items-center justify-between gap-3 border-t border-gray-100 pt-2 max-md:flex-col max-md:items-stretch">
+                                                <span className="text-sm text-gray-400">{formatDate(item.date)}</span>
+                                                <div className="flex flex-nowrap items-center justify-end gap-2 overflow-x-auto max-md:justify-start">
+                                                    {item.mayakValues && (
+                                                        <Button inverted className={ACTION_BUTTON_CLASSNAME} onClick={() => handleApplyToMayak(item)} title={"\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u043e\u043b\u044f \u041c\u0410\u042f\u041a-\u041e\u041a\u041e \u0438 \u0441\u0440\u0430\u0437\u0443 \u043f\u043e\u0434\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u0438\u0445 \u0432 \u0444\u043e\u0440\u043c\u0443"}>
+                                                            <CopyIcon className="mr-2 h-4 w-4" /> {"\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u043e\u043b\u044f \u041c\u0410\u042f\u041a-\u041e\u041a\u041e"}
+                                                        </Button>
+                                                    )}
+                                                    <div className="relative">
+                                                        <Button inverted className={ACTION_BUTTON_CLASSNAME} onClick={() => handleCopy(item.prompt, `${itemKey}_prompt`)} title={"\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0440\u043e\u043c\u0442"}>
+                                                            <CopyIcon className="mr-2 h-4 w-4" /> {"\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0440\u043e\u043c\u0442"}
+                                                        </Button>
+                                                        {copiedKey === `${itemKey}_prompt` && <span className="absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white shadow-lg">{"\u041f\u0440\u043e\u043c\u0442 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d"}</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </Block>
+                                    );
+                                })
                             ) : (
                                 <Block className="flex flex-col gap-2">
-                                    <p className="text-gray-400 w-full">История запросов пуста</p>
-                                    <div className="flex justify-between items-center w-full border-t border-transparent pt-2 mt-1">
-                                         <span className="text-sm text-transparent select-none">00.00.0000</span>
-                                         <div className="w-9 h-9"></div>
-                                    </div>
+                                    <p className="w-full text-gray-400">{"\u0418\u0441\u0442\u043e\u0440\u0438\u044f \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432 \u043f\u0443\u0441\u0442\u0430"}</p>
                                 </Block>
                             )}
                         </div>

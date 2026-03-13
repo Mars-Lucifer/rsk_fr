@@ -1,18 +1,15 @@
+﻿import { readMayakActiveUser } from "./readMayakActiveUser";
+
 export async function saveMayakRankingTest({ results, setRankingDelta5 }) {
     try {
         if (results?.level5?.delta !== undefined) {
             setRankingDelta5(results.level5.delta);
         }
 
-        const activeUser =
-            document.cookie
-                .split("; ")
-                .find((row) => row.startsWith("active_user="))
-                ?.split("=")[1] || "anonymous";
-
+        const activeUser = readMayakActiveUser();
         const payload = {
             date: new Date().toISOString(),
-            user: activeUser,
+            user: activeUser.id,
             type: "ranking_test",
             results,
             totalDelta: Object.values(results).reduce((sum, r) => sum + r.delta, 0),
@@ -24,6 +21,6 @@ export async function saveMayakRankingTest({ results, setRankingDelta5 }) {
             body: JSON.stringify(payload),
         });
     } catch (err) {
-        console.error("?????? ?????????? ??????????? ????????????:", err);
+        console.error("Ошибка сохранения ranking test:", err);
     }
 }

@@ -1,4 +1,4 @@
-// app/actions.js
+﻿// app/actions.js
 
 export async function getKeyFromCookies() {
     const cookieString = document.cookie;
@@ -28,16 +28,15 @@ export async function addKeyToCookies(text) {
     document.cookie = `activated_key=${encodeURIComponent(JSON.stringify(newItem))}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
 }
 
-// !!! ИСПРАВЛЕННАЯ ФУНКЦИЯ !!!
-export async function addUserToCookies(userId, text) {
+export async function addUserToCookies(userId, text, meta = {}) {
     const newItem = {
         id: userId,
-        name: text // <--- ТЕПЕРЬ МЫ СОХРАНЯЕМ ИМЯ!
+        name: text,
+        ...meta,
     };
 
     const expires = new Date();
     expires.setTime(expires.getTime() + 30 * 24 * 60 * 60 * 1000);
-    // Обратите внимание: используем encodeURIComponent, чтобы русские буквы не ломали куки
     document.cookie = `active_user=${encodeURIComponent(JSON.stringify(newItem))}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
 }
 
@@ -45,8 +44,7 @@ export function getUserFromCookies() {
     const cookieString = document.cookie;
     const cookies = cookieString.split(";").reduce((acc, cookie) => {
         const [name, value] = cookie.trim().split("=");
-        // Важно: декодируем значение перед использованием
-        acc[name] = value ? decodeURIComponent(value) : ""; 
+        acc[name] = value ? decodeURIComponent(value) : "";
         return acc;
     }, {});
 
@@ -54,16 +52,13 @@ export function getUserFromCookies() {
     if (!userCookie) return null;
 
     try {
-        const parsed = JSON.parse(userCookie);
-        return parsed; 
+        return JSON.parse(userCookie);
     } catch {
-        // Фоллбэк для старых куки, где было просто имя или ID строкой
         return { id: "unknown", name: userCookie };
     }
 }
 
 export async function removeKeyCookie() {
-    // Устанавливаем дату истечения в прошлое, чтобы удалить куку
     document.cookie = "activated_key=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
 }
 

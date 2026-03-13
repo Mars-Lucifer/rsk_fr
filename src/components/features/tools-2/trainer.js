@@ -4,6 +4,11 @@ import Buffer from "./addons/popup";
 import RankingTestPopup from "./addons/RankingTestPopup";
 import MayakServicesPanel from "./MayakServicesPanel";
 import InstructionImageModal from "./InstructionImageModal";
+import MayakInspectorPanel from "./MayakInspectorPanel";
+import MayakInspectorWidget from "./MayakInspectorWidget";
+import MayakInspectorNotificationStack from "./MayakInspectorNotificationStack";
+import MayakTaskTimelinePanel from "./MayakTaskTimelinePanel";
+import { MayakInspectorReviewPopup } from "./MayakTaskArtifactPopups";
 import { MayakField, TrainerControls } from "./TrainerUiSections";
 import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup } from "./TrainerPopups";
 
@@ -16,9 +21,9 @@ import RandomIcon from "@/assets/general/random.svg";
 import ResetIcon from "@/assets/general/ResetIcon.svg";
 import CloseIcon from "@/assets/general/close.svg";
 
-// Добавляем getUserFromCookies
+// Р”РѕР±Р°РІР»СЏРµРј getUserFromCookies
 import { removeKeyCookie } from "./actions";
-// Добавляем эти две строки для работы сертификата
+// Р”РѕР±Р°РІР»СЏРµРј СЌС‚Рё РґРІРµ СЃС‚СЂРѕРєРё РґР»СЏ СЂР°Р±РѕС‚С‹ СЃРµСЂС‚РёС„РёРєР°С‚Р°
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import CourseIcon from "@/assets/nav/course.svg";
 import Button from "@/components/ui/Button";
@@ -30,6 +35,7 @@ import { saveMayakTaskAttempt } from "./utils/saveMayakTaskAttempt";
 import { loadMayakBuffer, saveMayakBuffer, appendMayakBufferValue, ensureMayakBufferOptions } from "./utils/mayakBufferStorage";
 import { buildMayakPromptDraft, cleanupMayakPrompt } from "./utils/buildMayakPromptDraft";
 import { saveMayakPromptHistory } from "./utils/saveMayakPromptHistory";
+import { readMayakTaskLog, syncMayakTaskLogFromStates } from "./utils/mayakTaskLogStorage";
 import { saveMayakRankingTest } from "./utils/saveMayakRankingTest";
 import { createEmptyMayakFields } from "./utils/mayakPromptState";
 import { clearMayakSessionCompletionState } from "./utils/mayakSessionCompletion";
@@ -52,8 +58,9 @@ import { useMayakCompletionActions } from "./hooks/useMayakCompletionActions";
 import { useMayakTaskExecutionActions } from "./hooks/useMayakTaskExecutionActions";
 import { useMayakPopupState } from "./hooks/useMayakPopupState";
 import { useMayakTypeUiState } from "./hooks/useMayakTypeUiState";
+import { useMayakInspectorSession } from "./hooks/useMayakInspectorSession";
 
-const TRAINER_PREFIX = "trainer_v2"; // Уникальный префикс для этого тренажера
+const TRAINER_PREFIX = "trainer_v2"; // РЈРЅРёРєР°Р»СЊРЅС‹Р№ РїСЂРµС„РёРєСЃ РґР»СЏ СЌС‚РѕРіРѕ С‚СЂРµРЅР°Р¶РµСЂР°
 
 const QWEN_EVALUATION_LIMIT = 20;
 const getStorageKey = (key) => `${TRAINER_PREFIX}_${key}`;
@@ -259,18 +266,18 @@ export default function TrainerPage({ goTo }) {
         who,
         taskVersion,
         isTokenValid,
-        tokenTaskRange, // Передаем в хук
-        tokenSectionId, // Slug папки раздела
+        tokenTaskRange, // РџРµСЂРµРґР°РµРј РІ С…СѓРє
+        tokenSectionId, // Slug РїР°РїРєРё СЂР°Р·РґРµР»Р°
         getStorageKey,
     });
 
-    // Автозавершение вводного задания (без таймера, без попапа завершения)
+    // РђРІС‚РѕР·Р°РІРµСЂС€РµРЅРёРµ РІРІРѕРґРЅРѕРіРѕ Р·Р°РґР°РЅРёСЏ (Р±РµР· С‚Р°Р№РјРµСЂР°, Р±РµР· РїРѕРїР°РїР° Р·Р°РІРµСЂС€РµРЅРёСЏ)
     const autoCompleteIntroTask = useCallback(async () => {
         const taskNumber = currentTask?.number?.toString();
         const taskName = currentTask?.name || `Задание ${currentTaskIndex + 1}`;
         const taskTextData = taskNumber ? tasksTexts.find((t) => t.number === taskNumber) : null;
 
-        // Записываем в лог с нулевым временем
+        // Р—Р°РїРёСЃС‹РІР°РµРј РІ Р»РѕРі СЃ РЅСѓР»РµРІС‹Рј РІСЂРµРјРµРЅРµРј
         const logEntry = {
             number: taskNumber || String(currentTaskIndex + 1),
             title: taskName,
@@ -286,7 +293,7 @@ export default function TrainerPage({ goTo }) {
         const filteredLog = currentLog.filter((item) => item.number && String(item.number) !== String(logEntry.number));
         localStorage.setItem(getStorageKey("session_tasks_log"), JSON.stringify([...filteredLog, logEntry]));
 
-        // Сохраняем на сервер
+        // РЎРѕС…СЂР°РЅСЏРµРј РЅР° СЃРµСЂРІРµСЂ
         try {
             await saveMayakTaskAttempt({
                 taskName,
@@ -302,7 +309,7 @@ export default function TrainerPage({ goTo }) {
             console.error("Error saving intro task:", err);
         }
 
-        // Останавливаем таймер если был запущен
+        // РћСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‚Р°Р№РјРµСЂ РµСЃР»Рё Р±С‹Р» Р·Р°РїСѓС‰РµРЅ
         if (timerState.isRunning) {
             stopTimer();
         }
@@ -318,7 +325,7 @@ export default function TrainerPage({ goTo }) {
     }, [currentTask]);
 
     useEffect(() => {
-        // Синхронизируем поле ввода: с токеном — номер задания, без — порядковый номер
+        // РЎРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµРј РїРѕР»Рµ РІРІРѕРґР°: СЃ С‚РѕРєРµРЅРѕРј вЂ” РЅРѕРјРµСЂ Р·Р°РґР°РЅРёСЏ, Р±РµР· вЂ” РїРѕСЂСЏРґРєРѕРІС‹Р№ РЅРѕРјРµСЂ
         if (tasks.length > 0 && tasks[currentTaskIndex]) {
             if (tokenTaskRange) {
                 setTaskInputValue(tasks[currentTaskIndex].number?.toString() || (currentTaskIndex + 1).toString());
@@ -360,13 +367,13 @@ export default function TrainerPage({ goTo }) {
     });
 
     const buildPromptDraftRef = useRef(null);
-
     const savePromptToHistory = useCallback(
-        (promptValue) => {
-            const nextHistory = saveMayakPromptHistory({
+        (promptValue, mayakValues) => {
+            saveMayakPromptHistory({
                 promptValue,
                 type,
                 storageKey: getStorageKey("history"),
+                mayakValues,
             });
         },
         [type]
@@ -376,7 +383,7 @@ export default function TrainerPage({ goTo }) {
         const builtDraft = buildMayakPromptDraft(fields);
         if (!builtDraft) {
             clearQwenState();
-            setPrompt('Пожалуйста, заполните все поля (или используйте "кубики").');
+            setPrompt('\u041f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430, \u0437\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0432\u0441\u0435 \u043f\u043e\u043b\u044f (\u0438\u043b\u0438 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 "\u043a\u0443\u0431\u0438\u043a\u0438").');
             return null;
         }
 
@@ -388,7 +395,7 @@ export default function TrainerPage({ goTo }) {
         });
 
         setPrompt(finalPrompt);
-        savePromptToHistory(finalPrompt);
+        savePromptToHistory(finalPrompt, values);
 
         return {
             values,
@@ -411,19 +418,42 @@ export default function TrainerPage({ goTo }) {
     }, []);
 
     useEffect(() => {
-        // Проверяем, есть ли наш одноразовый флаг
+        // РџСЂРѕРІРµСЂСЏРµРј, РµСЃС‚СЊ Р»Рё РЅР°С€ РѕРґРЅРѕСЂР°Р·РѕРІС‹Р№ С„Р»Р°Рі
         const isCompletionPending = localStorage.getItem(getStorageKey("sessionCompletionPending")) === "true";
 
         if (isCompletionPending) {
-            // Если да, значит пользователь вернулся с Яндекс.Формы
-            // 1. Сразу удаляем флаг, чтобы это не повторилось при перезагрузке
+            // Р•СЃР»Рё РґР°, Р·РЅР°С‡РёС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РІРµСЂРЅСѓР»СЃСЏ СЃ РЇРЅРґРµРєСЃ.Р¤РѕСЂРјС‹
+            // 1. РЎСЂР°Р·Сѓ СѓРґР°Р»СЏРµРј С„Р»Р°Рі, С‡С‚РѕР±С‹ СЌС‚Рѕ РЅРµ РїРѕРІС‚РѕСЂРёР»РѕСЃСЊ РїСЂРё РїРµСЂРµР·Р°РіСЂСѓР·РєРµ
             localStorage.removeItem(getStorageKey("sessionCompletionPending"));
-            // 2. Перенаправляем на главную страницу
+            // 2. РџРµСЂРµРЅР°РїСЂР°РІР»СЏРµРј РЅР° РіР»Р°РІРЅСѓСЋ СЃС‚СЂР°РЅРёС†Сѓ
             goTo("index");
         }
     }, [goTo]);
 
     const { activeUser, mayakData } = useMayakRuntimeData();
+
+    const { currentTaskState, error: sessionError, fetchTaskDetails, reviewTask, sessionSnapshot, submitTaskForReview, syncRole, notifyTaskStarted, token } = useMayakInspectorSession({
+        activeUser,
+        currentTask,
+        tokenSectionId,
+        setSelectedRole,
+    });
+    const isInspectorUser = Boolean(sessionSnapshot?.inspectorView);
+    const pendingInspectionCount = sessionSnapshot?.inspectorView?.pendingTasks?.length || 0;
+    const [isInspectorWidgetOpen, setIsInspectorWidgetOpen] = useState(() => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem(getStorageKey("inspectorWidgetOpen")) === "true";
+    });
+    const [isTaskTimelineOpen, setIsTaskTimelineOpen] = useState(false);
+    const [taskTimelineEntries, setTaskTimelineEntries] = useState([]);
+    const [taskCompletionMode, setTaskCompletionMode] = useState("summary");
+    const [isUploadingArtifact, setIsUploadingArtifact] = useState(false);
+    const uploadPopupResolverRef = useRef(null);
+    const [reviewPopupTaskKey, setReviewPopupTaskKey] = useState("");
+    const [reviewPopupData, setReviewPopupData] = useState(null);
+    const [reviewPopupLoading, setReviewPopupLoading] = useState(false);
+
+
 
     const {
         activeTypeKey,
@@ -448,7 +478,20 @@ export default function TrainerPage({ goTo }) {
         formatTaskTime,
         getStorageKey,
         isIntroTask,
+        onTaskStart: notifyTaskStarted,
+        onTaskSubmit: submitTaskForReview,
         prompt,
+        requestTaskAttachment: ({ taskData }) => {
+            return new Promise((resolve) => {
+                uploadPopupResolverRef.current = resolve;
+                setCurrentTaskData(taskData || null);
+                setTaskCompletionMode("attachment");
+                setShowCompletionPopup(true);
+            });
+        },
+        qwenGreenCount,
+        qwenResponse,
+        qwenTotalFields,
         setCompletedTasks,
         setCurrentTaskData,
         setShowCompletionPopup,
@@ -532,6 +575,7 @@ export default function TrainerPage({ goTo }) {
         setSelectedRole,
         setShowRolePopup,
         stopTimer,
+        syncRole,
         timerIsRunning: timerState.isRunning,
     });
 
@@ -627,6 +671,102 @@ export default function TrainerPage({ goTo }) {
     const qwenZoneMeta = getQwenZoneMeta(qwenZone);
     const qwenScoreMeta = qwenGreenCount === null ? null : getQwenScoreMeta(qwenGreenCount, qwenTotalFields);
     const shouldShowQwenMascot = !qwenLoading && activeQwenMascotAsset && showMascotVideo;
+    const inspectionStatus = currentTaskState?.status || null;
+    const isInspectionPending = inspectionStatus === "pending_inspection";
+    const isInspectionRejected = inspectionStatus === "rejected";
+    const rejectedCorrectionDeadlineMs = currentTaskState?.correctionDeadlineAt ? new Date(currentTaskState.correctionDeadlineAt).getTime() : null;
+    const isRejectedCorrectionActive = Boolean(isInspectionRejected && rejectedCorrectionDeadlineMs && rejectedCorrectionDeadlineMs > Date.now());
+    const taskActionLabel = timerState.isRunning ? undefined : isInspectionPending ? "На проверке" : isInspectionRejected ? "Исправить задание" : undefined;
+    const hasInspectorNotifications = isInspectorUser && !isInspectorWidgetOpen && pendingInspectionCount > 0;
+    const disableTaskNavigation = isInspectionPending || isRejectedCorrectionActive;
+    const disableCompleteSession = isInspectionPending || isRejectedCorrectionActive || hasInspectorNotifications;
+
+    const handleReviewTask = async ({ taskKey, action, reason }) => {
+        try {
+            await reviewTask({ taskKey, action, reason });
+            if (reviewPopupTaskKey === taskKey) {
+                setReviewPopupTaskKey("");
+                setReviewPopupData(null);
+            }
+        } catch (error) {
+            alert(error.message || "Не удалось обработать задание");
+        }
+    };
+    const handleConfirmArtifactUpload = (file) => {
+        const resolver = uploadPopupResolverRef.current;
+        uploadPopupResolverRef.current = null;
+        setIsUploadingArtifact(false);
+        setTaskCompletionMode("summary");
+        setShowCompletionPopup(false);
+        if (resolver) resolver(file instanceof File ? file : null);
+    };
+
+    const handleCancelArtifactUpload = () => {
+        const resolver = uploadPopupResolverRef.current;
+        uploadPopupResolverRef.current = null;
+        setIsUploadingArtifact(false);
+        setTaskCompletionMode("summary");
+        setShowCompletionPopup(false);
+        if (resolver) resolver(null);
+    };
+
+    const handleOpenInspectorTask = async (taskKey) => {
+        if (!taskKey) return;
+        setReviewPopupTaskKey(taskKey);
+        setReviewPopupLoading(true);
+        try {
+            const details = await fetchTaskDetails({ mode: "inspector", taskKey });
+            setReviewPopupData(details);
+        } catch (error) {
+            alert(error.message || "Не удалось открыть задание");
+            setReviewPopupTaskKey("");
+            setReviewPopupData(null);
+        } finally {
+            setReviewPopupLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const storedValue = localStorage.getItem(getStorageKey("inspectorWidgetOpen"));
+        if (storedValue !== null) {
+            setIsInspectorWidgetOpen(storedValue === "true");
+        }
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        localStorage.setItem(getStorageKey("inspectorWidgetOpen"), String(isInspectorWidgetOpen));
+    }, [isInspectorWidgetOpen]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const rawFields = sessionStorage.getItem(getStorageKey("historyApplyFields"));
+        if (!rawFields) return;
+        try {
+            const parsedFields = JSON.parse(rawFields);
+            setFields((prev) => ({ ...prev, ...parsedFields }));
+            setPrompt("");
+        } finally {
+            sessionStorage.removeItem(getStorageKey("historyApplyFields"));
+        }
+    }, [getStorageKey]);
+
+    useEffect(() => {
+        setTaskTimelineEntries(readMayakTaskLog(getStorageKey("session_tasks_log")));
+    }, []);
+
+    useEffect(() => {
+        const nextEntries = syncMayakTaskLogFromStates(getStorageKey("session_tasks_log"), sessionSnapshot?.taskStates || []);
+        setTaskTimelineEntries(nextEntries);
+    }, [sessionSnapshot]);
+
+    useEffect(() => {
+        if (sessionSnapshot?.session?.status !== "completed") return;
+        removeKeyCookie();
+        localStorage.removeItem("trainer_v2_userRole");
+        goTo("settings");
+    }, [goTo, sessionSnapshot?.session?.status]);
 
     const trainerControlsProps = {
         who,
@@ -645,9 +785,9 @@ export default function TrainerPage({ goTo }) {
         selectedRole,
         rankingDelta5,
         onWhoChange: (value) => {
-            // Сначала обновляем состояние, чтобы UI отреагировал
+            // РЎРЅР°С‡Р°Р»Р° РѕР±РЅРѕРІР»СЏРµРј СЃРѕСЃС‚РѕСЏРЅРёРµ, С‡С‚РѕР±С‹ UI РѕС‚СЂРµР°РіРёСЂРѕРІР°Р»
             setWho(value);
-            // Затем, если выбрали "Мы" и анкета не пройдена, показываем попап
+            // Р—Р°С‚РµРј, РµСЃР»Рё РІС‹Р±СЂР°Р»Рё "РњС‹" Рё Р°РЅРєРµС‚Р° РЅРµ РїСЂРѕР№РґРµРЅР°, РїРѕРєР°Р·С‹РІР°РµРј РїРѕРїР°Рї
             if (value === "we" && !hasCompletedSecondQuestionnaire) {
                 showSwitchToWeConfirmation();
             }
@@ -658,38 +798,38 @@ export default function TrainerPage({ goTo }) {
         onTaskInputChange: (e) => {
             const value = e.target.value;
 
-            // Немедленно обновляем поле ввода, чтобы ввод был плавным
-            if (!/^\d*$/.test(value)) return; // Разрешаем вводить только цифры
+            // РќРµРјРµРґР»РµРЅРЅРѕ РѕР±РЅРѕРІР»СЏРµРј РїРѕР»Рµ РІРІРѕРґР°, С‡С‚РѕР±С‹ РІРІРѕРґ Р±С‹Р» РїР»Р°РІРЅС‹Рј
+            if (!/^\d*$/.test(value)) return; // Р Р°Р·СЂРµС€Р°РµРј РІРІРѕРґРёС‚СЊ С‚РѕР»СЊРєРѕ С†РёС„СЂС‹
             setTaskInputValue(value);
 
-            // Сбрасываем предыдущий таймер
+            // РЎР±СЂР°СЃС‹РІР°РµРј РїСЂРµРґС‹РґСѓС‰РёР№ С‚Р°Р№РјРµСЂ
             if (debounceTimeoutRef.current) {
                 clearTimeout(debounceTimeoutRef.current);
             }
 
-            // Если поле пустое, ничего не делаем
+            // Р•СЃР»Рё РїРѕР»Рµ РїСѓСЃС‚РѕРµ, РЅРёС‡РµРіРѕ РЅРµ РґРµР»Р°РµРј
             if (value.trim() === "") {
                 return;
             }
 
-            // Устанавливаем новый таймер
+            // РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј РЅРѕРІС‹Р№ С‚Р°Р№РјРµСЂ
             debounceTimeoutRef.current = setTimeout(() => {
                 const inputNum = parseInt(value, 10);
                 let newIndex;
 
                 if (tokenTaskRange) {
-                    // С токеном: ищем по номеру задания (task.number)
+                    // РЎ С‚РѕРєРµРЅРѕРј: РёС‰РµРј РїРѕ РЅРѕРјРµСЂСѓ Р·Р°РґР°РЅРёСЏ (task.number)
                     newIndex = tasks.findIndex((t) => parseInt(t.number, 10) === inputNum);
                 } else {
-                    // Без токена: ввод = порядковый номер (1, 2, 3...)
+                    // Р‘РµР· С‚РѕРєРµРЅР°: РІРІРѕРґ = РїРѕСЂСЏРґРєРѕРІС‹Р№ РЅРѕРјРµСЂ (1, 2, 3...)
                     newIndex = inputNum - 1;
                 }
 
-                // Если задание найдено и в пределах допустимого диапазона — переключаем
+                // Р•СЃР»Рё Р·Р°РґР°РЅРёРµ РЅР°Р№РґРµРЅРѕ Рё РІ РїСЂРµРґРµР»Р°С… РґРѕРїСѓСЃС‚РёРјРѕРіРѕ РґРёР°РїР°Р·РѕРЅР° вЂ” РїРµСЂРµРєР»СЋС‡Р°РµРј
                 if (newIndex >= 0 && newIndex >= allowedMinIndex && newIndex <= allowedMaxIndex && newIndex < tasks.length) {
                     goToTask(newIndex);
                 }
-                // Если не найдено — просто не переключаем, даём пользователю исправить
+                // Р•СЃР»Рё РЅРµ РЅР°Р№РґРµРЅРѕ вЂ” РїСЂРѕСЃС‚Рѕ РЅРµ РїРµСЂРµРєР»СЋС‡Р°РµРј, РґР°С‘Рј РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ РёСЃРїСЂР°РІРёС‚СЊ
             }, 600);
         },
         onToggleTaskTimer: toggleTaskTimer,
@@ -699,6 +839,10 @@ export default function TrainerPage({ goTo }) {
         mayakData,
         onShowInstruction: handleShowInstruction,
         isCurrentTaskIntro: isIntroTask(currentTaskIndex),
+        taskActionLabel,
+        isTaskActionDisabled: isInspectionPending,
+        disableTaskNavigation,
+        disableCompleteSession,
     };
 
     return (
@@ -713,6 +857,25 @@ export default function TrainerPage({ goTo }) {
                     title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
                     <TimeIcon />
                 </Button>
+                <Button icon onClick={() => setIsTaskTimelineOpen((prev) => !prev)} title="История заданий">
+                    <CourseIcon />
+                </Button>
+                {isInspectorUser && (
+                    <div className="relative">
+                        <Button
+                            icon
+                            className={pendingInspectionCount > 0 && !isInspectorWidgetOpen ? "!border-amber-300 !bg-amber-50 !text-amber-700" : ""}
+                            onClick={() => setIsInspectorWidgetOpen((prev) => !prev)}
+                            title="Инспектор">
+                            <AdminIcon />
+                        </Button>
+                        {pendingInspectionCount > 0 && !isInspectorWidgetOpen && (
+                            <span className="pointer-events-none absolute -right-1 -top-1 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                                {pendingInspectionCount}
+                            </span>
+                        )}
+                    </div>
+                )}
                 {isAdmin && (
                     <Button
                         icon
@@ -750,12 +913,12 @@ export default function TrainerPage({ goTo }) {
                         <TrainerControls {...trainerControlsProps} />
                     </div>
                 )}
-                <Block className="col-span-12 lg:col-span-6 !h-full">
+                                <Block className="col-span-12 lg:col-span-6 !h-full min-w-0">
                     <form className="flex flex-col h-full justify-between">
                         <div className="flex flex-col gap-[1.25rem]">
                             <div className="flex flex-col gap-[1rem]">
                                 <Switcher
-                                    value={activeTypeKey} // Используем activeTypeKey для правильного выделения
+                                    value={activeTypeKey} // РСЃРїРѕР»СЊР·СѓРµРј activeTypeKey РґР»СЏ РїСЂР°РІРёР»СЊРЅРѕРіРѕ РІС‹РґРµР»РµРЅРёСЏ
                                     onChange={handleTypeSwitch}
                                     className="!w-full !flex-wrap">
                                     {mayakData.defaultTypes.map((t) => (
@@ -820,13 +983,16 @@ export default function TrainerPage({ goTo }) {
                     </form>
                 </Block>
 
-                <div className="col-span-12 lg:col-span-6 h-full flex flex-col gap-4">
+                <div className="col-span-12 lg:col-span-6 h-full min-w-0 flex flex-col gap-4">
                     {!isMobile && <TrainerControls {...trainerControlsProps} />}
+                    {sessionError && <div className="text-sm text-red-600">{sessionError}</div>}
+
+                    {sessionSnapshot?.session?.id && !isInspectorUser && <MayakInspectorPanel currentTaskState={currentTaskState} onReviewTask={handleReviewTask} sessionSnapshot={sessionSnapshot} />}
 
                     <Block className="flex-grow !bg-slate-50 flex flex-col">
                         <h6 className="text-black mb-2">Ваш промт</h6>
                         <div className="flex-grow overflow-y-auto">
-                            <p className="text-gray-600">{prompt || 'Заполните поля и нажмите "Создать промт"'}</p>
+                            <p className="text-gray-600">{prompt || '\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u043f\u043e\u043b\u044f \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0440\u043e\u043c\u0442"'}</p>
                         </div>
                     </Block>
 
@@ -889,11 +1055,37 @@ export default function TrainerPage({ goTo }) {
                 {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />}
                 <InstructionImageModal instructionModal={instructionModal} onClose={handleCloseInstructionModal} />
             </div>
+
+            {isTaskTimelineOpen && <MayakTaskTimelinePanel entries={taskTimelineEntries} onClose={() => setIsTaskTimelineOpen(false)} />}
+
+            {hasInspectorNotifications && <MayakInspectorNotificationStack onOpenTask={handleOpenInspectorTask} onReviewTask={handleReviewTask} pendingTasks={sessionSnapshot?.inspectorView?.pendingTasks || []} />}
+
+            {isInspectorUser && isInspectorWidgetOpen && (
+                <MayakInspectorWidget
+                    currentTaskState={currentTaskState}
+                    onClose={() => setIsInspectorWidgetOpen(false)}
+                    onOpenTask={handleOpenInspectorTask}
+                    onReviewTask={handleReviewTask}
+                    sessionSnapshot={sessionSnapshot}
+                    storageKey={getStorageKey("inspectorWidgetPosition")}
+                />
+            )}
+            {reviewPopupTaskKey && <MayakInspectorReviewPopup details={reviewPopupData} loading={reviewPopupLoading} mode="inspector" onClose={() => { setReviewPopupTaskKey(""); setReviewPopupData(null); }} onApprove={() => handleReviewTask({ taskKey: reviewPopupTaskKey, action: "approve", reason: "" })} onReject={(reason) => handleReviewTask({ taskKey: reviewPopupTaskKey, action: "reject", reason })} token={token} userId={activeUser?.id || ""} />}
             {showCompletionPopup && (
                 <TaskCompletionPopup
                     taskData={currentTaskData}
                     elapsedTime={timerState.readyElapsedTime}
+                    isSubmitting={isUploadingArtifact}
+                    mode={taskCompletionMode}
+                    onAttachmentConfirm={(file) => {
+                        setIsUploadingArtifact(true);
+                        handleConfirmArtifactUpload(file);
+                    }}
                     onClose={() => {
+                        if (taskCompletionMode === "attachment") {
+                            handleCancelArtifactUpload();
+                            return;
+                        }
                         setShowCompletionPopup(false);
                     }}
                 />

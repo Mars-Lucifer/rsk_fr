@@ -1,10 +1,8 @@
-﻿export async function saveMayakQuestionnaire({ questionnaireType, data, storageKey, onSecondCompleted }) {
+﻿import { readMayakActiveUser } from "./readMayakActiveUser";
+
+export async function saveMayakQuestionnaire({ questionnaireType, data, storageKey, onSecondCompleted }) {
     try {
-        const activeUser =
-            document.cookie
-                .split("; ")
-                .find((row) => row.startsWith("active_user="))
-                ?.split("=")[1] || "anonymous";
+        const activeUser = readMayakActiveUser();
 
         const response = await fetch("/api/mayak/saveQuestionnaire", {
             method: "POST",
@@ -12,7 +10,7 @@
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                userId: decodeURIComponent(activeUser),
+                userId: activeUser.id,
                 questionnaireType,
                 data,
             }),

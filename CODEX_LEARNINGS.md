@@ -1,4 +1,4 @@
-# Codex Learnings
+﻿# Codex Learnings
 
 This file stores short project-specific lessons so repeated mistakes are not made across future tasks.
 
@@ -204,3 +204,24 @@ Add only verified, reusable lessons. Skip one-off noise.
 - Root cause: content storage fallback previously selected the first existing directory instead of checking whether it contained a valid MAYAK manifest or section data.
 - Fix: keep `MAYAK_CONTENT_DIR` as the explicit override, but otherwise choose the first valid MAYAK storage root and use atomic JSON writes for manifest/section saves.
 - Prevention: when MAYAK content can live in multiple candidate directories, treat directory existence and content validity as separate checks; do not let an empty placeholder directory win over a valid storage root.
+
+### 2026-03-11 - Section-scoped MAYAK tokens must validate saved trainer index against the active section
+
+- Problem: MAYAK could successfully load `content-bundle?sectionId=301-400` and still open an empty `Задание №1` instead of the first task in that section.
+- Root cause: the trainer restored `currentTaskIndex=0` from session storage as a globally valid index because the task array was long enough, even though that saved index did not belong to the active section.
+- Fix: when a section-scoped token is active, restore the saved task index only if the saved task belongs to the same `sectionId`; otherwise start from the first task of the section.
+- Prevention: for MAYAK section-scoped access, validate saved navigation state against both array bounds and section ownership; a globally valid index is not necessarily valid for the active section.
+
+### 2026-03-11 - MAYAK server bypass requires both code support and service-level env, not only terminal export
+
+- Problem: enabling MAYAK bypass or admin settings on a production server appeared to have no effect even after `export MAYAK_*` commands were run in the shell.
+- Root cause: the running Next.js app was managed by `systemd`, so service processes did not inherit ad-hoc terminal exports.
+- Fix: add required MAYAK env vars to the `systemd` service override (for example `MAYAK_ADMIN_PASSWORD`, `MAYAK_CONTENT_DIR`, `MAYAK_ENABLE_SERVER_BYPASS`), then run `daemon-reload` and restart the service.
+- Prevention: when MAYAK runs under `systemd`, treat service env as the source of truth; do not assume shell exports will modify the active application process.
+
+### 2026-03-12 - MAYAK close buttons in flex headers must lock their box size
+
+- Problem: close controls in MAYAK popups and floating panels could visually stretch into wide pills even when the icon itself was correct.
+- Root cause: different popup headers mixed native `button` and MAYAK `Button` usage inside flex containers, while the project button styles assume full-size/action-button layouts unless width and shrink behavior are explicitly constrained.
+- Fix: use an explicit close-button contract with fixed `w/h`, matching `min-w/min-h`, and `shrink-0`; then style only the icon appearance on top of that fixed box.
+- Prevention: for MAYAK close buttons, do not rely on generic action-button defaults inside headers; always lock the button container size first and only then tune colors/hover states.

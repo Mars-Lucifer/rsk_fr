@@ -1,12 +1,8 @@
-﻿export async function saveMayakMeasurements({ elapsedTime, levels, taskNumber = 3 }) {
-    try {
-        const activeUser =
-            document.cookie
-                .split("; ")
-                .find((row) => row.startsWith("active_user="))
-                ?.split("=")[1] || "anonymous";
+﻿import { readMayakActiveUser } from "./readMayakActiveUser";
 
-        const decodedUser = decodeURIComponent(activeUser);
+export async function saveMayakMeasurements({ elapsedTime, levels, taskNumber = 3 }) {
+    try {
+        const activeUser = readMayakActiveUser();
         const timestamp = new Date().toISOString();
 
         const measurementData = {
@@ -22,7 +18,7 @@
         };
 
         const payload = {
-            [decodedUser]: {
+            [activeUser.id]: {
                 [timestamp]: measurementData,
             },
         };

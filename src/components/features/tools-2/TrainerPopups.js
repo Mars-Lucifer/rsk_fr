@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+﻿import { memo, useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input/Input";
 import CloseIcon from "@/assets/general/close.svg";
@@ -365,70 +365,44 @@ export const SessionCompletionPopup = memo(function SessionCompletionPopup({ onC
     );
 });
 
-export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData, onClose, elapsedTime }) {
-    // --- НАЧАЛО ДОБАВЛЕННОЙ ЛОГИКИ ---
-    const [levels, setLevels] = useState({
-        level1: "",
-        level2: "",
-        level3: "",
-        level4: "",
-        level5: "",
-    });
+export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData, onAttachmentConfirm, onClose, elapsedTime, isSubmitting = false, mode = "summary" }) {
+    const [attachmentFile, setAttachmentFile] = useState(null);
 
-    const handleLevelChange = (level, value) => {
-        setLevels((prev) => ({
-            ...prev,
-            [level]: value,
-        }));
-    };
-
-    const isSaveDisabled = !Object.values(levels).some((level) => level !== "");
-    // --- КОНЕЦ ДОБАВЛЕННОЙ ЛОГИКИ ---
-
-    const [isCopied, setIsCopied] = useState(false);
+    useEffect(() => {
+        setAttachmentFile(null);
+    }, [mode, taskData?.number]);
 
     if (!taskData) return null;
 
+    const isAttachmentMode = mode === "attachment";
     const formatTaskTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
-        return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+        return mins.toString().padStart(2, "0") + ":" + secs.toString().padStart(2, "0");
     };
 
-    const handleCopyClick = () => {
-        const textToCopy = `Задание №${taskData.number}\n\nОписание:\n${taskData.description}\n\nЗадача:\n${taskData.task}\n\nРезультат:\n\n`;
-        copyToClipboard(textToCopy)
-            .then(() => {
-                setIsCopied(true);
-                setTimeout(() => {
-                    setIsCopied(false);
-                    onClose();
-                }, 800);
-            })
-            .catch((err) => {
-                console.error("Ошибка копирования:", err);
-                alert("Не удалось скопировать текст.");
-            });
-    };
+    const normalizedTitle = String(taskData.title || "").trim();
+    const titlePattern = new RegExp("^\\u0417\\u0430\\u0434\\u0430\\u043d\\u0438\\u0435\\s*(?:\\u2116)?\\s*" + String(taskData.number || "").trim() + "$", "i");
+    const shouldShowTaskTitle = normalizedTitle && !titlePattern.test(normalizedTitle);
 
     return (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
             <div className="bg-white p-6 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto pointer-events-auto shadow-lg border border-gray-200">
                 <div className="flex items-start justify-between mb-4">
                     <div>
-                        <h3 className="text-xl font-bold">Задание №{taskData.number}</h3>
-                        <p className="text-sm text-gray-400 mt-1">Время выполнения: {formatTaskTime(elapsedTime)}</p>
+                        <h3 className="text-xl font-bold">{"\u0417\u0430\u0434\u0430\u043d\u0438\u0435 \u2116" + taskData.number}</h3>
+                        <p className="text-sm text-gray-400 mt-1">{"\u0412\u0440\u0435\u043c\u044f \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f: " + formatTaskTime(elapsedTime)}</p>
                     </div>
-                    <Button icon className="!bg-transparent !text-black hover:!bg-black/5" onClick={onClose}>
-                        <CloseIcon />
+                    <Button icon className="!w-9 !h-9 !min-w-[2.25rem] !min-h-[2.25rem] !p-0 !bg-transparent !text-black hover:!bg-black/5 flex items-center justify-center !shrink-0" onClick={onClose}>
+                        <CloseIcon className="h-3.5 w-3.5" />
                     </Button>
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                    {taskData.title && (
+                    {shouldShowTaskTitle && (
                         <div>
                             <p className="text-gray-800 text-lg mb-1" style={{ fontWeight: 900 }}>
-                                Название задания:
+                                {"\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u0434\u0430\u043d\u0438\u044f:"}
                             </p>
                             <p className="whitespace-pre-line text-gray-700 text-sm">{taskData.title}</p>
                         </div>
@@ -436,32 +410,47 @@ export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData,
                     {taskData.contentType && (
                         <div>
                             <p className="text-gray-800 text-lg mb-1" style={{ fontWeight: 900 }}>
-                                Тип контента:
+                                {"\u0422\u0438\u043f \u043a\u043e\u043d\u0442\u0435\u043d\u0442\u0430:"}
                             </p>
                             <p className="whitespace-pre-line text-gray-700 text-sm">{taskData.contentType}</p>
                         </div>
                     )}
                     <div>
                         <p className="text-gray-800 text-lg mb-1" style={{ fontWeight: 900 }}>
-                            Описание ситуации:
+                            {"\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0441\u0438\u0442\u0443\u0430\u0446\u0438\u0438:"}
                         </p>
                         <p className="whitespace-pre-line text-gray-700 text-sm">{taskData.description}</p>
                     </div>
                     <div>
                         <p className="text-gray-800 text-lg mb-1" style={{ fontWeight: 900 }}>
-                            Вашей задачей было:
+                            {"\u0412\u0430\u0448\u0435\u0439 \u0437\u0430\u0434\u0430\u0447\u0435\u0439 \u0431\u044b\u043b\u043e:"}
                         </p>
                         <p className="whitespace-pre-line text-gray-700 text-sm">{taskData.task}</p>
                     </div>
                 </div>
 
-                <div className="mt-4 flex justify-end relative">
-                    <Button onClick={handleCopyClick} className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200">
-                        Скопировать задание
-                    </Button>
-                    {isCopied && <span className="absolute -top-8 right-0 bg-black text-white text-xs px-3 py-1.5 rounded-lg shadow-lg animate-fade-in">Скопировано!</span>}
-                </div>
+                {isAttachmentMode && (
+                    <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-2 text-base font-semibold text-slate-900">{"\u041f\u0440\u0438\u043a\u0440\u0435\u043f\u0438\u0442\u0435 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442"}</div>
+                        <div className="mb-3 text-sm text-slate-500">{"\u041f\u043e\u0441\u043b\u0435 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0437\u0430\u0434\u0430\u043d\u0438\u0435 \u0441\u0440\u0430\u0437\u0443 \u0443\u0439\u0434\u0435\u0442 \u043d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443 \u0438\u043d\u0441\u043f\u0435\u043a\u0442\u043e\u0440\u0443"}</div>
+                        <label className="mb-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center">
+                            <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.mp4,.mov,.webm,.txt,.xls,.xlsx,.csv" onChange={(event) => setAttachmentFile(event.target.files?.[0] || null)} />
+                            <div className="text-sm font-medium text-slate-700">{"\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0430\u0439\u043b \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u0430"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{"PDF, Word, \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u044f, \u0432\u0438\u0434\u0435\u043e, \u0442\u0430\u0431\u043b\u0438\u0446\u044b \u0438 \u0442\u0435\u043a\u0441\u0442\u043e\u0432\u044b\u0435 \u0444\u0430\u0439\u043b\u044b"}</div>
+                            {attachmentFile && <div className="mt-3 rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">{attachmentFile.name}</div>}
+                        </label>
+                        <div className="flex justify-end gap-2">
+                            <Button onClick={onClose} className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200" disabled={isSubmitting}>
+                                {"\u041e\u0442\u043c\u0435\u043d\u0430"}
+                            </Button>
+                            <Button className="!bg-slate-900 !text-white hover:!bg-slate-800" onClick={() => onAttachmentConfirm?.(attachmentFile)} disabled={!attachmentFile || isSubmitting}>
+                                {isSubmitting ? "\u041e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u044e..." : "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 });
+

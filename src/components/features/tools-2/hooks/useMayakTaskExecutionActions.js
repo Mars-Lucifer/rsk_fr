@@ -1,6 +1,7 @@
-﻿import { useCallback } from "react";
+import { useCallback } from "react";
 
 import { saveMayakTaskAttempt } from "../utils/saveMayakTaskAttempt";
+import { upsertMayakTaskLogEntry } from "../utils/mayakTaskLogStorage";
 
 export const useMayakTaskExecutionActions = ({
     activeUser,
@@ -12,7 +13,13 @@ export const useMayakTaskExecutionActions = ({
     formatTaskTime,
     getStorageKey,
     isIntroTask,
+    onTaskStart,
+    onTaskSubmit,
     prompt,
+    qwenGreenCount,
+    qwenResponse,
+    qwenTotalFields,
+    requestTaskAttachment,
     setCompletedTasks,
     setCurrentTaskData,
     setShowCompletionPopup,
@@ -25,6 +32,8 @@ export const useMayakTaskExecutionActions = ({
     userType,
     who,
 }) => {
+    const activeUserId = activeUser?.id || "anonymous";
+
     const toggleTaskTimer = useCallback(async () => {
         if (isIntroTask(currentTaskIndex)) {
             if (timerState.isRunning) {
@@ -35,85 +44,52 @@ export const useMayakTaskExecutionActions = ({
             }
             return;
         }
+
         if (timerState.isRunning) {
             const timeWhenStopped = timerState.elapsedTime;
-            stopTimer();
-
             const taskNumber = currentTask?.number?.toString();
+            const safeTaskNumber = taskNumber || String(currentTaskIndex + 1);
+            const taskKey = `${tokenSectionId || "global"}:${safeTaskNumber}`;
+            const taskName = currentTask?.name || `\u0417\u0430\u0434\u0430\u043d\u0438\u0435 ${currentTaskIndex + 1}`;
             const taskTextData = taskNumber ? tasksTexts.find((t) => t.number === taskNumber) : null;
+            const preparedTaskData = taskTextData
+                ? { ...taskTextData, title: currentTask?.title || "", contentType: currentTask?.contentType || "" }
+                : {
+                      number: currentTask?.number || currentTaskIndex + 1,
+                      title: currentTask?.title || "",
+                      contentType: currentTask?.contentType || "",
+                      description: currentTask?.description || "\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u0437\u0430\u0434\u0430\u043d\u0438\u044f \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e",
+                      task: currentTask?.name || "\u0422\u0435\u043a\u0441\u0442 \u0437\u0430\u0434\u0430\u043d\u0438\u044f \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d",
+                  };
 
-            if (taskTextData) {
-                setCurrentTaskData({
-                    ...taskTextData,
-                    title: currentTask?.title || "",
-                    contentType: currentTask?.contentType || "",
-                });
-            } else {
-                console.warn(`Текст для задания ${currentTaskIndex + 1} не найден.`);
-                setCurrentTaskData({
-                    number: currentTask?.number || currentTaskIndex + 1,
-                    title: currentTask?.title || "",
-                    contentType: currentTask?.contentType || "",
-                    description: currentTask?.description || "Описание задания недоступно",
-                    task: currentTask?.name || "Текст задания недоступен",
-                });
+            const attachmentFile = typeof requestTaskAttachment === "function"
+                ? await requestTaskAttachment({
+                      taskNumber: safeTaskNumber,
+                      taskTitle: currentTask?.title || currentTask?.name || `\u0417\u0430\u0434\u0430\u043d\u0438\u0435 ${currentTaskIndex + 1}` ,
+                      taskData: preparedTaskData,
+                      elapsedTime: timeWhenStopped,
+                  })
+                : null;
+
+            if (!(attachmentFile instanceof File)) {
+                return;
             }
 
-            setShowCompletionPopup(true);
-
+            stopTimer();
             const minutes = Math.round(timeWhenStopped / 60);
-            const taskName = currentTask?.name || `Задание ${currentTaskIndex + 1}`;
-
-            const logEntry = {
-                number: taskNumber || String(currentTaskIndex + 1),
-                title: taskName,
-                taskTitle: currentTask?.title || "",
-                contentType: currentTask?.contentType || "",
-                description: taskTextData?.description || "",
-                taskText: taskTextData?.task || "",
-                time: formatTaskTime(timeWhenStopped),
-                mayak: {
-                    m: fields.m,
-                    a: fields.a,
-                    y: fields.y,
-                    k: fields.k,
-                    o1: fields.o1,
-                    k2: fields.k2,
-                    o2: fields.o2,
-                },
-                finalPrompt: prompt,
-            };
-
-            const currentLog = JSON.parse(localStorage.getItem(getStorageKey("session_tasks_log")) || "[]");
-            const filteredLog = currentLog.filter((item) => item.number && String(item.number) !== String(logEntry.number));
-            localStorage.setItem(getStorageKey("session_tasks_log"), JSON.stringify([...filteredLog, logEntry]));
 
             try {
-                const result = await saveMayakTaskAttempt({
-                    taskName,
-                    minutes,
-                    currentTaskIndex,
-                    type,
-                    userType,
-                    who,
-                    taskElapsedTime: timeWhenStopped,
-                    sectionId: tokenSectionId,
-                });
-
+                const result = await saveMayakTaskAttempt({ taskName, minutes, currentTaskIndex, type, userType, who, taskElapsedTime: timeWhenStopped, sectionId: tokenSectionId });
                 if (!result.success) {
                     console.warn("Failed to save to server, using localStorage fallback");
                     const newTasks = {
                         ...completedTasks,
-                        [activeUser]: {
-                            ...(completedTasks[activeUser] || {}),
+                        [activeUserId]: {
+                            ...(completedTasks[activeUserId] || {}),
                             [taskName]: {
                                 attempts: [
-                                    ...(completedTasks[activeUser]?.[taskName]?.attempts || []),
-                                    {
-                                        timestamp: new Date().toISOString(),
-                                        timeSpent: minutes,
-                                        taskDetails: { type, userType, who },
-                                    },
+                                    ...(completedTasks[activeUserId]?.[taskName]?.attempts || []),
+                                    { timestamp: new Date().toISOString(), timeSpent: minutes, taskDetails: { type, userType, who } },
                                 ],
                             },
                         },
@@ -124,11 +100,49 @@ export const useMayakTaskExecutionActions = ({
             } catch (err) {
                 console.error("Error saving task data:", err);
             }
-        } else {
-            startTimer();
+
+            let sessionTaskState = null;
+            if (typeof onTaskSubmit === "function") {
+                sessionTaskState = await onTaskSubmit({ file: attachmentFile, taskNumber: safeTaskNumber, taskName, elapsedSeconds: timeWhenStopped, sectionId: tokenSectionId });
+            }
+
+            const finalStatus = sessionTaskState?.status || null;
+            upsertMayakTaskLogEntry(getStorageKey("session_tasks_log"), {
+                taskKey,
+                number: safeTaskNumber,
+                title: taskName,
+                taskTitle: currentTask?.title || "",
+                contentType: currentTask?.contentType || "",
+                description: taskTextData?.description || "",
+                taskText: taskTextData?.task || "",
+                time: formatTaskTime(timeWhenStopped),
+                secondsSpent: timeWhenStopped,
+                mayak: { m: fields.m, a: fields.a, y: fields.y, k: fields.k, o1: fields.o1, k2: fields.k2, o2: fields.o2 },
+                finalPrompt: prompt,
+                status: finalStatus || "completed",
+                rejectionCount: 0,
+                rejectionReason: "",
+                attachmentName: attachmentFile.name,
+                qwen: qwenResponse || qwenGreenCount !== null ? { requested: true, score: `${Number.isFinite(qwenGreenCount) ? qwenGreenCount : 0}/${Number.isFinite(qwenTotalFields) ? qwenTotalFields : 7}` } : null,
+                updatedAt: new Date().toISOString(),
+            });
+
+            const shouldOpenCompletionPopup = !finalStatus || finalStatus === "approved" || finalStatus === "auto_approved";
+            if (shouldOpenCompletionPopup) {
+                setCurrentTaskData(preparedTaskData);
+                setShowCompletionPopup(true);
+            }
+            return;
         }
+
+        if (typeof onTaskStart === "function") {
+            const shouldStart = await onTaskStart({ taskNumber: currentTask?.number?.toString() || String(currentTaskIndex + 1), taskName: currentTask?.name || `\u0417\u0430\u0434\u0430\u043d\u0438\u0435 ${currentTaskIndex + 1}`, sectionId: tokenSectionId });
+            if (shouldStart === false) return;
+        }
+
+        startTimer();
     }, [
-        activeUser,
+        activeUserId,
         autoCompleteIntroTask,
         completedTasks,
         currentTask,
@@ -137,7 +151,13 @@ export const useMayakTaskExecutionActions = ({
         formatTaskTime,
         getStorageKey,
         isIntroTask,
+        onTaskStart,
+        onTaskSubmit,
         prompt,
+        qwenGreenCount,
+        qwenResponse,
+        qwenTotalFields,
+        requestTaskAttachment,
         setCompletedTasks,
         setCurrentTaskData,
         setShowCompletionPopup,
@@ -152,7 +172,5 @@ export const useMayakTaskExecutionActions = ({
         who,
     ]);
 
-    return {
-        toggleTaskTimer,
-    };
+    return { toggleTaskTimer };
 };

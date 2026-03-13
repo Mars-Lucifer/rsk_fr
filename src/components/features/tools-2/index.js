@@ -1,4 +1,4 @@
-﻿import Header from "@/components/layout/Header";
+import Header from "@/components/layout/Header";
 import Buffer from "./addons/popup";
 import { getKeyFromCookies } from "./actions";
 

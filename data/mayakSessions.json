@@ -1,0 +1,604 @@
+{
+  "sessions": [
+    {
+      "id": "a6e90809-3a92-4776-a1cc-11f9edf74278",
+      "name": "Тест",
+      "status": "completed",
+      "tokenId": "8b1d122e-c52f-4328-9eb5-67bc7099922d",
+      "token": "6137241eb8c4d0aeb59ad206d492664cb826c8acff9e037ba10067da6680707c",
+      "sectionId": "301-400-2",
+      "taskRange": "301-400",
+      "tables": [
+        "1",
+        "2",
+        "3"
+      ],
+      "inspectorAssignments": [
+        {
+          "inspectorTableNumber": "1",
+          "targetTableNumber": "2"
+        },
+        {
+          "inspectorTableNumber": "2",
+          "targetTableNumber": "3"
+        },
+        {
+          "inspectorTableNumber": "3",
+          "targetTableNumber": "2"
+        }
+      ],
+      "participants": [
+        {
+          "userId": "926360ea-7b92-470f-b5b6-e1a4f614a6a5",
+          "name": "1 1",
+          "userData": {
+            "lastName": "1",
+            "firstName": "1",
+            "college": "1",
+            "tableNumber": "1"
+          },
+          "tableNumber": "1",
+          "role": "ИНСПЕКТОР",
+          "createdAt": "2026-03-12T06:40:22.745Z",
+          "updatedAt": "2026-03-12T06:41:46.432Z"
+        },
+        {
+          "userId": "b893437e-ffe9-4724-b72e-c21bc5699d54",
+          "name": "Лебедев Андрей",
+          "userData": {
+            "lastName": "Лебедев",
+            "firstName": "Андрей",
+            "college": "12",
+            "tableNumber": "2"
+          },
+          "tableNumber": "2",
+          "role": null,
+          "createdAt": "2026-03-12T06:41:24.357Z",
+          "updatedAt": "2026-03-12T06:41:24.357Z"
+        }
+      ],
+      "taskStates": {
+        "b893437e-ffe9-4724-b72e-c21bc5699d54": {
+          "301-400-2:305": {
+            "taskKey": "301-400-2:305",
+            "taskNumber": "305",
+            "taskName": "Задание 305",
+            "sectionId": "301-400-2",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "auto_approved",
+            "startedAt": "2026-03-12T13:50:22.676Z",
+            "submittedAt": "2026-03-12T13:51:00.046Z",
+            "decidedAt": "2026-03-12T13:53:02.697Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 24,
+            "updatedAt": "2026-03-12T13:53:02.697Z",
+            "correctionDeadlineAt": null,
+            "attachments": [
+              {
+                "id": "5869fe2d-c74f-4734-998c-1e1960192588",
+                "originalFilename": "14.pdf",
+                "storedFilename": "5869fe2d-c74f-4734-998c-1e1960192588_14.pdf",
+                "mimetype": "application/pdf",
+                "size": 3900,
+                "extension": ".pdf",
+                "relativePath": "a6e90809-3a92-4776-a1cc-11f9edf74278/b893437e-ffe9-4724-b72e-c21bc5699d54/301-400-2_305/5869fe2d-c74f-4734-998c-1e1960192588_14.pdf",
+                "uploadedAt": "2026-03-12T13:51:00.045Z"
+              }
+            ]
+          },
+          "301-400-2:306": {
+            "taskKey": "301-400-2:306",
+            "taskNumber": "306",
+            "taskName": "Задание 306",
+            "sectionId": "301-400-2",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "approved",
+            "startedAt": "2026-03-12T07:54:48.826Z",
+            "submittedAt": "2026-03-12T07:54:53.670Z",
+            "decidedAt": "2026-03-12T07:55:41.287Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "926360ea-7b92-470f-b5b6-e1a4f614a6a5",
+            "reviewedByName": "1 1",
+            "elapsedSeconds": 4,
+            "correctionDeadlineAt": null,
+            "updatedAt": "2026-03-12T07:55:41.287Z"
+          },
+          "301-400-2:309": {
+            "taskKey": "301-400-2:309",
+            "taskNumber": "309",
+            "taskName": "Задание 309",
+            "sectionId": "301-400-2",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "approved",
+            "startedAt": "2026-03-12T14:06:32.894Z",
+            "submittedAt": "2026-03-12T14:06:42.940Z",
+            "decidedAt": "2026-03-12T14:07:05.879Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "926360ea-7b92-470f-b5b6-e1a4f614a6a5",
+            "reviewedByName": "1 1",
+            "elapsedSeconds": 1,
+            "correctionDeadlineAt": null,
+            "updatedAt": "2026-03-12T14:07:05.879Z",
+            "attachments": [
+              {
+                "id": "e43b6c61-d64e-4770-b5a1-c6ccd8f01528",
+                "originalFilename": "14.pdf",
+                "storedFilename": "e43b6c61-d64e-4770-b5a1-c6ccd8f01528_14.pdf",
+                "mimetype": "application/pdf",
+                "size": 3900,
+                "extension": ".pdf",
+                "relativePath": "a6e90809-3a92-4776-a1cc-11f9edf74278/b893437e-ffe9-4724-b72e-c21bc5699d54/301-400-2_309/e43b6c61-d64e-4770-b5a1-c6ccd8f01528_14.pdf",
+                "uploadedAt": "2026-03-12T14:06:42.940Z"
+              }
+            ]
+          },
+          "301-400-2:311": {
+            "taskKey": "301-400-2:311",
+            "taskNumber": "311",
+            "taskName": "Задание 311",
+            "sectionId": "301-400-2",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "approved",
+            "startedAt": "2026-03-12T08:14:58.477Z",
+            "submittedAt": "2026-03-12T08:15:05.183Z",
+            "decidedAt": "2026-03-12T08:16:11.648Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "926360ea-7b92-470f-b5b6-e1a4f614a6a5",
+            "reviewedByName": "1 1",
+            "elapsedSeconds": 6,
+            "correctionDeadlineAt": null,
+            "updatedAt": "2026-03-12T08:16:11.648Z"
+          },
+          "301-400-2:312": {
+            "taskKey": "301-400-2:312",
+            "taskNumber": "312",
+            "taskName": "Задание 312",
+            "sectionId": "301-400-2",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "approved",
+            "startedAt": "2026-03-12T08:17:46.047Z",
+            "submittedAt": "2026-03-12T08:17:53.215Z",
+            "decidedAt": "2026-03-12T08:17:57.405Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "926360ea-7b92-470f-b5b6-e1a4f614a6a5",
+            "reviewedByName": "1 1",
+            "elapsedSeconds": 6,
+            "correctionDeadlineAt": null,
+            "updatedAt": "2026-03-12T08:17:57.405Z"
+          },
+          "301-400-2:304": {
+            "taskKey": "301-400-2:304",
+            "taskNumber": "304",
+            "taskName": "Задание 304",
+            "sectionId": "301-400-2",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "auto_approved",
+            "startedAt": "2026-03-12T18:19:42.666Z",
+            "submittedAt": "2026-03-12T18:20:13.255Z",
+            "decidedAt": "2026-03-13T06:05:53.898Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 21,
+            "correctionDeadlineAt": null,
+            "attachments": [
+              {
+                "id": "a99900ec-912d-435b-82ba-6ba6c6f974c3",
+                "originalFilename": "586.pdf",
+                "storedFilename": "a99900ec-912d-435b-82ba-6ba6c6f974c3_586.pdf",
+                "mimetype": "application/pdf",
+                "size": 16217,
+                "extension": ".pdf",
+                "relativePath": "a6e90809-3a92-4776-a1cc-11f9edf74278/b893437e-ffe9-4724-b72e-c21bc5699d54/301-400-2_304/a99900ec-912d-435b-82ba-6ba6c6f974c3_586.pdf",
+                "uploadedAt": "2026-03-12T18:20:13.253Z"
+              }
+            ],
+            "updatedAt": "2026-03-13T06:05:53.898Z"
+          }
+        },
+        "926360ea-7b92-470f-b5b6-e1a4f614a6a5": {
+          "301-400-2:313": {
+            "taskKey": "301-400-2:313",
+            "taskNumber": "313",
+            "taskName": "Задание 313",
+            "sectionId": "301-400-2",
+            "tableNumber": "1",
+            "inspectorTableNumber": null,
+            "status": "auto_approved",
+            "startedAt": "2026-03-12T06:43:10.640Z",
+            "submittedAt": "2026-03-12T06:43:10.894Z",
+            "decidedAt": "2026-03-12T06:43:10.894Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 0,
+            "updatedAt": "2026-03-12T06:43:10.894Z"
+          },
+          "301-400-2:306": {
+            "taskKey": "301-400-2:306",
+            "taskNumber": "306",
+            "taskName": "Задание 306",
+            "sectionId": "301-400-2",
+            "tableNumber": "1",
+            "inspectorTableNumber": null,
+            "status": "auto_approved",
+            "startedAt": "2026-03-12T07:14:43.261Z",
+            "submittedAt": "2026-03-12T07:14:43.597Z",
+            "decidedAt": "2026-03-12T07:14:43.597Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 0,
+            "correctionDeadlineAt": null,
+            "updatedAt": "2026-03-12T07:14:43.597Z"
+          },
+          "301-400-2:305": {
+            "taskKey": "301-400-2:305",
+            "taskNumber": "305",
+            "taskName": "Задание 305",
+            "sectionId": "301-400-2",
+            "tableNumber": "1",
+            "inspectorTableNumber": null,
+            "status": "auto_approved",
+            "startedAt": "2026-03-12T07:27:15.594Z",
+            "submittedAt": "2026-03-12T07:27:16.395Z",
+            "decidedAt": "2026-03-12T07:27:16.395Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 0,
+            "correctionDeadlineAt": null,
+            "updatedAt": "2026-03-12T07:27:16.395Z"
+          },
+          "301-400-2:307": {
+            "taskKey": "301-400-2:307",
+            "taskNumber": "307",
+            "taskName": "Задание 307",
+            "sectionId": "301-400-2",
+            "tableNumber": "1",
+            "inspectorTableNumber": null,
+            "status": "auto_approved",
+            "startedAt": "2026-03-12T07:41:42.503Z",
+            "submittedAt": "2026-03-12T07:41:43.674Z",
+            "decidedAt": "2026-03-12T07:41:43.674Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 0,
+            "correctionDeadlineAt": null,
+            "updatedAt": "2026-03-12T07:41:43.674Z"
+          },
+          "301-400-2:304": {
+            "taskKey": "301-400-2:304",
+            "taskNumber": "304",
+            "taskName": "Задание 304",
+            "sectionId": "301-400-2",
+            "tableNumber": "1",
+            "inspectorTableNumber": null,
+            "status": "auto_approved",
+            "startedAt": "2026-03-12T14:06:12.925Z",
+            "submittedAt": "2026-03-12T14:06:21.054Z",
+            "decidedAt": "2026-03-12T14:06:21.054Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 0,
+            "correctionDeadlineAt": null,
+            "attachments": [
+              {
+                "id": "f0c4c862-1d3b-442d-8920-af4a39871baf",
+                "originalFilename": "14.pdf",
+                "storedFilename": "f0c4c862-1d3b-442d-8920-af4a39871baf_14.pdf",
+                "mimetype": "application/pdf",
+                "size": 3900,
+                "extension": ".pdf",
+                "relativePath": "a6e90809-3a92-4776-a1cc-11f9edf74278/926360ea-7b92-470f-b5b6-e1a4f614a6a5/301-400-2_304/f0c4c862-1d3b-442d-8920-af4a39871baf_14.pdf",
+                "uploadedAt": "2026-03-12T14:06:21.053Z"
+              }
+            ],
+            "updatedAt": "2026-03-12T14:06:21.054Z"
+          }
+        }
+      },
+      "createdAt": "2026-03-12T06:39:21.151Z",
+      "updatedAt": "2026-03-13T16:17:41.229Z",
+      "completedAt": "2026-03-13T16:17:41.229Z"
+    },
+    {
+      "id": "00ca2367-772f-44c6-a2b4-d54d09ba3f5a",
+      "name": "Арзамас",
+      "status": "completed",
+      "completedAt": "2026-03-13T16:17:39.851Z",
+      "tokenId": "289c1375-a2cf-4812-ac47-396201b32fd4",
+      "token": "1fbf0e7bb6caf56e43c8f411f9a009edff07f0348fbcb94dea74df557decb077",
+      "sectionId": "301-400",
+      "taskRange": "301-400",
+      "tables": [
+        "1",
+        "2",
+        "3"
+      ],
+      "inspectorAssignments": [
+        {
+          "inspectorTableNumber": "1",
+          "targetTableNumber": "2"
+        },
+        {
+          "inspectorTableNumber": "2",
+          "targetTableNumber": "3"
+        },
+        {
+          "inspectorTableNumber": "3",
+          "targetTableNumber": "1"
+        }
+      ],
+      "participants": [
+        {
+          "userId": "ed58ed88-60e4-48f6-a3b7-4cc71f8bf9e0",
+          "name": "Лебедев  Андрей",
+          "userData": {
+            "lastName": "Лебедев ",
+            "firstName": "Андрей",
+            "college": "123",
+            "tableNumber": "1"
+          },
+          "tableNumber": "1",
+          "role": null,
+          "createdAt": "2026-03-13T06:11:26.015Z",
+          "updatedAt": "2026-03-13T06:11:26.015Z"
+        }
+      ],
+      "taskStates": {},
+      "createdAt": "2026-03-13T06:10:11.597Z",
+      "updatedAt": "2026-03-13T16:17:39.851Z"
+    },
+    {
+      "id": "8471036b-ba50-432a-b62c-e83addd05076",
+      "name": "Тест",
+      "status": "completed",
+      "completedAt": "2026-03-13T16:17:36.602Z",
+      "tokenId": "eac70c8d-fae4-4d90-b2e3-4c8262680403",
+      "token": "aeb8431d2499981acbb43a0fb4c6fb8d5af3d32c8ba4293b82616d0755afb799",
+      "sectionId": "301-400",
+      "taskRange": "301-400",
+      "tables": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10"
+      ],
+      "inspectorAssignments": [
+        {
+          "inspectorTableNumber": "1",
+          "targetTableNumber": "2"
+        },
+        {
+          "inspectorTableNumber": "2",
+          "targetTableNumber": "3"
+        },
+        {
+          "inspectorTableNumber": "3",
+          "targetTableNumber": "4"
+        },
+        {
+          "inspectorTableNumber": "4",
+          "targetTableNumber": "5"
+        },
+        {
+          "inspectorTableNumber": "5",
+          "targetTableNumber": "6"
+        },
+        {
+          "inspectorTableNumber": "6",
+          "targetTableNumber": "7"
+        },
+        {
+          "inspectorTableNumber": "7",
+          "targetTableNumber": "8"
+        },
+        {
+          "inspectorTableNumber": "8",
+          "targetTableNumber": "9"
+        },
+        {
+          "inspectorTableNumber": "9",
+          "targetTableNumber": "10"
+        },
+        {
+          "inspectorTableNumber": "10",
+          "targetTableNumber": "1"
+        }
+      ],
+      "participants": [
+        {
+          "userId": "50038ae3-6fde-4354-b8f8-b5b75ea3bf5b",
+          "name": "Лебедев Андрей",
+          "userData": {
+            "lastName": "Лебедев",
+            "firstName": "Андрей",
+            "college": "1",
+            "tableNumber": "1"
+          },
+          "tableNumber": "1",
+          "role": null,
+          "createdAt": "2026-03-13T06:13:20.414Z",
+          "updatedAt": "2026-03-13T06:13:20.414Z"
+        }
+      ],
+      "taskStates": {},
+      "createdAt": "2026-03-13T06:12:06.133Z",
+      "updatedAt": "2026-03-13T16:17:36.602Z"
+    },
+    {
+      "id": "b36618fc-07fd-408c-a0f5-102652b3bdaa",
+      "name": "1",
+      "status": "completed",
+      "completedAt": "2026-03-13T16:17:38.066Z",
+      "tokenId": "bde6a4aa-c59f-47c0-a9f7-712b655b4b87",
+      "token": "d53f7093f44acff923e36b08adfe04702e8f42e31a0f8f55a7e98f53bff31152",
+      "sectionId": "1-100",
+      "taskRange": "1-100",
+      "tables": [
+        "1",
+        "2",
+        "3"
+      ],
+      "inspectorAssignments": [
+        {
+          "inspectorTableNumber": "1",
+          "targetTableNumber": "2"
+        },
+        {
+          "inspectorTableNumber": "2",
+          "targetTableNumber": "3"
+        },
+        {
+          "inspectorTableNumber": "3",
+          "targetTableNumber": "1"
+        }
+      ],
+      "participants": [
+        {
+          "userId": "309a5d83-28e9-4049-9f43-5c6c1f1ca2cc",
+          "name": "1 1",
+          "userData": {
+            "lastName": "1",
+            "firstName": "1",
+            "college": "1",
+            "tableNumber": "1"
+          },
+          "tableNumber": "1",
+          "role": "ИНСПЕКТОР",
+          "createdAt": "2026-03-13T06:15:13.243Z",
+          "updatedAt": "2026-03-13T06:15:42.891Z"
+        },
+        {
+          "userId": "f769d2b3-9ba4-438b-b18e-73b413382dd4",
+          "name": "тест тест",
+          "userData": {
+            "lastName": "тест",
+            "firstName": "тест",
+            "college": "2",
+            "tableNumber": "2"
+          },
+          "tableNumber": "2",
+          "role": null,
+          "createdAt": "2026-03-13T06:16:44.957Z",
+          "updatedAt": "2026-03-13T06:16:44.957Z"
+        }
+      ],
+      "taskStates": {
+        "f769d2b3-9ba4-438b-b18e-73b413382dd4": {
+          "1-100:7": {
+            "taskKey": "1-100:7",
+            "taskNumber": "7",
+            "taskName": "Задание 7",
+            "sectionId": "1-100",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "auto_approved",
+            "startedAt": "2026-03-13T06:19:48.141Z",
+            "submittedAt": "2026-03-13T06:21:03.541Z",
+            "decidedAt": "2026-03-13T06:23:04.001Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 32,
+            "correctionDeadlineAt": null,
+            "attachments": [
+              {
+                "id": "a731ec66-f905-4e07-91d9-cdc9cf302405",
+                "originalFilename": "586.pdf",
+                "storedFilename": "a731ec66-f905-4e07-91d9-cdc9cf302405_586.pdf",
+                "mimetype": "application/pdf",
+                "size": 16217,
+                "extension": ".pdf",
+                "relativePath": "b36618fc-07fd-408c-a0f5-102652b3bdaa/f769d2b3-9ba4-438b-b18e-73b413382dd4/1-100_7/a731ec66-f905-4e07-91d9-cdc9cf302405_586.pdf",
+                "uploadedAt": "2026-03-13T06:21:03.540Z"
+              }
+            ],
+            "updatedAt": "2026-03-13T06:23:04.001Z"
+          },
+          "1-100:9": {
+            "taskKey": "1-100:9",
+            "taskNumber": "9",
+            "taskName": "Задание 9",
+            "sectionId": "1-100",
+            "tableNumber": "2",
+            "inspectorTableNumber": "1",
+            "status": "started",
+            "startedAt": "2026-03-13T06:35:59.535Z",
+            "submittedAt": null,
+            "decidedAt": null,
+            "rejectionReason": "",
+            "reviewedByUserId": null,
+            "reviewedByName": null,
+            "elapsedSeconds": null,
+            "correctionDeadlineAt": null,
+            "attachments": [
+              {
+                "id": "933ebb58-7a44-4cea-8170-5e10ac126e7e",
+                "originalFilename": "586.pdf",
+                "storedFilename": "933ebb58-7a44-4cea-8170-5e10ac126e7e_586.pdf",
+                "mimetype": "application/pdf",
+                "size": 16217,
+                "extension": ".pdf",
+                "relativePath": "b36618fc-07fd-408c-a0f5-102652b3bdaa/f769d2b3-9ba4-438b-b18e-73b413382dd4/1-100_9/933ebb58-7a44-4cea-8170-5e10ac126e7e_586.pdf",
+                "uploadedAt": "2026-03-13T06:33:36.047Z"
+              }
+            ],
+            "updatedAt": "2026-03-13T06:35:59.535Z"
+          }
+        },
+        "309a5d83-28e9-4049-9f43-5c6c1f1ca2cc": {
+          "1-100:6": {
+            "taskKey": "1-100:6",
+            "taskNumber": "6",
+            "taskName": "Задание 6",
+            "sectionId": "1-100",
+            "tableNumber": "1",
+            "inspectorTableNumber": "3",
+            "status": "auto_approved",
+            "startedAt": "2026-03-13T06:33:11.725Z",
+            "submittedAt": "2026-03-13T06:33:20.666Z",
+            "decidedAt": "2026-03-13T06:35:21.927Z",
+            "rejectionReason": "",
+            "reviewedByUserId": "system",
+            "reviewedByName": "Система",
+            "elapsedSeconds": 0,
+            "correctionDeadlineAt": null,
+            "attachments": [
+              {
+                "id": "8829d46c-ef0b-4b20-a027-b1281cdf1a5f",
+                "originalFilename": "586.pdf",
+                "storedFilename": "8829d46c-ef0b-4b20-a027-b1281cdf1a5f_586.pdf",
+                "mimetype": "application/pdf",
+                "size": 16217,
+                "extension": ".pdf",
+                "relativePath": "b36618fc-07fd-408c-a0f5-102652b3bdaa/309a5d83-28e9-4049-9f43-5c6c1f1ca2cc/1-100_6/8829d46c-ef0b-4b20-a027-b1281cdf1a5f_586.pdf",
+                "uploadedAt": "2026-03-13T06:33:20.663Z"
+              }
+            ],
+            "updatedAt": "2026-03-13T06:35:21.927Z"
+          }
+        }
+      },
+      "createdAt": "2026-03-13T06:14:31.366Z",
+      "updatedAt": "2026-03-13T16:17:38.066Z"
+    }
+  ]
+}
