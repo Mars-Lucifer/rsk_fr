@@ -7,16 +7,21 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
     const [showDropdown, setShowDropdown] = useState(false);
 
     useEffect(() => {
+        let cancelled = false;
+        let frameId = null;
         if (options && Array.isArray(options)) {
             const mapped = options.map((opt) => ({
                 value: opt.id ?? opt.organization_id ?? opt.value ?? opt,
                 label: opt.short_name ?? opt.label ?? opt,
             }));
-            setItems(mapped);
+            frameId = requestAnimationFrame(() => {
+                setItems(mapped);
+            });
         } else if (src) {
             fetch(src)
                 .then((res) => res.text())
                 .then((text) => {
+                    if (cancelled) return;
                     const lines = text
                         .split("\n")
                         .map((l) => l.trim())
@@ -24,17 +29,35 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
                     setItems(lines.map((l) => ({ value: l, label: l })));
                 });
         }
+
+        return () => {
+            cancelled = true;
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
     }, [options, src]);
 
     useEffect(() => {
+        let frameId = null;
         if (controlledValue && items.length > 0) {
             const match = items.find((i) => String(i.value) === String(controlledValue));
             if (match) {
-                setInputValue(match.label);
+                frameId = requestAnimationFrame(() => {
+                    setInputValue(match.label);
+                });
             }
         } else if (!controlledValue) {
-            setInputValue("");
+            frameId = requestAnimationFrame(() => {
+                setInputValue("");
+            });
         }
+
+        return () => {
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
     }, [controlledValue, items]);
 
     const handleInput = (val) => {

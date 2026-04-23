@@ -113,23 +113,37 @@ export function useMayakPromptBuilder({ type, mayakData, tasksTexts, currentTask
     }, [buildTaskContext, currentTaskNumber, fields, onInvalidDraft, savePromptToHistory, tasksTexts]);
 
     useEffect(() => {
+        let frameId = null;
         const storedBuffer = getCookie(getStorageKey("buffer"));
+        let nextBuffer = {};
         if (storedBuffer) {
             try {
-                setBuffer(JSON.parse(storedBuffer));
+                nextBuffer = JSON.parse(storedBuffer);
             } catch {
-                setBuffer({});
+                nextBuffer = {};
             }
         }
 
+        let nextHistory = [];
         try {
             const storedHistory = JSON.parse(localStorage.getItem(getStorageKey("history")) || "[]");
             if (Array.isArray(storedHistory)) {
-                setHistory(storedHistory);
+                nextHistory = storedHistory;
             }
         } catch {
-            setHistory([]);
+            nextHistory = [];
         }
+
+        frameId = requestAnimationFrame(() => {
+            setBuffer(nextBuffer);
+            setHistory(nextHistory);
+        });
+
+        return () => {
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
     }, [getStorageKey]);
 
     const handleChange = useCallback((code, value) => {

@@ -559,36 +559,6 @@ export default function AdminMayakOnboardingPage() {
                 {error ? <div className="rounded-[1rem] border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm font-medium text-[#b91c1c]">{error}</div> : null}
                 {activeTab === "links" || activeTab === "progress" ? (
                     <>
-<<<<<<< HEAD
-                        <section className="rounded-[1.5rem] border border-(--color-gray-plus-50) bg-white p-5 shadow-sm">
-                            <div className="mb-4 text-lg font-black text-(--color-black)">Создать ссылку</div>
-                            <div className="grid items-stretch gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                <EditorField label="Название сессии" required invalid={createAttempted && Boolean(createLinkErrors.title)} hint={createAttempted ? createLinkErrors.title : ""}>
-                                    <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Название сессии" className={inputClassName} />
-                                </EditorField>
-                                <EditorField
-                                    label="Ссылка на чат"
-                                    invalid={createAttempted && Boolean(createLinkErrors.chatLink)}
-                                    hint={createAttempted ? createLinkErrors.chatLink || "Необязательно. Если ссылка есть, начните с https://." : "Необязательно. Если ссылка есть, начните с https://."}>
-                                    <input value={form.chatLink} onChange={(event) => setForm((current) => ({ ...current, chatLink: event.target.value }))} placeholder="https://..." className={inputClassName} />
-                                </EditorField>
-                                <EditorField label="Дата начала" required invalid={createAttempted && Boolean(createLinkErrors.startDate)} hint={createAttempted ? createLinkErrors.startDate : ""}>
-                                    <input type="date" value={form.startDate} onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))} className={inputClassName} />
-                                </EditorField>
-                                <EditorField
-                                    label="Дата окончания"
-                                    invalid={createAttempted && Boolean(createLinkErrors.endDate)}
-                                    hint={createAttempted ? createLinkErrors.endDate || "Необязательно. Оставьте пустым для однодневной ссылки." : "Необязательно. Оставьте пустым для однодневной ссылки."}>
-                                    <input type="date" value={form.endDate} onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))} className={inputClassName} />
-                                </EditorField>
-                            </div>
-                            <div className="mt-4 flex justify-end">
-                                <button type="button" className={primaryButtonClassName} onClick={handleCreateLink}>
-                                    Создать ссылку
-                                </button>
-                            </div>
-                        </section>
-=======
                         {activeTab === "links" ? (
                             <section className="rounded-[1.5rem] border border-(--color-gray-plus-50) bg-white p-5 shadow-sm">
                                 <div className="mb-4 text-lg font-black text-(--color-black)">Создать ссылку</div>
@@ -619,7 +589,6 @@ export default function AdminMayakOnboardingPage() {
                                 </div>
                             </section>
                         ) : null}
->>>>>>> codex/mayak-auth-wip
 
                         <div className="grid gap-4">
                             {links.length === 0 ? (

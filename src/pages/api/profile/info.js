@@ -1,3 +1,4 @@
+import { readLocalProfileMock, shouldUseLocalProfileMock } from "@/lib/localProfileMock";
 import { fetchPortalProfileFromRequest, PortalProfileRequestError } from "@/lib/portalProfileServer";
 
 export default async function ProfileInfoHandler(req, res) {
@@ -6,6 +7,16 @@ export default async function ProfileInfoHandler(req, res) {
     }
 
     try {
+        if (shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing: true })) {
+            const localProfile = await readLocalProfileMock();
+            return res.status(200).json({
+                success: true,
+                data: localProfile.data,
+                userId: localProfile.userId,
+                isMock: true,
+            });
+        }
+
         const { payload } = await fetchPortalProfileFromRequest(req);
         return res.status(200).json({ success: true, data: payload });
     } catch (error) {

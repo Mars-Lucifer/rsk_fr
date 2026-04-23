@@ -121,15 +121,25 @@ export function useMayakQwenEvaluation({ getStorageKey, buildPromptDraft, curren
     }, [getStorageKey, syncQwenEvaluationQuota]);
 
     useEffect(() => {
+        let frameId = null;
         const existingSessionStartTime = localStorage.getItem(getStorageKey("sessionStartTime"));
-        if (existingSessionStartTime) {
-            syncQwenEvaluationQuota(existingSessionStartTime);
-            return;
-        }
 
-        const nextSessionStartTime = Date.now().toString();
-        localStorage.setItem(getStorageKey("sessionStartTime"), nextSessionStartTime);
-        syncQwenEvaluationQuota(nextSessionStartTime);
+        frameId = requestAnimationFrame(() => {
+            if (existingSessionStartTime) {
+                syncQwenEvaluationQuota(existingSessionStartTime);
+                return;
+            }
+
+            const nextSessionStartTime = Date.now().toString();
+            localStorage.setItem(getStorageKey("sessionStartTime"), nextSessionStartTime);
+            syncQwenEvaluationQuota(nextSessionStartTime);
+        });
+
+        return () => {
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
     }, [getStorageKey, syncQwenEvaluationQuota]);
 
     const resetQwenFeedback = useCallback(() => {

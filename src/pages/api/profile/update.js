@@ -1,4 +1,6 @@
 
+import { shouldUseLocalProfileMock, updateLocalProfileMock } from "@/lib/localProfileMock";
+
 function sanitizeProfileFieldsForUpstream(fields) {
     const out = { ...fields };
     const rawPascal = out.Organization_id;
@@ -42,6 +44,20 @@ export default async function ProfileUpdateHandler(req, res) {
         const { role, ...profileFields } = bodyData;
         const sanitizedFields = sanitizeProfileFieldsForUpstream(profileFields);
 
+        if (shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing: true })) {
+            const updatedProfile = await updateLocalProfileMock({
+                ...sanitizedFields,
+                ...(role ? { Type: role } : {}),
+            });
+
+            return res.json({
+                success: true,
+                data: updatedProfile.data,
+                userId: updatedProfile.userId,
+                isMock: true,
+            });
+        }
+
         const response = await fetch("https://api.rosdk.ru/users/profile_interaction/update_my_profile/", {
             method: "PATCH",
             headers: {
@@ -84,7 +100,7 @@ export default async function ProfileUpdateHandler(req, res) {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
-                    Cookie: `users_access_token=${token}`,
+                    Cookie: req.headers.cookie || "",
                 },
                 body: JSON.stringify({ role }),
                 cache: "no-store",

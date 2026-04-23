@@ -21,7 +21,6 @@ export default function CategoryPage() {
     const { loading, categories: projects, error, fetchProjects } = useProjects();
     const { category: url } = router.query;
     const [selectedLevel, setSelectedLevel] = useState(1);
-    const [maxLevel, setMaxLevel] = useState(1);
 
     useEffect(() => {
         if (organization) {
@@ -31,15 +30,16 @@ export default function CategoryPage() {
 
     useEffect(() => {
         if (projects.length > 0) {
-            const maxLvl = Math.max(...projects.map((p) => p.level_number || 1));
-            setMaxLevel(maxLvl);
-
             const projectsInCat = projects.filter((p) => p.star_category === url);
             const incompleteProject = projectsInCat.find((p) => !p.tasks.every((t) => t.status === "ACCEPTED"));
+            const nextSelectedLevel = incompleteProject?.level_number || 1;
+            const frameId = requestAnimationFrame(() => {
+                setSelectedLevel(nextSelectedLevel);
+            });
 
-            if (incompleteProject) {
-                setSelectedLevel(incompleteProject.level_number || 1);
-            }
+            return () => {
+                cancelAnimationFrame(frameId);
+            };
         }
     }, [projects, url]);
 

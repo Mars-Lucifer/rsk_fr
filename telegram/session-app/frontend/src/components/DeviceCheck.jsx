@@ -1,6 +1,24 @@
 import React, { useState } from 'react';
 import { useDeviceCheck } from '../hooks/useDeviceCheck';
 
+const DeviceRow = ({ label, current, target, isValid }) => (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 0',
+    borderBottom: '1px solid #eee'
+  }}>
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: '0.8rem', color: '#888' }}>{label}</div>
+      <div style={{ fontWeight: '500' }}>{current}</div>
+    </div>
+    <div style={{ textAlign: 'right' }}>
+      <div style={{ fontSize: '0.8rem', color: '#888' }}>РўСЂРµР±СѓРµС‚СЃСЏ</div>
+      <div style={{ fontWeight: '500' }}>{target} {isValid ? 'вњ…' : 'вќЊ'}</div>
+    </div>
+  </div>
+);
+
 const DeviceCheck = ({ onComplete }) => {
   const { specs, checkDevice } = useDeviceCheck();
   const [loading, setLoading] = useState(false);
@@ -71,19 +89,19 @@ const DeviceCheck = ({ onComplete }) => {
         </>
       ) : (
         <div style={{ textAlign: 'left' }}>
-          <Row 
+          <DeviceRow 
             label="Операционная система" 
             current={specs.os} 
             target="Win 10/11, macOS" 
             isValid={specs.os === 'Windows 10/11' || specs.os === 'macOS'} 
           />
-          <Row 
+          <DeviceRow 
             label="Объем памяти (RAM)" 
             current={specs.ram >= 8 ? "8 GB или более" : `${specs.ram} GB`} 
             target="≥ 8 GB" 
             isValid={specs.ram >= 8} 
           />
-          <Row 
+          <DeviceRow 
             label="Веб-браузер" 
             current={specs.browser} 
             target="Chrome" 

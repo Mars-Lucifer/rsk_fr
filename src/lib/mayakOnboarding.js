@@ -249,13 +249,10 @@ export async function createMayakOnboardingLink(payload = {}) {
     }
 
     const endDate = String(payload.endDate || "").trim();
-<<<<<<< HEAD
     if (!endDate && payload?.requireEndDate) {
         throw new Error("Укажите дату окончания");
     }
 
-=======
->>>>>>> codex/mayak-auth-wip
     if (endDate && endDate < eventDate) {
         throw new Error("Дата окончания не может быть раньше даты начала");
     }

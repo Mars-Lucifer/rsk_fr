@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import Layout from "@/components/layout/Layout";
 import Header from "@/components/layout/Header";
 import PortalAuthFlow from "@/components/features/auth/PortalAuthFlow";
+import LocalProfileMockSwitcher from "@/components/pages/profile/LocalProfileMockSwitcher";
 import { clearUserData, saveUserData } from "@/utils/auth";
 import { consumePortalAuthReturnPath } from "@/lib/portalAuthReturn";
 import {
@@ -16,9 +17,15 @@ import {
 export default function AuthPage() {
     const router = useRouter();
     const [isSessionChecking, setIsSessionChecking] = useState(() => !hasResolvedPortalProfileCache());
+    const isLocalMockLogoutMode = router.isReady && router.query.localMock === "off";
 
     useEffect(() => {
         if (!router.isReady) {
+            return;
+        }
+
+        if (isLocalMockLogoutMode) {
+            clearUserData();
             return;
         }
 
@@ -63,7 +70,7 @@ export default function AuthPage() {
         return () => {
             isCancelled = true;
         };
-    }, [router]);
+    }, [isLocalMockLogoutMode, router]);
 
     return (
         <Layout>
@@ -73,13 +80,21 @@ export default function AuthPage() {
 
             <div className="hero" style={{ placeItems: "center" }}>
                 <div className="auth_cntr col-span-4 w-full flex flex-col justify-center">
-                    {isSessionChecking ? (
+                    {isLocalMockLogoutMode ? (
+                        <>
+                            <PortalAuthFlow className="w-full" />
+                            <LocalProfileMockSwitcher />
+                        </>
+                    ) : isSessionChecking ? (
                         <div className="flex flex-col gap-[0.75rem] items-center text-center">
                             <h3>Проверяем сессию</h3>
                             <p className="text-(--color-gray-black)">Если вы уже вошли на портале, сразу перенаправим дальше.</p>
                         </div>
                     ) : (
-                        <PortalAuthFlow className="w-full" />
+                        <>
+                            <PortalAuthFlow className="w-full" />
+                            <LocalProfileMockSwitcher />
+                        </>
                     )}
                 </div>
             </div>

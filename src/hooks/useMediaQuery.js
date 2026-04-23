@@ -1,29 +1,27 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export function useMediaQuery(query) {
-    const [matches, setMatches] = useState(false);
+    const [matches, setMatches] = useState(() => {
+        if (typeof window === "undefined") {
+            return false;
+        }
+
+        return window.matchMedia(query).matches;
+    });
 
     useEffect(() => {
-        // Проверяем, что код выполняется в браузере
         if (typeof window === "undefined") {
-            return;
+            return undefined;
         }
 
         const media = window.matchMedia(query);
-        if (media.matches !== matches) {
-            setMatches(media.matches);
-        }
-
         const listener = () => {
             setMatches(media.matches);
         };
 
-        // Используем новый безопасный метод
         media.addEventListener("change", listener);
-
-        // Функция очистки для удаления слушателя
         return () => media.removeEventListener("change", listener);
-    }, [matches, query]);
+    }, [query]);
 
     return matches;
 }

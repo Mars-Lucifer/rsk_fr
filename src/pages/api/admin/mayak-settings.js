@@ -22,8 +22,13 @@ export default async function handler(req, res) {
         const finalFileOpenrouterApiKey =
             settings.finalFileOpenrouterApiKey || process.env.MAYAK_FINAL_FILE_OPENROUTER_API_KEY || openrouterApiKey || "";
         const finalFileModel = settings.finalFileModel || process.env.MAYAK_FINAL_FILE_MODEL || "google/gemini-3-flash-preview";
+        const qwenReminderCronSecret =
+            settings.qwenReminderCronSecret || process.env.MAYAK_QWEN_REMINDER_CRON_SECRET || "";
         const telegramBotUsername = settings.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "";
         const telegramWebhookUrl = settings.telegramWebhookUrl || process.env.TELEGRAM_WEBHOOK_URL || "";
+        const qwenReminderChatIds = Array.isArray(settings.qwenReminderChatIds)
+            ? settings.qwenReminderChatIds.map((value) => String(value).trim()).filter(Boolean)
+            : [];
         const baseUrl = settings.baseUrl || process.env.BASE_URL || "";
         const qwenTokens = normalizeQwenTokenEntries(settings.qwenTokens);
         const qwenBackupEntry = normalizeQwenTokenEntries(settings.qwenBackupToken)[0] || null;
@@ -41,10 +46,14 @@ export default async function handler(req, res) {
                 finalFileOpenrouterApiKey: maskSecret(finalFileOpenrouterApiKey),
                 finalFileOpenrouterApiKeyIsSet: !!finalFileOpenrouterApiKey,
                 finalFileModel,
+                qwenReminderCronSecret: maskSecret(qwenReminderCronSecret),
+                qwenReminderCronSecretIsSet: !!qwenReminderCronSecret,
                 telegramBotUsername,
                 telegramBotUsernameIsSet: !!telegramBotUsername,
                 telegramWebhookUrl,
                 telegramWebhookUrlIsSet: !!telegramWebhookUrl,
+                qwenReminderChatIds,
+                qwenReminderChatIdsCount: qwenReminderChatIds.length,
                 baseUrl,
                 baseUrlIsSet: !!baseUrl,
                 introQuestionnaireUrl: questionnaires.introQuestionnaireUrl,
@@ -76,8 +85,10 @@ export default async function handler(req, res) {
             openrouterApiKey,
             finalFileOpenrouterApiKey,
             finalFileModel,
+            qwenReminderCronSecret,
             telegramBotUsername,
             telegramWebhookUrl,
+            qwenReminderChatIds,
             baseUrl,
             introQuestionnaireUrl,
             completionSurveyUrl,
@@ -114,6 +125,11 @@ export default async function handler(req, res) {
             process.env.MAYAK_FINAL_FILE_MODEL = settings.finalFileModel;
         }
 
+        if (qwenReminderCronSecret !== undefined) {
+            settings.qwenReminderCronSecret = typeof qwenReminderCronSecret === "string" ? qwenReminderCronSecret.trim() : "";
+            process.env.MAYAK_QWEN_REMINDER_CRON_SECRET = settings.qwenReminderCronSecret;
+        }
+
         if (telegramBotUsername !== undefined) {
             settings.telegramBotUsername = telegramBotUsername;
             process.env.TELEGRAM_BOT_USERNAME = telegramBotUsername;
@@ -122,6 +138,13 @@ export default async function handler(req, res) {
         if (telegramWebhookUrl !== undefined) {
             settings.telegramWebhookUrl = telegramWebhookUrl;
             process.env.TELEGRAM_WEBHOOK_URL = telegramWebhookUrl;
+        }
+
+        if (qwenReminderChatIds !== undefined) {
+            const normalizedChatIds = (Array.isArray(qwenReminderChatIds) ? qwenReminderChatIds : String(qwenReminderChatIds).split(/[,\r\n]+/))
+                .map((value) => String(value || "").trim())
+                .filter(Boolean);
+            settings.qwenReminderChatIds = normalizedChatIds;
         }
 
         if (baseUrl !== undefined) {

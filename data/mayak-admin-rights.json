@@ -1,0 +1,19 @@
+{
+  "rights": [
+    {
+      "id": "15f5434a-5978-4236-8ba5-810edd42be8a",
+      "userId": "900001",
+      "fullName": "Тестова Мария Игоревна",
+      "sectionId": "101-200",
+      "taskRange": "101-200",
+      "rangeName": "1",
+      "status": "active",
+      "grantedAt": "2026-04-23T13:42:28.729Z",
+      "updatedAt": "2026-04-23T17:05:06.178Z",
+      "revokedAt": null,
+      "totalQuota": 12,
+      "usedQuota": 4,
+      "remainingQuota": 8
+    }
+  ]
+}

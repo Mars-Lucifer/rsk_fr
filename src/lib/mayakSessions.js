@@ -2,7 +2,13 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 
-import { createMayakSessionToken, deleteMayakSessionToken, listMayakSessionTokens, updateMayakSessionToken } from "@/lib/mayakSessionTokens";
+import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
+import {
+    createMayakSessionToken,
+    deleteMayakSessionToken,
+    listMayakSessionTokens,
+    updateMayakSessionToken,
+} from "@/lib/mayakSessionTokens";
 
 const SESSIONS_FILE = path.join(process.cwd(), "data", "mayak-sessions.json");
 const SESSION_FILES_ROOT = path.join(process.cwd(), "data", "mayak-session-files");
@@ -29,7 +35,7 @@ function normalizeTokenIds(tokenIds) {
 }
 
 function normalizePositiveInteger(value, fallback = 0) {
-    const parsed = parseInt(value, 10);
+    const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
@@ -68,6 +74,7 @@ export function normalizeMayakSession(input = {}) {
     const tokenUsageLimit = normalizePositiveInteger(input.tokenUsageLimit);
     const reviewTimeoutSeconds = normalizePositiveInteger(input.reviewTimeoutSeconds, DEFAULT_REVIEW_TIMEOUT_SECONDS);
     const reworkTimeoutSeconds = normalizePositiveInteger(input.reworkTimeoutSeconds, DEFAULT_REWORK_TIMEOUT_SECONDS);
+    const participantLimit = normalizePositiveInteger(input.participantLimit, 0);
 
     return {
         id: normalizeString(input.id) || crypto.randomUUID(),
@@ -79,6 +86,11 @@ export function normalizeMayakSession(input = {}) {
         reviewTimeoutSeconds,
         reworkTimeoutSeconds,
         requiresTableSelection: tableCount > 0,
+        participantLimit,
+        ownerUserId: normalizeString(input.ownerUserId),
+        ownerFullName: normalizeString(input.ownerFullName),
+        source: normalizeString(input.source),
+        expiresAt: normalizeString(input.expiresAt) || null,
         tokenIds: normalizeTokenIds(input.tokenIds),
         status: normalizeString(input.status) || "active",
         createdAt: normalizeString(input.createdAt) || now,
@@ -114,6 +126,18 @@ function assertValidSessionPayload(payload) {
         throw new Error("Таймер исправления должен быть не меньше 1 секунды");
     }
 
+    if (normalized.source === "delegated-admin") {
+        if (!normalized.ownerUserId) {
+            throw new Error("Для пользовательской сессии нужен владелец");
+        }
+        if (!normalized.expiresAt) {
+            throw new Error("Для пользовательской сессии нужен срок действия");
+        }
+        if (normalized.participantLimit < 1) {
+            throw new Error("Для пользовательской сессии нужен лимит участников");
+        }
+    }
+
     if (normalized.tokenIds.length === 0) {
         throw new Error("Привяжите хотя бы один токен к сессии");
     }
@@ -127,7 +151,7 @@ function assertValidSessionPayload(payload) {
 
     const invalidSectionTokens = tokens.filter((token) => {
         if (!normalized.tokenIds.includes(token.id)) return false;
-        return (token.sectionId || token.taskRange || "") !== normalized.sectionId;
+        return token.sectionId !== normalized.sectionId || token.taskRange !== normalized.taskRange;
     });
     if (invalidSectionTokens.length > 0) {
         throw new Error("Все токены сессии должны быть привязаны к выбранному разделу");
@@ -149,6 +173,7 @@ function assertNoActiveTokenOverlap(sessions, tokenIds, existingSessionId = null
 }
 
 export async function listMayakSessions() {
+    await sweepExpiredDelegatedMayakSessions();
     const store = await readMayakSessionsStore();
     return store.sessions
         .slice()
@@ -158,6 +183,13 @@ export async function listMayakSessions() {
             if (aCompleted !== bCompleted) return aCompleted - bCompleted;
             return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
         });
+}
+
+export async function getMayakSessionById(sessionId) {
+    const normalizedId = normalizeString(String(sessionId || ""));
+    if (!normalizedId) return null;
+    const sessions = await listMayakSessions();
+    return sessions.find((session) => session.id === normalizedId) || null;
 }
 
 export async function findActiveMayakSessionByTokenId(tokenId) {
@@ -197,6 +229,10 @@ export async function createMayakSession(payload) {
         usageLimit: basePayload.tokenUsageLimit,
         sectionId: basePayload.sectionId,
         taskRange: basePayload.taskRange,
+        ownerUserId: basePayload.ownerUserId,
+        ownerFullName: basePayload.ownerFullName,
+        source: basePayload.source,
+        expiresAt: basePayload.expiresAt,
     });
 
     const tokens = await listMayakSessionTokens();
@@ -205,6 +241,11 @@ export async function createMayakSession(payload) {
         reviewTimeoutSeconds: basePayload.reviewTimeoutSeconds,
         reworkTimeoutSeconds: basePayload.reworkTimeoutSeconds,
         tokenUsageLimit: basePayload.tokenUsageLimit,
+        participantLimit: basePayload.participantLimit,
+        ownerUserId: basePayload.ownerUserId,
+        ownerFullName: basePayload.ownerFullName,
+        source: basePayload.source,
+        expiresAt: basePayload.expiresAt,
         tokenIds: [autoToken.id],
         _tokens: tokens,
     });
@@ -242,6 +283,10 @@ export async function updateMayakSession(sessionId, payload) {
         createdAt: current.createdAt,
         status: current.status,
         completedAt: current.completedAt,
+        ownerUserId: current.ownerUserId,
+        ownerFullName: current.ownerFullName,
+        source: current.source,
+        expiresAt: current.expiresAt,
     });
 
     assertNoActiveTokenOverlap(store.sessions, normalized.tokenIds, current.id);
@@ -253,6 +298,10 @@ export async function updateMayakSession(sessionId, payload) {
             sectionId: normalized.sectionId,
             taskRange: normalized.taskRange,
             usageLimit: normalized.tokenUsageLimit,
+            ownerUserId: normalized.ownerUserId,
+            ownerFullName: normalized.ownerFullName,
+            source: normalized.source,
+            expiresAt: normalized.expiresAt,
         });
     }
 

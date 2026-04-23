@@ -95,17 +95,22 @@ export default function Aside({ isMobileOpen, closeMobile }) {
                 transition={springTransition}
                 className="overflow-hidden bg-white max-[640px]:fixed max-[640px]:z-[100] max-[640px]:h-full max-[640px]:left-0 max-[640px]:top-0 sm:relative sm:translate-x-0">
                 {/* ЛОГОТИП И БУРГЕР */}
-                <div className={`logo-container flex items-center ${isCollapsed && screenType !== "mobile" ? "justify-center" : "justify-between"}`}>
+                <div
+                    className={`logo-container grid items-center gap-3 ${isCollapsed && screenType !== "mobile" ? "justify-center" : ""}`}
+                    style={{ gridTemplateColumns: !isCollapsed || screenType === "mobile" ? "minmax(0, 1fr) 2rem" : "2rem" }}
+                >
                     <AnimatePresence mode="wait">
                         {(!isCollapsed || screenType === "mobile") && (
-                            <motion.div key="logo" initial={false} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
-                                <div className="relative w-[76px] h-[40px] max-[900px]:w-[46px] max-[900px]:h-[24px]">
-                                    <Image src="/images/logo.svg" alt="logo" fill priority />
+                            <motion.div key="logo" initial={false} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ type: "spring", stiffness: 400, damping: 20 }} className="min-w-0 flex flex-1 justify-start">
+                                <div className="relative h-[120px] w-[228px] max-[900px]:h-[72px] max-[900px]:w-[138px]">
+                                    <Image src="/images/logo.png" alt="logo" fill priority className="object-contain" />
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
-                    <Burger onClick={screenType === "mobile" ? closeMobile : toggleSidebar} className="cursor-pointer flex-shrink-0 w-[1.25rem] h-[1.25rem]" />
+                    <div className="z-[2] flex h-[2rem] w-[2rem] items-center justify-center justify-self-end">
+                        <Burger onClick={screenType === "mobile" ? closeMobile : toggleSidebar} className="cursor-pointer flex-shrink-0 w-[1.25rem] h-[1.25rem]" />
+                    </div>
                 </div>
 
                 {isLoading ? (

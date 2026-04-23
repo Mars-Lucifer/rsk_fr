@@ -155,8 +155,12 @@ export default function WorkFolderPage({ goTo }) {
     const [hydrated, setHydrated] = useState(false);
 
     useEffect(() => {
-        setUserData(getUserData());
-        setHydrated(true);
+        const frameId = window.requestAnimationFrame(() => {
+            setUserData(getUserData());
+            setHydrated(true);
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
     }, []);
 
     if (!hydrated || !userData) return null;

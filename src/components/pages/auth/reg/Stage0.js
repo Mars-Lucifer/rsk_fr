@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input/Input";
 import Switcher from "@/components/ui/Switcher";
-import { useEffect } from "react";
 
 import Yandex from "@/assets/general/yandex.svg";
 import VKWidget from "@/components/features/auth/VKWidget";
@@ -15,12 +14,7 @@ export default function RegStage0({ onContinue, pageVariants, custom = 1, onOAut
         first_name: "",
         email: "",
         password: "",
-        role: userType,
     });
-
-    useEffect(() => {
-        setFormData((prev) => ({ ...prev, role: userType }));
-    }, [userType]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -79,7 +73,7 @@ export default function RegStage0({ onContinue, pageVariants, custom = 1, onOAut
             name: [firstName, lastName].filter(Boolean).join(" "),
             email,
             password: formData.password,
-            role: formData.role,
+            role: userType,
         };
 
         try {

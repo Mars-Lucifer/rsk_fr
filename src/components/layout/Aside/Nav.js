@@ -14,8 +14,8 @@ const BASE_NAV_LINKS = [
         label: "Команды",
         disable: false,
         login: true,
-        learn: false,
-        href: "/teams",
+        learn: true,
+        href: "#",
         icon: dynamic(() => import("@/assets/nav/team.svg")),
         submenu: [
             { label: "Список команд", href: "/teams" },
@@ -127,11 +127,19 @@ export function NavItem({ label, href, icon: Icon, submenu, isCollapsed, isHover
 
     const shouldShowSubmenu = (isHovered || isSubmenuActive || (screenType && screenType !== "desktop")) && !isCollapsed;
 
+    const handleNavClick = () => {
+        if (href === "/tools/mayak-oko" && typeof window !== "undefined") {
+            sessionStorage.setItem("currentPage", "mayakOko");
+            sessionStorage.removeItem("previousPage");
+        }
+    };
+
     return (
         <div className={`group flex flex-col gap-[0.75rem] cursor-pointer`} onMouseEnter={() => onHover(label)} onMouseLeave={() => onHover(null)}>
             <Link
                 className={`${isMainActive || isSubmenuActive ? "active" : ""} items-center ${isInactive ? "inactive pointer-events-none" : isSubmenuActive ? "opacity-100" : "opacity-30 group-hover:opacity-100"}`}
-                href={isInactive ? "#" : href}>
+                href={isInactive ? "#" : href}
+                onClick={handleNavClick}>
                 <Icon className="w-[1.375rem] h-[1.375rem] max-[900px]:w-[1.25rem] max-[900px]:h-[1.25rem]" />
                 <AnimatePresence>
                     {!isCollapsed && (

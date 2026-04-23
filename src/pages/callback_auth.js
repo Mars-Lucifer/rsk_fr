@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Layout from "@/components/layout/Layout";
 import { saveUserData } from "@/utils/auth";
 import { clearMayakPortalAuthPending, readMayakPortalAuthPending } from "@/utils/mayakPortalAuth";
+import { consumePortalAuthReturnPath } from "@/lib/portalAuthReturn";
 
 export default function CallbackAuth() {
     const router = useRouter();
@@ -24,7 +25,7 @@ export default function CallbackAuth() {
             const oauthProvider = providerParam || state || "yandex";
             setProvider(oauthProvider);
             const pendingMayakAuth = readMayakPortalAuthPending();
-            const mayakReturnPath = pendingMayakAuth?.returnPath || "";
+            const mayakReturnPath = pendingMayakAuth?.returnPath || consumePortalAuthReturnPath() || "";
 
             try {
                 // Отправляем код на наш API

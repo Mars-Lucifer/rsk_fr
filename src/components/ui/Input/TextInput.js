@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function TextInput({ value: controlledValue, onChange, name, big, small, ...props }) {
-    const [value, setValue] = useState(controlledValue || "");
-    const handle = (val) => {
-        setValue(val);
-        onChange?.({ target: { name, value: val } });
+    const isControlled = controlledValue !== undefined;
+    const [uncontrolledValue, setUncontrolledValue] = useState(controlledValue || "");
+    const value = isControlled ? controlledValue : uncontrolledValue;
+
+    const handle = (nextValue) => {
+        if (!isControlled) {
+            setUncontrolledValue(nextValue);
+        }
+
+        onChange?.({ target: { name, value: nextValue } });
     };
 
-    useEffect(() => {
-        if (controlledValue !== undefined) setValue(controlledValue);
-    }, [controlledValue]);
-
-    return <input value={value} onChange={(e) => handle(e.target.value)} name={name} className={`w-full ${big ? "big" : small ? "small" : ""}`} {...props} />;
+    return <input value={value} onChange={(event) => handle(event.target.value)} name={name} className={`w-full ${big ? "big" : small ? "small" : ""}`} {...props} />;
 }

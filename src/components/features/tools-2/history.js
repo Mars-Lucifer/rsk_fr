@@ -56,8 +56,11 @@ export default function HistoryPage({ goTo }) {
     const [copiedId, setCopiedId] = useState(null);
 
     useEffect(() => {
-        const historyData = parseHistoryCookie();
-        setHistory(historyData);
+        const frameId = window.requestAnimationFrame(() => {
+            setHistory(parseHistoryCookie());
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
     }, []);
 
     // ИЗМЕНЕНИЕ 2: Обновляем логику фильтрации для объединенной категории "Разное"

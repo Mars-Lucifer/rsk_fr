@@ -90,15 +90,29 @@ export default function OrganIndexPage() {
 };
 
     useEffect(() => {
-        getTotalCount();
+        const frameId = requestAnimationFrame(() => {
+            getTotalCount();
+        });
+
+        return () => {
+            cancelAnimationFrame(frameId);
+        };
     }, []);
 
     useEffect(() => {
         // При изменении поискового запроса сбрасываем на первую страницу
-        if (searchQuery) {
-            setCurrentPage(0);
-        }
-        loadOrgs(currentPage);
+        const frameId = requestAnimationFrame(() => {
+            if (searchQuery) {
+                setCurrentPage(0);
+                loadOrgs(0);
+                return;
+            }
+            loadOrgs(currentPage);
+        });
+
+        return () => {
+            cancelAnimationFrame(frameId);
+        };
     }, [currentPage, searchQuery, loadOrgs]);
 
     // Обработчик поиска

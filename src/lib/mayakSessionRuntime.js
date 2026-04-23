@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { execFile } from "child_process";
 import { promisify } from "util";
 
-import { completeMayakSession, listMayakSessions } from "@/lib/mayakSessions";
+import { completeMayakSession, getMayakSessionById } from "@/lib/mayakSessions";
 
 const execFileAsync = promisify(execFile);
 
@@ -185,11 +185,6 @@ function ensureSessionBucket(store, sessionId) {
         };
     }
     return store.sessions[sessionId];
-}
-
-async function getSessionById(sessionId) {
-    const sessions = await listMayakSessions();
-    return sessions.find((session) => session.id === sessionId) || null;
 }
 
 function getInspectorTargetTable(tableNumber, tableCount) {
@@ -436,7 +431,7 @@ async function convertWordToPdf(sourcePath, targetDir) {
 }
 
 export async function registerMayakSessionParticipant({ sessionId, userId, name, organization, tableNumber }) {
-    const session = await getSessionById(sessionId);
+    const session = await getMayakSessionById(sessionId);
     if (!session || session.status !== "active") {
         throw new Error("РЎРµСЃСЃРёСЏ РЅРµРґРѕСЃС‚СѓРїРЅР° РёР»Рё СѓР¶Рµ Р·Р°РІРµСЂС€РµРЅР°");
     }
@@ -449,6 +444,10 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
     const store = await readStore();
     const bucket = ensureSessionBucket(store, sessionId);
     const existing = bucket.participants[userId] || {};
+    const participantLimit = normalizeTableNumber(session.participantLimit);
+    if (!existing.userId && participantLimit > 0 && Object.keys(bucket.participants || {}).length >= participantLimit) {
+        throw new Error("Лимит участников для этого токена исчерпан");
+    }
     bucket.participants[userId] = {
         userId,
         name: normalizeString(name) || existing.name || "РЈС‡Р°СЃС‚РЅРёРє",
@@ -465,7 +464,7 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
 }
 
 export async function assignMayakSessionRole({ sessionId, userId, role }) {
-    const session = await getSessionById(sessionId);
+    const session = await getMayakSessionById(sessionId);
     if (!session || session.status !== "active") {
         throw new Error("РЎРµСЃСЃРёСЏ РЅРµРґРѕСЃС‚СѓРїРЅР° РёР»Рё СѓР¶Рµ Р·Р°РІРµСЂС€РµРЅР°");
     }
@@ -499,7 +498,7 @@ export async function assignMayakSessionRole({ sessionId, userId, role }) {
 }
 
 export async function setMayakSessionParticipantRole({ sessionId, userId, role }) {
-    const session = await getSessionById(sessionId);
+    const session = await getMayakSessionById(sessionId);
     if (!session || session.status !== "active") {
         throw new Error("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430");
     }
@@ -539,7 +538,7 @@ export async function setMayakSessionParticipantRole({ sessionId, userId, role }
 }
 
 export async function listMayakSessionParticipants(sessionId) {
-    const session = await getSessionById(sessionId);
+    const session = await getMayakSessionById(sessionId);
     if (!session) {
         throw new Error("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430");
     }
@@ -593,7 +592,7 @@ export async function createMayakSessionReview({
     storedFile,
     submissionText,
 }) {
-    const session = await getSessionById(sessionId);
+    const session = await getMayakSessionById(sessionId);
     if (!session || session.status !== "active") {
         throw new Error("РЎРµСЃСЃРёСЏ РЅРµРґРѕСЃС‚СѓРїРЅР° РёР»Рё СѓР¶Рµ Р·Р°РІРµСЂС€РµРЅР°");
     }
@@ -668,7 +667,7 @@ export async function createMayakSessionReview({
 }
 
 export async function resolveMayakSessionReview({ sessionId, reviewId, inspectorUserId, action, comment }) {
-    const session = await getSessionById(sessionId);
+    const session = await getMayakSessionById(sessionId);
     const store = await readStore();
     const bucket = ensureSessionBucket(store, sessionId);
     await expirePendingReviews(store, sessionId);
@@ -728,7 +727,7 @@ export async function resolveMayakSessionReview({ sessionId, reviewId, inspector
 }
 
 export async function getMayakSessionRuntimeState({ sessionId, userId }) {
-    const session = await getSessionById(sessionId);
+    const session = await getMayakSessionById(sessionId);
     if (!session || session.status !== "active") {
         return {
             sessionActive: false,
@@ -844,6 +843,11 @@ export async function saveMayakSessionUploadFile({ sessionId, userId, reviewId, 
 }
 
 export async function getMayakSessionReviewFile({ sessionId, reviewId, type, filename }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
     const store = await readStore();
     const bucket = ensureSessionBucket(store, sessionId);
     const review = bucket.reviews?.[reviewId];

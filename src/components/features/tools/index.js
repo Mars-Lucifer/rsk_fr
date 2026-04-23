@@ -497,32 +497,46 @@ export default function IndexPage({ goTo }) {
         checkToken();
     }, []);
 
+    const readCookie = (name) => {
+        const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+        return match ? decodeURIComponent(match[2]) : null;
+    };
+
     useEffect(() => {
+        let frameId = null;
         // Читаем буфер из cookie
-        const buf = getCookie(getStorageKey("buffer"));
+        const buf = readCookie(getStorageKey("buffer"));
+        let nextBuffer = {};
         if (buf) {
             try {
-                setBuffer(JSON.parse(buf));
+                nextBuffer = JSON.parse(buf);
             } catch {
-                setBuffer({});
+                nextBuffer = {};
             }
         }
         // Читаем историю из cookie
         const hist = localStorage.getItem(getStorageKey("history"));
+        let nextHistory = [];
 
         if (hist) {
             try {
-                setHistory(JSON.parse(hist));
+                nextHistory = JSON.parse(hist);
             } catch {
-                setHistory([]);
+                nextHistory = [];
             }
         }
-    }, []);
 
-    function getCookie(name) {
-        const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-        return match ? decodeURIComponent(match[2]) : null;
-    }
+        frameId = requestAnimationFrame(() => {
+            setBuffer(nextBuffer);
+            setHistory(nextHistory);
+        });
+
+        return () => {
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
+    }, []);
 
     function setCookie(name, value, days = 30) {
         try {

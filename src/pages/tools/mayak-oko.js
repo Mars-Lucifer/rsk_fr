@@ -48,7 +48,6 @@ export default function Home() {
             document.cookie = "active_user=; expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; path=/; SameSite=Lax";
 
             sessionStorage.setItem("currentPage", "settings");
-            setPageKey("settings");
             window.location.replace("/tools/mayak-oko");
         }
     }, [router.isReady, router.query.restart]);

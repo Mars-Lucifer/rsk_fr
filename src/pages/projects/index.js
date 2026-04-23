@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import { getCookie } from "@/utils/cookies";
 import { useProjects } from "@/hooks/fetchProjects";
@@ -14,7 +14,6 @@ import Notify from "@/assets/general/notify.svg";
 
 export default function Projects({ organization }) {
     const { loading, categories: projects, error, fetchProjects } = useProjects();
-    const [processedCategories, setProcessedCategories] = useState([]);
 
     useEffect(() => {
         if (organization) {
@@ -22,22 +21,23 @@ export default function Projects({ organization }) {
         }
     }, [organization, fetchProjects]);
 
-    useEffect(() => {
-        if (!loading && !error && projects) {
-            const enhanced = staticCategories.map((cat) => {
-                const catProjects = projects.filter((p) => p.star_category === cat.url);
-
-                const completedProjects = catProjects.filter((p) => p.tasks.length > 0 && p.tasks.every((t) => t.status === "ACCEPTED"));
-
-                const star_index = completedProjects.reduce((sum, p) => sum + p.star_index, 0);
-
-                const level_number = completedProjects.length > 0 ? Math.max(...completedProjects.map((p) => p.level_number)) : 0;
-
-                return { ...cat, star_index, level_number };
-            });
-            setProcessedCategories(enhanced);
+    const processedCategories = useMemo(() => {
+        if (loading || error || !projects) {
+            return [];
         }
-    }, [loading, error, projects]);
+
+        return staticCategories.map((cat) => {
+            const catProjects = projects.filter((p) => p.star_category === cat.url);
+
+            const completedProjects = catProjects.filter((p) => p.tasks.length > 0 && p.tasks.every((t) => t.status === "ACCEPTED"));
+
+            const star_index = completedProjects.reduce((sum, p) => sum + p.star_index, 0);
+
+            const level_number = completedProjects.length > 0 ? Math.max(...completedProjects.map((p) => p.level_number)) : 0;
+
+            return { ...cat, star_index, level_number };
+        });
+    }, [error, loading, projects]);
 
     
     if (!organization) {

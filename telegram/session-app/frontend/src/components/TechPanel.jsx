@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import React, { useState } from 'react';
 import TaskList from './TaskList.jsx';
 import TaskDetail from './TaskDetail.jsx';

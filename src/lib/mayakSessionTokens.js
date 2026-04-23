@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 
+import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
+
 const SESSION_TOKENS_FILE = path.join(process.cwd(), "data", "mayak-session-tokens.json");
 const SESSIONS_FILE = path.join(process.cwd(), "data", "mayak-sessions.json");
 
@@ -14,8 +16,14 @@ function normalizeString(value) {
 }
 
 function normalizeUsageLimit(value) {
-    const parsed = parseInt(value, 10);
+    const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function isExpiredToken(token) {
+    if (!token?.expiresAt) return false;
+    const expiresTs = Date.parse(token.expiresAt);
+    return Number.isFinite(expiresTs) && expiresTs <= Date.now();
 }
 
 async function ensureStoreFile() {
@@ -60,8 +68,9 @@ async function readSessionsStore() {
 function toTokenWithStats(token) {
     return {
         ...token,
-        remainingAttempts: token.usageLimit - token.usedCount,
+        remainingAttempts: Math.max(0, token.usageLimit - token.usedCount),
         isExhausted: token.usedCount >= token.usageLimit,
+        isExpired: isExpiredToken(token),
     };
 }
 
@@ -76,6 +85,10 @@ function normalizeSessionToken(input = {}) {
         usageLimit: normalizeUsageLimit(input.usageLimit),
         usedCount: Number.isFinite(input.usedCount) ? input.usedCount : 0,
         isActive: input.isActive !== false,
+        ownerUserId: normalizeString(input.ownerUserId),
+        ownerFullName: normalizeString(input.ownerFullName),
+        source: normalizeString(input.source),
+        expiresAt: normalizeString(input.expiresAt) || null,
         createdAt: normalizeString(input.createdAt) || now,
         updatedAt: now,
     };
@@ -100,15 +113,24 @@ function assertValidTokenPayload(payload) {
 }
 
 export async function listMayakSessionTokens() {
+    await sweepExpiredDelegatedMayakSessions();
     const store = await readStore();
     return store.tokens
         .map(toTokenWithStats)
         .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 }
 
+export async function getMayakSessionTokenById(tokenId) {
+    const normalizedId = normalizeString(tokenId);
+    if (!normalizedId) return null;
+    const tokens = await listMayakSessionTokens();
+    return tokens.find((token) => token.id === normalizedId) || null;
+}
+
 export async function getMayakSessionTokenByValue(tokenValue) {
     const normalizedValue = normalizeString(tokenValue);
     if (!normalizedValue) return null;
+    await sweepExpiredDelegatedMayakSessions();
     const store = await readStore();
     const token = store.tokens.find((item) => item.token === normalizedValue);
     return token ? toTokenWithStats(token) : null;
@@ -125,6 +147,10 @@ export async function validateMayakSessionToken(tokenValue) {
         return { valid: false, error: "Токен деактивирован", token };
     }
 
+    if (token.isExpired) {
+        return { valid: false, error: "Срок действия токена истёк", token, remainingAttempts: 0 };
+    }
+
     if (token.usedCount >= token.usageLimit) {
         return {
             valid: false,
@@ -137,12 +163,13 @@ export async function validateMayakSessionToken(tokenValue) {
     return {
         valid: true,
         token,
-        remainingAttempts: token.usageLimit - token.usedCount,
+        remainingAttempts: Math.max(0, token.usageLimit - token.usedCount),
     };
 }
 
 export async function useMayakSessionToken(tokenValue) {
     const normalizedValue = normalizeString(tokenValue);
+    await sweepExpiredDelegatedMayakSessions();
     const store = await readStore();
     const index = store.tokens.findIndex((item) => item.token === normalizedValue);
 
@@ -153,6 +180,10 @@ export async function useMayakSessionToken(tokenValue) {
     const current = store.tokens[index];
     if (!current.isActive) {
         return { success: false, error: "Токен деактивирован" };
+    }
+
+    if (isExpiredToken(current)) {
+        return { success: false, error: "Срок действия токена истёк", remainingAttempts: 0 };
     }
 
     if (current.usedCount >= current.usageLimit) {
@@ -169,7 +200,7 @@ export async function useMayakSessionToken(tokenValue) {
     return {
         success: true,
         token: toTokenWithStats(store.tokens[index]),
-        remainingAttempts: store.tokens[index].usageLimit - store.tokens[index].usedCount,
+        remainingAttempts: Math.max(0, store.tokens[index].usageLimit - store.tokens[index].usedCount),
     };
 }
 
@@ -193,7 +224,7 @@ export async function updateMayakSessionToken(tokenId, payload) {
     const store = await readStore();
     const index = store.tokens.findIndex((token) => token.id === tokenId);
     if (index === -1) {
-        throw new Error("Session-С‚РѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ");
+        throw new Error("Session-токен не найден");
     }
 
     const current = store.tokens[index];
@@ -208,7 +239,7 @@ export async function updateMayakSessionToken(tokenId, payload) {
     });
 
     if (normalized.usageLimit < current.usedCount) {
-        throw new Error("Р›РёРјРёС‚ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёР№ РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РјРµРЅСЊС€Рµ СѓР¶Рµ РёСЃРїРѕР»СЊР·РѕРІР°РЅРЅС‹С… РїРѕРїС‹С‚РѕРє");
+        throw new Error("Лимит использований не может быть меньше уже использованных попыток");
     }
 
     store.tokens[index] = normalized;
@@ -218,7 +249,9 @@ export async function updateMayakSessionToken(tokenId, payload) {
 
 export async function deleteMayakSessionToken(tokenId) {
     const sessions = await readSessionsStore();
-    const activeSession = sessions.find((session) => session.status === "active" && Array.isArray(session.tokenIds) && session.tokenIds.includes(tokenId));
+    const activeSession = sessions.find(
+        (session) => session.status === "active" && Array.isArray(session.tokenIds) && session.tokenIds.includes(tokenId)
+    );
     if (activeSession) {
         throw new Error(`Session-токен используется в активной сессии "${activeSession.name}"`);
     }

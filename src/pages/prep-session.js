@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Head from 'next/head';
+import Script from 'next/script';
 
 const API_BASE = '/api/mayak/prep-session';
 
@@ -781,8 +782,8 @@ export default function PrepSessionPage() {
     <>
       <Head>
         <title>Подготовка к сессии</title>
-        <script src="https://telegram.org/js/telegram-web-app.js" />
       </Head>
+      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" />
       <div className="prep-session">
         {loading ? (
           <div className="ps-loading">Загрузка...</div>

@@ -45,19 +45,16 @@ export async function executeMayakSessionCompletion({
     onClearState,
     redirectTo = "/profile",
 }) {
-    const activeUser =
-        document.cookie
-            .split("; ")
-            .find((row) => row.startsWith("active_user="))
-            ?.split("=")[1] || "anonymous";
+    const activeUser = getUserFromCookies();
+    const activeUserId = String(activeUser?.id || activeUser?.portalUserId || "anonymous").trim() || "anonymous";
 
     const payload = buildMayakSessionCompletionPayload({
-        activeUserId: activeUser?.id,
+        activeUserId,
         elapsedTime,
         levels,
     });
 
-    return fetch("/api/mayak/saveDeltaTest", {
+    await fetch("/api/mayak/saveDeltaTest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

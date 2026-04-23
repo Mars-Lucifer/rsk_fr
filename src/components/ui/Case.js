@@ -40,7 +40,13 @@ export default function Case({ value, onChange, children, tabs, pages = 5, perPa
 
     // Сброс страницы при смене таба, children или количества элементов
     useEffect(() => {
-        setPage(0);
+        const frameId = requestAnimationFrame(() => {
+            setPage(0);
+        });
+
+        return () => {
+            cancelAnimationFrame(frameId);
+        };
     }, [value, children, contentLength]);
 
     // Пагинация-свитчер (универсальный рендер)

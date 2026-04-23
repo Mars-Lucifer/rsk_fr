@@ -1,11 +1,12 @@
 import { useCallback } from "react";
 
-import { buildMayakSessionArtifacts } from "../utils/mayakSessionArtifacts";
-import { clearMayakSessionCompletionState, saveMayakCompletionDelta } from "../utils/mayakSessionCompletion";
+import { blobToBase64, buildMayakSessionArtifacts } from "../utils/mayakSessionArtifacts";
+import { clearMayakSessionCompletionState, executeMayakSessionCompletion, saveMayakCompletionDelta } from "../utils/mayakSessionCompletion";
 import { buildMayakCertificateBlob, buildMayakQrDataUrl, buildMayakSessionLogBlob, downloadMayakBlob } from "../utils/mayakSessionDocuments";
 import { getKeyFromCookies, getUserFromCookies } from "../actions";
 
 const ENABLE_MAYAK_TELEGRAM_COMPLETION_DELIVERY = false;
+const ENABLE_MAYAK_FINAL_ANALYTICS = false;
 
 function buildFullMayakName(userData) {
     const explicitParts = [userData?.lastName, userData?.firstName, userData?.patronymic]
@@ -147,7 +148,7 @@ export const useMayakCompletionActions = ({
         } catch (error) {
             console.error("Ошибка при генерации логов:", error);
         }
-    }, [buildCompletionLogData]);
+    }, [formatTaskTime, getStorageKey, selectedRole, tokenSectionId]);
 
     const handleDownloadCertificate = useCallback(async () => {
         try {
@@ -165,6 +166,10 @@ export const useMayakCompletionActions = ({
     }, []);
 
     const handleDownloadAnalytics = useCallback(async () => {
+        if (!ENABLE_MAYAK_FINAL_ANALYTICS) {
+            return;
+        }
+
         try {
             const userData = getUserFromCookies();
             const userName = buildFullMayakName(userData);
@@ -174,8 +179,16 @@ export const useMayakCompletionActions = ({
                 tokenSectionId,
             });
             const totalTime = formatTaskTime(totalSessionSeconds);
+            const logData = {
+                userName,
+                userRole: selectedRole,
+                date: dateStr,
+                totalTime,
+                rankingData,
+                tasks: enrichedTasks,
+            };
 
-            const res = await fetch("/api/mayak/session-analytics", {
+            const response = await fetch("/api/mayak/session-analytics", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ logData }),
@@ -191,7 +204,7 @@ export const useMayakCompletionActions = ({
         } catch (error) {
             console.error("Ошибка при генерации аналитики:", error);
         }
-    }, [buildCompletionLogData]);
+    }, [formatTaskTime, getStorageKey, selectedRole, tokenSectionId]);
 
     const handleSendToTelegram = useCallback(async () => {
         if (!ENABLE_MAYAK_TELEGRAM_COMPLETION_DELIVERY) {
@@ -314,24 +327,6 @@ export const useMayakCompletionActions = ({
             tasks: enrichedTasks,
         });
 
-        let analyticsBlob = null;
-
-        try {
-            const analyticsResponse = await fetch("/api/mayak/session-analytics", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ logData }),
-            });
-
-            if (!analyticsResponse.ok) {
-                const payload = await analyticsResponse.json().catch(() => ({}));
-                throw new Error(payload.error || "Не удалось сформировать аналитический отчёт");
-            }
-
-            analyticsBlob = await analyticsResponse.blob();
-        } catch (error) {
-            console.error("Не удалось сформировать аналитику MAYAK, сохраняем остальные материалы:", error);
-        }
         const filesToSave = [
             {
                 kind: "certificate",
@@ -346,15 +341,6 @@ export const useMayakCompletionActions = ({
                 base64: await blobToBase64(logBlob),
             },
         ];
-
-        if (analyticsBlob) {
-            filesToSave.push({
-                kind: "analytics",
-                fileName: `Analytics_Mayak_${safeNamePart}_${fileStamp}.pdf`,
-                contentType: "application/pdf",
-                base64: await blobToBase64(analyticsBlob),
-            });
-        }
 
         const saveResponse = await fetch("/api/profile/mayak-artifacts", {
             method: "POST",
@@ -413,7 +399,6 @@ export const useMayakCompletionActions = ({
                     }),
                 redirectTo: isGuestUser ? "/tools/mayak-oko" : "/profile",
             });
-            window.location.href = "/";
         } catch (error) {
             console.error("Ошибка в процессе завершения:", error);
             alert(error.message || "Не удалось сохранить материалы MAYAK в личном кабинете.");

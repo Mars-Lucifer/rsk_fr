@@ -299,9 +299,15 @@ export function InspectorReviewModal({ review, loading, error, onApprove, onReje
     const [customRejectComment, setCustomRejectComment] = useState("");
 
     useEffect(() => {
-        setShowRejectOptions(false);
-        setShowCustomReject(false);
-        setCustomRejectComment("");
+        const frameId = requestAnimationFrame(() => {
+            setShowRejectOptions(false);
+            setShowCustomReject(false);
+            setCustomRejectComment("");
+        });
+
+        return () => {
+            cancelAnimationFrame(frameId);
+        };
     }, [review?.id]);
 
     if (!review) return null;

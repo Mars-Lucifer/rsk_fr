@@ -4,16 +4,22 @@ import Image from "next/image";
 import ImageIcon from "@/assets/general/image.svg";
 
 export default function ImageInput({ value: controlledValue, onChange, onImageChange, accept = "image/*", name, ...props }) {
-    const [value, setValue] = useState(controlledValue || "");
     const [preview, setPreview] = useState(null);
     const fileRef = useRef();
 
     useEffect(() => {
-        if (controlledValue !== undefined) setValue(controlledValue);
+        if (controlledValue) {
+            return undefined;
+        }
+
+        const frameId = window.requestAnimationFrame(() => {
+            setPreview(null);
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
     }, [controlledValue]);
 
     const handleFile = (file) => {
-        setValue(file.name);
         onChange?.({ target: { name, value: file.name } });
         onImageChange?.(file);
     };
@@ -31,7 +37,6 @@ export default function ImageInput({ value: controlledValue, onChange, onImageCh
 
     const handleRemove = () => {
         setPreview(null);
-        setValue("");
         fileRef.current.value = "";
         onChange?.({ target: { name, value: "" } });
     };

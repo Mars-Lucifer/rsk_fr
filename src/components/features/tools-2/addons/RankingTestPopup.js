@@ -226,7 +226,10 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
     const scrollContainerRef = useRef(null);
     const autoScrollRef = useRef(null);
     const currentLevelRef = useRef(currentLevel);
-    currentLevelRef.current = currentLevel;
+
+    useEffect(() => {
+        currentLevelRef.current = currentLevel;
+    }, [currentLevel]);
 
     const level = levels[currentLevel];
     const userOrder = userOrders[currentLevel];
@@ -333,7 +336,7 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
         startAutoScroll(e.clientY);
     };
 
-    const handleMouseMove = useCallback((e) => {
+    const handleMouseMove = (e) => {
         if (!mouseState.current.dragging || !listRef.current) return;
         e.preventDefault();
         updateAutoScroll(e.clientY);
@@ -373,16 +376,16 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
             newOrders[lvl] = newOrder;
             return newOrders;
         });
-    }, []);
+    };
 
-    const handleMouseUp = useCallback(() => {
+    const handleMouseUp = () => {
         if (!mouseState.current.dragging) return;
         stopAutoScroll();
         mouseState.current.dragging = false;
         mouseState.current.dragId = null;
         setDragId(null);
         dragIdRef.current = null;
-    }, []);
+    };
 
     // Слушаем mousemove/mouseup на document чтобы drag работал даже за пределами списка
     useEffect(() => {
@@ -407,8 +410,7 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
         startAutoScroll(touch.clientY);
     };
 
-    const handleTouchMove = useCallback(
-        (e) => {
+    const handleTouchMove = (e) => {
             if (!touchState.current.dragging || !listRef.current) return;
             e.preventDefault();
             const touch = e.touches[0];
@@ -450,18 +452,16 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
                 newOrders[lvl] = newOrder;
                 return newOrders;
             });
-        },
-        []
-    );
+        };
 
-    const handleTouchEnd = useCallback(() => {
+    const handleTouchEnd = () => {
         if (!touchState.current.dragging) return;
         stopAutoScroll();
         touchState.current.dragging = false;
         touchState.current.dragId = null;
         setDragId(null);
         dragIdRef.current = null;
-    }, []);
+    };
 
     useEffect(() => {
         const el = listRef.current;

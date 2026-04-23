@@ -1,5 +1,5 @@
-import { validateToken, useToken } from "@/utils/mayakTokens";
-import { useMayakSessionToken, validateMayakSessionToken } from "@/lib/mayakSessionTokens";
+import { validateToken, useToken as consumeLegacyToken } from "@/utils/mayakTokens";
+import { useMayakSessionToken as consumeMayakSessionToken, validateMayakSessionToken } from "@/lib/mayakSessionTokens";
 import { findActiveMayakSessionByTokenId } from "@/lib/mayakSessions";
 
 const DEV_BYPASS_TOKEN = "fffff";
@@ -108,7 +108,7 @@ export default async function handler(req, res) {
                 });
             }
 
-            const legacyResult = useToken(token);
+            const legacyResult = consumeLegacyToken(token);
             if (legacyResult.success) {
                 return res.status(200).json({
                     success: true,
@@ -119,7 +119,7 @@ export default async function handler(req, res) {
                 });
             }
 
-            const sessionResult = await useMayakSessionToken(token);
+            const sessionResult = await consumeMayakSessionToken(token);
             if (sessionResult.success) {
                 return res.status(200).json({
                     success: true,

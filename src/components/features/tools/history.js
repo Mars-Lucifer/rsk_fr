@@ -56,8 +56,11 @@ export default function HistoryPage({ goTo }) {
     const [history, setHistory] = useState([]);
 
     useEffect(() => {
-        const historyData = parseHistoryCookie();
-        setHistory(historyData);
+        const frameId = window.requestAnimationFrame(() => {
+            setHistory(parseHistoryCookie());
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
     }, []);
 
     const filteredHistory = history.filter((item) => {

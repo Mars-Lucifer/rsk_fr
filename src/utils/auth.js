@@ -1,11 +1,20 @@
 import Cookies from "js-cookie";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+
 import { invalidatePortalProfileCache } from "@/lib/portalProfileClient";
 
-// Получение userData из cookies
+const USER_DATA_UPDATED_EVENT = "mayak:user-data-updated";
+
+function emitUserDataUpdated() {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(USER_DATA_UPDATED_EVENT));
+    }
+}
+
 export function getUserData() {
     const cookie = Cookies.get("userData");
     if (!cookie) return null;
+
     try {
         return JSON.parse(cookie);
     } catch {
@@ -13,37 +22,50 @@ export function getUserData() {
     }
 }
 
-// Проверка, авторизован ли пользователь
 export function isAuthorized() {
     const user = getUserData();
     return !!user?.token;
 }
 
-// Сохраняем userData в cookies (включая токен)
 export function saveUserData(data) {
     const current = getUserData() || {};
-    const updated = { ...current, ...data, token: true }; // добавляем "токен"
+    const updated = { ...current, ...data, token: true };
+
     Cookies.set("userData", JSON.stringify(updated), {
         path: "/",
         sameSite: "strict",
         expires: 7,
     });
+
+    emitUserDataUpdated();
     return updated;
 }
 
-// Удаление данных (выход)
 export function clearUserData() {
     Cookies.remove("userData");
     invalidatePortalProfileCache();
+    emitUserDataUpdated();
 }
 
-// React-хук для получения userData внутри компонентов
 export function useUserData() {
-    const [userData, setUserData] = useState(null);
+    const [userData, setUserData] = useState(() => getUserData());
 
     useEffect(() => {
-        const data = getUserData();
-        setUserData(data);
+        const syncUserData = () => {
+            setUserData(getUserData());
+        };
+
+        if (typeof window !== "undefined") {
+            window.addEventListener(USER_DATA_UPDATED_EVENT, syncUserData);
+            window.addEventListener("focus", syncUserData);
+        }
+
+        return () => {
+            if (typeof window !== "undefined") {
+                window.removeEventListener(USER_DATA_UPDATED_EVENT, syncUserData);
+                window.removeEventListener("focus", syncUserData);
+            }
+        };
     }, []);
 
     return userData;

@@ -54,14 +54,24 @@ export default function IndexPage({ goTo }) {
 
     // Восстанавливаем поля из sessionStorage при загрузке
     useEffect(() => {
+        let frameId = null;
         const savedFields = sessionStorage.getItem(getStorageKey("fields"));
         if (savedFields) {
             try {
-                setFields(JSON.parse(savedFields));
+                const nextFields = JSON.parse(savedFields);
+                frameId = requestAnimationFrame(() => {
+                    setFields(nextFields);
+                });
             } catch (e) {
                 console.error("Error parsing saved fields", e);
             }
         }
+
+        return () => {
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
     }, []);
 
     // Сохраняем поля в sessionStorage при изменении
@@ -148,30 +158,44 @@ export default function IndexPage({ goTo }) {
         checkToken();
     }, []);
 
+    const readCookie = (name) => {
+        const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+        return match ? decodeURIComponent(match[2]) : null;
+    };
+
     useEffect(() => {
-        const buf = getCookie(getStorageKey("buffer"));
+        let frameId = null;
+        const buf = readCookie(getStorageKey("buffer"));
+        let nextBuffer = {};
         if (buf) {
             try {
-                setBuffer(JSON.parse(buf));
+                nextBuffer = JSON.parse(buf);
             } catch {
-                setBuffer({});
+                nextBuffer = {};
             }
         }
 
+        let nextHistory = [];
         const hist = localStorage.getItem(getStorageKey("history"));
         if (hist) {
             try {
-                setHistory(JSON.parse(hist));
+                nextHistory = JSON.parse(hist);
             } catch {
-                setHistory([]);
+                nextHistory = [];
             }
         }
-    }, []);
 
-    function getCookie(name) {
-        const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
-        return match ? decodeURIComponent(match[2]) : null;
-    }
+        frameId = requestAnimationFrame(() => {
+            setBuffer(nextBuffer);
+            setHistory(nextHistory);
+        });
+
+        return () => {
+            if (frameId) {
+                cancelAnimationFrame(frameId);
+            }
+        };
+    }, []);
 
     function setCookie(name, value, days = 30) {
         try {

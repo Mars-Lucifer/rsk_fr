@@ -227,6 +227,113 @@ async function handlePrepStatus(apiBase, chatId, sessionId) {
   await sendMessage(apiBase, chatId, formatPrepStatus(session));
 }
 
+async function handleChatId(apiBase, chatId, chatType) {
+  await sendMessage(
+    apiBase,
+    chatId,
+    `ID этого чата: <code>${chatId}</code>\nТип чата: <code>${chatType || 'unknown'}</code>`
+  );
+}
+
+function decodeJwtPayload(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length < 2) return null;
+
+  try {
+    return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function formatDateTimeMsk(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'неизвестно';
+  return new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'Europe/Moscow',
+  }).format(date);
+}
+
+function formatRemainingTime(remainingMs) {
+  if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+    return 'истёк';
+  }
+
+  const totalMinutes = Math.ceil(remainingMs / (60 * 1000));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return `${days} д. ${hours} ч.`;
+  if (hours > 0) return `${hours} ч. ${minutes} мин.`;
+  return `${minutes} мин.`;
+}
+
+async function handleQwenTokens(apiBase, chatId) {
+  const settings = getStoredMayakSettings();
+  const primaryTokens = Array.isArray(settings.qwenTokens) ? settings.qwenTokens : [];
+  const backupToken = settings.qwenBackupToken && typeof settings.qwenBackupToken === 'object' ? [settings.qwenBackupToken] : [];
+  const allTokens = [...primaryTokens, ...backupToken];
+
+  if (allTokens.length === 0) {
+    await sendMessage(apiBase, chatId, 'Qwen-токены не настроены.');
+    return;
+  }
+
+  const lines = ['<b>Qwen-токены</b>', ''];
+
+  allTokens.forEach((entry, index) => {
+    const tokenName = String(entry?.name || (index < primaryTokens.length ? `Токен ${index + 1}` : 'Резервный токен')).trim();
+    const tokenValue = String(entry?.token || '').trim();
+    const payload = decodeJwtPayload(tokenValue);
+    const exp = Number(payload?.exp);
+
+    lines.push(`• <b>${tokenName}</b>`);
+    if (!Number.isFinite(exp)) {
+      lines.push('  Срок: не удалось определить');
+      lines.push('');
+      return;
+    }
+
+    const expiresAt = new Date(exp * 1000).toISOString();
+    const remainingMs = Date.parse(expiresAt) - Date.now();
+    lines.push(`  Истекает: ${formatDateTimeMsk(expiresAt)} МСК`);
+    lines.push(`  Осталось: ${formatRemainingTime(remainingMs)}`);
+    lines.push('');
+  });
+
+  await sendMessage(apiBase, chatId, lines.join('\n').trim());
+}
+
+async function syncCommandsForChat(apiBase, chatId, isAdminChat = false) {
+  const userCommands = [
+    { command: 'start', description: 'Начать работу с ботом' },
+    { command: 'token', description: 'Запросить токен доступа' },
+    { command: 'chat_id', description: 'Показать ID текущего чата' },
+  ];
+
+  const commands = isAdminChat
+    ? [
+        ...userCommands,
+        { command: 'qwen_tokens', description: 'Показать сроки Qwen-токенов' },
+        { command: 'new_session', description: 'Создать prep-сессию' },
+        { command: 'sessions', description: 'Список активных сессий' },
+        { command: 'status', description: 'Статус последней сессии' },
+      ]
+    : userCommands;
+
+  await fetch(`${apiBase}/setMyCommands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      scope: { type: 'chat', chat_id: chatId },
+      commands,
+    }),
+  });
+}
+
 // --- Обработчик запроса токена ---
 
 async function handleTokenRequest(apiBase, chatId, fromId, username, firstName) {
@@ -272,6 +379,12 @@ async function handleTokenRequest(apiBase, chatId, fromId, username, firstName) 
 // --- Обработчик МАЯК-сертификатов ---
 
 async function handleStart(apiBase, chatId, sessionId, firstName) {
+  try {
+    await syncCommandsForChat(apiBase, chatId, isBotAdmin(chatId));
+  } catch (error) {
+    console.error('[TG Bot] Не удалось обновить команды для чата:', chatId, error.message);
+  }
+
   if (!sessionId) {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://self.rosdk.ru';
     await sendMessage(apiBase, chatId,
@@ -391,6 +504,7 @@ export async function processUpdate(update) {
   if (!message || !message.text) return;
 
   const chatId = message.chat.id;
+  const chatType = message.chat?.type;
   const text = message.text.trim();
   const firstName = message.from?.first_name || 'пользователь';
   const fromId = message.from?.id;
@@ -430,6 +544,20 @@ export async function processUpdate(update) {
   // /token — запрос токена доступа
   if (text === '/token') {
     await handleTokenRequest(apiBase, chatId, message.from?.id, message.from?.username, firstName);
+    return;
+  }
+
+  if (text === '/qwen_tokens') {
+    if (!isBotAdmin(fromId)) {
+      await sendMessage(apiBase, chatId, '🔒 У вас нет доступа к этой команде.');
+      return;
+    }
+    await handleQwenTokens(apiBase, chatId);
+    return;
+  }
+
+  if (text === '/chat_id') {
+    await handleChatId(apiBase, chatId, chatType);
     return;
   }
 
@@ -544,6 +672,18 @@ async function registerCommands(apiBase) {
       }),
     });
 
+    await fetch(`${apiBase}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commands: [
+          { command: 'start', description: 'Начать работу с ботом' },
+          { command: 'token', description: 'Запросить токен доступа' },
+          { command: 'chat_id', description: 'Показать ID текущего чата' },
+        ],
+      }),
+    });
+
     // Дополнительные команды для админов
     const adminIds = getBotAdminIds();
     for (const adminId of adminIds) {
@@ -555,6 +695,23 @@ async function registerCommands(apiBase) {
           commands: [
             { command: 'start', description: 'Начать работу с ботом' },
             { command: 'token', description: 'Запросить токен доступа' },
+            { command: 'new_session', description: 'Создать prep-сессию' },
+            { command: 'sessions', description: 'Список активных сессий' },
+            { command: 'status', description: 'Статус последней сессии' },
+          ],
+        }),
+      });
+
+      await fetch(`${apiBase}/setMyCommands`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: { type: 'chat', chat_id: adminId },
+          commands: [
+            { command: 'start', description: 'Начать работу с ботом' },
+            { command: 'token', description: 'Запросить токен доступа' },
+            { command: 'chat_id', description: 'Показать ID текущего чата' },
+            { command: 'qwen_tokens', description: 'Показать сроки Qwen-токенов' },
             { command: 'new_session', description: 'Создать prep-сессию' },
             { command: 'sessions', description: 'Список активных сессий' },
             { command: 'status', description: 'Статус последней сессии' },

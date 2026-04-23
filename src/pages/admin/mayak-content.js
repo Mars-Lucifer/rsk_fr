@@ -364,9 +364,7 @@ function RangeEditor({ range, onBack }) {
     const [editingName, setEditingName] = useState(false);
     const isDirty = useRef(false);
     const tasksRef = useRef(tasks);
-    tasksRef.current = tasks;
     const textsRef = useRef(texts);
-    textsRef.current = texts;
     const [boundTokens, setBoundTokens] = useState([]);
     const [fileSizes, setFileSizes] = useState({});
 
@@ -422,6 +420,14 @@ function RangeEditor({ range, onBack }) {
         return () => window.removeEventListener("mouseup", handleMouseUp);
     }, []);
 
+    useEffect(() => {
+        tasksRef.current = tasks;
+    }, [tasks]);
+
+    useEffect(() => {
+        textsRef.current = texts;
+    }, [texts]);
+
     // Предупреждение при уходе с несохранёнными данными
     useEffect(() => {
         const handleBeforeUnload = (e) => {
@@ -473,116 +479,123 @@ function RangeEditor({ range, onBack }) {
 
     // Keyboard handler: навигация + clipboard + delete
     const keydownHandlerRef = useRef(null);
-    keydownHandlerRef.current = (e) => {
-        const tag = document.activeElement?.tagName?.toLowerCase();
-        const inInput = tag === "input" || tag === "textarea";
-        const sel = getSelectionRange();
-        const isMulti = sel && (sel.r1 !== sel.r2 || sel.c1 !== sel.c2);
+    const applyUndoRef = useRef(null);
+    const getCellValueRef = useRef(null);
+    const saveSnapshotRef = useRef(null);
+    const handlePasteMultiRef = useRef(null);
+    const setCellValueRef = useRef(null);
+    useEffect(() => {
+        keydownHandlerRef.current = (e) => {
+            const tag = document.activeElement?.tagName?.toLowerCase();
+            const inInput = tag === "input" || tag === "textarea";
+            const sel = getSelectionRange();
+            const isMulti = sel && (sel.r1 !== sel.r2 || sel.c1 !== sel.c2);
 
-        // Escape — убрать фокус из input, сбросить выделение
-        if (e.key === "Escape") {
-            if (inInput) {
-                document.activeElement.blur();
-            }
-            setSelStart(activeCell);
-            setSelEnd(activeCell);
-            return;
-        }
-
-        // Tab — переход к следующей/предыдущей ячейке
-        if (e.key === "Tab" && activeCell) {
-            e.preventDefault();
-            moveActiveCell(0, e.shiftKey ? -1 : 1);
-            return;
-        }
-
-        // Enter — переход вниз (если не в multiline textarea)
-        if (e.key === "Enter" && activeCell && !e.ctrlKey && !e.metaKey) {
-            const col = COLUMNS[activeCell.col];
-            if (col && col.multiline && inInput && !e.shiftKey) return; // в textarea Enter = новая строка
-            e.preventDefault();
-            moveActiveCell(e.shiftKey ? -1 : 1, 0);
-            return;
-        }
-
-        // Стрелки — навигация (только если НЕ внутри input)
-        if (!inInput && activeCell) {
-            if (e.key === "ArrowDown") { e.preventDefault(); moveActiveCell(1, 0); return; }
-            if (e.key === "ArrowUp") { e.preventDefault(); moveActiveCell(-1, 0); return; }
-            if (e.key === "ArrowRight") { e.preventDefault(); moveActiveCell(0, 1); return; }
-            if (e.key === "ArrowLeft") { e.preventDefault(); moveActiveCell(0, -1); return; }
-        }
-
-        // Ctrl+Z — отмена последней групповой операции
-        if ((e.ctrlKey || e.metaKey) && e.key === "z") {
-            if (inInput && !isMulti) return; // одиночная ячейка — стандартный undo браузера
-            e.preventDefault();
-            applyUndo();
-            return;
-        }
-
-        // Ctrl+C — копировать выделенные ячейки как TSV
-        if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-            if (!sel) return;
-            if (!isMulti && inInput) return;
-            e.preventDefault();
-            const lines = [];
-            for (let r = sel.r1; r <= sel.r2; r++) {
-                const cells = [];
-                for (let c = sel.c1; c <= sel.c2; c++) {
-                    const col = COLUMNS[c];
-                    if (!col) { cells.push(""); continue; }
-                    cells.push(String(getCellValue(r, col) || ""));
+            // Escape — убрать фокус из input, сбросить выделение
+            if (e.key === "Escape") {
+                if (inInput) {
+                    document.activeElement.blur();
                 }
-                lines.push(cells.join("\t"));
+                setSelStart(activeCell);
+                setSelEnd(activeCell);
+                return;
             }
-            navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
-            return;
-        }
 
-        // Ctrl+V — вставить из буфера в ячейки начиная с selStart
-        if ((e.ctrlKey || e.metaKey) && e.key === "v") {
-            if (!selStart) return;
-            if (!isMulti && inInput) {
+            // Tab — переход к следующей/предыдущей ячейке
+            if (e.key === "Tab" && activeCell) {
+                e.preventDefault();
+                moveActiveCell(0, e.shiftKey ? -1 : 1);
+                return;
+            }
+
+            // Enter — переход вниз (если не в multiline textarea)
+            if (e.key === "Enter" && activeCell && !e.ctrlKey && !e.metaKey) {
+                const col = COLUMNS[activeCell.col];
+                if (col && col.multiline && inInput && !e.shiftKey) return; // в textarea Enter = новая строка
+                e.preventDefault();
+                moveActiveCell(e.shiftKey ? -1 : 1, 0);
+                return;
+            }
+
+            // Стрелки — навигация (только если НЕ внутри input)
+            if (!inInput && activeCell) {
+                if (e.key === "ArrowDown") { e.preventDefault(); moveActiveCell(1, 0); return; }
+                if (e.key === "ArrowUp") { e.preventDefault(); moveActiveCell(-1, 0); return; }
+                if (e.key === "ArrowRight") { e.preventDefault(); moveActiveCell(0, 1); return; }
+                if (e.key === "ArrowLeft") { e.preventDefault(); moveActiveCell(0, -1); return; }
+            }
+
+            // Ctrl+Z — отмена последней групповой операции
+            if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+                if (inInput && !isMulti) return; // одиночная ячейка — стандартный undo браузера
+                e.preventDefault();
+                applyUndoRef.current?.();
+                return;
+            }
+
+            // Ctrl+C — копировать выделенные ячейки как TSV
+            if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+                if (!sel) return;
+                if (!isMulti && inInput) return;
+                e.preventDefault();
+                const lines = [];
+                for (let r = sel.r1; r <= sel.r2; r++) {
+                    const cells = [];
+                    for (let c = sel.c1; c <= sel.c2; c++) {
+                        const col = COLUMNS[c];
+                        if (!col) { cells.push(""); continue; }
+                        cells.push(String(getCellValueRef.current?.(r, col) || ""));
+                    }
+                    lines.push(cells.join("\t"));
+                }
+                navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
+                return;
+            }
+
+            // Ctrl+V — вставить из буфера в ячейки начиная с selStart
+            if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+                if (!selStart) return;
+                if (!isMulti && inInput) {
+                    navigator.clipboard.readText().then((text) => {
+                        if (text && (text.includes("\t") || text.includes("\n"))) {
+                            saveSnapshotRef.current?.();
+                            handlePasteMultiRef.current?.(selStart.row, selStart.col, text);
+                        }
+                    }).catch(() => {});
+                    return;
+                }
+                e.preventDefault();
                 navigator.clipboard.readText().then((text) => {
-                    if (text && (text.includes("\t") || text.includes("\n"))) {
-                        saveSnapshot();
-                        handlePasteMulti(selStart.row, selStart.col, text);
+                    if (!text) return;
+                    saveSnapshotRef.current?.();
+                    if (text.includes("\t") || text.includes("\n")) {
+                        handlePasteMultiRef.current?.(selStart.row, selStart.col, text);
+                    } else {
+                        const col = COLUMNS[selStart.col];
+                        if (col && !col.readOnly && !col.fileCol && !col.checkbox) {
+                            setCellValueRef.current?.(selStart.row, col, text);
+                        }
                     }
                 }).catch(() => {});
                 return;
             }
-            e.preventDefault();
-            navigator.clipboard.readText().then((text) => {
-                if (!text) return;
-                saveSnapshot();
-                if (text.includes("\t") || text.includes("\n")) {
-                    handlePasteMulti(selStart.row, selStart.col, text);
-                } else {
-                    const col = COLUMNS[selStart.col];
-                    if (col && !col.readOnly && !col.fileCol && !col.checkbox) {
-                        setCellValue(selStart.row, col, text);
-                    }
-                }
-            }).catch(() => {});
-            return;
-        }
 
-        // Delete/Backspace — очистить выделенные ячейки
-        if (e.key !== "Delete" && e.key !== "Backspace") return;
-        if (!sel) return;
-        if (!isMulti && inInput) return;
-        e.preventDefault();
-        if (inInput) document.activeElement.blur();
-        saveSnapshot();
-        for (let r = sel.r1; r <= sel.r2; r++) {
-            for (let c = sel.c1; c <= sel.c2; c++) {
-                const col = COLUMNS[c];
-                if (!col || col.readOnly || col.fileCol || col.checkbox || col.autoCheckbox) continue;
-                setCellValue(r, col, "");
+            // Delete/Backspace — очистить выделенные ячейки
+            if (e.key !== "Delete" && e.key !== "Backspace") return;
+            if (!sel) return;
+            if (!isMulti && inInput) return;
+            e.preventDefault();
+            if (inInput) document.activeElement.blur();
+            saveSnapshotRef.current?.();
+            for (let r = sel.r1; r <= sel.r2; r++) {
+                for (let c = sel.c1; c <= sel.c2; c++) {
+                    const col = COLUMNS[c];
+                    if (!col || col.readOnly || col.fileCol || col.checkbox || col.autoCheckbox) continue;
+                    setCellValueRef.current?.(r, col, "");
+                }
             }
-        }
-    };
+        };
+    }, [activeCell, moveActiveCell, selStart, selectionRange]);
 
     useEffect(() => {
         const handler = (e) => keydownHandlerRef.current?.(e);
@@ -634,7 +647,16 @@ function RangeEditor({ range, onBack }) {
         } catch (err) { console.error(err); }
     }, [range]);
 
-    useEffect(() => { loadData(); loadBoundTokens(); }, [loadData, loadBoundTokens]);
+    useEffect(() => {
+        const frameId = requestAnimationFrame(() => {
+            loadData();
+            loadBoundTokens();
+        });
+
+        return () => {
+            cancelAnimationFrame(frameId);
+        };
+    }, [loadData, loadBoundTokens]);
 
     // --- Геттеры/сеттеры для unified доступа ---
     const textsMap = useMemo(() => {
@@ -645,7 +667,7 @@ function RangeEditor({ range, onBack }) {
 
     const getTextForTask = (taskNum) => textsMap[String(taskNum)] || null;
 
-    const getCellValue = (rowIdx, col) => {
+    function getCellValue(rowIdx, col) {
         const task = tasks[rowIdx];
         if (!task) return "";
         if (col.source === "text") {
@@ -653,7 +675,7 @@ function RangeEditor({ range, onBack }) {
             return t?.[col.key] || "";
         }
         return task[col.key] || "";
-    };
+    }
 
     // Мемоизированные счётчики для тулбара
     const toolbarCounts = useMemo(() => ({
@@ -666,23 +688,23 @@ function RangeEditor({ range, onBack }) {
     }), [tasks, existingInstructions, existingFiles, existingMaps]);
 
     // Сохранить снимок состояния перед групповой операцией (для Ctrl+Z)
-    const saveSnapshot = () => {
+    function saveSnapshot() {
         undoStack.current.push({
             tasks: JSON.parse(JSON.stringify(tasks)),
             texts: JSON.parse(JSON.stringify(texts)),
         });
         if (undoStack.current.length > 30) undoStack.current.shift();
-    };
+    }
 
-    const applyUndo = () => {
+    function applyUndo() {
         const snapshot = undoStack.current.pop();
         if (!snapshot) return;
         setTasks(snapshot.tasks);
         setTexts(snapshot.texts);
         isDirty.current = true;
-    };
+    }
 
-    const setCellValue = useCallback((rowIdx, col, value) => {
+    function setCellValue(rowIdx, col, value) {
         const task = tasksRef.current[rowIdx];
         if (!task) return;
         isDirty.current = true;
@@ -705,7 +727,7 @@ function RangeEditor({ range, onBack }) {
         }
         // Очищаем ошибки для этой строки
         setValidationErrors((prev) => prev.filter((e) => e.index !== rowIdx));
-    }, []);
+    }
 
     // Стабильный коллбэк для Cell — принимает (rowIdx, colIdx, value)
     const handleCellChange = useCallback((rowIdx, colIdx, value) => {
@@ -735,7 +757,7 @@ function RangeEditor({ range, onBack }) {
     }, []);
 
     // --- Вставка из Google Sheets (Tab + Enter) ---
-    const handlePasteMulti = useCallback((startRow, startCol, text) => {
+    function handlePasteMulti(startRow, startCol, text) {
         const rows = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
         if (rows.length > 1 && rows[rows.length - 1].trim() === "") rows.pop();
 
@@ -758,7 +780,15 @@ function RangeEditor({ range, onBack }) {
                 setCellValue(targetRow, COLUMNS[colIdx], cells[c]);
             }
         }
-    }, []);
+    }
+
+    useEffect(() => {
+        applyUndoRef.current = applyUndo;
+        getCellValueRef.current = getCellValue;
+        saveSnapshotRef.current = saveSnapshot;
+        handlePasteMultiRef.current = handlePasteMulti;
+        setCellValueRef.current = setCellValue;
+    }, [applyUndo, getCellValue, handlePasteMulti, saveSnapshot, setCellValue]);
 
     // --- Загрузка файла ---
     const handleUploadFile = useCallback(async (file, type, renamedFilename, oldFilename) => {

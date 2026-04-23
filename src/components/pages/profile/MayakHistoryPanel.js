@@ -43,13 +43,11 @@ export default function MayakHistoryPanel() {
     }, []);
 
     return (
-        <div className="block-wrapper col-span-4 max-[900px]:col-span-12">
+        <div className="block-wrapper col-span-12 max-[900px]:col-span-12">
             <h6>История MAYAK</h6>
             {isLoading ? (
                 <p className="text-(--color-gray-black)">Загружаем завершенные прохождения...</p>
-            ) : historyItems.length === 0 ? (
-                <p className="text-(--color-gray-black)">История появится здесь после первого завершенного прохождения MAYAK.</p>
-            ) : (
+            ) : historyItems.length > 0 ? (
                 <div className="flex flex-col gap-[1rem]">
                     {historyItems.map((item) => (
                         <div key={item.runId} className="flex flex-col gap-[0.5rem] rounded-[24px] border border-(--color-gray-plus) p-[1rem]">
@@ -81,7 +79,7 @@ export default function MayakHistoryPanel() {
                         </div>
                     ))}
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }

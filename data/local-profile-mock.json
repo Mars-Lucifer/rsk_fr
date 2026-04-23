@@ -1,23 +1,74 @@
 {
-  "userId": "local-mayak-user",
-  "data": {
-    "id": "local-mayak-user",
-    "email": "local-mayak@example.test",
-    "username": "local-mayak",
-    "NameIRL": "Тест",
-    "Surname": "Пользователь",
-    "Patronymic": "",
-    "Type": "student",
-    "Region": "Локальная среда",
-    "Description": "Локальный тестовый профиль для проверки MAYAK.",
-    "Organization_id": "local-org",
-    "Organization": {
-      "id": "local-org",
-      "short_name": "Локальная организация",
-      "name": "Локальная организация",
-      "full_name": "Локальная организация"
+  "activeUserId": "900001",
+  "profiles": [
+    {
+      "userId": "900001",
+      "data": {
+        "id": "900001",
+        "email": "mayak.local.student@example.test",
+        "username": "mayak.local.student",
+        "NameIRL": "Мария",
+        "Surname": "Тестова",
+        "Patronymic": "Игоревна",
+        "Type": "student",
+        "Region": "Москва",
+        "Description": "Тестовый локальный профиль для проверки МАЯК admin-rights и пользовательских токенов.",
+        "Organization_id": "local-org",
+        "Organization": {
+          "id": "local-org",
+          "short_name": "Локальный МАЯК",
+          "name": "Локальный МАЯК",
+          "full_name": "Локальный МАЯК"
+        },
+        "team": "Тестовая команда МАЯК",
+        "team_id": "local-team"
+      }
     },
-    "team": "Локальная команда",
-    "team_id": "local-team"
-  }
+    {
+      "userId": "900002",
+      "data": {
+        "id": "900002",
+        "email": "mayak.local.expert@example.test",
+        "username": "mayak.local.expert",
+        "NameIRL": "Алексей",
+        "Surname": "Проверкин",
+        "Patronymic": "Сергеевич",
+        "Type": "student",
+        "Region": "Казань",
+        "Description": "Второй локальный профиль для проверки выдачи прав нескольким пользователям.",
+        "Organization_id": "local-org-2",
+        "Organization": {
+          "id": "local-org-2",
+          "short_name": "Тестовый контур МАЯК",
+          "name": "Тестовый контур МАЯК",
+          "full_name": "Тестовый контур МАЯК"
+        },
+        "team": "Команда проверок",
+        "team_id": "local-team-2"
+      }
+    },
+    {
+      "userId": "900003",
+      "data": {
+        "id": "900003",
+        "email": "mayak.local.member@example.test",
+        "username": "mayak.local.member",
+        "NameIRL": "Елена",
+        "Surname": "Маршрутова",
+        "Patronymic": "Павловна",
+        "Type": "student",
+        "Region": "Санкт-Петербург",
+        "Description": "Третий локальный профиль для полного прогона сценариев МАЯК.",
+        "Organization_id": "local-org-3",
+        "Organization": {
+          "id": "local-org-3",
+          "short_name": "Лаборатория МАЯК",
+          "name": "Лаборатория МАЯК",
+          "full_name": "Лаборатория МАЯК"
+        },
+        "team": "Поток 3",
+        "team_id": "local-team-3"
+      }
+    }
+  ]
 }

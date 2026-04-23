@@ -10,40 +10,44 @@ import Textarea from "@/components/ui/Textarea";
 import Notify from "@/assets/general/notify.svg";
 import SettsIcon from "@/assets/general/setts.svg";
 
+function buildTeamFormData(team) {
+    return {
+        name: team?.name || "",
+        description: team?.description || "",
+    };
+}
+
 export default function TeamSettsPage({ goTo, teamData }) {
     const router = useRouter();
     const team = teamData.team_info;
 
-    const [formData, setFormData] = useState({ name: "", description: "" });
-    const [originalData, setOriginalData] = useState({ name: "", description: "" });
-    const [isDirty, setIsDirty] = useState(false);
-    const [hydrated, setHydrated] = useState(false);
+    const [formData, setFormData] = useState(() => buildTeamFormData(team));
+    const [originalData, setOriginalData] = useState(() => buildTeamFormData(team));
+    const [hydrated, setHydrated] = useState(Boolean(team));
 
     useEffect(() => {
         if (team) {
-            setFormData({
-                name: team.name || "",
-                description: team.description || "",
+            const nextFormData = buildTeamFormData(team);
+            const frameId = requestAnimationFrame(() => {
+                setFormData(nextFormData);
+                setOriginalData(nextFormData);
+                setHydrated(true);
             });
-            setOriginalData({
-                name: team.name || "",
-                description: team.description || "",
-            });
-            setHydrated(true);
+
+            return () => {
+                cancelAnimationFrame(frameId);
+            };
         }
     }, [team]);
+
+    const isDirty = formData.name !== originalData.name || formData.description !== originalData.description;
 
     if (!team) return <TeamNotFound activeButton goTo={goTo} />;
     if (!hydrated) return null;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => {
-            const newForm = { ...prev, [name]: value };
-            const dirty = Object.keys(newForm).some((key) => newForm[key] !== originalData[key]);
-            setIsDirty(dirty);
-            return newForm;
-        });
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = async (e) => {
@@ -68,7 +72,6 @@ export default function TeamSettsPage({ goTo, teamData }) {
             const data = await response.json();
             if (response.ok) {
                 setOriginalData(formData);
-                setIsDirty(false);
                 alert("Изменения сохранены!");
                 router.reload();
                 router.push("/teams/my");
