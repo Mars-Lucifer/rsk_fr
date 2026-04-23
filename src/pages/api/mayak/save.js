@@ -34,8 +34,9 @@ export default async function handler(req, res) {
     }
 
     const { key, userId, data } = req.body || {};
+    const effectiveUserId = String(userId || data?.portalUserId || data?.id || "").trim();
 
-    if (!key || !userId || !data) {
+    if (!key || !effectiveUserId || !data) {
         return res.status(400).json({ error: "Missing required fields: key, userId, data" });
     }
 
@@ -59,8 +60,8 @@ export default async function handler(req, res) {
             allData[key] = {};
         }
 
-        const currentEntry = allData[key]?.[userId] && typeof allData[key][userId] === "object" ? allData[key][userId] : {};
-        const certificateNumber = ensureMayakCertificateNumberInStore(allData, { tokenKey: key, userId });
+        const currentEntry = allData[key]?.[effectiveUserId] && typeof allData[key][effectiveUserId] === "object" ? allData[key][effectiveUserId] : {};
+        const certificateNumber = ensureMayakCertificateNumberInStore(allData, { tokenKey: key, userId: effectiveUserId });
         const isCompletionSave = data.isFinished === true || Boolean(data.finishedAt);
 
         const finalData = {
@@ -79,7 +80,7 @@ export default async function handler(req, res) {
                   }),
         };
 
-        allData[key][userId] = finalData;
+        allData[key][effectiveUserId] = finalData;
 
         fs.writeFileSync(filePath, JSON.stringify(allData, null, 2));
         return res.status(200).json({ success: true, certificateNumber, data: finalData });
