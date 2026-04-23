@@ -37,7 +37,11 @@ export default async function handler(req, res) {
     const effectiveUserId = String(userId || data?.portalUserId || data?.id || "").trim();
 
     if (!key || !effectiveUserId || !data) {
-        return res.status(400).json({ error: "Missing required fields: key, userId, data" });
+        const missingFields = [];
+        if (!key) missingFields.push("key");
+        if (!effectiveUserId) missingFields.push("userId");
+        if (!data) missingFields.push("data");
+        return res.status(400).json({ error: `Missing required fields: ${missingFields.join(", ")}` });
     }
 
     let release;

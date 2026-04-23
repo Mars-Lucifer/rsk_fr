@@ -746,6 +746,10 @@ export default function SettingsPage({ goTo }) {
                 tokenType: sessionInfo.tokenType,
             });
 
+            if (!nextProfile.id) {
+                throw new Error("Не удалось определить идентификатор пользователя портала. Проверьте email или логин в профиле.");
+            }
+
             const saveResponse = await fetch("/api/mayak/save", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

@@ -39,6 +39,19 @@ function pickId(data) {
     ]);
 }
 
+function pickStablePortalUserId(payload, data) {
+    return pickString([
+        pickId(data),
+        payload?.userId,
+        payload?.user_id,
+        data?.email,
+        data?.mail,
+        data?.username,
+        data?.login,
+        data?.nickname,
+    ]);
+}
+
 function firstPositiveOrganizationId(data) {
     const candidates = [
         data?.Organization_id,
@@ -121,6 +134,7 @@ export function normalizePortalProfile(payload) {
     const fullName = buildPortalFullName(data);
     const organizationId = getPortalOrganizationId(data);
     const organizationLabel = getPortalOrganizationLabel(data);
+    const stableUserId = pickStablePortalUserId(payload, data);
     const name = pickString([data?.NameIRL, data?.name, data?.first_name, data?.firstName]);
     const surname = pickString([data?.Surname, data?.surname, data?.last_name, data?.lastName]);
     const patronymic = pickString([data?.Patronymic, data?.middle_name, data?.middleName]);
@@ -129,7 +143,7 @@ export function normalizePortalProfile(payload) {
 
     return {
         raw: data,
-        id: pickId(data),
+        id: stableUserId,
         email,
         username,
         name,
