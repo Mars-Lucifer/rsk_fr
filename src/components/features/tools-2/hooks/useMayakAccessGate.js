@@ -2,6 +2,21 @@ import { useEffect, useState } from "react";
 
 import { getKeyFromCookies, getUserFromCookies } from "../actions";
 
+const MAYAK_GUEST_SUFFIX = "aaaaa";
+
+function normalizeMayakToken(rawToken) {
+    const token = String(rawToken || "").trim();
+    if (!token) {
+        return "";
+    }
+
+    if (token.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX)) {
+        return token.slice(0, -MAYAK_GUEST_SUFFIX.length).trim();
+    }
+
+    return token;
+}
+
 export const useMayakAccessGate = ({ getStorageKey, goTo }) => {
     const [isTokenValid, setIsTokenValid] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
@@ -12,7 +27,7 @@ export const useMayakAccessGate = ({ getStorageKey, goTo }) => {
     useEffect(() => {
         async function checkToken() {
             const keyInCookies = await getKeyFromCookies();
-            const token = keyInCookies?.text;
+            const token = normalizeMayakToken(keyInCookies?.text);
             const activeUser = getUserFromCookies();
 
             if (!token || !activeUser?.id) {

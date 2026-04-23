@@ -3,6 +3,20 @@ import { useMayakSessionToken as consumeMayakSessionToken, validateMayakSessionT
 import { findActiveMayakSessionByTokenId } from "@/lib/mayakSessions";
 
 const DEV_BYPASS_TOKEN = "fffff";
+const MAYAK_GUEST_SUFFIX = "aaaaa";
+
+function normalizeMayakToken(rawToken) {
+    const token = String(rawToken || "").trim();
+    if (!token) {
+        return "";
+    }
+
+    if (token.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX)) {
+        return token.slice(0, -MAYAK_GUEST_SUFFIX.length).trim();
+    }
+
+    return token;
+}
 
 function isLocalMayakBypassEnabled(req) {
     const host = String(req.headers.host || "").toLowerCase();
@@ -56,9 +70,9 @@ async function buildValidationResponse(result, tokenType = "legacy") {
 export default async function handler(req, res) {
     if (req.method === "GET") {
         try {
-            const { token } = req.query;
+            const token = normalizeMayakToken(req.query?.token);
 
-            if (!token || typeof token !== "string") {
+            if (!token) {
                 return res.status(400).json({
                     success: false,
                     valid: false,
@@ -89,9 +103,9 @@ export default async function handler(req, res) {
 
     if (req.method === "POST") {
         try {
-            const { token } = req.body;
+            const token = normalizeMayakToken(req.body?.token);
 
-            if (!token || typeof token !== "string") {
+            if (!token) {
                 return res.status(400).json({
                     success: false,
                     error: "Токен не указан",
