@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input/Input";
 import PortalAuthFlow from "@/components/features/auth/PortalAuthFlow";
-import PortalProfileEditor from "@/components/features/auth/PortalProfileEditor";
 import {
     addKeyToCookies,
     addUserToCookies,
@@ -16,7 +15,6 @@ import {
 import CloseIcon from "@/assets/general/close.svg";
 import {
     buildPortalUserCookiePayload,
-    isPortalProfileComplete,
     normalizePortalProfile,
 } from "@/lib/portalProfile";
 import {
@@ -39,6 +37,11 @@ const EMPTY_GUEST_FORM = {
     lastName: "",
     patronymic: "",
 };
+
+function hasPortalIdentityFields(payload) {
+    const profile = normalizePortalProfile(payload);
+    return Boolean(String(profile.surname || "").trim() && String(profile.name || "").trim());
+}
 
 function parseMayakGuestToken(tokenValue) {
     const normalized = String(tokenValue || "").trim();
@@ -95,7 +98,7 @@ async function validateTokenAPI(tokenValue) {
             tableCount: data.tableCount || 0,
         };
     } catch (error) {
-        console.error("Ошибка проверки токена:", error);
+        console.error("РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё С‚РѕРєРµРЅР°:", error);
         return {
             valid: false,
             isActive: false,
@@ -103,7 +106,7 @@ async function validateTokenAPI(tokenValue) {
             remainingAttempts: 0,
             usageLimit: 0,
             usedCount: 0,
-            error: "Ошибка сервера",
+            error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°",
             isBypass: false,
             tokenType: "legacy",
             sessionId: null,
@@ -128,8 +131,8 @@ async function consumeTokenAPI(tokenValue) {
             isBypass: data.isBypass || false,
         };
     } catch (error) {
-        console.error("Ошибка использования токена:", error);
-        return { success: false, remainingAttempts: 0, error: "Ошибка сервера", isBypass: false };
+        console.error("РћС€РёР±РєР° РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ С‚РѕРєРµРЅР°:", error);
+        return { success: false, remainingAttempts: 0, error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°", isBypass: false };
     }
 }
 
@@ -146,8 +149,8 @@ async function loginMayakAdmin(password) {
             error: data.error || null,
         };
     } catch (error) {
-        console.error("Ошибка авторизации администратора:", error);
-        return { success: false, error: "Ошибка сервера" };
+        console.error("РћС€РёР±РєР° Р°РІС‚РѕСЂРёР·Р°С†РёРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°:", error);
+        return { success: false, error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°" };
     }
 }
 
@@ -177,6 +180,9 @@ export default function SettingsPage({ goTo }) {
     const [isGuestMode, setIsGuestMode] = useState(false);
     const [guestForm, setGuestForm] = useState(EMPTY_GUEST_FORM);
     const [guestFormError, setGuestFormError] = useState("");
+    const [portalIdentityForm, setPortalIdentityForm] = useState(EMPTY_GUEST_FORM);
+    const [portalIdentityError, setPortalIdentityError] = useState("");
+    const [isSavingPortalIdentity, setIsSavingPortalIdentity] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [tokenRemainingAttempts, setTokenRemainingAttempts] = useState(0);
@@ -206,6 +212,16 @@ export default function SettingsPage({ goTo }) {
 
     const portalProfile = portalProfilePayload ? normalizePortalProfile(portalProfilePayload) : null;
     const isStoredTokenActive = Boolean(token && storedToken && storedToken === token);
+    const hasPortalIdentity = hasPortalIdentityFields(portalProfilePayload);
+
+    useEffect(() => {
+        setPortalIdentityForm({
+            firstName: String(portalProfile?.name || "").trim(),
+            lastName: String(portalProfile?.surname || "").trim(),
+            patronymic: String(portalProfile?.patronymic || "").trim(),
+        });
+        setPortalIdentityError("");
+    }, [portalProfile?.name, portalProfile?.surname, portalProfile?.patronymic]);
 
     const getRangeClass = (val) => {
         if (val < 30) return "range-low";
@@ -294,7 +310,7 @@ export default function SettingsPage({ goTo }) {
             syncRegisteredUserState(sessionInfoRef.current, payload, tokenRef.current);
             return payload;
         } catch (error) {
-            console.error("Ошибка получения профиля портала:", error);
+            console.error("РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РїСЂРѕС„РёР»СЏ РїРѕСЂС‚Р°Р»Р°:", error);
             setPortalProfilePayload(null);
             setIsPortalChecked(true);
             return null;
@@ -355,7 +371,7 @@ export default function SettingsPage({ goTo }) {
             if (isAccessible) {
                 setTokenError("");
             } else {
-                setTokenError(result.error || "Токен недействителен");
+                setTokenError(result.error || "РўРѕРєРµРЅ РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ");
             }
 
             if (portalProfilePayloadRef.current || isPortalCheckedRef.current) {
@@ -452,19 +468,19 @@ export default function SettingsPage({ goTo }) {
     const enterWithDevBypass = useCallback(async () => {
         setBypassPasswordError("");
         if (!bypassPassword) {
-            setBypassPasswordError("Введите пароль администратора");
+            setBypassPasswordError("Р’РІРµРґРёС‚Рµ РїР°СЂРѕР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°");
             return;
         }
 
         const authResult = await loginMayakAdmin(bypassPassword);
         if (!authResult.success) {
-            setBypassPasswordError(authResult.error || "Не удалось подтвердить локальный вход");
+            setBypassPasswordError(authResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґС‚РІРµСЂРґРёС‚СЊ Р»РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ");
             return;
         }
 
         const resolvedTableNumber = String(tableNumber || "").trim();
         if (sessionInfo.tokenType === "session" && !resolvedTableNumber) {
-            setBypassPasswordError("Пожалуйста, выберите ваш стол");
+            setBypassPasswordError("РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІР°С€ СЃС‚РѕР»");
             return;
         }
 
@@ -472,7 +488,7 @@ export default function SettingsPage({ goTo }) {
         const bypassProfile = bypassPayload ? normalizePortalProfile(bypassPayload) : null;
 
         const localUserId = String(bypassProfile?.id || "local-mayak-user").trim();
-        const localFullName = String(bypassProfile?.fullName || "Локальный вход").trim() || "Локальный вход";
+        const localFullName = String(bypassProfile?.fullName || "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ").trim() || "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ";
         const userRecord = {
             id: localUserId,
             portalUserId: localUserId,
@@ -503,7 +519,7 @@ export default function SettingsPage({ goTo }) {
         });
 
         if (!saveResponse.ok) {
-            throw new Error("Не удалось сохранить локального пользователя МАЯК");
+            throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ Р»РѕРєР°Р»СЊРЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РњРђРЇРљ");
         }
 
         if (sessionInfo.tokenType === "session" && sessionInfo.sessionId) {
@@ -521,13 +537,13 @@ export default function SettingsPage({ goTo }) {
 
             const participantPayload = await participantResponse.json().catch(() => ({}));
             if (!participantResponse.ok || !participantPayload.success) {
-                throw new Error(participantPayload.error || "Не удалось зарегистрировать локального участника в сессии");
+                throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ Р»РѕРєР°Р»СЊРЅРѕРіРѕ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
             }
         }
 
         await addKeyToCookies(token);
         setStoredToken(token);
-        await addUserToCookies("dev-bypass", "Локальный вход", {
+        await addUserToCookies("dev-bypass", "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ", {
             tokenType: "bypass",
         });
         setHasRegisteredUser(true);
@@ -536,7 +552,7 @@ export default function SettingsPage({ goTo }) {
 
     const activateGuestUser = useCallback(async () => {
         if (!isTokenValid) {
-            setGuestFormError("Введите корректный токен.");
+            setGuestFormError("Р’РІРµРґРёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ С‚РѕРєРµРЅ.");
             return;
         }
 
@@ -545,7 +561,7 @@ export default function SettingsPage({ goTo }) {
         const patronymic = String(guestForm.patronymic || "").trim();
 
         if (!lastName || !firstName) {
-            setGuestFormError("Для входа заполните фамилию и имя.");
+            setGuestFormError("Р”Р»СЏ РІС…РѕРґР° Р·Р°РїРѕР»РЅРёС‚Рµ С„Р°РјРёР»РёСЋ Рё РёРјСЏ.");
             return;
         }
 
@@ -553,7 +569,7 @@ export default function SettingsPage({ goTo }) {
             sessionInfo.tokenType === "session" && !String(tableNumber || "").trim() && Number(sessionInfo.tableCount) === 1 ? "1" : String(tableNumber || "").trim();
 
         if (sessionInfo.tokenType === "session" && !resolvedTableNumber) {
-            setGuestFormError("Пожалуйста, выберите ваш стол.");
+            setGuestFormError("РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІР°С€ СЃС‚РѕР».");
             return;
         }
 
@@ -590,7 +606,7 @@ export default function SettingsPage({ goTo }) {
             });
 
             if (!saveResponse.ok) {
-                throw new Error("Не удалось сохранить гостевого пользователя МАЯК");
+                throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РіРѕСЃС‚РµРІРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РњРђРЇРљ");
             }
 
             const savePayload = await saveResponse.json().catch(() => ({}));
@@ -611,7 +627,7 @@ export default function SettingsPage({ goTo }) {
 
                 const participantPayload = await participantResponse.json().catch(() => ({}));
                 if (!participantResponse.ok || !participantPayload.success) {
-                    throw new Error(participantPayload.error || "Не удалось зарегистрировать гостевого участника в сессии");
+                    throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ РіРѕСЃС‚РµРІРѕРіРѕ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
                 }
             }
 
@@ -636,12 +652,57 @@ export default function SettingsPage({ goTo }) {
             goTo("trainer");
         } catch (error) {
 
-            console.error("Ошибка активации гостевого МАЯК:", error);
-            setGuestFormError(error.message || "Не удалось активировать гостевой вход.");
+            console.error("РћС€РёР±РєР° Р°РєС‚РёРІР°С†РёРё РіРѕСЃС‚РµРІРѕРіРѕ РњРђРЇРљ:", error);
+            setGuestFormError(error.message || "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ РіРѕСЃС‚РµРІРѕР№ РІС…РѕРґ.");
         } finally {
             setIsLoading(false);
         }
     }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isTokenValid, sessionInfo, tableNumber, token]);
+
+    const savePortalIdentity = useCallback(async () => {
+        const firstName = String(portalIdentityForm.firstName || "").trim();
+        const lastName = String(portalIdentityForm.lastName || "").trim();
+        const patronymic = String(portalIdentityForm.patronymic || "").trim();
+
+        if (!lastName || !firstName) {
+            setPortalIdentityError("Для входа заполните фамилию и имя.");
+            return false;
+        }
+
+        setIsSavingPortalIdentity(true);
+        setPortalIdentityError("");
+
+        try {
+            const response = await fetch("/api/profile/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                    Surname: lastName,
+                    NameIRL: firstName,
+                    Patronymic: patronymic,
+                }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                throw new Error(payload?.error || "Не удалось сохранить имя профиля.");
+            }
+
+            const nextPayload = payload?.data?.data ? payload.data : { success: true, data: payload.data || {} };
+            primePortalProfileCache(nextPayload);
+            setPortalProfilePayload(nextPayload);
+            setIsPortalChecked(true);
+            syncRegisteredUserState(sessionInfoRef.current, nextPayload, tokenRef.current);
+            return true;
+        } catch (error) {
+            console.error("Ошибка сохранения имени портального профиля для MAYAK:", error);
+            setPortalIdentityError(String(error?.message || "Не удалось сохранить имя профиля."));
+            return false;
+        } finally {
+            setIsSavingPortalIdentity(false);
+        }
+    }, [portalIdentityForm.firstName, portalIdentityForm.lastName, portalIdentityForm.patronymic, syncRegisteredUserState]);
 
     const activatePortalAccess = useCallback(async () => {
         if (isDevBypass) {
@@ -654,14 +715,13 @@ export default function SettingsPage({ goTo }) {
             return;
         }
 
-        const requiresCompletedPortalProfile = sessionInfo.tokenType !== "session";
-        if (!portalProfilePayload || (requiresCompletedPortalProfile && !isPortalProfileComplete(portalProfilePayload))) {
-            alert("Для входа в МАЯК заполните обязательные поля профиля.");
+        if (!portalProfilePayload || !hasPortalIdentityFields(portalProfilePayload)) {
+            alert("Для входа в МАЯК заполните фамилию и имя профиля.");
             return;
         }
 
         if (sessionInfo.tokenType === "session" && !String(tableNumber || "").trim()) {
-            alert("Выберите стол для входа в сессию.");
+            alert("Р’С‹Р±РµСЂРёС‚Рµ СЃС‚РѕР» РґР»СЏ РІС…РѕРґР° РІ СЃРµСЃСЃРёСЋ.");
             return;
         }
 
@@ -670,7 +730,7 @@ export default function SettingsPage({ goTo }) {
             if (!isStoredTokenActive) {
                 const consumeResult = await consumeTokenAPI(token);
                 if (!consumeResult.success) {
-                    alert(consumeResult.error || "Не удалось активировать токен.");
+                    alert(consumeResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ С‚РѕРєРµРЅ.");
                     return;
                 }
                 setTokenRemainingAttempts(consumeResult.remainingAttempts || 0);
@@ -710,7 +770,8 @@ export default function SettingsPage({ goTo }) {
             });
 
             if (!saveResponse.ok) {
-                throw new Error("Не удалось сохранить контекст входа МАЯК");
+                const savePayload = await saveResponse.json().catch(() => ({}));
+                throw new Error(savePayload.error || "Не удалось сохранить контекст входа МАЯК");
             }
 
             if (sessionInfo.tokenType === "session" && sessionInfo.sessionId) {
@@ -728,7 +789,7 @@ export default function SettingsPage({ goTo }) {
 
                 const participantPayload = await participantResponse.json().catch(() => ({}));
                 if (!participantResponse.ok || !participantPayload.success) {
-                    throw new Error(participantPayload.error || "Не удалось зарегистрировать участника в сессии");
+                    throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
                 }
             }
 
@@ -754,8 +815,8 @@ export default function SettingsPage({ goTo }) {
                 return;
             }
 
-            console.error("Ошибка активации МАЯК:", error);
-            alert(error.message || "Произошла ошибка при активации тренажера.");
+            console.error("РћС€РёР±РєР° Р°РєС‚РёРІР°С†РёРё РњРђРЇРљ:", error);
+            alert(error.message || "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР° РїСЂРё Р°РєС‚РёРІР°С†РёРё С‚СЂРµРЅР°Р¶РµСЂР°.");
         } finally {
             setIsLoading(false);
         }
@@ -771,10 +832,10 @@ export default function SettingsPage({ goTo }) {
                 const activeUser = getUserFromCookies();
                 return (
                     <div className="flex flex-col gap-[1rem] items-center">
-                        <span className="big p-3 bg-green-100 text-green-700 rounded-md">Тренажер активирован</span>
+                        <span className="big p-3 bg-green-100 text-green-700 rounded-md">Тренажёр активирован</span>
                         <span className="small text-(--color-gray-black)">{activeUser?.name || "Гостевой пользователь"}</span>
                         <Button onClick={() => goTo("trainer")} className="w-full">
-                            Войти в тренажер
+                            Войти в тренажёр
                         </Button>
                     </div>
                 );
@@ -783,7 +844,7 @@ export default function SettingsPage({ goTo }) {
             return (
                 <div className="flex flex-col gap-[1rem] w-full">
                     <span className="big p-3 bg-green-100 text-green-700 rounded-md block text-center">
-                        Заполните ФИО для входа в тренажер. После завершения сертификат, лог и аналитика скачаются автоматически.
+                        Заполните ФИО для входа в тренажёр. После завершения сертификат и лог сохранятся автоматически.
                     </span>
                     <div className="flex flex-col gap-[0.75rem]">
                         <Input
@@ -840,7 +901,7 @@ export default function SettingsPage({ goTo }) {
                         </div>
                     ) : null}
                     <Button onClick={activateGuestUser} disabled={isLoading}>
-                        {isLoading ? "Подключаем..." : "Войти в тренажер"}
+                        {isLoading ? "Подключаем..." : "Войти в тренажёр"}
                     </Button>
                 </div>
             );
@@ -871,24 +932,45 @@ export default function SettingsPage({ goTo }) {
             );
         }
 
-        if (sessionInfo.tokenType !== "session" && !isPortalProfileComplete(portalProfilePayload)) {
+        if (!hasPortalIdentity) {
             return (
                 <div className="flex flex-col gap-[1rem] w-full">
                     <span className="big p-3 bg-green-100 text-green-700 rounded-md block text-center">
-                        Профиль портала найден. Для входа в МАЯК заполните фамилию, имя и организацию.
+                        Профиль портала найден. Для входа в МАЯК заполните фамилию и имя.
                     </span>
-                    <PortalProfileEditor
-                        profilePayload={portalProfilePayload}
-                        title="Профиль портала"
-                        description="Эти данные будут использованы для сертификата и истории в личном кабинете."
-                        submitLabel="Сохранить профиль"
-                        onSaved={(payload) => {
-                            primePortalProfileCache(payload);
-                            setPortalProfilePayload(payload);
-                            setIsPortalChecked(true);
-                            syncRegisteredUserState(sessionInfoRef.current, payload, tokenRef.current);
-                        }}
-                    />
+                    <div className="flex flex-col gap-[0.75rem] w-full">
+                        <Input
+                            name="portalLastName"
+                            placeholder="Фамилия *"
+                            value={portalIdentityForm.lastName}
+                            onChange={(event) => {
+                                setPortalIdentityForm((prev) => ({ ...prev, lastName: event.target.value }));
+                                setPortalIdentityError("");
+                            }}
+                        />
+                        <Input
+                            name="portalFirstName"
+                            placeholder="Имя *"
+                            value={portalIdentityForm.firstName}
+                            onChange={(event) => {
+                                setPortalIdentityForm((prev) => ({ ...prev, firstName: event.target.value }));
+                                setPortalIdentityError("");
+                            }}
+                        />
+                        <Input
+                            name="portalPatronymic"
+                            placeholder="Отчество"
+                            value={portalIdentityForm.patronymic}
+                            onChange={(event) => {
+                                setPortalIdentityForm((prev) => ({ ...prev, patronymic: event.target.value }));
+                                setPortalIdentityError("");
+                            }}
+                        />
+                        {portalIdentityError ? <span className="small text-red-600 block text-center">{portalIdentityError}</span> : null}
+                    </div>
+                    <Button onClick={savePortalIdentity} disabled={isSavingPortalIdentity}>
+                        {isSavingPortalIdentity ? "Сохраняем..." : "Сохранить и продолжить"}
+                    </Button>
                 </div>
             );
         }
@@ -896,13 +978,13 @@ export default function SettingsPage({ goTo }) {
         if (hasRegisteredUser) {
             return (
                 <div className="flex flex-col gap-[1rem] items-center">
-                    <span className="big p-3 bg-green-100 text-green-700 rounded-md">Тренажер активирован</span>
+                    <span className="big p-3 bg-green-100 text-green-700 rounded-md">Тренажёр активирован</span>
                     <span className="small text-(--color-gray-black)">
                         {portalProfile.fullName}
                         {portalProfile.organizationLabel ? `, ${portalProfile.organizationLabel}` : ""}
                     </span>
                     <Button onClick={() => goTo("trainer")} className="w-full">
-                        Войти в тренажер
+                        Р’РѕР№С‚Рё РІ С‚СЂРµРЅР°Р¶РµСЂ
                     </Button>
                 </div>
             );
@@ -975,7 +1057,7 @@ export default function SettingsPage({ goTo }) {
                             </p>
                             {sessionInfo.tokenType === "session" && sessionInfo.sessionName ? (
                                 <p className="small text-(--color-gray-black)">
-                                    Сессионный вход: <b>{sessionInfo.sessionName}</b>. После portal-входа нужно выбрать стол.
+                                    Сессионный вход: <b>{sessionInfo.sessionName}</b>. После входа нужно выбрать стол.
                                 </p>
                             ) : null}
                         </div>
@@ -1017,7 +1099,7 @@ export default function SettingsPage({ goTo }) {
                                 />
                                 {bypassPasswordError ? <span className="small text-red-600 block text-center">{bypassPasswordError}</span> : null}
                                 <Button onClick={enterWithDevBypass} className="w-full">
-                                    Войти в тренажер
+                                    Войти в тренажёр
                                 </Button>
                             </div>
                         ) : null}

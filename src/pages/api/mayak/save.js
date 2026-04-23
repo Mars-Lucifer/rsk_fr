@@ -1,63 +1,91 @@
 import fs from "fs";
 import path from "path";
+
 import { ensureMayakCertificateNumberInStore } from "@/lib/mayakCertificateNumbers";
 
 let lockPromise = Promise.resolve();
+
+function safeReadJsonObject(filePath) {
+    if (!fs.existsSync(filePath)) {
+        return {};
+    }
+
+    try {
+        const rawValue = fs.readFileSync(filePath, "utf-8").trim();
+        if (!rawValue) {
+            return {};
+        }
+
+        const parsed = JSON.parse(rawValue);
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+        const backupPath = `${filePath}.corrupted-${Date.now()}.bak`;
+        try {
+            fs.copyFileSync(filePath, backupPath);
+        } catch {}
+        console.warn("Failed to parse MAYAK results store, fallback to empty object:", error);
+        return {};
+    }
+}
 
 export default async function handler(req, res) {
     if (req.method !== "POST") {
         return res.status(405).json({ error: "Method not allowed" });
     }
 
-    const { key, userId, data } = req.body;
+    const { key, userId, data } = req.body || {};
 
     if (!key || !userId || !data) {
         return res.status(400).json({ error: "Missing required fields: key, userId, data" });
     }
 
-    // Очередь для предотвращения race condition при записи в файл
     let release;
-    const prev = lockPromise;
-    lockPromise = new Promise(resolve => { release = resolve; });
-    await prev;
+    const previousLock = lockPromise;
+    lockPromise = new Promise((resolve) => {
+        release = resolve;
+    });
+    await previousLock;
 
-    // Путь к файлу данных (сохраняем в корень проекта)
     const filePath = path.join(process.cwd(), "data", "results.json");
 
     try {
-        // Создаем папку data, если её нет
-        if (!fs.existsSync(path.dirname(filePath))) {
-            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        const dirPath = path.dirname(filePath);
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
         }
 
-        // Читаем или создаем файл
-        let allData = {};
-        if (fs.existsSync(filePath)) {
-            allData = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+        const allData = safeReadJsonObject(filePath);
+        if (!allData[key] || typeof allData[key] !== "object") {
+            allData[key] = {};
         }
 
-        // Добавляем данные и фиксируем время сервера
-        if (!allData[key]) allData[key] = {};
-
-        // Добавляем метку времени, если её нет в пришедших данных
         const currentEntry = allData[key]?.[userId] && typeof allData[key][userId] === "object" ? allData[key][userId] : {};
         const certificateNumber = ensureMayakCertificateNumberInStore(allData, { tokenKey: key, userId });
+        const isCompletionSave = data.isFinished === true || Boolean(data.finishedAt);
+
         const finalData = {
             ...currentEntry,
             ...data,
             certificateNumber,
-            finishedAt: data.finishedAt || new Date().toISOString(),
-            isFinished: true
+            createdAt: currentEntry.createdAt || data.createdAt || new Date().toISOString(),
+            ...(isCompletionSave
+                ? {
+                      finishedAt: data.finishedAt || currentEntry.finishedAt || new Date().toISOString(),
+                      isFinished: true,
+                  }
+                : {
+                      finishedAt: currentEntry.finishedAt || null,
+                      isFinished: currentEntry.isFinished === true,
+                  }),
         };
 
         allData[key][userId] = finalData;
 
-        // Сохраняем
         fs.writeFileSync(filePath, JSON.stringify(allData, null, 2));
-        res.status(200).json({ success: true, certificateNumber, data: finalData });
+        return res.status(200).json({ success: true, certificateNumber, data: finalData });
     } catch (error) {
-        console.error("Ошибка сохранения:", error);
-        res.status(500).json({ error: "Ошибка сервера" });
+        console.error("MAYAK save error:", error);
+        return res.status(500).json({ error: error?.message || "Server error" });
     } finally {
         release();
     }
