@@ -200,9 +200,17 @@ async function getReminderRecipients(settings) {
 }
 
 async function sendTelegramReminderMessage(chatId, text, botToken) {
-    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    const settings = await readMayakSettings();
+    const apiBase = String(settings.telegramApiBase || process.env.TELEGRAM_API_BASE || "https://api.telegram.org").replace(/\/+$/, "");
+    const gatewaySecret = String(settings.telegramGatewaySecret || process.env.TELEGRAM_GATEWAY_SECRET || "").trim();
+    const headers = { "Content-Type": "application/json" };
+    if (gatewaySecret) {
+        headers["X-Telegram-Gateway-Secret"] = gatewaySecret;
+    }
+
+    const response = await fetch(`${apiBase}/bot${botToken}/sendMessage`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
             chat_id: chatId,
             text,

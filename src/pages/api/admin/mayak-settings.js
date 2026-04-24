@@ -26,6 +26,9 @@ export default async function handler(req, res) {
             settings.qwenReminderCronSecret || process.env.MAYAK_QWEN_REMINDER_CRON_SECRET || "";
         const telegramBotUsername = settings.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "";
         const telegramWebhookUrl = settings.telegramWebhookUrl || process.env.TELEGRAM_WEBHOOK_URL || "";
+        const telegramApiBase = settings.telegramApiBase || process.env.TELEGRAM_API_BASE || "";
+        const telegramGatewaySecret = settings.telegramGatewaySecret || process.env.TELEGRAM_GATEWAY_SECRET || "";
+        const telegramPortalSecret = settings.telegramPortalSecret || process.env.TELEGRAM_PORTAL_SECRET || "";
         const qwenReminderChatIds = Array.isArray(settings.qwenReminderChatIds)
             ? settings.qwenReminderChatIds.map((value) => String(value).trim()).filter(Boolean)
             : [];
@@ -52,6 +55,12 @@ export default async function handler(req, res) {
                 telegramBotUsernameIsSet: !!telegramBotUsername,
                 telegramWebhookUrl,
                 telegramWebhookUrlIsSet: !!telegramWebhookUrl,
+                telegramApiBase,
+                telegramApiBaseIsSet: !!telegramApiBase,
+                telegramGatewaySecret: maskSecret(telegramGatewaySecret),
+                telegramGatewaySecretIsSet: !!telegramGatewaySecret,
+                telegramPortalSecret: maskSecret(telegramPortalSecret),
+                telegramPortalSecretIsSet: !!telegramPortalSecret,
                 qwenReminderChatIds,
                 qwenReminderChatIdsCount: qwenReminderChatIds.length,
                 baseUrl,
@@ -88,6 +97,9 @@ export default async function handler(req, res) {
             qwenReminderCronSecret,
             telegramBotUsername,
             telegramWebhookUrl,
+            telegramApiBase,
+            telegramGatewaySecret,
+            telegramPortalSecret,
             qwenReminderChatIds,
             baseUrl,
             introQuestionnaireUrl,
@@ -103,7 +115,11 @@ export default async function handler(req, res) {
 
         const settings = await readMayakSettings();
         let botRestarted = false;
-        const shouldRestartBot = telegramBotToken !== undefined || telegramWebhookUrl !== undefined;
+        const shouldRestartBot =
+            telegramBotToken !== undefined ||
+            telegramWebhookUrl !== undefined ||
+            telegramApiBase !== undefined ||
+            telegramGatewaySecret !== undefined;
 
         if (telegramBotToken !== undefined) {
             settings.telegramBotToken = telegramBotToken;
@@ -138,6 +154,21 @@ export default async function handler(req, res) {
         if (telegramWebhookUrl !== undefined) {
             settings.telegramWebhookUrl = telegramWebhookUrl;
             process.env.TELEGRAM_WEBHOOK_URL = telegramWebhookUrl;
+        }
+
+        if (telegramApiBase !== undefined) {
+            settings.telegramApiBase = typeof telegramApiBase === "string" ? telegramApiBase.trim() : "";
+            process.env.TELEGRAM_API_BASE = settings.telegramApiBase;
+        }
+
+        if (telegramGatewaySecret !== undefined) {
+            settings.telegramGatewaySecret = typeof telegramGatewaySecret === "string" ? telegramGatewaySecret.trim() : "";
+            process.env.TELEGRAM_GATEWAY_SECRET = settings.telegramGatewaySecret;
+        }
+
+        if (telegramPortalSecret !== undefined) {
+            settings.telegramPortalSecret = typeof telegramPortalSecret === "string" ? telegramPortalSecret.trim() : "";
+            process.env.TELEGRAM_PORTAL_SECRET = settings.telegramPortalSecret;
         }
 
         if (qwenReminderChatIds !== undefined) {

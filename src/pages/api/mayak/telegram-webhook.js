@@ -1,8 +1,15 @@
 import { processUpdate } from '@/lib/telegramBot';
+import { readMayakSettings } from '@/lib/mayakSettings';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const settings = await readMayakSettings();
+  const expectedSecret = process.env.TELEGRAM_PORTAL_SECRET || settings.telegramPortalSecret;
+  if (expectedSecret && req.headers['x-portal-secret'] !== expectedSecret) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
