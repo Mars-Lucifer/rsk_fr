@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
@@ -74,17 +74,17 @@ export default function MayakAdminRightsPage() {
             const rangesPayload = await rangesRes.json().catch(() => ({}));
 
             if (!rightsRes.ok || !rightsPayload.success) {
-                throw new Error(rightsPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РІС‹РґР°РЅРЅС‹Рµ РїСЂР°РІР°");
+                throw new Error(rightsPayload.error || "Не удалось загрузить выданные права");
             }
             if (!rangesRes.ok || !rangesPayload.success) {
-                throw new Error(rangesPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РєРѕР»РѕРґС‹ РњРђРЇРљ");
+                throw new Error(rangesPayload.error || "Не удалось загрузить колоды МАЯК");
             }
 
             setRights(Array.isArray(rightsPayload.data) ? rightsPayload.data : []);
             setRanges(Array.isArray(rangesPayload.data) ? rangesPayload.data : []);
             setError("");
         } catch (loadError) {
-            setError(loadError.message || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ");
+            setError(loadError.message || "Не удалось загрузить данные");
         } finally {
             setLoading(false);
         }
@@ -154,14 +154,14 @@ export default function MayakAdminRightsPage() {
 
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.success) {
-                throw new Error(payload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РїСЂР°РІР°");
+                throw new Error(payload.error || "Не удалось сохранить права");
             }
 
-            setMessage(editingId ? "РџСЂР°РІРѕ РѕР±РЅРѕРІР»РµРЅРѕ" : "РџСЂР°РІРѕ РІС‹РґР°РЅРѕ");
+            setMessage(editingId ? "Право обновлено" : "Право выдано");
             resetForm();
             await loadAll();
         } catch (submitError) {
-            setError(submitError.message || "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РїСЂР°РІР°");
+            setError(submitError.message || "Не удалось сохранить права");
         } finally {
             setSaving(false);
         }
@@ -192,12 +192,12 @@ export default function MayakAdminRightsPage() {
             setCopiedRightId(`${right.id}:${type}`);
             window.setTimeout(() => setCopiedRightId((current) => (current === `${right.id}:${type}` ? "" : current)), 1600);
         } catch {
-            setError("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєРѕРїРёСЂРѕРІР°С‚СЊ");
+            setError("Не удалось скопировать");
         }
     };
 
     const handleRevoke = async (right) => {
-        if (!window.confirm(`РћС‚РѕР·РІР°С‚СЊ РґРѕСЃС‚СѓРї "${right.title || right.accessId}"?`)) return;
+        if (!window.confirm(`Отозвать доступ "${right.title || right.accessId}"?`)) return;
 
         setRevokingId(right.id);
         setError("");
@@ -207,14 +207,14 @@ export default function MayakAdminRightsPage() {
             const response = await fetch(`/api/admin/mayak-admin-rights/${right.id}`, { method: "DELETE" });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || !payload.success) {
-                throw new Error(payload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РѕР·РІР°С‚СЊ РїСЂР°РІР°");
+                throw new Error(payload.error || "Не удалось отозвать права");
             }
 
             if (editingId === right.id) resetForm();
-            setMessage("РџСЂР°РІР° РѕС‚РѕР·РІР°РЅС‹");
+            setMessage("Права отозваны");
             await loadAll();
         } catch (revokeError) {
-            setError(revokeError.message || "РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РѕР·РІР°С‚СЊ РїСЂР°РІР°");
+            setError(revokeError.message || "Не удалось отозвать права");
         } finally {
             setRevokingId("");
         }
@@ -224,7 +224,7 @@ export default function MayakAdminRightsPage() {
         return (
             <>
                 <Header />
-                {!loading ? <div style={{ padding: 32, textAlign: "center" }}>РџСЂРѕРІРµСЂРєР° РґРѕСЃС‚СѓРїР°...</div> : null}
+                {!loading ? <div style={{ padding: 32, textAlign: "center" }}>Проверка доступа...</div> : null}
             </>
         );
     }
@@ -235,9 +235,9 @@ export default function MayakAdminRightsPage() {
             <div style={{ maxWidth: 1240, margin: "0 auto", padding: "16px 20px 40px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
                     <div>
-                        <h1 style={{ fontSize: 24, margin: 0, color: "#0f172a" }}>РђРґРјРёРЅ-РїСЂР°РІР° РњРђРЇРљ</h1>
+                        <h1 style={{ fontSize: 24, margin: 0, color: "#0f172a" }}>Админ-права МАЯК</h1>
                         <div style={{ fontSize: 13, color: "#64748b", marginTop: 6 }}>
-                            Р”РѕСЃС‚СѓРїС‹ РїРѕ СЃСЃС‹Р»РєРµ Рё РїР°СЂРѕР»СЋ РґР»СЏ СЃРѕР·РґР°РЅРёСЏ РґРµР»РµРіРёСЂРѕРІР°РЅРЅС‹С… СЃРµСЃСЃРёР№ РњРђРЇРљ.
+                            Доступы по ссылке и паролю для создания делегированных сессий МАЯК.
                         </div>
                     </div>
                     <MayakAdminBackLink />
@@ -247,39 +247,39 @@ export default function MayakAdminRightsPage() {
                 {message ? <div style={{ ...noticeStyle, background: "#f0fdf4", color: "#166534", borderColor: "#bbf7d0" }}>{message}</div> : null}
 
                 <section style={panelStyle}>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", marginBottom: 12 }}>{editingId ? "РћР±РЅРѕРІРёС‚СЊ РїСЂР°РІРѕ" : "Р’С‹РґР°С‚СЊ РїСЂР°РІРѕ"}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", marginBottom: 12 }}>{editingId ? "Обновить право" : "Выдать право"}</div>
 
                     <div style={formGridStyle}>
                         <label style={fieldStyle}>
-                            <span style={labelStyle}>РќР°Р·РІР°РЅРёРµ РґРѕСЃС‚СѓРїР°</span>
+                            <span style={labelStyle}>Название доступа</span>
                             <input
                                 value={form.title}
                                 onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
                                 style={inputStyle}
-                                placeholder="РќР°РїСЂРёРјРµСЂ, РРЅС‚РµРЅСЃРёРІ Р°РїСЂРµР»СЊ"
+                                placeholder="Например, Интенсив апрель"
                             />
                         </label>
 
                         <label style={fieldStyle}>
-                            <span style={labelStyle}>РљРѕР»РѕРґР° РњРђРЇРљ</span>
+                            <span style={labelStyle}>Колода МАЯК</span>
                             <select value={form.sectionId} onChange={(event) => handleRangeChange(event.target.value)} style={inputStyle}>
-                                <option value="">Р’С‹Р±РµСЂРёС‚Рµ РєРѕР»РѕРґСѓ</option>
+                                <option value="">Выберите колоду</option>
                                 {rangeOptions.map((range) => (
                                     <option key={range.value} value={range.value}>
                                         {range.value}
-                                        {range.rangeName ? ` вЂў ${range.rangeName}` : ""}
+                                        {range.rangeName ? ` - ${range.rangeName}` : ""}
                                     </option>
                                 ))}
                             </select>
                         </label>
 
                         <label style={fieldStyle}>
-                            <span style={labelStyle}>Р”РёР°РїР°Р·РѕРЅ</span>
+                            <span style={labelStyle}>Диапазон</span>
                             <input value={form.taskRange} readOnly style={{ ...inputStyle, background: "#f8fafc" }} />
                         </label>
 
                         <label style={fieldStyle}>
-                            <span style={labelStyle}>РљРѕР»-РІРѕ РІС‹РґР°С‡</span>
+                            <span style={labelStyle}>Кол-во выдач</span>
                             <input
                                 type="number"
                                 min="1"
@@ -291,19 +291,19 @@ export default function MayakAdminRightsPage() {
                         </label>
 
                         <label style={fieldStyle}>
-                            <span style={labelStyle}>РџР°СЂРѕР»СЊ РґРѕСЃС‚СѓРїР°</span>
+                            <span style={labelStyle}>Пароль доступа</span>
                             <div style={{ display: "flex", gap: 8 }}>
                                 <input
                                     value={form.accessPassword}
                                     onChange={(event) => setForm((current) => ({ ...current, accessPassword: event.target.value }))}
                                     style={{ ...inputStyle, width: "100%" }}
-                                    placeholder="РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё"
+                                    placeholder="Автоматически"
                                 />
                                 <button
                                     type="button"
                                     style={secondaryButtonStyle}
                                     onClick={() => setForm((current) => ({ ...current, accessPassword: generateAccessPassword() }))}>
-                                    Р“РµРЅРµСЂРёСЂРѕРІР°С‚СЊ
+                                    Генерировать
                                 </button>
                             </div>
                         </label>
@@ -311,11 +311,11 @@ export default function MayakAdminRightsPage() {
                         <div style={{ display: "flex", gap: 8, alignItems: "end", justifyContent: "flex-end" }}>
                             {editingId ? (
                                 <button type="button" style={secondaryButtonStyle} onClick={resetForm}>
-                                    РћС‚РјРµРЅР°
+                                    Отмена
                                 </button>
                             ) : null}
                             <button type="button" style={primaryButtonStyle} onClick={handleSubmit} disabled={saving}>
-                                {saving ? "РЎРѕС…СЂР°РЅСЏРµРј..." : editingId ? "РЎРѕС…СЂР°РЅРёС‚СЊ" : "Р’С‹РґР°С‚СЊ"}
+                                {saving ? "Сохраняем..." : editingId ? "Сохранить" : "Выдать"}
                             </button>
                         </div>
                     </div>
@@ -323,14 +323,14 @@ export default function MayakAdminRightsPage() {
 
                 <section style={{ marginTop: 20 }}>
                     <div style={sectionHeaderStyle}>
-                        <h2 style={{ margin: 0, fontSize: 18 }}>Р’С‹РґР°РЅРЅС‹Рµ РїСЂР°РІР°</h2>
+                        <h2 style={{ margin: 0, fontSize: 18 }}>Выданные права</h2>
                         <span style={sectionCountStyle}>{rights.length}</span>
                     </div>
 
                     {loading ? (
-                        <div style={emptyHintStyle}>Р—Р°РіСЂСѓР·РєР°...</div>
+                        <div style={emptyHintStyle}>Загрузка...</div>
                     ) : rights.length === 0 ? (
-                        <div style={emptyHintStyle}>Р’С‹РґР°РЅРЅС‹С… РїСЂР°РІ РїРѕРєР° РЅРµС‚.</div>
+                        <div style={emptyHintStyle}>Выданных прав пока нет.</div>
                     ) : (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                             {rights.map((right) => (
@@ -338,7 +338,7 @@ export default function MayakAdminRightsPage() {
                                     <div style={rowGridStyle}>
                                         <div style={{ minWidth: 0 }}>
                                             <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                {right.title || "Р‘РµР· РЅР°Р·РІР°РЅРёСЏ"}
+                                                {right.title || "Без названия"}
                                             </div>
                                             {right.accessId ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{`/mayak-access/${right.accessId}`}</div> : null}
                                         </div>
@@ -349,7 +349,7 @@ export default function MayakAdminRightsPage() {
                                                 background: right.status === "active" ? "#dcfce7" : "#f1f5f9",
                                                 color: right.status === "active" ? "#166534" : "#475569",
                                             }}>
-                                            {right.status === "active" ? "РђРєС‚РёРІРЅРѕ" : "РћС‚РѕР·РІР°РЅРѕ"}
+                                            {right.status === "active" ? "Активно" : "Отозвано"}
                                         </span>
 
                                         <div style={mutedCellStyle}>{formatRangeLabel(right)}</div>
@@ -359,20 +359,20 @@ export default function MayakAdminRightsPage() {
                                         <div style={actionsStyle}>
                                             {right.accessId ? (
                                                 <button type="button" style={secondaryButtonStyle} onClick={() => copyAccessText(right, "link")}>
-                                                    {copiedRightId === `${right.id}:link` ? "РЎРєРѕРїРёСЂРѕРІР°РЅРѕ" : "РЎСЃС‹Р»РєР°"}
+                                                    {copiedRightId === `${right.id}:link` ? "Скопировано" : "Ссылка"}
                                                 </button>
                                             ) : null}
                                             {right.accessPassword ? (
                                                 <button type="button" style={secondaryButtonStyle} onClick={() => copyAccessText(right, "password")}>
-                                                    {copiedRightId === `${right.id}:password` ? "РЎРєРѕРїРёСЂРѕРІР°РЅРѕ" : "РџР°СЂРѕР»СЊ"}
+                                                    {copiedRightId === `${right.id}:password` ? "Скопировано" : "Пароль"}
                                                 </button>
                                             ) : null}
                                             <button type="button" style={secondaryButtonStyle} onClick={() => handleEdit(right)}>
-                                                РР·РјРµРЅРёС‚СЊ
+                                                Изменить
                                             </button>
                                             {right.status === "active" ? (
                                                 <button type="button" style={dangerButtonStyle} onClick={() => handleRevoke(right)} disabled={revokingId === right.id}>
-                                                    {revokingId === right.id ? "РћС‚Р·С‹РІР°РµРј..." : "РћС‚РѕР·РІР°С‚СЊ"}
+                                                    {revokingId === right.id ? "Отзываем..." : "Отозвать"}
                                                 </button>
                                             ) : null}
                                         </div>
