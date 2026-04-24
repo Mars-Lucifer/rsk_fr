@@ -6,6 +6,7 @@ import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionC
 
 const SESSION_TOKENS_FILE = path.join(process.cwd(), "data", "mayak-session-tokens.json");
 const SESSIONS_FILE = path.join(process.cwd(), "data", "mayak-sessions.json");
+const RIGHTS_FILE = path.join(process.cwd(), "data", "mayak-admin-rights.json");
 
 function createEmptyStore() {
     return { tokens: [] };
@@ -63,6 +64,42 @@ async function readSessionsStore() {
     } catch {
         return [];
     }
+}
+
+async function readRightsStore() {
+    try {
+        const raw = await fs.readFile(RIGHTS_FILE, "utf-8");
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed?.rights) ? parsed.rights : [];
+    } catch {
+        return [];
+    }
+}
+
+async function getDelegatedOwnerUsageState(ownerUserId, tokens = []) {
+    const ownerKey = normalizeString(ownerUserId);
+    if (!ownerKey) return null;
+
+    const rights = await readRightsStore();
+    const right = rights.find(
+        (item) =>
+            String(item.status || "") === "active" &&
+            (normalizeString(item.accessId) === ownerKey || normalizeString(item.userId) === ownerKey)
+    );
+    if (!right) return null;
+
+    const totalLimit = normalizeUsageLimit(right.totalParticipantLimit || 180);
+    const usedCount = tokens
+        .filter((token) => String(token.source || "") === "delegated-admin")
+        .filter((token) => normalizeString(token.ownerUserId) === ownerKey)
+        .filter((token) => token.isActive !== false && !isExpiredToken(token))
+        .reduce((sum, token) => sum + Math.max(0, Number(token.usedCount) || 0), 0);
+
+    return {
+        totalLimit,
+        usedCount,
+        remainingAttempts: Math.max(0, totalLimit - usedCount),
+    };
 }
 
 function toTokenWithStats(token) {
@@ -151,7 +188,20 @@ export async function validateMayakSessionToken(tokenValue) {
         return { valid: false, error: "Срок действия токена истёк", token, remainingAttempts: 0 };
     }
 
-    if (token.usedCount >= token.usageLimit) {
+    const store = await readStore();
+    const delegatedUsageState =
+        String(token.source || "") === "delegated-admin" ? await getDelegatedOwnerUsageState(token.ownerUserId, store.tokens) : null;
+
+    if (delegatedUsageState && delegatedUsageState.remainingAttempts < 1) {
+        return {
+            valid: false,
+            error: "Лимит входов по доступу исчерпан",
+            token,
+            remainingAttempts: 0,
+        };
+    }
+
+    if (!delegatedUsageState && token.usedCount >= token.usageLimit) {
         return {
             valid: false,
             error: "Лимит использований исчерпан",
@@ -160,10 +210,18 @@ export async function validateMayakSessionToken(tokenValue) {
         };
     }
 
+    const responseToken = delegatedUsageState
+        ? {
+              ...token,
+              usageLimit: delegatedUsageState.totalLimit,
+              usedCount: delegatedUsageState.usedCount,
+          }
+        : token;
+
     return {
         valid: true,
-        token,
-        remainingAttempts: Math.max(0, token.usageLimit - token.usedCount),
+        token: responseToken,
+        remainingAttempts: delegatedUsageState?.remainingAttempts ?? Math.max(0, token.usageLimit - token.usedCount),
     };
 }
 
@@ -186,7 +244,13 @@ export async function useMayakSessionToken(tokenValue) {
         return { success: false, error: "Срок действия токена истёк", remainingAttempts: 0 };
     }
 
-    if (current.usedCount >= current.usageLimit) {
+    const delegatedUsageState =
+        String(current.source || "") === "delegated-admin" ? await getDelegatedOwnerUsageState(current.ownerUserId, store.tokens) : null;
+    if (delegatedUsageState && delegatedUsageState.remainingAttempts < 1) {
+        return { success: false, error: "Лимит входов по доступу исчерпан", remainingAttempts: 0 };
+    }
+
+    if (!delegatedUsageState && current.usedCount >= current.usageLimit) {
         return { success: false, error: "Лимит использований исчерпан", remainingAttempts: 0 };
     }
 
@@ -197,10 +261,20 @@ export async function useMayakSessionToken(tokenValue) {
     };
     await writeStore(store);
 
+    const responseToken = delegatedUsageState
+        ? {
+              ...store.tokens[index],
+              usageLimit: delegatedUsageState.totalLimit,
+              usedCount: delegatedUsageState.usedCount + 1,
+          }
+        : store.tokens[index];
+
     return {
         success: true,
-        token: toTokenWithStats(store.tokens[index]),
-        remainingAttempts: Math.max(0, store.tokens[index].usageLimit - store.tokens[index].usedCount),
+        token: toTokenWithStats(responseToken),
+        remainingAttempts: delegatedUsageState
+            ? Math.max(0, delegatedUsageState.remainingAttempts - 1)
+            : Math.max(0, store.tokens[index].usageLimit - store.tokens[index].usedCount),
     };
 }
 

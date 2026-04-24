@@ -49,7 +49,7 @@ export default async function handler(req, res) {
                 },
             });
         } catch (error) {
-            return res.status(500).json({ success: false, error: error.message || "Не удалось загрузить данные MAYAK" });
+            return res.status(500).json({ success: false, error: error.message || "Не удалось загрузить данные МАЯК" });
         }
     }
 
@@ -59,6 +59,7 @@ export default async function handler(req, res) {
                 userId,
                 sessionName: req.body?.sessionName,
                 tableCount: req.body?.tableCount,
+                participantLimit: req.body?.participantLimit || 30,
             });
 
             return res.status(200).json({

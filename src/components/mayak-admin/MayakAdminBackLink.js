@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function MayakAdminBackLink({ href = "/admin?view=sections", label = "Назад в MAYAK admin", className = "", onClick }) {
+export default function MayakAdminBackLink({ href = "/admin?view=sections", label = "Назад в админку МАЯК", className = "", onClick }) {
     return (
         <Link
             href={href}

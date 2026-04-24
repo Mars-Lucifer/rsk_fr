@@ -1,0 +1,579 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/router";
+
+import Layout from "@/components/layout/Layout";
+
+function formatDateTime(value) {
+    const parsed = value ? new Date(value) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) return "-";
+    return parsed.toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+}
+
+function formatRemainingTime(expiresAt, nowTs) {
+    const expiresTs = Date.parse(expiresAt || "");
+    if (!Number.isFinite(expiresTs)) return "--:--:--";
+
+    const remainingMs = Math.max(0, expiresTs - nowTs);
+    const totalSeconds = Math.floor(remainingMs / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getStorageKey(accessId) {
+    return `mayak_delegated_access_${accessId}`;
+}
+
+function buildTableOptions() {
+    return Array.from({ length: 6 }, (_, index) => String(index + 1));
+}
+
+export default function MayakDelegatedAccessPage() {
+    const router = useRouter();
+    const accessId = String(router.query?.accessId || "");
+    const restoredAccessRef = useRef("");
+    const [password, setPassword] = useState("");
+    const [isUnlocked, setIsUnlocked] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState("");
+    const [message, setMessage] = useState("");
+    const [copiedKey, setCopiedKey] = useState("");
+    const [overview, setOverview] = useState({ right: null, sessions: [] });
+    const [nowTs, setNowTs] = useState(Date.now());
+    const [isCompact, setIsCompact] = useState(false);
+    const [form, setForm] = useState({
+        sessionName: "",
+        tableCount: "1",
+    });
+
+    const tableOptions = useMemo(() => buildTableOptions(), []);
+    const right = overview.right || null;
+    const sessions = Array.isArray(overview.sessions) ? overview.sessions : [];
+
+    const apiRequest = useCallback(
+        async (body, passwordOverride) => {
+            const resolvedPassword = passwordOverride ?? password;
+            const response = await fetch(`/api/mayak/delegated-access/${encodeURIComponent(accessId)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: resolvedPassword, ...body }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || "Ошибка доступа");
+            }
+            return payload.data || {};
+        },
+        [accessId, password]
+    );
+
+    const loadOverview = useCallback(
+        async (passwordOverride = password) => {
+            const resolvedPassword = String(passwordOverride || "").trim();
+            if (!accessId || !resolvedPassword) return;
+
+            setLoading(true);
+            setError("");
+            try {
+                const data = await apiRequest({ action: "overview" }, resolvedPassword);
+                setOverview(data);
+                setPassword(resolvedPassword);
+                setIsUnlocked(true);
+                window.sessionStorage.setItem(getStorageKey(accessId), resolvedPassword);
+            } catch (loadError) {
+                setIsUnlocked(false);
+                setError(loadError.message || "Неверный пароль");
+                window.sessionStorage.removeItem(getStorageKey(accessId));
+            } finally {
+                setLoading(false);
+            }
+        },
+        [accessId, apiRequest, password]
+    );
+
+    useEffect(() => {
+        if (!router.isReady || !accessId || restoredAccessRef.current === accessId) return;
+        restoredAccessRef.current = accessId;
+        const savedPassword = window.sessionStorage.getItem(getStorageKey(accessId)) || "";
+        if (savedPassword) {
+            loadOverview(savedPassword);
+        }
+    }, [accessId, loadOverview, router.isReady]);
+
+    useEffect(() => {
+        if (!isUnlocked) return undefined;
+        const intervalId = window.setInterval(() => setNowTs(Date.now()), 1000);
+        return () => window.clearInterval(intervalId);
+    }, [isUnlocked]);
+
+    useEffect(() => {
+        const updateCompact = () => setIsCompact(window.innerWidth < 900);
+        updateCompact();
+        window.addEventListener("resize", updateCompact);
+        return () => window.removeEventListener("resize", updateCompact);
+    }, []);
+
+    const handleLogin = async (event) => {
+        event.preventDefault();
+        await loadOverview(password);
+    };
+
+    const handleCreate = async (event) => {
+        event.preventDefault();
+        setCreating(true);
+        setError("");
+        setMessage("");
+
+        try {
+            const data = await apiRequest({
+                action: "create_session",
+                sessionName: form.sessionName,
+                tableCount: form.tableCount,
+            });
+            setOverview(data);
+            setForm((current) => ({
+                ...current,
+                sessionName: "",
+            }));
+            setMessage("Сессия создана");
+        } catch (createError) {
+            setError(createError.message || "Не удалось создать сессию");
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const handleComplete = async (sessionId) => {
+        setError("");
+        setMessage("");
+        try {
+            const data = await apiRequest({ action: "complete_session", sessionId });
+            setOverview(data);
+            setMessage("Сессия завершена");
+        } catch (completeError) {
+            setError(completeError.message || "Не удалось завершить сессию");
+        }
+    };
+
+    const copyText = async (key, value) => {
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopiedKey(key);
+            window.setTimeout(() => setCopiedKey((current) => (current === key ? "" : current)), 1600);
+        } catch {
+            setError("Не удалось скопировать");
+        }
+    };
+
+    const buildParticipantLink = (tokenValue) => {
+        if (!tokenValue || typeof window === "undefined") return "";
+        return `${window.location.origin}/tools/mayak-oko?token=${encodeURIComponent(tokenValue)}`;
+    };
+
+    if (!isUnlocked) {
+        return (
+            <Layout style={layoutStyle}>
+                <section style={loginShellStyle}>
+                    <form onSubmit={handleLogin} style={loginBoxStyle}>
+                        <h1 style={loginTitleStyle}>Введите пароль</h1>
+                        <input
+                            autoFocus
+                            type="password"
+                            value={password}
+                            onChange={(event) => setPassword(event.target.value)}
+                            style={loginInputStyle}
+                            aria-label="Пароль доступа"
+                        />
+                        {error ? <div style={errorStyle}>{error}</div> : null}
+                        <button type="submit" style={primaryButtonStyle} disabled={loading || !password.trim()}>
+                            {loading ? "Проверяем..." : "Войти"}
+                        </button>
+                    </form>
+                </section>
+            </Layout>
+        );
+    }
+
+    return (
+        <Layout style={layoutStyle}>
+            <section style={pageStyle}>
+                <header style={{ ...headerStyle, ...(isCompact ? compactHeaderStyle : null) }}>
+                    <div>
+                        <div style={eyebrowStyle}>Доступ МАЯК</div>
+                        <h1 style={titleStyle}>{right?.title || right?.fullName || "Сессии"}</h1>
+                    </div>
+                    <div style={{ ...metricGridStyle, ...(isCompact ? compactMetricGridStyle : null) }}>
+                        <div style={metricStyle}>
+                            <span style={metricValueStyle}>{`${right?.remainingQuota ?? 0}/${right?.totalQuota ?? 0}`}</span>
+                            <span style={metricLabelStyle}>сессий осталось</span>
+                        </div>
+                        <div style={metricStyle}>
+                            <span style={metricValueStyle}>{`${right?.remainingParticipantLimit ?? 0}/${right?.totalParticipantLimit ?? 0}`}</span>
+                            <span style={metricLabelStyle}>входов осталось</span>
+                        </div>
+                    </div>
+                </header>
+
+                <div style={metaLineStyle}>
+                    <span>{right?.taskRange || right?.sectionId || "Колода"}</span>
+                    {right?.sectionId && right.sectionId !== right.taskRange ? <span>{right.sectionId}</span> : null}
+                </div>
+
+                {error ? <div style={noticeErrorStyle}>{error}</div> : null}
+                {message ? <div style={noticeSuccessStyle}>{message}</div> : null}
+
+                <form onSubmit={handleCreate} style={{ ...createPanelStyle, ...(isCompact ? compactCreatePanelStyle : null) }}>
+                    <label style={fieldStyle}>
+                        <span style={labelStyle}>Название</span>
+                        <input
+                            value={form.sessionName}
+                            onChange={(event) => setForm((current) => ({ ...current, sessionName: event.target.value }))}
+                            style={inputStyle}
+                            maxLength={80}
+                        />
+                    </label>
+
+                    <label style={fieldStyle}>
+                        <span style={labelStyle}>Столы</span>
+                        <select
+                            value={form.tableCount}
+                            onChange={(event) => setForm((current) => ({ ...current, tableCount: event.target.value }))}
+                            style={inputStyle}>
+                            {tableOptions.map((option) => (
+                                <option key={option} value={option}>
+                                    {option}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <button
+                        type="submit"
+                        style={primaryButtonStyle}
+                        disabled={creating || (right?.remainingQuota || 0) < 1}>
+                        {creating ? "Создаём..." : "Создать сессию"}
+                    </button>
+                </form>
+
+                <div style={sessionsListStyle}>
+                    {sessions.length === 0 ? <div style={emptyStyle}>Активных сессий нет</div> : null}
+
+                    {sessions.map((item) => {
+                        const token = item.token || {};
+                        const participantLink = buildParticipantLink(token.value);
+
+                        return (
+                            <article key={item.sessionId} style={sessionRowStyle}>
+                                <div style={{ ...sessionHeaderStyle, ...(isCompact ? compactSessionHeaderStyle : null) }}>
+                                    <div>
+                                        <h2 style={sessionTitleStyle}>{item.sessionName || "Сессия"}</h2>
+                                        <div style={sessionMetaStyle}>
+                                            <span>{`24 часа: ${item.isExpired ? "истекла" : formatRemainingTime(item.expiresAt, nowTs)}`}</span>
+                                            <span>{`Столы: ${item.tableCount}`}</span>
+                                            <span>{`Входы: ${token.usedCount || 0}/${token.usageLimit || item.participantLimit || 0}`}</span>
+                                            <span>{formatDateTime(item.expiresAt)}</span>
+                                        </div>
+                                    </div>
+                                    <button type="button" style={secondaryButtonStyle} onClick={() => handleComplete(item.sessionId)}>
+                                        Завершить
+                                    </button>
+                                </div>
+
+                                <div style={{ ...shareGridStyle, ...(isCompact ? compactShareGridStyle : null) }}>
+                                    <div style={shareBoxStyle}>
+                                        <span style={labelStyle}>Ссылка</span>
+                                        <code style={codeStyle}>{participantLink}</code>
+                                        <button type="button" style={secondaryButtonStyle} onClick={() => copyText(`${item.sessionId}:link`, participantLink)}>
+                                            {copiedKey === `${item.sessionId}:link` ? "Скопировано" : "Копировать ссылку"}
+                                        </button>
+                                    </div>
+                                    <div style={shareBoxStyle}>
+                                        <span style={labelStyle}>Токен</span>
+                                        <code style={codeStyle}>{token.value}</code>
+                                        <button type="button" style={secondaryButtonStyle} onClick={() => copyText(`${item.sessionId}:token`, token.value)}>
+                                            {copiedKey === `${item.sessionId}:token` ? "Скопировано" : "Копировать токен"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </article>
+                        );
+                    })}
+                </div>
+            </section>
+        </Layout>
+    );
+}
+
+const layoutStyle = {
+    minHeight: "100vh",
+    background: "#f5f7f8",
+    color: "#101820",
+};
+
+const pageStyle = {
+    width: "min(1180px, 100%)",
+    margin: "0 auto",
+    padding: "28px 22px 40px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+};
+
+const loginShellStyle = {
+    minHeight: "calc(100vh - 56px)",
+    display: "grid",
+    placeItems: "center",
+    padding: 20,
+};
+
+const loginBoxStyle = {
+    width: "min(360px, 100%)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    border: "1px solid #d9e0e5",
+    borderRadius: 8,
+    background: "#fff",
+    padding: 20,
+};
+
+const loginTitleStyle = {
+    margin: 0,
+    fontSize: 24,
+    lineHeight: 1.2,
+};
+
+const loginInputStyle = {
+    minHeight: 46,
+    border: "1px solid #b9c4cc",
+    borderRadius: 8,
+    padding: "0 12px",
+    fontSize: 18,
+};
+
+const headerStyle = {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: 18,
+    alignItems: "end",
+};
+
+const compactHeaderStyle = {
+    gridTemplateColumns: "minmax(0, 1fr)",
+};
+
+const eyebrowStyle = {
+    fontSize: 12,
+    letterSpacing: 0,
+    color: "#627178",
+    marginBottom: 6,
+    fontWeight: 800,
+};
+
+const titleStyle = {
+    margin: 0,
+    fontSize: 34,
+    lineHeight: 1.08,
+};
+
+const metricGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(140px, 1fr))",
+    gap: 10,
+};
+
+const compactMetricGridStyle = {
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+};
+
+const metricStyle = {
+    border: "1px solid #d9e0e5",
+    borderRadius: 8,
+    background: "#fff",
+    padding: 14,
+};
+
+const metricValueStyle = {
+    display: "block",
+    fontSize: 30,
+    fontWeight: 800,
+    lineHeight: 1,
+};
+
+const metricLabelStyle = {
+    display: "block",
+    marginTop: 6,
+    color: "#627178",
+    fontSize: 13,
+};
+
+const metaLineStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px 12px",
+    color: "#627178",
+    fontSize: 14,
+};
+
+const createPanelStyle = {
+    display: "grid",
+    gridTemplateColumns: "minmax(220px, 1fr) 110px auto",
+    gap: 12,
+    alignItems: "end",
+    border: "1px solid #d9e0e5",
+    borderRadius: 8,
+    background: "#fff",
+    padding: 14,
+};
+
+const compactCreatePanelStyle = {
+    gridTemplateColumns: "minmax(0, 1fr)",
+};
+
+const fieldStyle = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+};
+
+const labelStyle = {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#627178",
+};
+
+const inputStyle = {
+    minHeight: 42,
+    border: "1px solid #b9c4cc",
+    borderRadius: 8,
+    padding: "0 12px",
+    fontSize: 14,
+    background: "#fff",
+};
+
+const primaryButtonStyle = {
+    minHeight: 42,
+    border: "1px solid #152022",
+    borderRadius: 8,
+    background: "#152022",
+    color: "#fff",
+    padding: "0 16px",
+    fontWeight: 800,
+    cursor: "pointer",
+};
+
+const secondaryButtonStyle = {
+    minHeight: 38,
+    border: "1px solid #b9c4cc",
+    borderRadius: 8,
+    background: "#fff",
+    color: "#152022",
+    padding: "0 12px",
+    fontWeight: 700,
+    cursor: "pointer",
+};
+
+const sessionsListStyle = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+};
+
+const sessionRowStyle = {
+    border: "1px solid #d9e0e5",
+    borderRadius: 8,
+    background: "#fff",
+    padding: 14,
+};
+
+const sessionHeaderStyle = {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    alignItems: "start",
+};
+
+const compactSessionHeaderStyle = {
+    flexDirection: "column",
+};
+
+const sessionTitleStyle = {
+    margin: 0,
+    fontSize: 20,
+};
+
+const sessionMetaStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px 12px",
+    marginTop: 6,
+    color: "#627178",
+    fontSize: 13,
+};
+
+const shareGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 10,
+    marginTop: 12,
+};
+
+const compactShareGridStyle = {
+    gridTemplateColumns: "minmax(0, 1fr)",
+};
+
+const shareBoxStyle = {
+    display: "grid",
+    gridTemplateColumns: "1fr auto",
+    gap: 8,
+    alignItems: "center",
+    borderRadius: 8,
+    background: "#f5f7f8",
+    padding: 10,
+};
+
+const codeStyle = {
+    gridColumn: "1 / -1",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontSize: 13,
+};
+
+const emptyStyle = {
+    border: "1px dashed #b9c4cc",
+    borderRadius: 8,
+    padding: 18,
+    background: "#fff",
+    color: "#627178",
+};
+
+const errorStyle = {
+    color: "#b42318",
+    fontSize: 13,
+};
+
+const noticeErrorStyle = {
+    border: "1px solid #f4b8b1",
+    borderRadius: 8,
+    background: "#fff3f1",
+    color: "#9f1f14",
+    padding: "10px 12px",
+};
+
+const noticeSuccessStyle = {
+    border: "1px solid #bde4c7",
+    borderRadius: 8,
+    background: "#f1fff4",
+    color: "#1c6b33",
+    padding: "10px 12px",
+};

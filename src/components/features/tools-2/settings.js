@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/router";
 
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
@@ -155,6 +156,7 @@ async function loginMayakAdmin(password) {
 }
 
 export default function SettingsPage({ goTo }) {
+    const router = useRouter();
     const skipNextTokenEffectRef = useRef(false);
     const portalProfilePayloadRef = useRef(getCachedPortalProfilePayload());
     const isPortalCheckedRef = useRef(hasResolvedPortalProfileCache());
@@ -381,6 +383,19 @@ export default function SettingsPage({ goTo }) {
             setIsValidating(false);
         }
     }, [syncRegisteredUserState]);
+
+    useEffect(() => {
+        if (!router.isReady) return;
+        const tokenFromUrl = String(router.query?.token || router.query?.password || "").trim();
+        if (!tokenFromUrl) return;
+
+        skipNextTokenEffectRef.current = true;
+        setToken(tokenFromUrl);
+        setTokenError("");
+        setShowNotification(false);
+        setIsTokenValid(false);
+        validateToken(tokenFromUrl);
+    }, [router.isReady, router.query?.password, router.query?.token, validateToken]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -988,7 +1003,7 @@ export default function SettingsPage({ goTo }) {
                         {portalProfile.organizationLabel ? `, ${portalProfile.organizationLabel}` : ""}
                     </span>
                     <Button onClick={() => goTo("trainer")} className="w-full">
-                        Р’РѕР№С‚Рё РІ С‚СЂРµРЅР°Р¶РµСЂ
+                        Войти в тренажёр
                     </Button>
                 </div>
             );

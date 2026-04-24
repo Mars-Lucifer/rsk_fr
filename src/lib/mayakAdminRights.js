@@ -3,13 +3,12 @@ import path from "path";
 import { promises as fs } from "fs";
 
 import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
-import { fetchMayakUsersBatchByIds } from "@/lib/mayakUserLookup";
 import { createMayakSession, deleteMayakSession, listMayakSessions } from "@/lib/mayakSessions";
 import { listMayakSessionTokens } from "@/lib/mayakSessionTokens";
 
 const RIGHTS_FILE = path.join(process.cwd(), "data", "mayak-admin-rights.json");
 const DEFAULT_TOTAL_QUOTA = 10;
-const DEFAULT_TOKEN_USAGE_LIMIT = 30;
+const DEFAULT_TOTAL_PARTICIPANT_LIMIT = 180;
 const DEFAULT_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_TABLES = 6;
 
@@ -31,61 +30,101 @@ function normalizePositiveInteger(value, fallback = 0) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function generateAccessId() {
+    return crypto.randomBytes(8).toString("hex");
+}
+
+export function generateDelegatedAccessPassword() {
+    return crypto.randomBytes(4).toString("hex").toUpperCase();
+}
+
 function toStoredRight(input = {}) {
     const now = new Date().toISOString();
     const totalQuota = normalizePositiveInteger(input.totalQuota, DEFAULT_TOTAL_QUOTA);
     const usedQuota = normalizeNonNegativeInteger(input.usedQuota, 0);
+    const totalParticipantLimit = normalizePositiveInteger(input.totalParticipantLimit, DEFAULT_TOTAL_PARTICIPANT_LIMIT);
+    const usedParticipantLimit = normalizeNonNegativeInteger(input.usedParticipantLimit, 0);
+    const title = normalizeString(input.title || input.fullName || input.name);
 
     return {
         id: normalizeString(input.id) || crypto.randomUUID(),
+        title,
         userId: normalizeString(input.userId),
-        fullName: normalizeString(input.fullName),
+        fullName: normalizeString(input.fullName) || title,
+        accessId: normalizeString(input.accessId) || generateAccessId(),
+        accessPassword: normalizeString(input.accessPassword) || generateDelegatedAccessPassword(),
         sectionId: normalizeString(input.sectionId),
         taskRange: normalizeString(input.taskRange),
         rangeName: normalizeString(input.rangeName),
         status: normalizeString(input.status) || "active",
         grantedAt: normalizeString(input.grantedAt) || now,
-        updatedAt: now,
+        updatedAt: normalizeString(input.updatedAt) || now,
         revokedAt: normalizeString(input.revokedAt) || null,
         totalQuota,
         usedQuota,
         remainingQuota: Math.max(0, totalQuota - usedQuota),
+        totalParticipantLimit,
+        usedParticipantLimit,
+        remainingParticipantLimit: Math.max(0, totalParticipantLimit - usedParticipantLimit),
     };
 }
 
-function toPublicRight(right = {}) {
-    const totalQuota = normalizePositiveInteger(right.totalQuota, DEFAULT_TOTAL_QUOTA);
-    const usedQuota = normalizeNonNegativeInteger(right.usedQuota, 0);
+function isActiveTokenForUsage(token = {}) {
+    if (token.isActive === false) return false;
+    const expiresTs = Date.parse(token.expiresAt || "");
+    return !Number.isFinite(expiresTs) || expiresTs > Date.now();
+}
 
-    return {
+function getActualUsedParticipantLimit(right = {}, tokens = []) {
+    const ownerKeys = new Set([normalizeString(right.accessId), normalizeString(right.userId)].filter(Boolean));
+    if (ownerKeys.size === 0) return 0;
+
+    return tokens
+        .filter((token) => String(token.source || "") === "delegated-admin")
+        .filter((token) => ownerKeys.has(normalizeString(token.ownerUserId)))
+        .filter(isActiveTokenForUsage)
+        .reduce((sum, token) => sum + normalizeNonNegativeInteger(token.usedCount, 0), 0);
+}
+
+function toPublicRight(right = {}, tokens = []) {
+    const stored = toStoredRight({
         ...right,
-        totalQuota,
-        usedQuota,
-        remainingQuota: Math.max(0, totalQuota - usedQuota),
-        isActive: String(right.status || "") === "active",
-    };
+        usedParticipantLimit: getActualUsedParticipantLimit(right, tokens),
+    });
+    return stored;
 }
 
 function assertValidRightPayload(payload = {}) {
     const normalized = toStoredRight(payload);
 
-    if (!normalized.userId) {
-        throw new Error("Укажите ID пользователя");
-    }
-
-    if (!normalized.fullName) {
-        throw new Error("Не удалось определить ФИО пользователя");
+    if (!normalized.title) {
+        throw new Error("Укажите название доступа");
     }
 
     if (!normalized.sectionId || !normalized.taskRange) {
-        throw new Error("Укажите колоду MAYAK");
+        throw new Error("Укажите колоду МАЯК");
     }
 
     if (normalized.totalQuota < 1) {
-        throw new Error("Количество выдач должно быть не меньше 1");
+        throw new Error("Лимит сессий должен быть не меньше 1");
+    }
+
+    if (normalized.totalParticipantLimit < 1) {
+        throw new Error("Общий лимит входов должен быть не меньше 1");
+    }
+
+    if (normalized.usedQuota > normalized.totalQuota) {
+        throw new Error("Лимит сессий не может быть меньше уже созданных");
     }
 
     return normalized;
+}
+
+async function writeStore(store) {
+    await fs.mkdir(path.dirname(RIGHTS_FILE), { recursive: true });
+    const tempFile = `${RIGHTS_FILE}.tmp`;
+    await fs.writeFile(tempFile, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tempFile, RIGHTS_FILE);
 }
 
 async function ensureStoreFile() {
@@ -102,22 +141,25 @@ async function readStore() {
     try {
         const raw = await fs.readFile(RIGHTS_FILE, "utf-8");
         const parsed = JSON.parse(raw);
-        return {
-            rights: Array.isArray(parsed?.rights) ? parsed.rights : [],
-        };
+        const rights = Array.isArray(parsed?.rights) ? parsed.rights : [];
+        let changed = false;
+        const hydratedRights = rights.map((right) => {
+            if (right.accessId && right.accessPassword && right.totalParticipantLimit && right.title) {
+                return right;
+            }
+            changed = true;
+            return toStoredRight(right);
+        });
+        if (changed) {
+            await writeStore({ rights: hydratedRights });
+        }
+        return { rights: hydratedRights };
     } catch {
         return createEmptyStore();
     }
 }
 
-async function writeStore(store) {
-    await fs.mkdir(path.dirname(RIGHTS_FILE), { recursive: true });
-    const tempFile = `${RIGHTS_FILE}.tmp`;
-    await fs.writeFile(tempFile, JSON.stringify(store, null, 2), "utf-8");
-    await fs.rename(tempFile, RIGHTS_FILE);
-}
-
-function sortRights(rights = []) {
+function sortRights(rights = [], tokens = []) {
     return rights
         .slice()
         .sort((left, right) => {
@@ -126,104 +168,100 @@ function sortRights(rights = []) {
             if (leftActive !== rightActive) return leftActive - rightActive;
             return String(right.updatedAt || right.grantedAt || "").localeCompare(String(left.updatedAt || left.grantedAt || ""));
         })
-        .map(toPublicRight);
+        .map((right) => toPublicRight(right, tokens));
+}
+
+function getRightOwnerKey(right = {}) {
+    return normalizeString(right.accessId || right.userId);
+}
+
+async function collectDelegatedSessionsForRight(right) {
+    const [sessions, tokens] = await Promise.all([listMayakSessions(), listMayakSessionTokens()]);
+    const tokenMap = new Map(tokens.map((token) => [token.id, token]));
+    const ownerKeys = new Set([normalizeString(right.accessId), normalizeString(right.userId)].filter(Boolean));
+
+    return sessions
+        .filter((session) => String(session.source || "") === "delegated-admin")
+        .filter((session) => ownerKeys.has(normalizeString(session.ownerUserId)))
+        .filter((session) => String(session.status || "") === "active")
+        .map((session) => {
+            const primaryToken =
+                (Array.isArray(session?.tokenIds) ? session.tokenIds : []).map((tokenId) => tokenMap.get(tokenId)).find(Boolean) || null;
+            return { session, token: primaryToken };
+        })
+        .sort((left, rightItem) => String(rightItem.session?.createdAt || "").localeCompare(String(left.session?.createdAt || "")));
 }
 
 export async function listMayakAdminRights() {
     await sweepExpiredDelegatedMayakSessions();
-    const store = await readStore();
-    return sortRights(store.rights);
+    const [store, tokens] = await Promise.all([readStore(), listMayakSessionTokens()]);
+    return sortRights(store.rights, tokens);
 }
 
 export async function getMayakAdminRightByUserId(userId, { includeInactive = false } = {}) {
     const normalizedUserId = normalizeString(String(userId || ""));
     if (!normalizedUserId) return null;
 
-    const store = await readStore();
+    const [store, tokens] = await Promise.all([readStore(), listMayakSessionTokens()]);
     const right =
         store.rights.find((item) => normalizeString(item.userId) === normalizedUserId && (includeInactive || String(item.status || "") === "active")) ||
         null;
-    return right ? toPublicRight(right) : null;
+    return right ? toPublicRight(right, tokens) : null;
+}
+
+export async function getMayakAdminRightByAccessId(accessId) {
+    const normalizedAccessId = normalizeString(String(accessId || ""));
+    if (!normalizedAccessId) return null;
+
+    const [store, tokens] = await Promise.all([readStore(), listMayakSessionTokens()]);
+    const right = store.rights.find((item) => normalizeString(item.accessId) === normalizedAccessId) || null;
+    return right ? toPublicRight(right, tokens) : null;
 }
 
 export async function getMayakAdminRightById(rightId) {
     const normalizedId = normalizeString(String(rightId || ""));
     if (!normalizedId) return null;
 
-    const store = await readStore();
+    const [store, tokens] = await Promise.all([readStore(), listMayakSessionTokens()]);
     const right = store.rights.find((item) => normalizeString(item.id) === normalizedId) || null;
-    return right ? toPublicRight(right) : null;
+    return right ? toPublicRight(right, tokens) : null;
 }
 
-export async function grantMayakAdminRight(req, payload = {}) {
-    const requestedUserId = normalizeString(String(payload.userId || ""));
-    const batchUsers = await fetchMayakUsersBatchByIds(req, [requestedUserId]);
-    const resolvedUser = batchUsers[requestedUserId];
-    if (!resolvedUser?.id) {
-        throw new Error("Пользователь с таким ID не найден");
-    }
+export function validateDelegatedAccessPassword(right, password) {
+    return Boolean(right?.status === "active" && normalizeString(right.accessPassword) && normalizeString(password) === normalizeString(right.accessPassword));
+}
 
+export async function grantMayakAdminRight(_req, payload = {}) {
     const store = await readStore();
-    const existingIndex = store.rights.findIndex((item) => normalizeString(item.userId) === requestedUserId);
-    const normalized = assertValidRightPayload({
-        ...payload,
-        userId: requestedUserId,
-        fullName: resolvedUser.fullName,
-    });
-
-    if (existingIndex >= 0) {
-        const current = store.rights[existingIndex];
-        const nextRight = toStoredRight({
-            ...current,
-            sectionId: normalized.sectionId,
-            taskRange: normalized.taskRange,
-            rangeName: normalized.rangeName,
-            fullName: normalized.fullName,
-            totalQuota: normalized.totalQuota,
-            status: "active",
-            revokedAt: null,
-            updatedAt: new Date().toISOString(),
-        });
-        store.rights[existingIndex] = nextRight;
-        await writeStore(store);
-        return toPublicRight(nextRight);
-    }
+    const normalized = assertValidRightPayload(payload);
 
     store.rights.push(normalized);
     await writeStore(store);
     return toPublicRight(normalized);
 }
 
-export async function updateMayakAdminRight(req, rightId, payload = {}) {
+export async function updateMayakAdminRight(_req, rightId, payload = {}) {
     const normalizedId = normalizeString(String(rightId || ""));
     const store = await readStore();
     const index = store.rights.findIndex((item) => normalizeString(item.id) === normalizedId);
     if (index === -1) {
-        throw new Error("Право администратора не найдено");
+        throw new Error("Доступ не найден");
     }
 
     const current = store.rights[index];
-    let fullName = current.fullName;
-    if (normalizeString(String(payload.userId || "")) && normalizeString(String(payload.userId || "")) !== normalizeString(current.userId)) {
-        throw new Error("Смена пользователя для уже выданного права не поддерживается");
-    }
-
-    if (!fullName) {
-        const batchUsers = await fetchMayakUsersBatchByIds(req, [current.userId]);
-        fullName = batchUsers[current.userId]?.fullName || current.fullName;
-    }
-
     const normalized = assertValidRightPayload({
         ...current,
         ...payload,
         id: current.id,
         userId: current.userId,
-        fullName,
+        accessId: current.accessId,
         grantedAt: current.grantedAt,
         status: current.status,
         revokedAt: current.revokedAt,
         totalQuota: payload.totalQuota ?? current.totalQuota,
+        totalParticipantLimit: payload.totalParticipantLimit ?? current.totalParticipantLimit,
         usedQuota: current.usedQuota,
+        usedParticipantLimit: current.usedParticipantLimit,
     });
 
     store.rights[index] = normalized;
@@ -236,13 +274,12 @@ export async function revokeMayakAdminRight(rightId) {
     const store = await readStore();
     const index = store.rights.findIndex((item) => normalizeString(item.id) === normalizedId);
     if (index === -1) {
-        throw new Error("Право администратора не найдено");
+        throw new Error("Доступ не найден");
     }
 
-    const current = store.rights[index];
     const revokedAt = new Date().toISOString();
     const nextRight = toStoredRight({
-        ...current,
+        ...store.rights[index],
         status: "revoked",
         revokedAt,
         updatedAt: revokedAt,
@@ -253,33 +290,24 @@ export async function revokeMayakAdminRight(rightId) {
     return toPublicRight(nextRight);
 }
 
-export async function createDelegatedMayakSessionForUser({ userId, sessionName, tableCount }) {
-    await sweepExpiredDelegatedMayakSessions();
-
-    const normalizedUserId = normalizeString(String(userId || ""));
-    if (!normalizedUserId) {
-        throw new Error("Не удалось определить пользователя");
-    }
-
+async function createDelegatedMayakSessionForRightIndex(store, index, { sessionName, tableCount }) {
     const normalizedTableCount = normalizePositiveInteger(tableCount, 0);
     if (normalizedTableCount < 1 || normalizedTableCount > DEFAULT_MAX_TABLES) {
         throw new Error("Количество столов должно быть от 1 до 6");
     }
 
-    const store = await readStore();
-    const index = store.rights.findIndex((item) => normalizeString(item.userId) === normalizedUserId && String(item.status || "") === "active");
-    if (index === -1) {
-        throw new Error("У пользователя нет активных админ-прав MAYAK");
+    const currentRight = toPublicRight(store.rights[index]);
+    if (currentRight.status !== "active") {
+        throw new Error("Доступ неактивен");
     }
 
-    const currentRight = toPublicRight(store.rights[index]);
     if (currentRight.remainingQuota < 1) {
-        throw new Error("Лимит создания токенов исчерпан");
+        throw new Error("Лимит создания сессий исчерпан");
     }
 
     const expiresAt = new Date(Date.now() + DEFAULT_TOKEN_TTL_MS).toISOString();
     const normalizedSessionName = normalizeString(sessionName);
-    const resolvedSessionName = normalizedSessionName || `Сессия ${currentRight.fullName} #${currentRight.usedQuota + 1}`;
+    const resolvedSessionName = normalizedSessionName || `Сессия ${currentRight.title || currentRight.accessId} #${currentRight.usedQuota + 1}`;
 
     let createdSession = null;
 
@@ -289,12 +317,12 @@ export async function createDelegatedMayakSessionForUser({ userId, sessionName, 
             sectionId: currentRight.sectionId,
             taskRange: currentRight.taskRange,
             tableCount: normalizedTableCount,
-            tokenUsageLimit: DEFAULT_TOKEN_USAGE_LIMIT,
-            ownerUserId: currentRight.userId,
-            ownerFullName: currentRight.fullName,
+            tokenUsageLimit: currentRight.totalParticipantLimit,
+            ownerUserId: getRightOwnerKey(currentRight),
+            ownerFullName: currentRight.title,
             source: "delegated-admin",
             expiresAt,
-            participantLimit: DEFAULT_TOKEN_USAGE_LIMIT,
+            participantLimit: currentRight.totalParticipantLimit,
         });
 
         const nextRight = toStoredRight({
@@ -310,7 +338,7 @@ export async function createDelegatedMayakSessionForUser({ userId, sessionName, 
             (Array.isArray(createdSession?.tokenIds) ? createdSession.tokenIds : []).map((tokenId) => tokenMap.get(tokenId)).find(Boolean) || null;
 
         return {
-            right: toPublicRight(nextRight),
+            right: toPublicRight(nextRight, tokens),
             session: createdSession,
             token: primaryToken,
         };
@@ -322,29 +350,65 @@ export async function createDelegatedMayakSessionForUser({ userId, sessionName, 
     }
 }
 
-export async function getMayakDelegatedAccessOverview(userId) {
+export async function createDelegatedMayakSessionForUser({ userId, sessionName, tableCount }) {
     await sweepExpiredDelegatedMayakSessions();
 
     const normalizedUserId = normalizeString(String(userId || ""));
-    const [right, sessions, tokens] = await Promise.all([getMayakAdminRightByUserId(normalizedUserId, { includeInactive: true }), listMayakSessions(), listMayakSessionTokens()]);
+    if (!normalizedUserId) {
+        throw new Error("Не удалось определить пользователя");
+    }
 
-    const tokenMap = new Map(tokens.map((token) => [token.id, token]));
-    const delegatedSessions = sessions
-        .filter((session) => String(session.source || "") === "delegated-admin" && normalizeString(session.ownerUserId) === normalizedUserId)
-        .filter((session) => String(session.status || "") === "active")
-        .map((session) => {
-            const primaryToken =
-                (Array.isArray(session?.tokenIds) ? session.tokenIds : []).map((tokenId) => tokenMap.get(tokenId)).find(Boolean) || null;
+    const store = await readStore();
+    const index = store.rights.findIndex((item) => normalizeString(item.userId) === normalizedUserId && String(item.status || "") === "active");
+    if (index === -1) {
+        throw new Error("У пользователя нет активного доступа МАЯК");
+    }
 
-            return {
-                session,
-                token: primaryToken,
-            };
-        })
-        .sort((left, right) => String(right.session?.createdAt || "").localeCompare(String(left.session?.createdAt || "")));
+    return createDelegatedMayakSessionForRightIndex(store, index, { sessionName, tableCount });
+}
+
+export async function createDelegatedMayakSessionForAccess({ accessId, password, sessionName, tableCount }) {
+    await sweepExpiredDelegatedMayakSessions();
+
+    const store = await readStore();
+    const index = store.rights.findIndex((item) => normalizeString(item.accessId) === normalizeString(accessId));
+    if (index === -1) {
+        throw new Error("Доступ не найден");
+    }
+
+    const tokens = await listMayakSessionTokens();
+    const currentRight = toPublicRight(store.rights[index], tokens);
+    if (!validateDelegatedAccessPassword(currentRight, password)) {
+        throw new Error("Неверный пароль");
+    }
+
+    return createDelegatedMayakSessionForRightIndex(store, index, { sessionName, tableCount });
+}
+
+export async function getMayakDelegatedAccessOverview(userId) {
+    await sweepExpiredDelegatedMayakSessions();
+
+    const right = await getMayakAdminRightByUserId(userId, { includeInactive: true });
 
     return {
         right,
-        sessions: delegatedSessions,
+        sessions: right ? await collectDelegatedSessionsForRight(right) : [],
+    };
+}
+
+export async function getMayakDelegatedAccessOverviewByAccess({ accessId, password }) {
+    await sweepExpiredDelegatedMayakSessions();
+
+    const right = await getMayakAdminRightByAccessId(accessId);
+    if (!right) {
+        throw new Error("Доступ не найден");
+    }
+    if (!validateDelegatedAccessPassword(right, password)) {
+        throw new Error("Неверный пароль");
+    }
+
+    return {
+        right,
+        sessions: await collectDelegatedSessionsForRight(right),
     };
 }

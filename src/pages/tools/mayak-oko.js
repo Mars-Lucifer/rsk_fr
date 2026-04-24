@@ -18,6 +18,9 @@ export default function Home() {
         setPageKey(pageName);
     };
 
+    const hasTokenQuery = router.isReady && (router.query.token || router.query.password);
+    const effectivePageKey = hasTokenQuery && pageKey === "mayakOko" ? "settings" : pageKey;
+
     useEffect(() => {
         if (router.isReady && router.query.restart !== undefined) {
             const prefix = "trainer_v2";
@@ -54,12 +57,12 @@ export default function Home() {
 
     return (
         <Layout>
-            <TransitionWrapper currentKey={pageKey}>
-                {pageKey === "mayakOko" && <IndexPage goTo={goTo} />}
-                {pageKey === "trainer" && <TrainerPage goTo={goTo} />}
-                {pageKey === "settings" && <SettingsPage goTo={goTo} />}
-                {pageKey === "history" && <HistoryPage goTo={goTo} />}
-                {pageKey === "admin" && <AdminPage goTo={goTo} />}
+            <TransitionWrapper currentKey={effectivePageKey}>
+                {effectivePageKey === "mayakOko" && <IndexPage goTo={goTo} />}
+                {effectivePageKey === "trainer" && <TrainerPage goTo={goTo} />}
+                {effectivePageKey === "settings" && <SettingsPage goTo={goTo} />}
+                {effectivePageKey === "history" && <HistoryPage goTo={goTo} />}
+                {effectivePageKey === "admin" && <AdminPage goTo={goTo} />}
             </TransitionWrapper>
         </Layout>
     );
