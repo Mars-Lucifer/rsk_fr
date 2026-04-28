@@ -13,6 +13,14 @@ const AuthIcon = dynamic(() => import("@/assets/nav/auth.svg"), { ssr: false });
 const Burger = dynamic(() => import("@/assets/nav/burger.svg"), { ssr: false });
 const Telegram = dynamic(() => import("@/assets/general/tg.svg"), { ssr: false });
 
+function getScreenType() {
+    if (typeof window === "undefined") return null;
+    const width = window.innerWidth;
+    if (width < 640) return "mobile";
+    if (width < 900) return "tablet";
+    return "desktop";
+}
+
 export default function Aside({ isMobileOpen, closeMobile }) {
     const router = useRouter();
     const userData = useUserData();
@@ -21,19 +29,13 @@ export default function Aside({ isMobileOpen, closeMobile }) {
     const initialCollapsed = Cookies.get("sidebarCollapsed") === "true";
     const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
     const [hovered, setHovered] = useState(null);
-    const [isMounted, setIsMounted] = useState(false);
-    const [screenType, setScreenType] = useState(null); // 'mobile', 'tablet' или 'desktop'
+    const [screenType, setScreenType] = useState(getScreenType); // 'mobile', 'tablet' или 'desktop'
 
     useEffect(() => {
         const handleResize = () => {
-            const width = window.innerWidth;
-            if (width < 640) setScreenType("mobile");
-            else if (width < 900) setScreenType("tablet");
-            else setScreenType("desktop");
+            setScreenType(getScreenType());
         };
 
-        handleResize(); 
-        setIsMounted(true);
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
     }, []);
@@ -59,7 +61,7 @@ export default function Aside({ isMobileOpen, closeMobile }) {
 
     
     const getVariant = () => {
-        if (!isMounted || screenType === null) return "mobileClosed";
+        if (screenType === null) return "mobileClosed";
 
         if (screenType === "mobile") {
             return isMobileOpen ? "mobileOpen" : "mobileClosed";
@@ -73,10 +75,10 @@ export default function Aside({ isMobileOpen, closeMobile }) {
     };
 
     
-    if (!isMounted || screenType === null) {
+    if (screenType === null) {
         return (
             <aside
-                className="overflow-hidden bg-white max-[640px]:fixed max-[640px]:z-[100] max-[640px]:h-full max-[640px]:left-0 max-[640px]:top-0 max-[640px]:-translate-x-full sm:relative"
+                className={`mayak-sidebar ${isCollapsed ? "mayak-sidebar-collapsed" : "mayak-sidebar-expanded"} overflow-hidden bg-white max-[640px]:fixed max-[640px]:z-[100] max-[640px]:h-full max-[640px]:left-0 max-[640px]:top-0 max-[640px]:-translate-x-full sm:relative`}
                 style={{
                     width: isCollapsed ? (typeof window !== "undefined" && window.innerWidth < 900 ? "5rem" : "6.5rem") : "var(--aside-expanded)",
                 }}
@@ -93,7 +95,7 @@ export default function Aside({ isMobileOpen, closeMobile }) {
                 animate={getVariant()}
                 variants={asideVariants}
                 transition={springTransition}
-                className="overflow-hidden bg-white max-[640px]:fixed max-[640px]:z-[100] max-[640px]:h-full max-[640px]:left-0 max-[640px]:top-0 sm:relative sm:translate-x-0">
+                className={`mayak-sidebar ${isCollapsed && screenType === "desktop" ? "mayak-sidebar-collapsed" : "mayak-sidebar-expanded"} overflow-hidden bg-white max-[640px]:fixed max-[640px]:z-[100] max-[640px]:h-full max-[640px]:left-0 max-[640px]:top-0 sm:relative sm:translate-x-0`}>
                 {/* ЛОГОТИП И БУРГЕР */}
                 <div
                     className={`logo-container grid items-center gap-3 ${isCollapsed && screenType !== "mobile" ? "justify-center" : ""}`}
@@ -103,7 +105,7 @@ export default function Aside({ isMobileOpen, closeMobile }) {
                         {(!isCollapsed || screenType === "mobile") && (
                             <motion.div key="logo" initial={false} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ type: "spring", stiffness: 400, damping: 20 }} className="min-w-0 flex flex-1 justify-start">
                                 <div className="relative h-[120px] w-[228px] max-[900px]:h-[72px] max-[900px]:w-[138px]">
-                                    <Image src="/images/logo.png" alt="logo" fill priority className="object-contain" />
+                                    <Image src="/images/logo.png" alt="logo" fill priority sizes="(max-width: 900px) 138px, 228px" className="object-contain" />
                                 </div>
                             </motion.div>
                         )}

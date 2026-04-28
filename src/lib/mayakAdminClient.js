@@ -20,6 +20,12 @@ export const MAYAK_ADMIN_SECTIONS = [
         href: "/admin/mayak-sessions",
     },
     {
+        id: "case-photos",
+        title: "Фотки",
+        description: "Фото для 4 направлений блока кейсов на странице тренажёра МАЯК.",
+        href: "/admin/mayak-case-photos",
+    },
+    {
         id: "admin-rights",
         title: "\u0410\u0434\u043c\u0438\u043d-\u043f\u0440\u0430\u0432\u0430",
         description:

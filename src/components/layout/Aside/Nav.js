@@ -2,7 +2,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getCookie, setCookie, clearCookies } from "@/utils/cookies";
 import { useProfile } from "@/hooks/fetchProfile";
 
@@ -26,6 +26,7 @@ const BASE_NAV_LINKS = [
     { label: "Проекты", disable: false, login: true, learn: true, href: "/projects", icon: dynamic(() => import("@/assets/nav/projects.svg")) },
     { label: "Обучение", disable: false, login: true, learn: false, href: "/cours", icon: dynamic(() => import("@/assets/nav/cours.svg")) },
     { label: "Маяк Око", href: "/tools/mayak-oko", login: false, learn: false, icon: dynamic(() => import("@/assets/nav/inst.svg")) },
+    { label: "Тренажер МАЯК", href: "/tools/mayak-trainer#overview", login: false, learn: false, inactive: true, icon: dynamic(() => import("@/assets/nav/mayak-trainer.svg")) },
     {
         label: "Админ панель",
         disable: true,
@@ -44,21 +45,21 @@ const BASE_NAV_LINKS = [
 
 export function useNavLinks() {
     const router = useRouter();
-    const [navLinks, setNavLinks] = useState(BASE_NAV_LINKS);
     const [isLoading, setIsLoading] = useState(true);
     const { data: profileData, fetchProfile } = useProfile();
 
-    const updateNavLinks = (role, learn, hasToken) => {
-        setNavLinks((prevLinks) =>
-            prevLinks.map((link) => {
+    const role = profileData?.Type || getCookie("role");
+    const navLinks = useMemo(
+        () =>
+            BASE_NAV_LINKS.map((link) => {
                 const updatedLink = { ...link };
                 if (link.label === "Админ панель") {
                     updatedLink.disable = role !== "moder" && role !== "admin";
                 }
                 return updatedLink;
-            })
-        );
-    };
+            }),
+        [role]
+    );
 
     useEffect(() => {
         const checkAuthAndRole = async () => {
@@ -72,7 +73,6 @@ export function useNavLinks() {
             }
 
             if (existingRole && existingLearn !== null) {
-                updateNavLinks(existingRole, existingLearn === "true", true);
                 setIsLoading(false);
                 return;
             }
@@ -102,14 +102,13 @@ export function useNavLinks() {
             setCookie("organization", organization);
         }
 
-        updateNavLinks(role, learn, true);
-        setIsLoading(false);
+        queueMicrotask(() => setIsLoading(false));
     }, [profileData, router]);
 
     return { navLinks, isLoading };
 }
 
-export function NavItem({ label, href, icon: Icon, submenu, isCollapsed, isHovered, onHover, disable, login, learn, screenType }) {
+export function NavItem({ label, href, icon: Icon, submenu, isCollapsed, isHovered, onHover, disable, login, learn, inactive, screenType }) {
     const router = useRouter();
     const isSubmenuActive = submenu?.some(
         (item) => router.pathname === item.href || router.asPath?.split("?")[0] === item.href
@@ -119,7 +118,7 @@ export function NavItem({ label, href, icon: Icon, submenu, isCollapsed, isHover
     const userData = getCookie("userData");
     const userLearn = getCookie("learn") === "true";
 
-    const isInactive = (login && !userData) || (learn && !userLearn);
+    const isInactive = inactive || (login && !userData) || (learn && !userLearn);
 
     if (disable) return null;
 

@@ -1,0 +1,7 @@
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+API response for /api/mayak/case-photo?filename=1777385916276-2bbcddc6-a094-4972-bb97-478b531dafe9.png exceeds 4MB. API Routes are meant to respond quickly. https://nextjs.org/docs/messages/api-routes-response-size-limit
+API response for /api/mayak/case-photo?filename=1777385927034-4a8e4cb3-a5bf-4ff8-bfe8-89932ad98869.png exceeds 4MB. API Routes are meant to respond quickly. https://nextjs.org/docs/messages/api-routes-response-size-limit
+API response for /api/mayak/case-photo?filename=1777385950579-b838343a-e57a-4b11-a737-56a2583dad95.png exceeds 4MB. API Routes are meant to respond quickly. https://nextjs.org/docs/messages/api-routes-response-size-limit
+API response for /api/mayak/case-photo?filename=1777385927034-4a8e4cb3-a5bf-4ff8-bfe8-89932ad98869.png exceeds 4MB. API Routes are meant to respond quickly. https://nextjs.org/docs/messages/api-routes-response-size-limit

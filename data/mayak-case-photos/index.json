@@ -1,0 +1,100 @@
+{
+  "photos": [
+    {
+      "id": "c60c7ade-934d-4ee7-87e1-c80ab4cd4042",
+      "directionId": "state",
+      "filename": "1777385950579-b838343a-e57a-4b11-a737-56a2583dad95.png",
+      "originalName": "Арзамас 12-13.03.png",
+      "createdAt": "2026-04-28T14:19:10.586Z",
+      "order": 6
+    },
+    {
+      "id": "dc4b9e35-1cf4-4b14-8eb4-68187d203c92",
+      "directionId": "education",
+      "filename": "1777385927034-4a8e4cb3-a5bf-4ff8-bfe8-89932ad98869.png",
+      "originalName": "РанХИГС.png",
+      "createdAt": "2026-04-28T14:18:47.048Z",
+      "order": 3
+    },
+    {
+      "id": "edd88357-e9c8-4665-91bd-5bd4348cba31",
+      "directionId": "state",
+      "filename": "1777385830242-96b498e2-49f2-42bb-b23f-145da5965c87.png",
+      "originalName": "Дашборд Московское Долголетие.png",
+      "createdAt": "2026-04-28T14:17:10.247Z",
+      "order": 5
+    },
+    {
+      "id": "5771e06f-bf5f-4414-9454-85b63d979608",
+      "directionId": "special",
+      "filename": "1777385798263-070a35df-b7f6-44ca-8b9f-83d85449f144.jpg",
+      "originalName": "photo_2026-04-23_20-01-07.jpg",
+      "createdAt": "2026-04-28T14:16:38.267Z",
+      "order": 2
+    },
+    {
+      "id": "77ce5c29-a0ba-4140-9521-386e52bb6cd9",
+      "directionId": "special",
+      "filename": "1777385779967-b7b56d4b-4066-4314-8caa-65a1c7f93d79.jpg",
+      "originalName": "photo_2026-04-15_15-20-16.jpg",
+      "createdAt": "2026-04-28T14:16:19.974Z",
+      "order": 3
+    },
+    {
+      "id": "507d973b-4c56-40a8-a8b3-2879628649bc",
+      "directionId": "special",
+      "filename": "1777385760853-eaf78528-1a57-4a65-841e-0d66c90ecdea.jpg",
+      "originalName": "photo_2026-03-24_13-48-21.jpg",
+      "createdAt": "2026-04-28T14:16:00.858Z",
+      "order": 1
+    },
+    {
+      "id": "5dc5d63f-f716-4a1a-8abb-42cba790eaec",
+      "directionId": "state",
+      "filename": "1777385735344-cd31029d-ba86-4d49-a236-47ed0875999e.jpg",
+      "originalName": "photo_2026-03-23_11-24-03.jpg",
+      "createdAt": "2026-04-28T14:15:35.350Z",
+      "order": 4
+    },
+    {
+      "id": "299d55e0-3abd-4d99-b8d9-daa5cc15ea9c",
+      "directionId": "state",
+      "filename": "1777385716302-d0b3ec9f-5f69-4567-8bf6-77efccf93e98.jpg",
+      "originalName": "photo_2026-03-16_22-15-00.jpg",
+      "createdAt": "2026-04-28T14:15:16.306Z",
+      "order": 3
+    },
+    {
+      "id": "e450e4f4-f4f5-4d0a-8eb5-52255c4f7f20",
+      "directionId": "state",
+      "filename": "1777385712775-a9d923c5-e598-4193-835b-391e30d97914.jpg",
+      "originalName": "photo_2026-03-07_09-26-40.jpg",
+      "createdAt": "2026-04-28T14:15:12.779Z",
+      "order": 2
+    },
+    {
+      "id": "e984d3f6-a9d1-437e-8e0f-3cdd82c6b0c5",
+      "directionId": "state",
+      "filename": "1777385703558-003e667c-7db7-45b9-a3a2-742cc5965882.jpg",
+      "originalName": "photo_2026-02-23_18-26-28.jpg",
+      "createdAt": "2026-04-28T14:15:03.563Z",
+      "order": 1
+    },
+    {
+      "id": "dc742b11-c601-441f-ab24-fb6090574825",
+      "directionId": "education",
+      "filename": "1777385682378-680cbb19-6b91-4a82-91ed-d85614a9fba6.jpg",
+      "originalName": "photo_2026-02-16_13-38-57.jpg",
+      "createdAt": "2026-04-28T14:14:42.382Z",
+      "order": 1
+    },
+    {
+      "id": "4c8d3850-d613-4f84-be79-4c75d550facc",
+      "directionId": "business",
+      "filename": "1777385653724-09899d41-6157-471f-ba29-cd3f5aea81d8.jpg",
+      "originalName": "photo_2026-02-03_14-24-59 (2).jpg",
+      "createdAt": "2026-04-28T14:14:13.727Z",
+      "order": 1
+    }
+  ]
+}
