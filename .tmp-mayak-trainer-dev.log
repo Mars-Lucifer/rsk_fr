@@ -789,3 +789,4 @@
  GET /api/mayak/validate-token?token=a4207bf1482cdf93b7ad31d093915f0dfcb5323038fa67305918da39a6159d21 304 in 3ms (compile: 746µs, render: 2ms)
  GET /api/mayak/content-data 304 in 10ms (compile: 4ms, render: 5ms)
  GET /api/mayak/case-photos 304 in 8ms (compile: 1462µs, render: 6ms)
+ GET / 200 in 189ms (compile: 153ms, render: 36ms)

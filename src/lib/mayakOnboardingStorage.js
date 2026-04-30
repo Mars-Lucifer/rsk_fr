@@ -2,11 +2,30 @@ import { promises as fs } from "fs";
 import path from "path";
 import { DEFAULT_MAYAK_ONBOARDING_CONFIG } from "./mayakOnboardingDefaults.js";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const FILES_ROOT = path.join(DATA_DIR, "mayak-onboarding-files");
-const CONFIG_FILE = path.join(DATA_DIR, "mayak-onboarding-config.json");
-const LINKS_FILE = path.join(DATA_DIR, "mayak-onboarding-links.json");
-const SUBMISSIONS_FILE = path.join(DATA_DIR, "mayak-onboarding-submissions.json");
+function normalizeConfiguredDir(value) {
+    if (!value || typeof value !== "string") return "";
+    return path.isAbsolute(value) ? value : path.join(process.cwd(), value);
+}
+
+function getDataDir() {
+    return normalizeConfiguredDir(process.env.MAYAK_ONBOARDING_DATA_DIR) || path.join(process.cwd(), "data");
+}
+
+function getFilesRoot() {
+    return path.join(getDataDir(), "mayak-onboarding-files");
+}
+
+function getConfigFile() {
+    return path.join(getDataDir(), "mayak-onboarding-config.json");
+}
+
+function getLinksFile() {
+    return path.join(getDataDir(), "mayak-onboarding-links.json");
+}
+
+function getSubmissionsFile() {
+    return path.join(getDataDir(), "mayak-onboarding-submissions.json");
+}
 
 async function pathExists(targetPath) {
     try {
@@ -51,53 +70,59 @@ function sanitizeId(value) {
 }
 
 export async function ensureMayakOnboardingStorage() {
-    await ensureDir(DATA_DIR);
-    await ensureDir(FILES_ROOT);
+    const dataDir = getDataDir();
+    const filesRoot = getFilesRoot();
+    const configFile = getConfigFile();
+    const linksFile = getLinksFile();
+    const submissionsFile = getSubmissionsFile();
 
-    if (!(await pathExists(CONFIG_FILE))) {
-        await writeJsonAtomic(CONFIG_FILE, DEFAULT_MAYAK_ONBOARDING_CONFIG);
+    await ensureDir(dataDir);
+    await ensureDir(filesRoot);
+
+    if (!(await pathExists(configFile))) {
+        await writeJsonAtomic(configFile, DEFAULT_MAYAK_ONBOARDING_CONFIG);
     }
-    if (!(await pathExists(LINKS_FILE))) {
-        await writeJsonAtomic(LINKS_FILE, []);
+    if (!(await pathExists(linksFile))) {
+        await writeJsonAtomic(linksFile, []);
     }
-    if (!(await pathExists(SUBMISSIONS_FILE))) {
-        await writeJsonAtomic(SUBMISSIONS_FILE, []);
+    if (!(await pathExists(submissionsFile))) {
+        await writeJsonAtomic(submissionsFile, []);
     }
 }
 
 export async function readOnboardingConfig() {
     await ensureMayakOnboardingStorage();
-    const config = await readJsonFile(CONFIG_FILE, DEFAULT_MAYAK_ONBOARDING_CONFIG);
+    const config = await readJsonFile(getConfigFile(), DEFAULT_MAYAK_ONBOARDING_CONFIG);
     return config && typeof config === "object" ? config : DEFAULT_MAYAK_ONBOARDING_CONFIG;
 }
 
 export async function writeOnboardingConfig(config) {
     await ensureMayakOnboardingStorage();
-    await writeJsonAtomic(CONFIG_FILE, config);
+    await writeJsonAtomic(getConfigFile(), config);
     return config;
 }
 
 export async function readOnboardingLinks() {
     await ensureMayakOnboardingStorage();
-    const links = await readJsonFile(LINKS_FILE, []);
+    const links = await readJsonFile(getLinksFile(), []);
     return Array.isArray(links) ? links : [];
 }
 
 export async function writeOnboardingLinks(links) {
     await ensureMayakOnboardingStorage();
-    await writeJsonAtomic(LINKS_FILE, Array.isArray(links) ? links : []);
+    await writeJsonAtomic(getLinksFile(), Array.isArray(links) ? links : []);
     return links;
 }
 
 export async function readOnboardingSubmissions() {
     await ensureMayakOnboardingStorage();
-    const submissions = await readJsonFile(SUBMISSIONS_FILE, []);
+    const submissions = await readJsonFile(getSubmissionsFile(), []);
     return Array.isArray(submissions) ? submissions : [];
 }
 
 export async function writeOnboardingSubmissions(submissions) {
     await ensureMayakOnboardingStorage();
-    await writeJsonAtomic(SUBMISSIONS_FILE, Array.isArray(submissions) ? submissions : []);
+    await writeJsonAtomic(getSubmissionsFile(), Array.isArray(submissions) ? submissions : []);
     return submissions;
 }
 
@@ -107,7 +132,7 @@ function getScopeRoot(scope, parentId) {
     if (!safeParentId) {
         throw new Error("Invalid parentId");
     }
-    return path.join(FILES_ROOT, safeScope, safeParentId);
+    return path.join(getFilesRoot(), safeScope, safeParentId);
 }
 
 export async function writeOnboardingFile({ scope, parentId, folder = "", filename, buffer }) {
