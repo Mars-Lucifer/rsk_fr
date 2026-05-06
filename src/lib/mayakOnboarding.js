@@ -98,6 +98,69 @@ function slugifyTitle(title) {
     return slugBase || "session";
 }
 
+const CYRILLIC_TO_LATIN_MAP = {
+    а: "a",
+    б: "b",
+    в: "v",
+    г: "g",
+    д: "d",
+    е: "e",
+    ё: "e",
+    ж: "zh",
+    з: "z",
+    и: "i",
+    й: "y",
+    к: "k",
+    л: "l",
+    м: "m",
+    н: "n",
+    о: "o",
+    п: "p",
+    р: "r",
+    с: "s",
+    т: "t",
+    у: "u",
+    ф: "f",
+    х: "h",
+    ц: "ts",
+    ч: "ch",
+    ш: "sh",
+    щ: "sch",
+    ъ: "",
+    ы: "y",
+    ь: "",
+    э: "e",
+    ю: "yu",
+    я: "ya",
+};
+
+function slugifyOnboardingTitle(title) {
+    const transliterated = Array.from(String(title || "").trim().toLowerCase())
+        .map((char) => CYRILLIC_TO_LATIN_MAP[char] ?? char)
+        .join("");
+
+    const slugBase = transliterated
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 48);
+
+    return slugBase || "session";
+}
+
+function buildUniqueOnboardingSlug(baseSlug, links = []) {
+    if (!links.some((link) => link.slug === baseSlug)) {
+        return baseSlug;
+    }
+
+    let suffix = 2;
+    let candidate = `${baseSlug}-${suffix}`;
+    while (links.some((link) => link.slug === candidate)) {
+        suffix += 1;
+        candidate = `${baseSlug}-${suffix}`;
+    }
+    return candidate;
+}
+
 export function getStructuredChecklistItems(checklist = {}) {
     return getProgressStructuredChecklistItems(checklist);
 }
@@ -258,11 +321,8 @@ export async function createMayakOnboardingLink(payload = {}) {
     }
 
     const links = await listMayakOnboardingLinks();
-    const baseSlug = slugifyTitle(title);
-    let slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
-    while (links.some((link) => link.slug === slug)) {
-        slug = `${baseSlug}-${Math.random().toString(36).slice(2, 8)}`;
-    }
+    const baseSlug = slugifyOnboardingTitle(title);
+    const slug = buildUniqueOnboardingSlug(baseSlug, links);
 
     const nextLink = normalizeLink({
         id: randomUUID(),
