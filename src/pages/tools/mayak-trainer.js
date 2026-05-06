@@ -308,6 +308,23 @@ const quickNav = [
     { href: "#lead", label: "Оставить заявку" },
 ];
 
+const heroPeopleSlides = [
+    {
+        src: "/images/mayak-hero-people-source.png",
+        alt: "Команда участников тренажёра МАЯК",
+        width: 2400,
+        height: 1800,
+        className: "mayak-hero-people",
+    },
+    {
+        src: "/images/mayak-hero-people-alt-v3.png",
+        alt: "Участники играют в тренажёр МАЯК за игровым полем",
+        width: 1672,
+        height: 941,
+        className: "mayak-hero-people mayak-hero-people-alt",
+    },
+];
+
 const flowStages = [
     {
         badge: "Этап 01",
@@ -848,6 +865,7 @@ export default function MayakTrainerPage() {
     const [openFoundation, setOpenFoundation] = useState(foundations[0].id);
     const [activeSection, setActiveSection] = useState(quickNav[0].href.slice(1));
     const [selectedDirection, setSelectedDirection] = useState(directions[0].id);
+    const [activeHeroSlide, setActiveHeroSlide] = useState(0);
     const [casePhotos, setCasePhotos] = useState([]);
     const [openedCase, setOpenedCase] = useState(null);
     const [openedImage, setOpenedImage] = useState(null);
@@ -868,6 +886,18 @@ export default function MayakTrainerPage() {
     const visibleCases = visiblePhotoCases.length ? visiblePhotoCases : trainerCases.filter((caseItem) => caseItem.category === selectedDirection);
     const casePages = chunkItems(visibleCases, 3);
     const selectedDirectionTitle = directions.find((direction) => direction.id === selectedDirection)?.title || "";
+
+    useEffect(() => {
+        if (heroPeopleSlides.length < 2) return undefined;
+
+        const intervalId = window.setInterval(() => {
+            setActiveHeroSlide((current) => (current + 1) % heroPeopleSlides.length);
+        }, 5000);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, []);
 
     const scrollCasesRight = () => {
         const node = casesScrollRef.current;
@@ -1086,7 +1116,15 @@ export default function MayakTrainerPage() {
                             width={2400}
                             height={1800}
                             priority
-                            className="mayak-hero-people"
+                            className={activeHeroSlide === 0 ? "mayak-hero-people mayak-hero-people-visible" : "mayak-hero-people mayak-hero-people-hidden"}
+                        />
+                        <Image
+                            src="/images/mayak-hero-people-alt-v3.png"
+                            alt="Участники играют в тренажёр МАЯК за игровым полем"
+                            width={1672}
+                            height={941}
+                            priority
+                            className={activeHeroSlide === 1 ? "mayak-hero-people mayak-hero-people-alt mayak-hero-people-visible" : "mayak-hero-people mayak-hero-people-alt mayak-hero-people-hidden"}
                         />
                     </div>
                 </section>
@@ -1459,13 +1497,33 @@ export default function MayakTrainerPage() {
                 }
 
                 .mayak-hero-people {
-                    position: relative;
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
                     z-index: 1;
                     height: auto;
                     width: min(62rem, 118%);
                     max-width: none;
-                    transform: translate(-8%, 2%);
+                    transform: translate(-58%, -48%);
                     object-fit: contain;
+                    opacity: 1;
+                    pointer-events: none;
+                    user-select: none;
+                    transition: opacity 0.7s ease-in-out;
+                }
+
+                .mayak-hero-people-visible {
+                    opacity: 1;
+                }
+
+                .mayak-hero-people-hidden {
+                    opacity: 0;
+                    pointer-events: none;
+                }
+
+                .mayak-hero-people-alt {
+                    width: min(59rem, 112%);
+                    transform: translate(-53%, -47%);
                 }
 
                 .mayak-sidebar-collapsed + main .mayak-hero-overview {
@@ -1493,7 +1551,12 @@ export default function MayakTrainerPage() {
 
                 .mayak-sidebar-collapsed + main .mayak-hero-people {
                     width: min(66rem, 124%);
-                    transform: translate(-15%, 2%);
+                    transform: translate(-65%, -48%);
+                }
+
+                .mayak-sidebar-collapsed + main .mayak-hero-people-alt {
+                    width: min(63rem, 116%);
+                    transform: translate(-59%, -47%);
                 }
 
                 .mayak-result-card {
@@ -2686,7 +2749,12 @@ export default function MayakTrainerPage() {
 
                     .mayak-hero-people {
                         width: min(62rem, 136%);
-                        transform: translate(-12%, -1%);
+                        transform: translate(-62%, -51%);
+                    }
+
+                    .mayak-hero-people-alt {
+                        width: min(56rem, 122%);
+                        transform: translate(-56%, -49%);
                     }
 
                     .mayak-cases-page {
@@ -2756,7 +2824,12 @@ export default function MayakTrainerPage() {
 
                     .mayak-hero-people {
                         width: 138%;
-                        transform: translate(-15%, -4%);
+                        transform: translate(-65%, -54%);
+                    }
+
+                    .mayak-hero-people-alt {
+                        width: 122%;
+                        transform: translate(-53%, -51%);
                     }
 
                     .mayak-methodology-grid,

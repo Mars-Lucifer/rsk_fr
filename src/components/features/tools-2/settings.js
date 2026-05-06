@@ -592,6 +592,16 @@ export default function SettingsPage({ goTo }) {
         setGuestFormError("");
 
         try {
+            if (!isStoredTokenActive) {
+                const consumeResult = await consumeTokenAPI(token);
+                if (!consumeResult.success) {
+                    throw new Error(consumeResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ С‚РѕРєРµРЅ.");
+                }
+                setTokenRemainingAttempts(consumeResult.remainingAttempts || 0);
+                await addKeyToCookies(token);
+                setStoredToken(token);
+            }
+
             const baseToken = parseMayakGuestToken(token).baseToken || String(token || "").trim();
             const userId = buildMayakGuestUserId(sessionInfo);
             const fullName = [lastName, firstName, patronymic].filter(Boolean).join(" ").trim();
@@ -646,8 +656,6 @@ export default function SettingsPage({ goTo }) {
                 }
             }
 
-            await addKeyToCookies(token);
-            setStoredToken(token);
             await addUserToCookies(userId, fullName, {
                 firstName,
                 lastName,
@@ -672,7 +680,7 @@ export default function SettingsPage({ goTo }) {
         } finally {
             setIsLoading(false);
         }
-    }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isTokenValid, sessionInfo, tableNumber, token]);
+    }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isStoredTokenActive, isTokenValid, sessionInfo, tableNumber, token]);
 
     const savePortalIdentity = useCallback(async () => {
         const firstName = String(portalIdentityForm.firstName || "").trim();
