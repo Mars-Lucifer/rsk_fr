@@ -1,7 +1,13 @@
 import { fetchPortalProfileFromRequest, PortalProfileRequestError } from "@/lib/portalProfileServer";
 import { isPortalProfileComplete } from "@/lib/portalProfile";
+import { readLocalProfileMock, shouldUseLocalProfileMock } from "@/lib/localProfileMock";
 import { parseActivatedKeyCookie, resolveMayakTokenContext } from "@/lib/mayakTokenContext";
-import { createMayakHistoryEntry, serializeMayakHistoryEntry } from "@/lib/mayakUserHistory";
+import {
+    attachAnalyticsToMayakHistoryEntry,
+    createMayakHistoryEntry,
+    markMayakHistoryAnalyticsFailed,
+    serializeMayakHistoryEntry,
+} from "@/lib/mayakUserHistory";
 import { buildMayakQrDataUrl, formatMayakHumanDate, generateMayakAnalyticsBuffer, generateMayakCertificateBuffer, generateMayakLogBuffer } from "@/lib/mayakDocumentGeneration";
 
 function parseActiveUserCookie(rawCookie) {
@@ -21,6 +27,26 @@ function getBaseUrl(req) {
     return `${protocol}://${host}`;
 }
 
+async function resolveCompletionProfile(req) {
+    if (shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing: true })) {
+        const localProfile = await readLocalProfileMock();
+        const data = localProfile?.data || {};
+        return {
+            id: String(localProfile?.userId || data.id || "local-mayak-user").trim(),
+            fullName: [data.Surname, data.NameIRL, data.Patronymic].map((value) => String(value || "").trim()).filter(Boolean).join(" ").trim() || "Локальный пользователь",
+            organizationLabel: data.Organization?.short_name || data.Organization?.name || data.Organization || "",
+            organizationId: String(data.Organization_id || data.Organization?.id || "local-org").trim(),
+        };
+    }
+
+    const { profile } = await fetchPortalProfileFromRequest(req);
+    if (!isPortalProfileComplete(profile)) {
+        throw new PortalProfileRequestError("Portal profile is incomplete", 409);
+    }
+
+    return profile;
+}
+
 export const config = {
     api: {
         bodyParser: {
@@ -35,10 +61,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { profile } = await fetchPortalProfileFromRequest(req);
-        if (!isPortalProfileComplete(profile)) {
-            return res.status(409).json({ success: false, error: "Portal profile is incomplete" });
-        }
+        const profile = await resolveCompletionProfile(req);
 
         const activeUser = parseActiveUserCookie(req.cookies?.active_user || "");
         if (!activeUser?.id || String(activeUser.id) !== String(profile.id)) {
@@ -69,14 +92,13 @@ export default async function handler(req, res) {
             userId: profile.id,
         });
 
-        const [certificateBuffer, logBuffer, analyticsBuffer] = await Promise.all([
+        const [certificateBuffer, logBuffer] = await Promise.all([
             generateMayakCertificateBuffer({
                 userName: profile.fullName,
                 qrDataUrl,
                 completedAt,
             }),
             generateMayakLogBuffer({ logData: safeLogData }),
-            generateMayakAnalyticsBuffer({ logData: safeLogData }),
         ]);
 
         const entry = await createMayakHistoryEntry({
@@ -88,8 +110,19 @@ export default async function handler(req, res) {
             completedAt,
             certificateBuffer,
             logBuffer,
-            analyticsBuffer,
         });
+
+        void generateMayakAnalyticsBuffer({ logData: safeLogData })
+            .then((analyticsBuffer) => attachAnalyticsToMayakHistoryEntry(entry.runId, analyticsBuffer))
+            .catch(async (analyticsError) => {
+                console.error("MAYAK background analytics generation failed:", analyticsError);
+                await markMayakHistoryAnalyticsFailed(
+                    entry.runId,
+                    analyticsError?.message || "Failed to generate analytics"
+                ).catch((historyError) => {
+                    console.error("Failed to persist MAYAK analytics error state:", historyError);
+                });
+            });
 
         return res.status(200).json({
             success: true,

@@ -1,104 +1,255 @@
-﻿import { useState, useEffect } from "react";
+"use client";
 
-export async function getServerSideProps() {
-    return { props: {} };
-}
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
+
 import Header from "@/components/layout/Header";
-import Layout from "@/components/layout/Layout";
-import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input/Input";
 import MayakAdminBackLink from "@/components/mayak-admin/MayakAdminBackLink";
 import { buildMayakAdminLoginUrl, getMayakAdminAuthStatus } from "@/lib/mayakAdminClient";
 
-export default function AdminMayakTokens() {
-    const [tokens, setTokens] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+const TOKEN_TYPES = [
+    { id: "all", label: "Все токены" },
+    { id: "legacy", label: "Обычный токен" },
+    { id: "session", label: "Сессионный токен" },
+    { id: "external_link", label: "Внешняя ссылка" },
+];
 
-    // Авторизация
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+const CREATE_TOKEN_TYPES = TOKEN_TYPES.filter((type) => type.id !== "all");
 
-    // Форма создания токена
-    const [newTokenName, setNewTokenName] = useState("");
-    const [newTokenLimit, setNewTokenLimit] = useState("");
-    const [newTokenRange, setNewTokenRange] = useState(""); // Новый стейт для диапазона
-    const [newCustomToken, setNewCustomToken] = useState(""); // Новый стейт для кастомного токена
-    const [creating, setCreating] = useState(false);
+const initialLegacyForm = {
+    name: "",
+    sectionId: "",
+    taskRange: "",
+    usageLimit: "1",
+};
 
-    // Добавление попыток
-    const [addAttemptsId, setAddAttemptsId] = useState(null);
-    const [attemptsToAdd, setAttemptsToAdd] = useState("");
+const initialSessionForm = {
+    name: "",
+    sectionId: "",
+    taskRange: "",
+    tableCount: "1",
+    tokenUsageLimit: "1",
+    reviewTimeoutSeconds: "130",
+    reworkTimeoutSeconds: "180",
+};
 
-    // Перепривязка раздела
-    const [rebindId, setRebindId] = useState(null);
-    const [rebindValue, setRebindValue] = useState("");
+const initialExternalForm = {
+    title: "",
+    sectionId: "",
+    taskRange: "",
+    rangeName: "",
+    totalQuota: "10",
+    totalParticipantLimit: "180",
+};
 
-    // Статистика
-    const [stats, setStats] = useState({ total: 0, activeCount: 0, exhaustedCount: 0 });
+function getTypeLabel(type) {
+    return TOKEN_TYPES.find((item) => item.id === type)?.label || type;
+}
 
-    // Запросы на токены
-    const [tokenRequests, setTokenRequests] = useState([]);
-    const [requestsLoading, setRequestsLoading] = useState(false);
-    const [approveTokenId, setApproveTokenId] = useState({}); // { requestId: tokenId }
+function getTypeTone(type) {
+    if (type === "legacy") return "ink";
+    if (type === "session") return "teal";
+    return "amber";
+}
 
-    // Ручное назначение токена
-    const [manualTelegramId, setManualTelegramId] = useState("");
-    const [manualName, setManualName] = useState("");
-    const [manualTokenId, setManualTokenId] = useState("");
-
-    // Названия разделов
-    const [rangeNames, setRangeNames] = useState({});
-    const [rangesList, setRangesList] = useState([]);
-
-    // Бот и админы
-    const [botInfo, setBotInfo] = useState({ username: null, link: null });
-    const [botAdmins, setBotAdmins] = useState([]);
-    const [newAdminId, setNewAdminId] = useState("");
-    const [newAdminName, setNewAdminName] = useState("");
-
-    // Настройки API-ключей
-    const [settingsTgToken, setSettingsTgToken] = useState("");
-    const [settingsOrKey, setSettingsOrKey] = useState("");
-    const [settingsFinalFileOrKey, setSettingsFinalFileOrKey] = useState("");
-    const [settingsFinalFileModel, setSettingsFinalFileModel] = useState("");
-    const [settingsQwenTokenName, setSettingsQwenTokenName] = useState("");
-    const [settingsQwenTokens, setSettingsQwenTokens] = useState("");
-    const [settingsQwenBackupTokenName, setSettingsQwenBackupTokenName] = useState("");
-    const [settingsQwenBackupToken, setSettingsQwenBackupToken] = useState("");
-    const [settingsBotUsername, setSettingsBotUsername] = useState("");
-    const [settingsWebhookUrl, setSettingsWebhookUrl] = useState("");
-    const [settingsBaseUrl, setSettingsBaseUrl] = useState("");
-    const [settingsPromptEvaluationProvider, setSettingsPromptEvaluationProvider] = useState("qwen");
-    const [settingsPromptEvaluationOllamaBaseUrl, setSettingsPromptEvaluationOllamaBaseUrl] = useState("");
-    const [settingsPromptEvaluationOllamaModel, setSettingsPromptEvaluationOllamaModel] = useState("");
-    const [settingsInfo, setSettingsInfo] = useState({
-        telegramBotToken: null,
-        telegramBotTokenIsSet: false,
-        openrouterApiKey: null,
-        openrouterApiKeyIsSet: false,
-        finalFileOpenrouterApiKey: null,
-        finalFileOpenrouterApiKeyIsSet: false,
-        finalFileModel: "google/gemini-3-flash-preview",
-        telegramBotUsername: "",
-        telegramBotUsernameIsSet: false,
-        telegramWebhookUrl: "",
-        telegramWebhookUrlIsSet: false,
-        baseUrl: "",
-        baseUrlIsSet: false,
-        promptEvaluationProvider: "qwen",
-        promptEvaluationOllamaBaseUrl: "http://127.0.0.1:11434",
-        promptEvaluationOllamaModel: "gemma4:e2b",
-        qwenTokens: [],
-        qwenTokensCount: 0,
-        qwenTokensIsSet: false,
-        qwenBackupToken: "",
-        qwenBackupTokenName: "",
-        qwenBackupTokenMask: null,
-        qwenBackupTokenIsSet: false,
+function formatDate(value) {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
     });
-    const [settingsSaving, setSettingsSaving] = useState(false);
+}
 
-    // Проверка авторизации при загрузке
+function formatStatus(item) {
+    if (item.status === "completed") return "Завершена";
+    if (item.status === "revoked") return "Неактивна";
+    if (item.status === "inactive") return "Неактивна";
+    if (item.status === "exhausted") return "Лимит исчерпан";
+    return "Активна";
+}
+
+function normalizeNumberInput(value, fallback) {
+    const parsed = Number.parseInt(String(value || ""), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? String(parsed) : String(fallback);
+}
+
+function buildAbsoluteUrl(path) {
+    if (!path || typeof window === "undefined") return path || "";
+    if (/^https?:\/\//i.test(path)) return path;
+    if (!path.startsWith("/")) return path;
+    return `${window.location.origin}${path}`;
+}
+
+function buildTrainerLink(token) {
+    return token ? `/tools/mayak-oko?token=${encodeURIComponent(token)}` : "";
+}
+
+async function parseJsonResponse(response, fallbackMessage) {
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.success === false) {
+        throw new Error(payload.error || fallbackMessage);
+    }
+    return payload;
+}
+
+function RangeSelect({ value, ranges, onChange }) {
+    return (
+        <select
+            value={value}
+            onChange={(event) => {
+                const sectionId = event.target.value;
+                const range = ranges.find((item) => (item.sectionId || item.range) === sectionId) || null;
+                onChange({
+                    sectionId,
+                    taskRange: range?.range || "",
+                    rangeName: range?.rangeName || "",
+                });
+            }}
+            className="token-input">
+            <option value="">Выберите раздел</option>
+            {ranges.map((range) => {
+                const key = range.sectionId || range.range;
+                return (
+                    <option key={key} value={key}>
+                        {key}
+                        {range.rangeName ? ` - ${range.rangeName}` : ""}
+                    </option>
+                );
+            })}
+        </select>
+    );
+}
+
+function CreateForm({ activeType, ranges, forms, setForms, onSubmit, saving }) {
+    const { legacyForm, sessionForm, externalForm } = forms;
+
+    if (activeType === "legacy") {
+        return (
+            <form className="create-form" onSubmit={onSubmit}>
+                <label>
+                    <span>Название</span>
+                    <input className="token-input" value={legacyForm.name} onChange={(event) => setForms.setLegacyForm((current) => ({ ...current, name: event.target.value }))} placeholder="Например, индивидуальный доступ" />
+                </label>
+                <label>
+                    <span>Раздел / колода</span>
+                    <RangeSelect
+                        value={legacyForm.sectionId}
+                        ranges={ranges}
+                        onChange={(nextRange) => setForms.setLegacyForm((current) => ({ ...current, ...nextRange }))}
+                    />
+                </label>
+                <label>
+                    <span>Лимит использований</span>
+                    <input className="token-input" type="number" min="1" value={legacyForm.usageLimit} onChange={(event) => setForms.setLegacyForm((current) => ({ ...current, usageLimit: event.target.value }))} />
+                </label>
+                <button className="primary-button" type="submit" disabled={saving}>
+                    {saving ? "Создаем..." : "Создать обычный токен"}
+                </button>
+            </form>
+        );
+    }
+
+    if (activeType === "session") {
+        return (
+            <form className="create-form" onSubmit={onSubmit}>
+                <label>
+                    <span>Название сессии</span>
+                    <input className="token-input" value={sessionForm.name} onChange={(event) => setForms.setSessionForm((current) => ({ ...current, name: event.target.value }))} placeholder="Например, Сессия 10А" />
+                </label>
+                <label>
+                    <span>Раздел / колода</span>
+                    <RangeSelect
+                        value={sessionForm.sectionId}
+                        ranges={ranges}
+                        onChange={(nextRange) => setForms.setSessionForm((current) => ({ ...current, ...nextRange }))}
+                    />
+                </label>
+                <label>
+                    <span>Количество столов</span>
+                    <input className="token-input" type="number" min="1" value={sessionForm.tableCount} onChange={(event) => setForms.setSessionForm((current) => ({ ...current, tableCount: event.target.value }))} />
+                </label>
+                <label>
+                    <span>Лимит входов</span>
+                    <input className="token-input" type="number" min="1" value={sessionForm.tokenUsageLimit} onChange={(event) => setForms.setSessionForm((current) => ({ ...current, tokenUsageLimit: event.target.value }))} />
+                </label>
+                <label>
+                    <span>Таймер проверки, сек</span>
+                    <input className="token-input" type="number" min="1" value={sessionForm.reviewTimeoutSeconds} onChange={(event) => setForms.setSessionForm((current) => ({ ...current, reviewTimeoutSeconds: event.target.value }))} />
+                </label>
+                <label>
+                    <span>Таймер исправления, сек</span>
+                    <input className="token-input" type="number" min="1" value={sessionForm.reworkTimeoutSeconds} onChange={(event) => setForms.setSessionForm((current) => ({ ...current, reworkTimeoutSeconds: event.target.value }))} />
+                </label>
+                <button className="primary-button" type="submit" disabled={saving}>
+                    {saving ? "Создаем..." : "Создать сессию"}
+                </button>
+            </form>
+        );
+    }
+
+    return (
+        <form className="create-form" onSubmit={onSubmit}>
+            <label>
+                <span>Название доступа</span>
+                <input className="token-input" value={externalForm.title} onChange={(event) => setForms.setExternalForm((current) => ({ ...current, title: event.target.value }))} placeholder="Например, Интенсив май" />
+            </label>
+            <label>
+                <span>Раздел / колода</span>
+                <RangeSelect
+                    value={externalForm.sectionId}
+                    ranges={ranges}
+                    onChange={(nextRange) => setForms.setExternalForm((current) => ({ ...current, ...nextRange }))}
+                />
+            </label>
+            <label>
+                <span>Лимит сессий</span>
+                <input className="token-input" type="number" min="1" value={externalForm.totalQuota} onChange={(event) => setForms.setExternalForm((current) => ({ ...current, totalQuota: event.target.value }))} />
+            </label>
+            <label>
+                <span>Общий лимит входов</span>
+                <input className="token-input" type="number" min="1" value={externalForm.totalParticipantLimit} onChange={(event) => setForms.setExternalForm((current) => ({ ...current, totalParticipantLimit: event.target.value }))} />
+            </label>
+            <button className="primary-button" type="submit" disabled={saving}>
+                {saving ? "Генерируем..." : "Сгенерировать"}
+            </button>
+        </form>
+    );
+}
+
+export default function AdminMayakTokens() {
+    const router = useRouter();
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [actionId, setActionId] = useState("");
+    const [error, setError] = useState("");
+    const [message, setMessage] = useState("");
+    const [ranges, setRanges] = useState([]);
+    const [items, setItems] = useState([]);
+    const [totals, setTotals] = useState({});
+    const [activeType, setActiveType] = useState("legacy");
+    const [filterType, setFilterType] = useState("all");
+    const [legacyForm, setLegacyForm] = useState(initialLegacyForm);
+    const [sessionForm, setSessionForm] = useState(initialSessionForm);
+    const [externalForm, setExternalForm] = useState(initialExternalForm);
+    const [lastCreated, setLastCreated] = useState(null);
+    const [editingId, setEditingId] = useState("");
+    const [editDraft, setEditDraft] = useState({});
+    const [actionFeedback, setActionFeedback] = useState({ id: "", text: "", type: "success" });
+
+    useEffect(() => {
+        if (!router.isReady) return;
+        const requestedType = String(router.query.type || "");
+        if (CREATE_TOKEN_TYPES.some((type) => type.id === requestedType)) {
+            setActiveType(requestedType);
+            setFilterType(requestedType);
+        }
+    }, [router.isReady, router.query.type]);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -106,22 +257,17 @@ export default function AdminMayakTokens() {
             try {
                 const { authenticated } = await getMayakAdminAuthStatus();
                 if (cancelled) return;
-
-                if (authenticated) {
-                    setIsAuthenticated(true);
-                } else if (typeof window !== "undefined") {
+                if (!authenticated) {
                     window.location.replace(buildMayakAdminLoginUrl(`${window.location.pathname}${window.location.search}`));
                     return;
                 }
+                setIsAuthenticated(true);
             } catch {
-                if (!cancelled && typeof window !== "undefined") {
+                if (!cancelled) {
                     window.location.replace(buildMayakAdminLoginUrl(`${window.location.pathname}${window.location.search}`));
-                    return;
                 }
-            }
-
-            if (!cancelled) {
-                setLoading(false);
+            } finally {
+                if (!cancelled) setLoading(false);
             }
         }
 
@@ -132,1441 +278,1024 @@ export default function AdminMayakTokens() {
         };
     }, []);
 
-    // Загрузка токенов
-    const fetchTokens = async () => {
+    const loadRanges = useCallback(async () => {
+        const payload = await parseJsonResponse(await fetch("/api/admin/mayak-content/ranges"), "Не удалось загрузить разделы");
+        setRanges(Array.isArray(payload.data) ? payload.data : []);
+    }, []);
+
+    const loadItems = useCallback(async () => {
+        const payload = await parseJsonResponse(await fetch("/api/admin/mayak-token-center"), "Не удалось загрузить токены");
+        setItems(Array.isArray(payload.data) ? payload.data : []);
+        setTotals(payload.totals || {});
+    }, []);
+
+    const loadAll = useCallback(async () => {
+        setLoading(true);
         try {
-            setLoading(true);
-            const res = await fetch("/api/admin/mayak-tokens", {
-                method: "GET",
-                headers: { "Content-Type": "application/json" },
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка загрузки данных");
-            }
-
-            const data = await res.json();
-            setTokens(data.data || []);
-            setStats({
-                total: data.total || 0,
-                activeCount: data.activeCount || 0,
-                exhaustedCount: data.exhaustedCount || 0,
-            });
-            setError(null);
-        } catch (err) {
-            console.error("Ошибка:", err);
-            setError(err.message);
+            await Promise.all([loadRanges(), loadItems()]);
+            setError("");
+        } catch (loadError) {
+            setError(loadError.message || "Не удалось загрузить данные");
         } finally {
             setLoading(false);
         }
-    };
+    }, [loadItems, loadRanges]);
 
     useEffect(() => {
-        if (isAuthenticated) {
-            fetchTokens();
-            fetchRanges();
-            fetchRequests();
-            fetchBotAdmins();
-            fetchSettings();
-        }
-    }, [isAuthenticated]);
+        if (isAuthenticated) loadAll();
+    }, [isAuthenticated, loadAll]);
 
-    // Загрузка запросов на токены
-    const fetchRequests = async () => {
-        try {
-            setRequestsLoading(true);
-            const res = await fetch("/api/admin/mayak-tokens/requests");
-            const data = await res.json();
-            if (data.success) {
-                setTokenRequests(data.data || []);
-            }
-        } catch (err) {
-            console.error("Ошибка загрузки запросов:", err);
-        } finally {
-            setRequestsLoading(false);
-        }
-    };
+    useEffect(() => {
+        if (!message && !error) return undefined;
+        const timeoutId = window.setTimeout(() => {
+            setMessage("");
+            setError("");
+        }, 2400);
+        return () => window.clearTimeout(timeoutId);
+    }, [message, error]);
 
-    // Загрузка админов бота
-    const fetchBotAdmins = async () => {
-        try {
-            const res = await fetch("/api/admin/bot-admins");
-            const data = await res.json();
-            if (data.success) {
-                setBotAdmins(data.data || []);
-                setBotInfo(data.bot || { username: null, link: null });
-            }
-        } catch (err) {
-            console.error("Ошибка загрузки админов бота:", err);
-        }
-    };
+    useEffect(() => {
+        if (!actionFeedback.text) return undefined;
+        const timeoutId = window.setTimeout(() => setActionFeedback({ id: "", text: "", type: "success" }), 1600);
+        return () => window.clearTimeout(timeoutId);
+    }, [actionFeedback]);
 
-    // Загрузка настроек API-ключей
-    const fetchSettings = async () => {
-        try {
-            const res = await fetch("/api/admin/mayak-settings");
-            if (!res.ok) return;
-            const text = await res.text();
-            if (!text.startsWith("{")) return;
-            const data = JSON.parse(text);
-            if (data.success) {
-                setSettingsInfo(data.data);
-                setSettingsPromptEvaluationProvider(data.data.promptEvaluationProvider || "qwen");
-                setSettingsPromptEvaluationOllamaBaseUrl(data.data.promptEvaluationOllamaBaseUrl || "");
-                setSettingsPromptEvaluationOllamaModel(data.data.promptEvaluationOllamaModel || "");
-            }
-        } catch (err) {
-            console.error("Ошибка загрузки настроек:", err);
-        }
-    };
-
-    const saveSettingsRequest = async (body, successMessage, clearCallback) => {
-        try {
-            setSettingsSaving(true);
-            const res = await fetch("/api/admin/mayak-settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            const text = await res.text();
-            if (!text.trim().startsWith("{")) {
-                throw new Error("Сервер вернул HTML вместо JSON. Обнови страницу и повтори ещё раз.");
-            }
-            const data = JSON.parse(text);
-            if (!data.success) throw new Error(data.error || "Ошибка сохранения");
-            if (clearCallback) clearCallback();
-            if (successMessage) {
-                alert(typeof successMessage === "function" ? successMessage(data) : successMessage);
-            }
-            await fetchSettings();
-        } catch (err) {
-            alert(err.message);
-        } finally {
-            setSettingsSaving(false);
-        }
-    };
-
-    // Сохранение настройки
-    const handleSaveSettings = async (field) => {
-        const body = {};
-        const fieldMap = {
-            telegramBotToken: { value: settingsTgToken, clear: () => setSettingsTgToken(""), emptyMsg: "Введите токен бота", successMsg: (d) => (d.botRestarted ? "Токен сохранён, бот перезапущен" : "Токен сохранён") },
-            openrouterApiKey: { value: settingsOrKey, clear: () => setSettingsOrKey(""), emptyMsg: "Введите API-ключ", successMsg: () => "API-ключ сохранён" },
-            finalFileOpenrouterApiKey: { value: settingsFinalFileOrKey, clear: () => setSettingsFinalFileOrKey(""), emptyMsg: "Введите API-ключ для итогового файла", successMsg: () => "Ключ итогового файла сохранён" },
-            finalFileModel: { value: settingsFinalFileModel, clear: () => setSettingsFinalFileModel(""), emptyMsg: "Введите модель для итогового файла", successMsg: () => "Модель итогового файла сохранена" },
-            telegramBotUsername: { value: settingsBotUsername, clear: () => setSettingsBotUsername(""), emptyMsg: "Введите username бота", successMsg: () => "Username бота сохранён" },
-            telegramWebhookUrl: { value: settingsWebhookUrl, clear: () => setSettingsWebhookUrl(""), emptyMsg: null, successMsg: (d) => (d.botRestarted ? "Webhook URL сохранён, бот перезапущен" : "Webhook URL сохранён") },
-            baseUrl: { value: settingsBaseUrl, clear: () => setSettingsBaseUrl(""), emptyMsg: null, successMsg: () => "Base URL сохранён" },
-            qwenBackupToken: { value: settingsQwenBackupToken, clear: () => setSettingsQwenBackupToken(""), emptyMsg: null, successMsg: () => "Резервный токен сохранён" },
-            promptEvaluationProvider: { value: settingsPromptEvaluationProvider, clear: null, emptyMsg: null, successMsg: () => "Провайдер оценки промптов сохранён" },
-            promptEvaluationOllamaBaseUrl: { value: settingsPromptEvaluationOllamaBaseUrl, clear: null, emptyMsg: null, successMsg: () => "URL Ollama сохранён" },
-            promptEvaluationOllamaModel: { value: settingsPromptEvaluationOllamaModel, clear: null, emptyMsg: null, successMsg: () => "Модель Ollama сохранена" },
-        };
-        const f = fieldMap[field];
-        if (!f) return;
-        if (f.emptyMsg && !f.value.trim()) {
-            alert(f.emptyMsg);
-            return;
-        }
-        if (field === "qwenBackupToken") {
-            body[field] = f.value.trim() ? { name: settingsQwenBackupTokenName.trim(), token: f.value.trim() } : "";
-        } else {
-            body[field] = f.value.trim();
-        }
-        await saveSettingsRequest(body, f.successMsg, f.clear);
-    };
-
-    const handleAddQwenTokens = async () => {
-        const tokenName = settingsQwenTokenName.trim();
-        const tokenToAdd = settingsQwenTokens.trim();
-
-        if (!tokenName) {
-            alert("Введите название Qwen-токена");
-            return;
-        }
-
-        if (!tokenToAdd) {
-            alert("Введите Qwen-токен");
-            return;
-        }
-
-        await saveSettingsRequest({ qwenTokenAdd: { name: tokenName, token: tokenToAdd } }, "Qwen-токен добавлен", () => {
-            setSettingsQwenTokenName("");
-            setSettingsQwenTokens("");
+    const visibleItems = useMemo(() => {
+        return items.filter((item) => {
+            if (filterType !== "all" && item.type !== filterType) return false;
+            return true;
         });
-    };
+    }, [filterType, items]);
 
-    const handleRemoveQwenToken = async (index) => {
-        if (!window.confirm("Удалить этот Qwen-токен из пула?")) return;
-        await saveSettingsRequest({ qwenTokenRemoveIndex: index }, "Qwen-токен удалён");
-    };
-
-    const handleSaveBackupToken = async () => {
-        const tokenName = settingsQwenBackupTokenName.trim();
-        const tokenValue = settingsQwenBackupToken.trim();
-
-        if (!tokenName) {
-            alert("Введите название резервного токена");
-            return;
-        }
-
-        if (!tokenValue) {
-            alert("Введите резервный токен");
-            return;
-        }
-
-        await saveSettingsRequest({ qwenBackupToken: { name: tokenName, token: tokenValue } }, "Резервный токен сохранён", () => {
-            setSettingsQwenBackupTokenName("");
-            setSettingsQwenBackupToken("");
-        });
-    };
-
-    const handleRemoveBackupToken = async () => {
-        if (!window.confirm("Удалить резервный токен?")) return;
-        await saveSettingsRequest({ qwenBackupToken: "" }, "Резервный токен удалён");
-    };
-
-    const handleRemoveFinalFileOpenrouterApiKey = async () => {
-        if (!window.confirm("Удалить OpenRouter API Key для итогового файла?")) return;
-        await saveSettingsRequest(
-            { finalFileOpenrouterApiKey: "" },
-            "Ключ итогового файла удалён",
-            () => setSettingsFinalFileOrKey("")
-        );
-    };
-
-    // Добавление админа бота
-    const handleAddBotAdmin = async () => {
-        if (!newAdminId.trim()) {
-            alert("Укажите Telegram ID");
-            return;
-        }
-        try {
-            const res = await fetch("/api/admin/bot-admins", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ telegramId: newAdminId.trim(), name: newAdminName.trim() }),
-            });
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error);
-            setBotAdmins(data.data);
-            setNewAdminId("");
-            setNewAdminName("");
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    // Удаление админа бота
-    const handleRemoveBotAdmin = async (telegramId) => {
-        if (!window.confirm("Удалить этого админа бота?")) return;
-        try {
-            const res = await fetch("/api/admin/bot-admins", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ telegramId }),
-            });
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error);
-            setBotAdmins(data.data);
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    // Одобрение запроса (привязка токена)
-    const handleApproveRequest = async (requestId) => {
-        const tokenId = approveTokenId[requestId];
-        if (!tokenId) {
-            alert("Выберите токен для привязки");
-            return;
-        }
-        try {
-            const res = await fetch("/api/admin/mayak-tokens/requests", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ requestId, action: "approve", tokenId }),
-            });
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка одобрения");
-            }
-            setApproveTokenId((prev) => {
-                const n = { ...prev };
-                delete n[requestId];
-                return n;
-            });
-            await fetchRequests();
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    // Ручное назначение токена по Telegram ID
-    const handleManualAssign = async () => {
-        if (!manualTelegramId.trim()) {
-            alert("Укажите Telegram ID");
-            return;
-        }
-        if (!manualTokenId) {
-            alert("Выберите токен");
-            return;
-        }
-        try {
-            const res = await fetch("/api/admin/mayak-tokens/requests", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "manual_assign", telegramId: manualTelegramId.trim(), tokenId: manualTokenId, name: manualName.trim() || null }),
-            });
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка назначения");
-            }
-            setManualTelegramId("");
-            setManualName("");
-            setManualTokenId("");
-            alert("Токен назначен, пользователь получит уведомление в Telegram");
-            await fetchRequests();
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    // Отклонение запроса
-    const handleRejectRequest = async (requestId) => {
-        if (!window.confirm("Отклонить запрос? Пользователь получит уведомление.")) return;
-        try {
-            const res = await fetch("/api/admin/mayak-tokens/requests", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ requestId, action: "reject" }),
-            });
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка отклонения");
-            }
-            await fetchRequests();
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    // Удаление запроса
-    const handleDeleteRequest = async (requestId) => {
-        if (!window.confirm("Удалить запрос навсегда?")) return;
-        try {
-            const res = await fetch("/api/admin/mayak-tokens/requests", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ requestId, action: "delete" }),
-            });
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка удаления");
-            }
-            await fetchRequests();
-        } catch (err) {
-            alert(err.message);
-        }
-    };
-
-    // Загрузка разделов для выпадающего списка
-    const fetchRanges = async () => {
-        try {
-            const res = await fetch("/api/admin/mayak-content/ranges");
-            const data = await res.json();
-            if (data.success && data.data) {
-                setRangesList(data.data);
-                const names = {};
-                data.data.forEach((r) => {
-                    const key = r.sectionId || r.range;
-                    if (r.rangeName) names[key] = r.rangeName;
-                });
-                setRangeNames(names);
-            }
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    // Создание нового токена
-    const selectedSection = rangesList.find((r) => (r.sectionId || r.range) === newTokenRange) || null;
-
-    const handleCreateToken = async (e) => {
-        e.preventDefault();
-
-        if (!newTokenName.trim() || !newTokenLimit) {
-            alert("Заполните все поля");
-            return;
-        }
-
-        try {
-            setCreating(true);
-            const res = await fetch("/api/admin/mayak-tokens/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: newTokenName.trim(),
-                    usageLimit: parseInt(newTokenLimit, 10),
-                    taskRange: selectedSection ? selectedSection.range : newTokenRange.trim() || null,
-                    sectionId: selectedSection ? selectedSection.sectionId : null,
-                    customToken: newCustomToken.trim() || null, // Отправляем кастомный токен
-                    
-                }),
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка создания токена");
-            }
-
-            setNewTokenName("");
-            setNewTokenLimit("");
-            setNewTokenRange(""); // Очищаем поле
-            setNewCustomToken(""); // Очищаем поле
-            await fetchTokens();
-        } catch (err) {
-            console.error("Ошибка создания:", err);
-            alert(err.message);
-        } finally {
-            setCreating(false);
-        }
-    };
-
-    // Добавление попыток
-    const handleAddAttempts = async (tokenId) => {
-        if (!attemptsToAdd || parseInt(attemptsToAdd, 10) <= 0) {
-            alert("Введите положительное число попыток");
-            return;
-        }
-
-        try {
-            const res = await fetch(`/api/admin/mayak-tokens/${tokenId}/add-attempts`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ attempts: parseInt(attemptsToAdd, 10) }),
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка добавления попыток");
-            }
-
-            setAddAttemptsId(null);
-            setAttemptsToAdd("");
-            await fetchTokens();
-        } catch (err) {
-            console.error("Ошибка:", err);
-            alert(err.message);
-        }
-    };
-
-    // Удаление токена
-    const handleDelete = async (tokenId, tokenName) => {
-        if (!window.confirm(`Вы уверены, что хотите УДАЛИТЬ токен "${tokenName}"? Это действие нельзя отменить.`)) {
-            return;
-        }
-
-        try {
-            const res = await fetch(`/api/admin/mayak-tokens/${tokenId}`, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({}),
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка удаления токена");
-            }
-
-            await fetchTokens();
-        } catch (err) {
-            console.error("Ошибка:", err);
-            alert(err.message);
-        }
-    };
-
-    // Перепривязка токена к другому разделу
-    const handleRebind = async (tokenId) => {
-        const section = rangesList.find((r) => (r.sectionId || r.range) === rebindValue) || null;
-        try {
-            const res = await fetch(`/api/admin/mayak-tokens/${tokenId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    
-                    sectionId: section ? section.sectionId : rebindValue || null,
-                    taskRange: section ? section.range : rebindValue || null,
-                }),
-            });
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "Ошибка перепривязки");
-            }
-            setRebindId(null);
-            setRebindValue("");
-            await fetchTokens();
-        } catch (err) {
-            console.error("Ошибка:", err);
-            alert(err.message);
-        }
-    };
-
-    // Копирование токена в буфер обмена
-    const copyToClipboard = async (text) => {
+    const copyAccess = async (item) => {
+        const link = buildAbsoluteUrl(item.link);
+        const text =
+            item.type === "external_link"
+                ? [
+                      `Ссылка: ${link}`,
+                      item.password ? `Пароль: ${item.password}` : "",
+                      "",
+                      "Это данные для входа в вашу админ-панель МАЯК.",
+                      "Вход выполняется по ссылке и паролю. В панели можно создавать отдельные сессии для участников.",
+                      "Введите название сессии, выберите количество столов/команд, которые будут проходить обучение, и скопируйте ссылку для участников.",
+                      "",
+                      "Важно: каждая созданная ссылка для обучения действует 24 часа, после чего данные удаляются.",
+                  ]
+                      .filter((line) => line !== null && line !== undefined)
+                      .join("\n")
+                : link;
+        if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
-            alert("Токен скопирован в буфер обмена");
-        } catch (err) {
-            console.error("Ошибка копирования:", err);
-            // Fallback для старых браузеров
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textArea);
-            alert("Токен скопирован в буфер обмена");
+            setActionFeedback({ id: item.id, text: "Скопировано", type: "success" });
+        } catch {
+            setActionFeedback({ id: item.id, text: "Не скопировано", type: "error" });
         }
     };
 
-    // Форматирование даты
-    const formatDate = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString("ru-RU", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+    const handleCreate = async (event) => {
+        event.preventDefault();
+        setSaving(true);
+        setError("");
+        setMessage("");
+        setLastCreated(null);
+
+        try {
+            let payload;
+            if (activeType === "legacy") {
+                payload = await parseJsonResponse(
+                    await fetch("/api/admin/mayak-tokens/generate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: legacyForm.name.trim(),
+                            usageLimit: normalizeNumberInput(legacyForm.usageLimit, 1),
+                            sectionId: legacyForm.sectionId || null,
+                            taskRange: legacyForm.taskRange || null,
+                        }),
+                    }),
+                    "Не удалось создать обычный токен"
+                );
+                setLegacyForm(initialLegacyForm);
+                setLastCreated({ type: "legacy", token: payload.data?.token || "", link: buildTrainerLink(payload.data?.token || "") });
+            } else if (activeType === "session") {
+                payload = await parseJsonResponse(
+                    await fetch("/api/admin/mayak-sessions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: sessionForm.name.trim(),
+                            sectionId: sessionForm.sectionId,
+                            taskRange: sessionForm.taskRange,
+                            tableCount: normalizeNumberInput(sessionForm.tableCount, 1),
+                            tokenUsageLimit: normalizeNumberInput(sessionForm.tokenUsageLimit, 1),
+                            reviewTimeoutSeconds: normalizeNumberInput(sessionForm.reviewTimeoutSeconds, 130),
+                            reworkTimeoutSeconds: normalizeNumberInput(sessionForm.reworkTimeoutSeconds, 180),
+                        }),
+                    }),
+                    "Не удалось создать сессию"
+                );
+                setSessionForm(initialSessionForm);
+                setLastCreated({ type: "session", sessionId: payload.data?.id || "" });
+            } else {
+                payload = await parseJsonResponse(
+                    await fetch("/api/admin/mayak-admin-rights", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            title: externalForm.title.trim(),
+                            sectionId: externalForm.sectionId,
+                            taskRange: externalForm.taskRange,
+                            rangeName: externalForm.rangeName,
+                            totalQuota: normalizeNumberInput(externalForm.totalQuota, 10),
+                            totalParticipantLimit: normalizeNumberInput(externalForm.totalParticipantLimit, 180),
+                        }),
+                    }),
+                    "Не удалось создать внешнюю ссылку"
+                );
+                setExternalForm(initialExternalForm);
+                setLastCreated({
+                    type: "external_link",
+                    link: payload.data?.accessId ? `/mayak-access/${payload.data.accessId}` : "",
+                    password: payload.data?.accessPassword || "",
+                });
+            }
+
+            setMessage("Доступ создан");
+            await loadItems();
+        } catch (createError) {
+            setError(createError.message || "Не удалось создать доступ");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const startEdit = (item) => {
+        setEditingId(item.id);
+        setEditDraft({
+            title: item.title || "",
+            sectionId: item.sectionId || "",
+            taskRange: item.taskRange || "",
+            rangeName: item.sourceRef?.rangeName || "",
+            usageLimit: String(item.usageLimit || 1),
+            tableCount: String(item.sourceRef?.tableCount || 1),
+            tokenUsageLimit: String(item.sourceRef?.tokenUsageLimit || item.usageLimit || 1),
+            reviewTimeoutSeconds: String(item.sourceRef?.reviewTimeoutSeconds || 130),
+            reworkTimeoutSeconds: String(item.sourceRef?.reworkTimeoutSeconds || 180),
+            totalQuota: String(item.sourceRef?.totalQuota || 10),
+            totalParticipantLimit: String(item.sourceRef?.totalParticipantLimit || item.usageLimit || 180),
         });
     };
 
-    // Статус токена
-    const getTokenStatus = (token) => {
-        if (!token.isActive) return { text: "Деактивирован", color: "text-[var(--color-red)]" };
-        if (token.isExhausted) return { text: "Исчерпан", color: "text-[var(--color-orange)]" };
-        return { text: "Активен", color: "text-[var(--color-green)]" };
+    const cancelEdit = () => {
+        setEditingId("");
+        setEditDraft({});
     };
 
-    if (loading) {
-        return (
-            <Layout>
-                <Header>
-                    <Header.Heading>Токены МАЯК</Header.Heading>
-                </Header>
-                <div className="flex h-full items-center justify-center">
-                    <p>Загрузка...</p>
-                </div>
-            </Layout>
-        );
-    }
+    const saveEdit = async (item) => {
+        setActionId(item.id);
+        setError("");
+        setMessage("");
 
-    if (error) {
-        return (
-            <Layout>
-                <Header>
-                    <Header.Heading>Токены МАЯК</Header.Heading>
-                    <MayakAdminBackLink />
-                </Header>
-                <div className="flex h-full items-center justify-center">
-                    <div className="text-center">
-                        <p className="text-[var(--color-red)] mb-4">{error}</p>
-                        <Button onClick={fetchTokens}>Попробовать снова</Button>
-                    </div>
-                </div>
-            </Layout>
-        );
-    }
+        try {
+            if (item.type === "legacy") {
+                await parseJsonResponse(
+                    await fetch(`/api/admin/mayak-tokens/${encodeURIComponent(item.id)}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: editDraft.title,
+                            sectionId: editDraft.sectionId || null,
+                            taskRange: editDraft.taskRange || null,
+                            usageLimit: normalizeNumberInput(editDraft.usageLimit, item.usageLimit || 1),
+                        }),
+                    }),
+                    "Не удалось обновить обычный токен"
+                );
+            } else if (item.type === "session") {
+                await parseJsonResponse(
+                    await fetch(`/api/admin/mayak-sessions/${encodeURIComponent(item.id)}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: editDraft.title,
+                            sectionId: editDraft.sectionId,
+                            taskRange: editDraft.taskRange,
+                            tableCount: normalizeNumberInput(editDraft.tableCount, item.sourceRef?.tableCount || 1),
+                            tokenUsageLimit: normalizeNumberInput(editDraft.tokenUsageLimit, item.usageLimit || 1),
+                            reviewTimeoutSeconds: normalizeNumberInput(editDraft.reviewTimeoutSeconds, item.sourceRef?.reviewTimeoutSeconds || 130),
+                            reworkTimeoutSeconds: normalizeNumberInput(editDraft.reworkTimeoutSeconds, item.sourceRef?.reworkTimeoutSeconds || 180),
+                        }),
+                    }),
+                    "Не удалось обновить сессию"
+                );
+            } else {
+                await parseJsonResponse(
+                    await fetch(`/api/admin/mayak-admin-rights/${encodeURIComponent(item.id)}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            title: editDraft.title,
+                            sectionId: editDraft.sectionId,
+                            taskRange: editDraft.taskRange,
+                            rangeName: editDraft.rangeName || "",
+                            totalQuota: normalizeNumberInput(editDraft.totalQuota, item.sourceRef?.totalQuota || 10),
+                            totalParticipantLimit: normalizeNumberInput(editDraft.totalParticipantLimit, item.sourceRef?.totalParticipantLimit || 180),
+                        }),
+                    }),
+                    "Не удалось обновить внешнюю ссылку"
+                );
+            }
+            setActionFeedback({ id: item.id, text: "Сохранено", type: "success" });
+            cancelEdit();
+            await loadItems();
+        } catch (editError) {
+            setActionFeedback({ id: item.id, text: editError.message || "Не сохранено", type: "error" });
+        } finally {
+            setActionId("");
+        }
+    };
 
-    // Форма авторизации
+    const handleRemove = async (item) => {
+        const actionLabel = item.type === "session" ? "завершить" : "удалить";
+        if (!window.confirm(`${actionLabel[0].toUpperCase()}${actionLabel.slice(1)} "${item.title}"?`)) return;
+
+        setActionId(item.id);
+        setError("");
+        setMessage("");
+
+        try {
+            const url =
+                item.type === "legacy"
+                    ? `/api/admin/mayak-tokens/${encodeURIComponent(item.id)}`
+                    : item.type === "session"
+                      ? `/api/admin/mayak-sessions/${encodeURIComponent(item.id)}`
+                      : `/api/admin/mayak-admin-rights/${encodeURIComponent(item.id)}`;
+
+            await parseJsonResponse(await fetch(url, { method: "DELETE" }), "Не удалось выполнить действие");
+            setActionFeedback({ id: item.id, text: item.type === "session" ? "Завершено" : "Удалено", type: "success" });
+            await loadItems();
+        } catch (removeError) {
+            setActionFeedback({ id: item.id, text: removeError.message || "Ошибка", type: "error" });
+        } finally {
+            setActionId("");
+        }
+    };
+
     if (!isAuthenticated) {
         return (
-            <Layout>
-                <Header>
-                    <Header.Heading>Токены МАЯК</Header.Heading>
-                </Header>
-                <div className="flex h-full items-center justify-center">
-                    <div className="text-center text-sm text-[#64748b]">Проверка доступа...</div>
-                </div>
-            </Layout>
+            <>
+                <Header />
+                <main className="token-page">
+                    <div className="muted">{loading ? "Проверка доступа..." : "Нужна авторизация администратора"}</div>
+                </main>
+            </>
         );
     }
 
     return (
-        <Layout>
-            <Header>
-                <Header.Heading>Токены МАЯК</Header.Heading>
-                <MayakAdminBackLink />
-            </Header>
-            <div className="hero">
-                <div className="col-span-12 flex flex-col gap-[1.5rem]">
-                    {/* Статистика */}
-                    <div className="flex gap-[1rem] flex-wrap">
-                        <div className="flex-1 min-w-[200px] p-[1rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                            <p className="link small text-(--color-gray-black)">Всего токенов</p>
-                            <p className="text-[1.5rem] font-bold">{stats.total}</p>
-                        </div>
-                        <div className="flex-1 min-w-[200px] p-[1rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                            <p className="link small text-(--color-gray-black)">Активных</p>
-                            <p className="text-[1.5rem] font-bold text-[var(--color-green)]">{stats.activeCount}</p>
-                        </div>
-                        <div className="flex-1 min-w-[200px] p-[1rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                            <p className="link small text-(--color-gray-black)">Исчерпанных</p>
-                            <p className="text-[1.5rem] font-bold text-[var(--color-orange)]">{stats.exhaustedCount}</p>
-                        </div>
+        <>
+            <Header />
+            <main className="token-page">
+                <div className="token-topbar">
+                    <div>
+                        <div className="eyebrow">MAYAK admin</div>
+                        <h1>Выдача токенов</h1>
+                    </div>
+                    <MayakAdminBackLink />
+                </div>
+
+                {error ? <div className="notice error">{error}</div> : null}
+                {message ? <div className="notice success">{message}</div> : null}
+
+                <section className="panel">
+                    <div className="type-switcher">
+                        {TOKEN_TYPES.map((type) => (
+                            <button
+                                key={type.id}
+                                type="button"
+                                className={activeType === type.id ? "active" : ""}
+                                onClick={() => {
+                                    if (type.id === "all") {
+                                        setActiveType("all");
+                                        setFilterType("all");
+                                        router.replace({ pathname: router.pathname }, undefined, { shallow: true });
+                                        return;
+                                    }
+                                    setActiveType(type.id);
+                                    setFilterType(type.id);
+                                    router.replace({ pathname: router.pathname, query: { type: type.id } }, undefined, { shallow: true });
+                                }}>
+                                <strong>{type.label}</strong>
+                                <span>
+                                    {type.id === "all"
+                                        ? totals.total || 0
+                                        : type.id === "legacy"
+                                          ? totals.legacy || 0
+                                          : type.id === "session"
+                                            ? totals.session || 0
+                                            : totals.external_link || 0}
+                                </span>
+                            </button>
+                        ))}
                     </div>
 
-                    {/* Telegram-бот */}
-                    <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                        <h5 className="mb-[1rem]">Telegram-бот</h5>
-                        <div className="flex flex-col gap-[1rem]">
-                            {/* Ссылка на бота */}
-                            <div className="flex items-center gap-[.75rem] flex-wrap">
-                                <span className="link small text-(--color-gray-black)">Бот:</span>
-                                {botInfo.username ? (
-                                    <a href={botInfo.link} target="_blank" rel="noopener noreferrer" style={{ color: "#0088cc", fontWeight: 600, fontSize: 14 }}>
-                                        @{botInfo.username}
-                                    </a>
-                                ) : (
-                                    <span className="text-(--color-gray-black)" style={{ fontSize: 13 }}>
-                                        Не настроен (задайте TELEGRAM_BOT_USERNAME в .env)
-                                    </span>
-                                )}
-                            </div>
+                    {activeType !== "all" ? (
+                        <CreateForm
+                            activeType={activeType}
+                            ranges={ranges}
+                            forms={{ legacyForm, sessionForm, externalForm }}
+                            setForms={{ setLegacyForm, setSessionForm, setExternalForm }}
+                            onSubmit={handleCreate}
+                            saving={saving}
+                        />
+                    ) : null}
 
-                            {/* Настройки API-ключей */}
-                            <div className="p-[.75rem] rounded-[.75rem] bg-(--color-white-gray)">
-                                <span className="link small text-(--color-gray-black)" style={{ display: "block", marginBottom: 8 }}>
-                                    Настройки:
-                                </span>
-                                <div className="flex flex-col gap-[.75rem]">
-                                    {/* Токен Telegram-бота */}
-                                    <div className="flex gap-[.5rem] items-end flex-wrap">
-                                        <div className="flex-1 min-w-[200px]">
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                Токен Telegram-бота
-                                                {settingsInfo.telegramBotTokenIsSet ? (
-                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.telegramBotToken})</span>
-                                                ) : (
-                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
-                                                )}
-                                            </label>
-                                            <Input type="password" placeholder="Введите новый токен бота" value={settingsTgToken} onChange={(e) => setSettingsTgToken(e.target.value)} />
-                                        </div>
-                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("telegramBotToken")} disabled={settingsSaving}>
-                                            {settingsSaving ? "..." : "Сохранить"}
-                                        </Button>
-                                    </div>
-                                    {/* Username бота */}
-                                    <div className="flex gap-[.5rem] items-end flex-wrap">
-                                        <div className="flex-1 min-w-[200px]">
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                Username бота (без @)
-                                                {settingsInfo.telegramBotUsernameIsSet ? (
-                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>(@{settingsInfo.telegramBotUsername})</span>
-                                                ) : (
-                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
-                                                )}
-                                            </label>
-                                            <Input type="text" placeholder="my_bot_username" value={settingsBotUsername} onChange={(e) => setSettingsBotUsername(e.target.value)} />
-                                        </div>
-                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("telegramBotUsername")} disabled={settingsSaving}>
-                                            {settingsSaving ? "..." : "Сохранить"}
-                                        </Button>
-                                    </div>
-                                    {/* OpenRouter API Key */}
-                                    <div className="flex gap-[.5rem] items-end flex-wrap">
-                                        <div className="flex-1 min-w-[200px]">
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                OpenRouter API Key
-                                                {settingsInfo.openrouterApiKeyIsSet ? (
-                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.openrouterApiKey})</span>
-                                                ) : (
-                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
-                                                )}
-                                            </label>
-                                            <Input type="password" placeholder="Введите OpenRouter API Key" value={settingsOrKey} onChange={(e) => setSettingsOrKey(e.target.value)} />
-                                        </div>
-                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("openrouterApiKey")} disabled={settingsSaving}>
-                                            {settingsSaving ? "..." : "Сохранить"}
-                                        </Button>
-                                    </div>
-                                    <div className="rounded-[.75rem] border border-(--color-gray-plus-50) bg-white p-[.75rem]">
-                                        <div className="flex flex-col gap-[.25rem] mb-[.75rem]">
-                                            <span className="link small text-(--color-gray-black)">Оценка промптов</span>
-                                            <span style={{ fontSize: 12, color: "#6b7280" }}>
-                                                Выберите, чем проверять поля MAYAK-ОКО: текущим Qwen-пулом или локальным Ollama для тестов.
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col gap-[.75rem]">
-                                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                                <div className="flex-1 min-w-[220px]">
-                                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                        Провайдер оценки
-                                                        <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>
-                                                            ({settingsInfo.promptEvaluationProvider === "ollama" ? "Ollama" : "Qwen"})
-                                                        </span>
-                                                    </label>
-                                                    <select
-                                                        value={settingsPromptEvaluationProvider}
-                                                        onChange={(e) => setSettingsPromptEvaluationProvider(e.target.value)}
-                                                        style={{
-                                                            padding: "10px 12px",
-                                                            borderRadius: 12,
-                                                            border: "1.5px solid var(--color-gray-plus-50)",
-                                                            fontSize: 13,
-                                                            background: "#fff",
-                                                            minWidth: 220,
-                                                            width: "100%",
-                                                        }}>
-                                                        <option value="qwen">Qwen</option>
-                                                        <option value="ollama">Ollama</option>
-                                                    </select>
-                                                </div>
-                                                <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("promptEvaluationProvider")} disabled={settingsSaving}>
-                                                    {settingsSaving ? "..." : "Сохранить"}
-                                                </Button>
+                    {lastCreated ? (
+                        <div className="created-box">
+                            <strong>Создано:</strong>
+                            {lastCreated.token ? <code>{lastCreated.token}</code> : null}
+                            {lastCreated.link ? <code>{buildAbsoluteUrl(lastCreated.link)}</code> : null}
+                            {lastCreated.sessionId ? <span>Сессия появится в списке ниже после обновления данных.</span> : null}
+                        </div>
+                    ) : null}
+                </section>
+
+                <section className="panel">
+                    {activeType === "all" ? (
+                        <div className="filters">
+                            <select
+                                className="token-input"
+                                value={filterType}
+                                onChange={(event) => setFilterType(event.target.value)}>
+                                <option value="all">Все токены ({totals.total || 0})</option>
+                                <option value="legacy">Обычные ({totals.legacy || 0})</option>
+                                <option value="session">Сессии ({totals.session || 0})</option>
+                                <option value="external_link">Внешние ({totals.external_link || 0})</option>
+                            </select>
+                        </div>
+                    ) : null}
+
+                    {loading ? <div className="empty">Загрузка...</div> : null}
+                    {!loading && visibleItems.length === 0 ? <div className="empty">Доступы не найдены</div> : null}
+
+                    <div className="access-list">
+                        {visibleItems.map((item) => {
+                            const tone = getTypeTone(item.type);
+                            const isEditing = editingId === item.id;
+                            const removeLabel = item.type === "session" ? "Завершить" : "Удалить";
+                            return (
+                                <article key={`${item.type}:${item.id}`} className={`access-card ${tone}`}>
+                                    <div className="access-main">
+                                        <div>
+                                            <div className="card-line">
+                                                <span className={`type-badge ${tone}`}>{getTypeLabel(item.type)}</span>
+                                                <span className="status-badge">{formatStatus(item)}</span>
                                             </div>
-                                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                                <div className="flex-1 min-w-[240px]">
-                                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                        URL Ollama
-                                                        <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>
-                                                            ({settingsInfo.promptEvaluationOllamaBaseUrl || "http://127.0.0.1:11434"})
-                                                        </span>
-                                                    </label>
-                                                    <Input
-                                                        type="text"
-                                                        placeholder={settingsInfo.promptEvaluationOllamaBaseUrl || "http://127.0.0.1:11434"}
-                                                        value={settingsPromptEvaluationOllamaBaseUrl}
-                                                        onChange={(e) => setSettingsPromptEvaluationOllamaBaseUrl(e.target.value)}
-                                                    />
+                                            {isEditing ? (
+                                                <div className="edit-stack">
+                                                    <input className="token-input compact" value={editDraft.title || ""} onChange={(event) => setEditDraft((current) => ({ ...current, title: event.target.value }))} />
+                                                    <RangeSelect value={editDraft.sectionId || ""} ranges={ranges} onChange={(nextRange) => setEditDraft((current) => ({ ...current, ...nextRange }))} />
                                                 </div>
-                                                <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("promptEvaluationOllamaBaseUrl")} disabled={settingsSaving}>
-                                                    {settingsSaving ? "..." : "Сохранить"}
-                                                </Button>
-                                            </div>
-                                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                                <div className="flex-1 min-w-[240px]">
-                                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                        Модель Ollama
-                                                        <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>
-                                                            ({settingsInfo.promptEvaluationOllamaModel || "gemma4:e2b"})
-                                                        </span>
-                                                    </label>
-                                                    <Input
-                                                        type="text"
-                                                        placeholder={settingsInfo.promptEvaluationOllamaModel || "gemma4:e2b"}
-                                                        value={settingsPromptEvaluationOllamaModel}
-                                                        onChange={(e) => setSettingsPromptEvaluationOllamaModel(e.target.value)}
-                                                    />
-                                                </div>
-                                                <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("promptEvaluationOllamaModel")} disabled={settingsSaving}>
-                                                    {settingsSaving ? "..." : "Сохранить"}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="rounded-[.75rem] border border-(--color-gray-plus-50) bg-white p-[.75rem]">
-                                        <div className="flex flex-col gap-[.25rem] mb-[.75rem]">
-                                            <span className="link small text-(--color-gray-black)">Итоговый файл: аналитика</span>
-                                            <span style={{ fontSize: 12, color: "#6b7280" }}>
-                                                Отдельные настройки для генерации итогового аналитического PDF. Если ключ не задан, используется общий OpenRouter API Key.
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col gap-[.75rem]">
-                                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                                <div className="flex-1 min-w-[200px]">
-                                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                        OpenRouter API Key для итогового файла
-                                                        {settingsInfo.finalFileOpenrouterApiKeyIsSet ? (
-                                                            <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.finalFileOpenrouterApiKey})</span>
-                                                        ) : (
-                                                            <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
-                                                        )}
-                                                    </label>
-                                                    <Input
-                                                        type="password"
-                                                        placeholder="Введите отдельный ключ OpenRouter для итогового файла"
-                                                        value={settingsFinalFileOrKey}
-                                                        onChange={(e) => setSettingsFinalFileOrKey(e.target.value)}
-                                                    />
-                                                </div>
-                                                <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("finalFileOpenrouterApiKey")} disabled={settingsSaving}>
-                                                    {settingsSaving ? "..." : "Сохранить"}
-                                                </Button>
-                                                {settingsInfo.finalFileOpenrouterApiKeyIsSet ? (
-                                                    <Button
-                                                        small
-                                                        inverted
-                                                        roundeful
-                                                        red
-                                                        className="!w-fit reject-button"
-                                                        onClick={handleRemoveFinalFileOpenrouterApiKey}
-                                                        disabled={settingsSaving}>
-                                                        Удалить
-                                                    </Button>
-                                                ) : null}
-                                            </div>
-                                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                                <div className="flex-1 min-w-[260px]">
-                                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                        Модель итогового файла
-                                                        <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.finalFileModel || "google/gemini-3-flash-preview"})</span>
-                                                    </label>
-                                                    <Input
-                                                        type="text"
-                                                        placeholder={settingsInfo.finalFileModel || "google/gemini-3-flash-preview"}
-                                                        value={settingsFinalFileModel}
-                                                        onChange={(e) => setSettingsFinalFileModel(e.target.value)}
-                                                    />
-                                                </div>
-                                                <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("finalFileModel")} disabled={settingsSaving}>
-                                                    {settingsSaving ? "..." : "Сохранить"}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-[.75rem]">
-                                        <div className="flex flex-col gap-[.5rem]">
-                                            <label className="link small text-(--color-gray-black) block">
-                                                Qwen токены
-                                                {settingsInfo.qwenTokensIsSet ? (
-                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>(сохранено: {settingsInfo.qwenTokensCount})</span>
-                                                ) : (
-                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не заданы)</span>
-                                                )}
-                                            </label>
-                                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                                <div className="min-w-[220px] flex-1">
-                                                    <Input type="text" placeholder="Название токена" value={settingsQwenTokenName} onChange={(e) => setSettingsQwenTokenName(e.target.value)} />
-                                                </div>
-                                                <div className="flex-1 min-w-[260px]">
-                                                    <Input type="password" placeholder="Введите один Qwen-токен" value={settingsQwenTokens} onChange={(e) => setSettingsQwenTokens(e.target.value)} />
-                                                </div>
-                                                <Button small inverted roundeful className="!w-fit approve-button" onClick={handleAddQwenTokens} disabled={settingsSaving}>
-                                                    {settingsSaving ? "..." : "Добавить"}
-                                                </Button>
-                                            </div>
-                                            {settingsInfo.qwenTokens.length > 0 ? (
-                                                <details className="rounded-[.75rem] border border-(--color-gray-plus-50) bg-white p-[.5rem_.75rem]">
-                                                    <summary className="link small text-(--color-gray-black)" style={{ cursor: "pointer", userSelect: "none" }}>
-                                                        Список токенов ({settingsInfo.qwenTokensCount})
-                                                    </summary>
-                                                    <div className="mt-[.5rem] flex flex-col gap-[.5rem]">
-                                                        {settingsInfo.qwenTokens.map((tokenInfo, index) => (
-                                                            <div
-                                                                key={`${tokenInfo.name}-${tokenInfo.mask}-${index}`}
-                                                                className="flex items-center justify-between gap-[.75rem] rounded-[.5rem] border border-(--color-gray-plus-50) bg-[#f8fafc] p-[.5rem_.75rem] flex-wrap">
-                                                                <div className="min-w-[240px] flex-1">
-                                                                    <div className="link small text-(--color-gray-black)">
-                                                                        №{index + 1}. {tokenInfo.name || `Токен ${index + 1}`}
-                                                                    </div>
-                                                                    <code className="text-[.75rem]">{tokenInfo.mask}</code>
-                                                                </div>
-                                                                <div className="flex gap-[.5rem] items-center flex-wrap">
-                                                                    <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => copyToClipboard(tokenInfo.token)} disabled={settingsSaving}>
-                                                                        Копировать
-                                                                    </Button>
-                                                                    <Button small inverted roundeful red className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={() => handleRemoveQwenToken(index)} disabled={settingsSaving}>
-                                                                        Удалить
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </details>
                                             ) : (
-                                                <div style={{ fontSize: 12, color: "#6b7280" }}>Сохранённых Qwen-токенов пока нет.</div>
+                                                <>
+                                                    <h3>{item.title}</h3>
+                                                    <div className="meta">
+                                                        <span>{item.sectionId || "Без раздела"}</span>
+                                                        {item.taskRange && item.taskRange !== item.sectionId ? <span>{item.taskRange}</span> : null}
+                                                        <span>{formatDate(item.updatedAt || item.createdAt)}</span>
+                                                    </div>
+                                                </>
                                             )}
                                         </div>
 
-                                        <div className="flex flex-col gap-[.5rem]">
-                                            <label className="link small text-(--color-gray-black) block">
-                                                Резервный платный токен
-                                                {settingsInfo.qwenBackupTokenIsSet ? (
-                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>(задан)</span>
-                                                ) : (
-                                                    <span style={{ color: "#6b7280", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
-                                                )}
-                                            </label>
-                                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                                <div className="min-w-[220px] flex-1">
-                                                    <Input type="text" placeholder="Название резервного токена" value={settingsQwenBackupTokenName} onChange={(e) => setSettingsQwenBackupTokenName(e.target.value)} />
+                                        <div className="usage-meter">
+                                            {isEditing ? (
+                                                <div className="edit-grid">
+                                                    {item.type === "legacy" ? (
+                                                        <label>
+                                                            <span>Лимит</span>
+                                                            <input className="token-input compact" type="number" min="1" value={editDraft.usageLimit || ""} onChange={(event) => setEditDraft((current) => ({ ...current, usageLimit: event.target.value }))} />
+                                                        </label>
+                                                    ) : null}
+                                                    {item.type === "session" ? (
+                                                        <>
+                                                            <label>
+                                                                <span>Столы</span>
+                                                                <input className="token-input compact" type="number" min="1" value={editDraft.tableCount || ""} onChange={(event) => setEditDraft((current) => ({ ...current, tableCount: event.target.value }))} />
+                                                            </label>
+                                                            <label>
+                                                                <span>Лимит</span>
+                                                                <input className="token-input compact" type="number" min="1" value={editDraft.tokenUsageLimit || ""} onChange={(event) => setEditDraft((current) => ({ ...current, tokenUsageLimit: event.target.value }))} />
+                                                            </label>
+                                                            <label>
+                                                                <span>Проверка</span>
+                                                                <input className="token-input compact" type="number" min="1" value={editDraft.reviewTimeoutSeconds || ""} onChange={(event) => setEditDraft((current) => ({ ...current, reviewTimeoutSeconds: event.target.value }))} />
+                                                            </label>
+                                                            <label>
+                                                                <span>Исправл.</span>
+                                                                <input className="token-input compact" type="number" min="1" value={editDraft.reworkTimeoutSeconds || ""} onChange={(event) => setEditDraft((current) => ({ ...current, reworkTimeoutSeconds: event.target.value }))} />
+                                                            </label>
+                                                        </>
+                                                    ) : null}
+                                                    {item.type === "external_link" ? (
+                                                        <>
+                                                            <label>
+                                                                <span>Сессии</span>
+                                                                <input className="token-input compact" type="number" min="1" value={editDraft.totalQuota || ""} onChange={(event) => setEditDraft((current) => ({ ...current, totalQuota: event.target.value }))} />
+                                                            </label>
+                                                            <label>
+                                                                <span>Входы</span>
+                                                                <input className="token-input compact" type="number" min="1" value={editDraft.totalParticipantLimit || ""} onChange={(event) => setEditDraft((current) => ({ ...current, totalParticipantLimit: event.target.value }))} />
+                                                            </label>
+                                                        </>
+                                                    ) : null}
                                                 </div>
-                                                <div className="flex-1 min-w-[260px]">
-                                                    <Input type="password" placeholder="Введите резервный токен" value={settingsQwenBackupToken} onChange={(e) => setSettingsQwenBackupToken(e.target.value)} />
-                                                </div>
-                                                <Button small inverted roundeful className="!w-fit approve-button" onClick={handleSaveBackupToken} disabled={settingsSaving}>
-                                                    {settingsSaving ? "..." : "Добавить"}
-                                                </Button>
-                                            </div>
-                                            {settingsInfo.qwenBackupTokenIsSet ? (
-                                                <details className="rounded-[.75rem] border border-(--color-gray-plus-50) bg-white p-[.5rem_.75rem]">
-                                                    <summary className="link small text-(--color-gray-black)" style={{ cursor: "pointer", userSelect: "none" }}>
-                                                        Резервный токен
-                                                    </summary>
-                                                    <div className="mt-[.5rem] flex flex-col gap-[.5rem]">
-                                                        <div className="flex items-center justify-between gap-[.75rem] rounded-[.5rem] border border-(--color-gray-plus-50) bg-[#f8fafc] p-[.5rem_.75rem] flex-wrap">
-                                                            <div className="min-w-[240px] flex-1">
-                                                                <div className="link small text-(--color-gray-black)">{settingsInfo.qwenBackupTokenName || "Резервный токен"}</div>
-                                                                <code className="text-[.75rem]">{settingsInfo.qwenBackupTokenMask}</code>
-                                                            </div>
-                                                            <div className="flex gap-[.5rem] items-center flex-wrap">
-                                                                <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => copyToClipboard(settingsInfo.qwenBackupToken)} disabled={settingsSaving}>
-                                                                    Копировать
-                                                                </Button>
-                                                                <Button small inverted roundeful red className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={handleRemoveBackupToken} disabled={settingsSaving}>
-                                                                    Удалить
-                                                                </Button>
-                                                            </div>
-                                                        </div>
+                                            ) : (
+                                                <>
+                                                    <div className="usage-line">
+                                                        <strong>{item.usedCount || 0}</strong>
+                                                        <span>/ {item.usageLimit || 0} входов</span>
                                                     </div>
-                                                </details>
-                                            ) : null}
+                                                    <div className="usage-track">
+                                                        <span style={{ width: `${Math.min(100, Math.max(0, ((item.usedCount || 0) / Math.max(1, item.usageLimit || 1)) * 100))}%` }} />
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
-                                        <div className="flex-1 min-w-[200px]">
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                Webhook URL
-                                                {settingsInfo.telegramWebhookUrlIsSet ? (
-                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>(задан)</span>
-                                                ) : (
-                                                    <span style={{ color: "#6b7280", marginLeft: 6, fontSize: 11 }}>(polling режим)</span>
-                                                )}
-                                            </label>
-                                            <Input
-                                                type="text"
-                                                placeholder={settingsInfo.telegramWebhookUrl || "https://self.rosdk.ru/api/mayak/telegram-webhook"}
-                                                value={settingsWebhookUrl}
-                                                onChange={(e) => setSettingsWebhookUrl(e.target.value)}
-                                            />
-                                        </div>
-                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("telegramWebhookUrl")} disabled={settingsSaving}>
-                                            {settingsSaving ? "..." : "Сохранить"}
-                                        </Button>
                                     </div>
-                                    {/* Base URL */}
-                                    <div className="flex gap-[.5rem] items-end flex-wrap">
-                                        <div className="flex-1 min-w-[200px]">
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">
-                                                Base URL приложения
-                                                {settingsInfo.baseUrlIsSet ? (
-                                                    <span style={{ color: "#22c55e", marginLeft: 6, fontSize: 11 }}>({settingsInfo.baseUrl})</span>
-                                                ) : (
-                                                    <span style={{ color: "#ef4444", marginLeft: 6, fontSize: 11 }}>(не задан)</span>
-                                                )}
-                                            </label>
-                                            <Input type="text" placeholder={settingsInfo.baseUrl || "https://self.rosdk.ru"} value={settingsBaseUrl} onChange={(e) => setSettingsBaseUrl(e.target.value)} />
-                                        </div>
-                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleSaveSettings("baseUrl")} disabled={settingsSaving}>
-                                            {settingsSaving ? "..." : "Сохранить"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
 
-                            {/* Список админов */}
-                            <div>
-                                <span className="link small text-(--color-gray-black)" style={{ display: "block", marginBottom: 8 }}>
-                                    Админы бота (могут создавать prep-сессии):
-                                </span>
-                                {botAdmins.length === 0 ? (
-                                    <p className="text-(--color-gray-black)" style={{ fontSize: 13 }}>
-                                        Нет админов
-                                    </p>
-                                ) : (
-                                    <div className="flex flex-col gap-[.5rem]">
-                                        {botAdmins.map((admin) => (
-                                            <div key={admin.telegramId} className="flex items-center justify-between gap-[.75rem] p-[.5rem_.75rem] rounded-[.5rem] bg-(--color-white-gray)">
-                                                <div>
-                                                    <span className="font-medium" style={{ fontSize: 14 }}>
-                                                        {admin.name || "Без имени"}
-                                                    </span>
-                                                    <span className="text-(--color-gray-black)" style={{ fontSize: 12, marginLeft: 8 }}>
-                                                        ID: {admin.telegramId}
-                                                    </span>
-                                                </div>
-                                                <Button small inverted roundeful className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={() => handleRemoveBotAdmin(admin.telegramId)}>
-                                                    Удалить
-                                                </Button>
+                                    <div className="value-grid">
+                                        {item.token ? (
+                                            <div>
+                                                <span>Токен</span>
+                                                <code>{item.token}</code>
                                             </div>
-                                        ))}
+                                        ) : null}
+                                        {item.link ? (
+                                            <div>
+                                                <span>Ссылка</span>
+                                                <code>{buildAbsoluteUrl(item.link)}</code>
+                                            </div>
+                                        ) : null}
+                                        {item.password && item.type !== "external_link" ? (
+                                            <div>
+                                                <span>Пароль</span>
+                                                <code>{item.password}</code>
+                                            </div>
+                                        ) : null}
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Форма добавления */}
-                            <div className="flex gap-[.5rem] items-end flex-wrap">
-                                <div>
-                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">Telegram ID</label>
-                                    <Input type="text" placeholder="123456789" value={newAdminId} onChange={(e) => setNewAdminId(e.target.value)} className="!w-[160px]" />
-                                </div>
-                                <div>
-                                    <label className="link small text-(--color-gray-black) block mb-[.25rem]">Имя (опц.)</label>
-                                    <Input type="text" placeholder="Имя" value={newAdminName} onChange={(e) => setNewAdminName(e.target.value)} className="!w-[160px]" />
-                                </div>
-                                <Button small inverted roundeful className="!w-fit approve-button" onClick={handleAddBotAdmin}>
-                                    Добавить
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Запросы на токены */}
-                    {(() => {
-                        const pendingRequests = tokenRequests.filter((r) => r.status === "pending" || r.status === "awaiting_code");
-                        const historyRequests = tokenRequests.filter((r) => r.status === "approved" || r.status === "rejected");
-                        return (
-                            <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                                <div className="flex items-center justify-between mb-[1rem]">
-                                    <h5>
-                                        Запросы на токены
-                                        {pendingRequests.length > 0 && (
-                                            <span style={{ marginLeft: 8, background: "#ef4444", color: "#fff", borderRadius: 999, padding: "2px 8px", fontSize: 12, fontWeight: 700 }}>{pendingRequests.length}</span>
+                                    <div className="actions">
+                                        <span className={`action-feedback ${actionFeedback.id === item.id ? actionFeedback.type : ""}`}>
+                                            {actionFeedback.id === item.id ? actionFeedback.text : ""}
+                                        </span>
+                                        {isEditing ? (
+                                            <>
+                                                <button type="button" className="icon-button save" onClick={() => saveEdit(item)} disabled={actionId === item.id}>
+                                                    OK
+                                                </button>
+                                                <button type="button" className="icon-button" onClick={cancelEdit} disabled={actionId === item.id}>
+                                                    Esc
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <button type="button" className="icon-button" title="Скопировать" aria-label="Скопировать" onClick={() => copyAccess(item)} disabled={!item.link}>
+                                                    ⧉
+                                                </button>
+                                                <button type="button" className="icon-button" title="Редактировать" aria-label="Редактировать" onClick={() => startEdit(item)} disabled={item.status === "completed" || item.status === "revoked"}>
+                                                    ✎
+                                                </button>
+                                                <button type="button" className="icon-button danger" title={removeLabel} aria-label={removeLabel} onClick={() => handleRemove(item)} disabled={actionId === item.id || item.status === "revoked"}>
+                                                    ×
+                                                </button>
+                                            </>
                                         )}
-                                    </h5>
-                                    <Button small inverted roundeful className="!w-fit" onClick={fetchRequests} disabled={requestsLoading}>
-                                        {requestsLoading ? "..." : "Обновить"}
-                                    </Button>
-                                </div>
-
-                                {/* Ручное назначение токена */}
-                                <div className="p-[.75rem] rounded-[.75rem] bg-(--color-white-gray) mb-[1rem]">
-                                    <span className="link small text-(--color-gray-black)" style={{ display: "block", marginBottom: 8 }}>
-                                        Назначить токен вручную:
-                                    </span>
-                                    <div className="flex gap-[.5rem] items-end flex-wrap">
-                                        <div>
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">Telegram ID</label>
-                                            <Input type="text" placeholder="123456789" value={manualTelegramId} onChange={(e) => setManualTelegramId(e.target.value)} className="!w-[140px]" />
-                                        </div>
-                                        <div>
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">Имя (опц.)</label>
-                                            <Input type="text" placeholder="Имя" value={manualName} onChange={(e) => setManualName(e.target.value)} className="!w-[120px]" />
-                                        </div>
-                                        <div>
-                                            <label className="link small text-(--color-gray-black) block mb-[.25rem]">Токен</label>
-                                            <select
-                                                value={manualTokenId}
-                                                onChange={(e) => setManualTokenId(e.target.value)}
-                                                style={{ padding: "8px 10px", borderRadius: 8, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 13, background: "#fff", minWidth: 160 }}>
-                                                <option value="">Выберите токен</option>
-                                                {tokens
-                                                    .filter((t) => t.isActive && !t.isExhausted)
-                                                    .map((t) => (
-                                                        <option key={t.id} value={t.id}>
-                                                            {t.name} ({t.sectionId || t.taskRange || "Все"})
-                                                        </option>
-                                                    ))}
-                                            </select>
-                                        </div>
-                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={handleManualAssign}>
-                                            Назначить
-                                        </Button>
                                     </div>
-                                </div>
-
-                                {pendingRequests.length === 0 && historyRequests.length === 0 && <p className="text-(--color-gray-black) text-center py-[1rem]">Нет запросов</p>}
-
-                                {pendingRequests.length > 0 && (
-                                    <div className="overflow-x-auto mb-[1rem]">
-                                        <table className="w-full">
-                                            <thead>
-                                                <tr className="border-b border-(--color-gray-plus-50)">
-                                                    <th className="text-left p-[.75rem] link small">Пользователь</th>
-                                                    <th className="text-left p-[.75rem] link small">Статус</th>
-                                                    <th className="text-left p-[.75rem] link small">Секретный код</th>
-                                                    <th className="text-left p-[.75rem] link small">Дата</th>
-                                                    <th className="text-right p-[.75rem] link small">Действия</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {pendingRequests.map((req) => (
-                                                    <tr key={req.id} className="border-b border-(--color-gray-plus-50) hover:bg-(--color-white-gray)">
-                                                        <td className="p-[.75rem]">
-                                                            <span className="font-medium">{req.firstName || "—"}</span>
-                                                            {req.username && <div className="text-[.75rem] text-(--color-gray-black)">@{req.username}</div>}
-                                                            <div className="text-[.7rem] text-(--color-gray-black)">ID: {req.telegramId}</div>
-                                                        </td>
-                                                        <td className="p-[.75rem]">
-                                                            {req.status === "awaiting_code" ? (
-                                                                <span style={{ color: "#f59e0b", fontWeight: 600, fontSize: 13 }}>Ждёт код</span>
-                                                            ) : (
-                                                                <span style={{ color: "#3b82f6", fontWeight: 600, fontSize: 13 }}>Ожидает</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-[.75rem]">
-                                                            {req.secretCode ? (
-                                                                <code className="text-[.85rem] bg-(--color-white-gray) px-[.5rem] py-[.25rem] rounded">{req.secretCode}</code>
-                                                            ) : (
-                                                                <span className="text-(--color-gray-black)">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-[.75rem] text-[.875rem] text-(--color-gray-black)">{formatDate(req.createdAt)}</td>
-                                                        <td className="p-[.75rem]">
-                                                            <div className="flex flex-col gap-[.5rem] items-end">
-                                                                <div className="flex gap-[.5rem] items-center">
-                                                                    <select
-                                                                        value={approveTokenId[req.id] || ""}
-                                                                        onChange={(e) => setApproveTokenId((prev) => ({ ...prev, [req.id]: e.target.value }))}
-                                                                        style={{ padding: "4px 6px", borderRadius: 6, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 12, background: "#fff", maxWidth: 180 }}>
-                                                                        <option value="">Выберите токен</option>
-                                                                        {tokens
-                                                                            .filter((t) => t.isActive && !t.isExhausted)
-                                                                            .map((t) => (
-                                                                                <option key={t.id} value={t.id}>
-                                                                                    {t.name} ({t.sectionId || t.taskRange || "Все"})
-                                                                                </option>
-                                                                            ))}
-                                                                    </select>
-                                                                    <Button small inverted roundeful className="!w-fit approve-button !p-[.25rem_.5rem]" onClick={() => handleApproveRequest(req.id)}>
-                                                                        Одобрить
-                                                                    </Button>
-                                                                </div>
-                                                                <div className="flex gap-[.5rem]">
-                                                                    <Button small inverted roundeful className="!w-fit reject-button !p-[.25rem_.5rem]" onClick={() => handleRejectRequest(req.id)}>
-                                                                        Отклонить
-                                                                    </Button>
-                                                                    <Button small inverted roundeful className="!w-fit !p-[.25rem_.5rem]" onClick={() => handleDeleteRequest(req.id)}>
-                                                                        Удалить
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-
-                                {historyRequests.length > 0 && (
-                                    <details style={{ marginTop: pendingRequests.length > 0 ? 8 : 0 }}>
-                                        <summary className="link small text-(--color-gray-black)" style={{ cursor: "pointer", userSelect: "none" }}>
-                                            История ({historyRequests.length})
-                                        </summary>
-                                        <div className="overflow-x-auto" style={{ marginTop: 8 }}>
-                                            <table className="w-full">
-                                                <thead>
-                                                    <tr className="border-b border-(--color-gray-plus-50)">
-                                                        <th className="text-left p-[.5rem] link small">Пользователь</th>
-                                                        <th className="text-left p-[.5rem] link small">Код</th>
-                                                        <th className="text-left p-[.5rem] link small">Токен</th>
-                                                        <th className="text-center p-[.5rem] link small">Статус</th>
-                                                        <th className="text-left p-[.5rem] link small">Дата</th>
-                                                        <th className="text-right p-[.5rem] link small"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {historyRequests.map((req) => {
-                                                        const assignedToken = req.assignedTokenId ? tokens.find((t) => t.id === req.assignedTokenId) : null;
-                                                        return (
-                                                            <tr key={req.id} className="border-b border-(--color-gray-plus-50)">
-                                                                <td className="p-[.5rem]">
-                                                                    <span className="text-[.85rem]">{req.firstName || "—"}</span>
-                                                                    {req.username && <span className="text-[.75rem] text-(--color-gray-black)"> @{req.username}</span>}
-                                                                    <div className="text-[.65rem] text-(--color-gray-black)">ID: {req.telegramId}</div>
-                                                                </td>
-                                                                <td className="p-[.5rem]">
-                                                                    <code className="text-[.75rem]">{req.secretCode || "—"}</code>
-                                                                </td>
-                                                                <td className="p-[.5rem]">
-                                                                    {assignedToken ? (
-                                                                        <div>
-                                                                            <code
-                                                                                className="text-[.7rem] bg-(--color-white-gray) px-[.25rem] py-[.1rem] rounded cursor-pointer"
-                                                                                title="Нажмите чтобы скопировать"
-                                                                                onClick={() => copyToClipboard(assignedToken.token)}>
-                                                                                {assignedToken.token.substring(0, 8)}...
-                                                                            </code>
-                                                                            <div className="text-[.65rem] text-(--color-gray-black)">{assignedToken.name}</div>
-                                                                            <div className="text-[.65rem] text-(--color-gray-black)">{assignedToken.sectionId || assignedToken.taskRange || "Все"}</div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="text-[.75rem] text-(--color-gray-black)">—</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-[.5rem] text-center">
-                                                                    {req.status === "approved" ? (
-                                                                        <span style={{ color: "#22c55e", fontWeight: 600, fontSize: 12 }}>Одобрен</span>
-                                                                    ) : (
-                                                                        <span style={{ color: "#ef4444", fontWeight: 600, fontSize: 12 }}>Отклонён</span>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-[.5rem] text-[.8rem] text-(--color-gray-black)">{formatDate(req.updatedAt)}</td>
-                                                                <td className="p-[.5rem] text-right">
-                                                                    <Button small inverted roundeful className="!w-fit !p-[.15rem_.4rem]" style={{ fontSize: 11 }} onClick={() => handleDeleteRequest(req.id)}>
-                                                                        ×
-                                                                    </Button>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </details>
-                                )}
-                            </div>
-                        );
-                    })()}
-
-                    {/* Форма создания токена */}
-                    <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                        <h5 className="mb-[1rem]">Создать новый токен</h5>
-                        <form onSubmit={handleCreateToken} className="flex gap-[1rem] flex-wrap items-end">
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="link small text-(--color-gray-black) block mb-[.5rem]">Название токена</label>
-                                <Input type="text" placeholder="Например: Группа 101" value={newTokenName} onChange={(e) => setNewTokenName(e.target.value)} />
-                            </div>
-                            <div className="w-[150px]">
-                                <label className="link small text-(--color-gray-black) block mb-[.5rem]">Лимит использований</label>
-                                <Input type="number" placeholder="30" min="1" value={newTokenLimit} onChange={(e) => setNewTokenLimit(e.target.value)} />
-                            </div>
-                            <div className="w-[200px]">
-                                <label className="link small text-(--color-gray-black) block mb-[.5rem]">Раздел (опц.)</label>
-                                <select
-                                    value={newTokenRange}
-                                    onChange={(e) => setNewTokenRange(e.target.value)}
-                                    style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 14, background: "#fff" }}>
-                                    <option value="">Все разделы</option>
-                                    {rangesList.map((r) => {
-                                        const key = r.sectionId || r.range;
-                                        return (
-                                            <option key={key} value={key}>
-                                                {key}
-                                                {r.rangeName ? ` — ${r.rangeName}` : ""}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                            </div>
-                            <div className="w-[200px]">
-                                <label className="link small text-(--color-gray-black) block mb-[.5rem]">Свой токен (опц.)</label>
-                                <Input type="text" placeholder="my-secret-token" value={newCustomToken} onChange={(e) => setNewCustomToken(e.target.value)} />
-                            </div>
-                            <Button type="submit" disabled={creating} className="!w-fit">
-                                {creating ? "Создание..." : "Создать токен"}
-                            </Button>
-                        </form>
+                                </article>
+                            );
+                        })}
                     </div>
+                </section>
+            </main>
 
-                    {/* Таблица токенов */}
-                    <div className="p-[1.25rem] rounded-[1rem] border-[1.5px] border-(--color-gray-plus-50)">
-                        <details open>
-                            <summary style={{ cursor: "pointer", userSelect: "none", listStyle: "none", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <h5 style={{ margin: 0 }}>Список токенов ({tokens.length})</h5>
-                                <span className="text-(--color-gray-black)" style={{ fontSize: 12 }}>
-                                    {tokens.length > 0 ? "свернуть/развернуть" : ""}
-                                </span>
-                            </summary>
+            <style jsx global>{`
+                .token-page {
+                    width: 100%;
+                    max-width: none;
+                    margin: 0;
+                    padding: 10px 14px 28px;
+                    color: #0f172a;
+                    background: #f8fafc;
+                }
 
-                            {tokens.length === 0 ? (
-                                <p className="text-(--color-gray-black) text-center py-[2rem]">Токены не найдены. Создайте первый токен выше.</p>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead>
-                                            <tr className="border-b border-(--color-gray-plus-50)">
-                                                <th className="text-left p-[.75rem] link small">Название</th>
-                                                <th className="text-left p-[.75rem] link small">Токен</th>
-                                                <th className="text-center p-[.75rem] link small">Диапазон</th>
-                                                <th className="text-center p-[.75rem] link small">Использований</th>
-                                                <th className="text-center p-[.75rem] link small">Статус</th>
-                                                <th className="text-left p-[.75rem] link small">Создан</th>
-                                                <th className="text-right p-[.75rem] link small">Действия</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {tokens.map((token) => {
-                                                const status = getTokenStatus(token);
-                                                // Проверка валидности привязки к разделу
-                                                const tokenSection = token.sectionId || token.taskRange;
-                                                const matchedRange = tokenSection ? rangesList.find((r) => (r.sectionId || r.range) === tokenSection) : null;
-                                                const hasBinding = !!tokenSection;
-                                                const sectionMissing = hasBinding && !matchedRange;
-                                                const rangeMismatch = hasBinding && matchedRange && token.taskRange && matchedRange.range !== token.taskRange;
-                                                const bindingInvalid = sectionMissing || rangeMismatch;
-                                                return (
-                                                    <tr key={token.id} className="border-b border-(--color-gray-plus-50) hover:bg-(--color-white-gray)">
-                                                        <td className="p-[.75rem]">
-                                                            <span className="font-medium">{token.name}</span>
-                                                        </td>
-                                                        <td className="p-[.75rem]">
-                                                            <div className="flex items-center gap-[.5rem]">
-                                                                <code className="text-[.75rem] bg-(--color-white-gray) px-[.5rem] py-[.25rem] rounded max-w-[200px] overflow-hidden text-ellipsis">{token.token.substring(0, 16)}...</code>
-                                                                <Button small inverted roundeful className="!w-fit !p-[.5rem]" onClick={() => copyToClipboard(token.token)}>
-                                                                    Копировать
-                                                                </Button>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-[.75rem] text-center">
-                                                            {rebindId === token.id ? (
-                                                                <div className="flex flex-col gap-[.25rem] items-center">
-                                                                    <select
-                                                                        value={rebindValue}
-                                                                        onChange={(e) => setRebindValue(e.target.value)}
-                                                                        style={{ width: "100%", padding: "4px 6px", borderRadius: 6, border: "1.5px solid var(--color-gray-plus-50)", fontSize: 12, background: "#fff" }}>
-                                                                        <option value="">Все разделы</option>
-                                                                        {rangesList.map((r) => {
-                                                                            const key = r.sectionId || r.range;
-                                                                            return (
-                                                                                <option key={key} value={key}>
-                                                                                    {key}
-                                                                                    {r.rangeName ? ` — ${r.rangeName}` : ""}
-                                                                                </option>
-                                                                            );
-                                                                        })}
-                                                                    </select>
-                                                                    <div className="flex gap-[.25rem]">
-                                                                        <Button small inverted roundeful className="!w-fit approve-button !p-[.25rem_.5rem]" onClick={() => handleRebind(token.id)}>
-                                                                            OK
-                                                                        </Button>
-                                                                        <Button
-                                                                            small
-                                                                            inverted
-                                                                            roundeful
-                                                                            className="!w-fit !p-[.25rem_.5rem]"
-                                                                            onClick={() => {
-                                                                                setRebindId(null);
-                                                                                setRebindValue("");
-                                                                            }}>
-                                                                            X
-                                                                        </Button>
-                                                                    </div>
-                                                                </div>
-                                                            ) : token.sectionId || token.taskRange ? (
-                                                                <div>
-                                                                    <span className="font-medium" style={bindingInvalid ? { color: "#dc2626" } : undefined}>
-                                                                        {token.sectionId || token.taskRange}
-                                                                    </span>
-                                                                    {rangeNames[token.sectionId || token.taskRange] && <div className="text-[.7rem] text-(--color-gray-black)">{rangeNames[token.sectionId || token.taskRange]}</div>}
-                                                                    {token.sectionId && token.taskRange && token.sectionId !== token.taskRange && <div className="text-[.65rem] text-(--color-gray-black)">({token.taskRange})</div>}
-                                                                    {sectionMissing && (
-                                                                        <div
-                                                                            style={{
-                                                                                fontSize: 10,
-                                                                                color: "#dc2626",
-                                                                                fontWeight: 600,
-                                                                                marginTop: 2,
-                                                                                padding: "1px 6px",
-                                                                                background: "#fef2f2",
-                                                                                borderRadius: 4,
-                                                                                display: "inline-block",
-                                                                                cursor: "pointer",
-                                                                            }}
-                                                                            onClick={() => {
-                                                                                setRebindId(token.id);
-                                                                                setRebindValue("");
-                                                                            }}>
-                                                                            Раздел не найден — перепривязать
-                                                                        </div>
-                                                                    )}
-                                                                    {rangeMismatch && (
-                                                                        <div
-                                                                            style={{
-                                                                                fontSize: 10,
-                                                                                color: "#dc2626",
-                                                                                fontWeight: 600,
-                                                                                marginTop: 2,
-                                                                                padding: "1px 6px",
-                                                                                background: "#fef2f2",
-                                                                                borderRadius: 4,
-                                                                                display: "inline-block",
-                                                                                cursor: "pointer",
-                                                                            }}
-                                                                            onClick={() => {
-                                                                                setRebindId(token.id);
-                                                                                setRebindValue("");
-                                                                            }}>
-                                                                            Диапазон не совпадает ({matchedRange.range}) — перепривязать
-                                                                        </div>
-                                                                    )}
-                                                                    {!bindingInvalid && (
-                                                                        <div
-                                                                            style={{ fontSize: 10, color: "#6366f1", cursor: "pointer", marginTop: 2 }}
-                                                                            onClick={() => {
-                                                                                setRebindId(token.id);
-                                                                                setRebindValue(token.sectionId || token.taskRange || "");
-                                                                            }}>
-                                                                            изменить
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <div>
-                                                                    <span>—</span>
-                                                                    <div
-                                                                        style={{ fontSize: 10, color: "#6366f1", cursor: "pointer", marginTop: 2 }}
-                                                                        onClick={() => {
-                                                                            setRebindId(token.id);
-                                                                            setRebindValue("");
-                                                                        }}>
-                                                                        привязать
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-[.75rem] text-center">
-                                                            <span className={token.isExhausted ? "text-[var(--color-red)]" : ""}>
-                                                                {token.usedCount} / {token.usageLimit}
-                                                            </span>
-                                                            <br />
-                                                            <span className="link small text-(--color-gray-black)">(осталось: {token.remainingAttempts})</span>
-                                                        </td>
-                                                        <td className="p-[.75rem] text-center">
-                                                            <span className={status.color}>{status.text}</span>
-                                                        </td>
-                                                        <td className="p-[.75rem] text-[.875rem] text-(--color-gray-black)">{formatDate(token.createdAt)}</td>
-                                                        <td className="p-[.75rem]">
-                                                            <div className="flex justify-end gap-[.5rem] flex-wrap">
-                                                                {addAttemptsId === token.id ? (
-                                                                    <div className="flex gap-[.5rem] items-center">
-                                                                        <Input type="number" placeholder="10" min="1" value={attemptsToAdd} onChange={(e) => setAttemptsToAdd(e.target.value)} className="!w-[80px]" />
-                                                                        <Button small inverted roundeful className="!w-fit approve-button" onClick={() => handleAddAttempts(token.id)}>
-                                                                            OK
-                                                                        </Button>
-                                                                        <Button
-                                                                            small
-                                                                            inverted
-                                                                            roundeful
-                                                                            className="!w-fit"
-                                                                            onClick={() => {
-                                                                                setAddAttemptsId(null);
-                                                                                setAttemptsToAdd("");
-                                                                            }}>
-                                                                            X
-                                                                        </Button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <>
-                                                                        <Button small inverted roundeful className="!w-fit" onClick={() => setAddAttemptsId(token.id)} disabled={!token.isActive}>
-                                                                            + Попытки
-                                                                        </Button>
-                                                                        {token.isActive && (
-                                                                            <Button small inverted roundeful red className="!w-fit reject-button" onClick={() => handleDelete(token.id, token.name)}>
-                                                                                Удалить
-                                                                            </Button>
-                                                                        )}
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </details>
-                    </div>
-                </div>
-            </div>
-        </Layout>
+                .token-topbar,
+                .list-header,
+                .access-main {
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 12px;
+                    align-items: center;
+                }
+
+                .eyebrow {
+                    color: #475569;
+                    font-size: 12px;
+                    font-weight: 800;
+                    letter-spacing: 0;
+                    text-transform: uppercase;
+                }
+
+                h1,
+                h2,
+                h3,
+                p {
+                    margin: 0;
+                }
+
+                h1 {
+                    margin-top: 2px;
+                    font-size: 26px;
+                    line-height: 1.1;
+                    color: #020617;
+                }
+
+                h2 {
+                    font-size: 18px;
+                    color: #020617;
+                }
+
+                h3 {
+                    margin-top: 7px;
+                    font-size: 16px;
+                    line-height: 1.25;
+                    color: #020617;
+                }
+
+                .token-topbar p,
+                .list-header p,
+                .empty,
+                .muted {
+                    margin-top: 8px;
+                    color: #64748b;
+                    font-size: 14px;
+                    line-height: 1.5;
+                }
+
+                .panel {
+                    margin-top: 10px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    background: #ffffff;
+                    padding: 12px;
+                    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+                }
+
+                .type-switcher {
+                    display: grid;
+                    grid-template-columns: repeat(4, minmax(0, 1fr));
+                    gap: 8px;
+                    margin-bottom: 10px;
+                }
+
+                .type-switcher button,
+                .primary-button,
+                .ghost-button,
+                .danger-button,
+                .icon-button {
+                    border-radius: 8px;
+                    font: inherit;
+                    cursor: pointer;
+                    transition:
+                        transform 0.15s ease,
+                        border-color 0.15s ease,
+                        background 0.15s ease;
+                }
+
+                .type-switcher button {
+                    border: 1px solid #dbe4ef;
+                    background: #f8fafc;
+                    padding: 10px 12px;
+                    text-align: center;
+                    color: #0f172a;
+                }
+
+                .type-switcher button.active {
+                    border-color: #0f766e;
+                    background: #0f766e;
+                    color: #ffffff;
+                }
+
+                .type-switcher strong,
+                .type-switcher span {
+                    display: inline;
+                    font-size: 14px;
+                    line-height: 1.2;
+                }
+
+                .type-switcher span {
+                    margin-left: 8px;
+                    opacity: 0.75;
+                }
+
+                .create-form {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+                    gap: 9px;
+                    align-items: end;
+                }
+
+                label {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 7px;
+                    min-width: 0;
+                }
+
+                label span {
+                    color: #1f2937;
+                    font-size: 12px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                }
+
+                .token-input {
+                    width: 100%;
+                    min-height: 38px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 8px;
+                    background: #fff;
+                    color: #020617;
+                    font-size: 14px;
+                    padding: 8px 10px;
+                    outline: none;
+                }
+
+                .token-input:focus {
+                    border-color: #0f766e;
+                    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+                }
+
+                .filters,
+                .actions,
+                .card-line,
+                .meta {
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                }
+
+                .primary-button {
+                    min-height: 38px;
+                    border: 1px solid #0f766e;
+                    background: #0f766e;
+                    color: #fff;
+                    font-weight: 800;
+                    padding: 10px 16px;
+                }
+
+                .ghost-button {
+                    min-height: 38px;
+                    border: 1px solid #cbd5e1;
+                    background: #fff;
+                    color: #0f172a;
+                    font-weight: 700;
+                    padding: 8px 12px;
+                }
+
+                .danger-button {
+                    min-height: 38px;
+                    border: 1px solid #fecaca;
+                    background: #fef2f2;
+                    color: #b91c1c;
+                    font-weight: 800;
+                    padding: 8px 12px;
+                }
+
+                button:disabled {
+                    cursor: not-allowed;
+                    opacity: 0.55;
+                }
+
+                .notice {
+                    position: fixed;
+                    top: 12px;
+                    right: 14px;
+                    z-index: 1000;
+                    max-width: min(420px, calc(100vw - 28px));
+                    border-radius: 8px;
+                    padding: 10px 12px;
+                    font-size: 14px;
+                    line-height: 1.45;
+                    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+                }
+
+                .created-box {
+                    margin-top: 10px;
+                    border-radius: 8px;
+                    padding: 10px 12px;
+                    font-size: 14px;
+                    line-height: 1.45;
+                }
+
+                .notice.error {
+                    border: 1px solid #fecaca;
+                    background: #fef2f2;
+                    color: #991b1b;
+                }
+
+                .notice.success {
+                    border: 1px solid #bbf7d0;
+                    background: #f0fdf4;
+                    color: #166534;
+                }
+
+                .action-feedback {
+                    display: inline-flex;
+                    align-items: center;
+                    min-height: 28px;
+                    min-width: 92px;
+                    color: #166534;
+                    font-size: 13px;
+                    font-weight: 700;
+                    white-space: nowrap;
+                }
+
+                .action-feedback.error {
+                    color: #b91c1c;
+                }
+
+                .created-box {
+                    display: flex;
+                    gap: 10px;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    border: 1px solid #bae6fd;
+                    background: #f0f9ff;
+                    color: #0c4a6e;
+                }
+
+                .filters {
+                    margin-top: 10px;
+                    display: grid;
+                    grid-template-columns: minmax(220px, 340px);
+                    gap: 10px;
+                    align-items: center;
+                }
+
+                .access-list {
+                    display: grid;
+                    gap: 8px;
+                    margin-top: 10px;
+                }
+
+                .access-card {
+                    display: grid;
+                    grid-template-columns: minmax(240px, 1.15fr) minmax(360px, 1.65fr) minmax(250px, auto);
+                    gap: 12px;
+                    align-items: center;
+                    border: 1px solid #e2e8f0;
+                    border-left-width: 5px;
+                    border-radius: 8px;
+                    padding: 10px 12px;
+                    background: #fff;
+                }
+
+                .access-card.ink {
+                    border-left-color: #334155;
+                }
+
+                .access-card.teal {
+                    border-left-color: #0f766e;
+                }
+
+                .access-card.amber {
+                    border-left-color: #d97706;
+                }
+
+                .type-badge,
+                .status-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    min-height: 22px;
+                    border-radius: 999px;
+                    padding: 2px 8px;
+                    font-size: 12px;
+                    font-weight: 800;
+                }
+
+                .type-badge.ink {
+                    background: #f1f5f9;
+                    color: #334155;
+                }
+
+                .type-badge.teal {
+                    background: #ccfbf1;
+                    color: #115e59;
+                }
+
+                .type-badge.amber {
+                    background: #fef3c7;
+                    color: #92400e;
+                }
+
+                .status-badge {
+                    background: #f8fafc;
+                    color: #475569;
+                    border: 1px solid #e2e8f0;
+                }
+
+                .meta {
+                    margin-top: 6px;
+                    color: #475569;
+                    font-size: 13px;
+                }
+
+                .meta span:not(:last-child)::after {
+                    content: "·";
+                    margin-left: 8px;
+                    color: #cbd5e1;
+                }
+
+                .usage-meter {
+                    min-width: 132px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    background: #f8fafc;
+                    padding: 8px;
+                }
+
+                .usage-line {
+                    display: flex;
+                    align-items: baseline;
+                    justify-content: space-between;
+                    gap: 8px;
+                    color: #334155;
+                }
+
+                .usage-line strong {
+                    color: #020617;
+                    font-size: 18px;
+                    line-height: 1;
+                }
+
+                .usage-line span {
+                    color: #475569;
+                    font-size: 12px;
+                }
+
+                .usage-track {
+                    height: 5px;
+                    overflow: hidden;
+                    border-radius: 999px;
+                    background: #e2e8f0;
+                    margin-top: 7px;
+                }
+
+                .usage-track span {
+                    display: block;
+                    height: 100%;
+                    border-radius: inherit;
+                    background: #0f766e;
+                }
+
+                .value-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: 8px;
+                    margin-top: 0;
+                    min-width: 0;
+                }
+
+                .value-grid div {
+                    min-width: 0;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    background: #f8fafc;
+                    padding: 7px 9px;
+                }
+
+                .value-grid span {
+                    display: block;
+                    color: #334155;
+                    font-size: 11px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                }
+
+                code {
+                    display: block;
+                    max-width: 100%;
+                    margin-top: 3px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    color: #0f172a;
+                    font-size: 13px;
+                }
+
+                .actions {
+                    align-self: center;
+                    justify-content: flex-end;
+                    margin-top: 0;
+                    flex-wrap: nowrap;
+                }
+
+                .empty {
+                    border: 1px dashed #cbd5e1;
+                    border-radius: 8px;
+                    padding: 18px;
+                    text-align: center;
+                }
+
+                .edit-stack {
+                    display: grid;
+                    grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr);
+                    gap: 8px;
+                    margin-top: 7px;
+                }
+
+                .edit-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+                    gap: 6px;
+                    min-width: 260px;
+                }
+
+                .token-input.compact {
+                    min-height: 34px;
+                    padding: 6px 8px;
+                }
+
+                .icon-button {
+                    min-width: 42px;
+                    min-height: 34px;
+                    border: 1px solid #cbd5e1;
+                    background: #fff;
+                    color: #0f172a;
+                    font-size: 12px;
+                    font-weight: 900;
+                    padding: 6px 9px;
+                }
+
+                .icon-button.save {
+                    border-color: #0f766e;
+                    background: #ecfdf5;
+                    color: #115e59;
+                }
+
+                .icon-button.danger {
+                    border-color: #fecaca;
+                    background: #fef2f2;
+                    color: #b91c1c;
+                    font-size: 16px;
+                    line-height: 1;
+                }
+
+                @media (max-width: 1160px) {
+                    .access-card {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .token-topbar,
+                    .list-header,
+                    .access-main {
+                        flex-direction: column;
+                    }
+
+                    .type-switcher,
+                    .filters {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .usage-meter {
+                        width: 100%;
+                        text-align: left;
+                    }
+
+                    .actions {
+                        justify-content: flex-start;
+                    }
+                }
+
+                @media (max-width: 720px) {
+                    .token-page {
+                        padding: 8px;
+                    }
+
+                    .type-switcher,
+                    .filters {
+                        grid-template-columns: 1fr;
+                    }
+
+                    .panel {
+                        padding: 10px;
+                    }
+                }
+            `}</style>
+        </>
     );
 }
-
 

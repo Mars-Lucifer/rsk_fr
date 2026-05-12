@@ -1,5 +1,5 @@
 import { requireMayakAdmin } from "@/lib/mayakAdminAuth";
-import { revokeMayakAdminRight, updateMayakAdminRight } from "@/lib/mayakAdminRights";
+import { deleteMayakAdminRight, updateMayakAdminRight } from "@/lib/mayakAdminRights";
 
 export default async function handler(req, res) {
     if (!requireMayakAdmin(req, res)) {
@@ -19,10 +19,10 @@ export default async function handler(req, res) {
 
     if (req.method === "DELETE") {
         try {
-            const right = await revokeMayakAdminRight(rightId);
+            const right = await deleteMayakAdminRight(rightId);
             return res.status(200).json({ success: true, data: right });
         } catch (error) {
-            return res.status(400).json({ success: false, error: error.message || "Не удалось отозвать админ-права" });
+            return res.status(400).json({ success: false, error: error.message || "Не удалось удалить админ-права" });
         }
     }
 

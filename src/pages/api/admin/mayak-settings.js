@@ -8,7 +8,14 @@ import {
     readMayakSettings,
     writeMayakSettings,
 } from "../../../lib/mayakSettings.js";
-import { maskSecret, normalizeQwenTokenEntries } from "../../../lib/mayakQwen.js";
+import { QWEN_EVALUATION_SYSTEM_PROMPT, getQwenTokenExpiryInfo, maskSecret, normalizeQwenTokenEntries } from "../../../lib/mayakQwen.js";
+
+const DEFAULT_ANALYTICS_PROMPT_FOR_ADMIN = `Ты — эксперт-аналитик тренажера МАЯК.
+
+Сформируй итоговую аналитику по данным прохождения участника.
+Оцени качество работы с методологией МАЯК-ОКО, выдели сильные стороны, проблемные зоны и практические рекомендации.
+Пиши понятно, профессионально и без лишней воды.
+Используй только названия "МАЯК" и "МАЯК-ОКО".`;
 
 export default async function handler(req, res) {
     if (!requireMayakAdmin(req, res)) {
@@ -38,6 +45,11 @@ export default async function handler(req, res) {
         const qwenBackupToken = qwenBackupEntry?.token || "";
         const questionnaires = getMayakQuestionnaireSettings(settings);
         const promptEvaluation = getMayakPromptEvaluationSettings(settings);
+        const sovaPrompt = typeof settings.sovaPrompt === "string" && settings.sovaPrompt.trim() ? settings.sovaPrompt : QWEN_EVALUATION_SYSTEM_PROMPT;
+        const analyticsPrompt =
+            typeof settings.analyticsPrompt === "string" && settings.analyticsPrompt.trim()
+                ? settings.analyticsPrompt
+                : DEFAULT_ANALYTICS_PROMPT_FOR_ADMIN;
 
         return res.status(200).json({
             success: true,
@@ -77,6 +89,7 @@ export default async function handler(req, res) {
                     name: entry.name || `Токен ${index + 1}`,
                     token: entry.token,
                     mask: maskSecret(entry.token),
+                    expiry: getQwenTokenExpiryInfo(entry.token),
                 })),
                 qwenTokensCount: qwenTokens.length,
                 qwenTokensIsSet: qwenTokens.length > 0,
@@ -84,6 +97,9 @@ export default async function handler(req, res) {
                 qwenBackupTokenName: qwenBackupEntry?.name || "Резервный токен",
                 qwenBackupTokenMask: maskSecret(qwenBackupToken),
                 qwenBackupTokenIsSet: !!qwenBackupToken,
+                qwenBackupTokenExpiry: getQwenTokenExpiryInfo(qwenBackupToken),
+                sovaPrompt,
+                analyticsPrompt,
             },
         });
     }
@@ -111,6 +127,8 @@ export default async function handler(req, res) {
             qwenTokenAdd,
             qwenTokenRemoveIndex,
             qwenBackupToken,
+            sovaPrompt,
+            analyticsPrompt,
         } = req.body;
 
         const settings = await readMayakSettings();
@@ -212,6 +230,14 @@ export default async function handler(req, res) {
         if (qwenBackupToken !== undefined) {
             const backupEntry = normalizeQwenTokenEntries(qwenBackupToken)[0] || null;
             settings.qwenBackupToken = backupEntry || "";
+        }
+
+        if (sovaPrompt !== undefined) {
+            settings.sovaPrompt = typeof sovaPrompt === "string" ? sovaPrompt : "";
+        }
+
+        if (analyticsPrompt !== undefined) {
+            settings.analyticsPrompt = typeof analyticsPrompt === "string" ? analyticsPrompt : "";
         }
 
         if (qwenTokenAdd !== undefined) {

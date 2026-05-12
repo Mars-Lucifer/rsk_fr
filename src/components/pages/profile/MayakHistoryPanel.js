@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+const HISTORY_POLL_MS = 5000;
+
 export default function MayakHistoryPanel() {
     const [historyItems, setHistoryItems] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -37,8 +39,13 @@ export default function MayakHistoryPanel() {
         };
 
         loadHistory();
+        const intervalId = window.setInterval(() => {
+            loadHistory();
+        }, HISTORY_POLL_MS);
+
         return () => {
             cancelled = true;
+            window.clearInterval(intervalId);
         };
     }, []);
 
@@ -72,9 +79,19 @@ export default function MayakHistoryPanel() {
                                 <a className="link" href={item.files?.log}>
                                     Лог
                                 </a>
-                                <a className="link" href={item.files?.analytics}>
-                                    Аналитика
-                                </a>
+                                {item.analyticsStatus === "ready" && item.files?.analytics ? (
+                                    <a className="link" href={item.files.analytics}>
+                                        Аналитика
+                                    </a>
+                                ) : item.analyticsStatus === "failed" ? (
+                                    <span className="text-(--color-gray-black)">
+                                        Аналитика не сформировалась
+                                    </span>
+                                ) : (
+                                    <span className="text-(--color-gray-black)">
+                                        Аналитика готовится...
+                                    </span>
+                                )}
                             </div>
                         </div>
                     ))}

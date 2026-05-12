@@ -4,6 +4,14 @@ import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { readMayakSettings } from './mayakSettings.js';
+import {
+  QWEN_API_URL,
+  QWEN_MODEL,
+  acquireLeastLoadedQwenToken,
+  getQwenTokenPool,
+  maskSecret,
+  releaseQwenToken,
+} from './mayakQwen.js';
 
 const DEFAULT_FINAL_FILE_MODEL = 'google/gemini-3-flash-preview';
 
@@ -397,31 +405,67 @@ ${tasksStr}
 
 async function getFinalFileLLMConfig() {
   const settings = await readMayakSettings();
-  const apiKey =
+  const qwenTokenPool = await getQwenTokenPool();
+  const openRouterApiKey =
     settings.finalFileOpenrouterApiKey ||
-    process.env.MAYAK_FINAL_FILE_OPENROUTER_API_KEY ||
     settings.openrouterApiKey ||
+    process.env.MAYAK_FINAL_FILE_OPENROUTER_API_KEY ||
     process.env.OPENROUTER_API_KEY ||
     '';
   const model = settings.finalFileModel || process.env.MAYAK_FINAL_FILE_MODEL || DEFAULT_FINAL_FILE_MODEL;
 
   return {
-    apiKey: String(apiKey || '').trim(),
+    qwenTokenPool,
+    openRouterApiKey: String(openRouterApiKey || '').trim(),
     model: String(model || '').trim() || DEFAULT_FINAL_FILE_MODEL,
+    analyticsPrompt: typeof settings.analyticsPrompt === 'string' ? settings.analyticsPrompt.trim() : '',
   };
 }
 
-// Р вЂ™РЎвЂ№Р В·Р С•Р Р† OpenRouter API
 async function callLLM(prompt) {
-  const { apiKey, model } = await getFinalFileLLMConfig();
-  if (!apiKey) {
-    throw new Error('РќРµ Р·Р°РґР°РЅ OpenRouter API Key РґР»СЏ РёС‚РѕРіРѕРІРѕРіРѕ С„Р°Р№Р»Р°. РЈРєР°Р¶РёС‚Рµ РµРіРѕ РІ /admin/mayak-tokens РёР»Рё РІ MAYAK_FINAL_FILE_OPENROUTER_API_KEY.');
+  const { qwenTokenPool, openRouterApiKey, model } = await getFinalFileLLMConfig();
+
+  const triedQwenTokens = new Set();
+  while (triedQwenTokens.size < qwenTokenPool.length) {
+    const qwenToken = acquireLeastLoadedQwenToken(qwenTokenPool, Array.from(triedQwenTokens));
+    if (!qwenToken) break;
+    triedQwenTokens.add(qwenToken);
+
+    try {
+      const res = await fetch(`${QWEN_API_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${qwenToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: QWEN_MODEL,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 8000,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content || 'Не удалось получить анализ';
+      }
+
+      console.error('[Analytics] Qwen API error:', res.status, maskSecret(qwenToken), await res.text());
+    } catch (error) {
+      console.error('[Analytics] Qwen request error:', maskSecret(qwenToken), error.message);
+    } finally {
+      releaseQwenToken(qwenToken);
+    }
+  }
+
+  if (!openRouterApiKey) {
+    throw new Error('Не задан Qwen-токен или резервный OpenRouter API Key для итоговой аналитики. Укажите его в /admin/mayak-ai-tokens.');
   }
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${openRouterApiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -437,16 +481,17 @@ async function callLLM(prompt) {
   }
 
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || 'РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ Р°РЅР°Р»РёР·';
+  return data.choices?.[0]?.message?.content || 'Не удалось получить анализ';
 }
-
 export async function generateAnalyticsBufferFromLogData(logData) {
   if (!logData || typeof logData !== 'object') {
     throw new Error('Р вЂќР В°Р Р…Р Р…РЎвЂ№Р Вµ Р В°Р Р…Р В°Р В»Р С‘РЎвЂљР С‘Р С”Р С‘ Р Р…Р Вµ Р С—Р ВµРЎР‚Р ВµР Т‘Р В°Р Р…РЎвЂ№');
   }
 
   // Р вЂ™РЎвЂ№Р В·РЎвЂ№Р Р†Р В°Р ВµР С LLM
-  const prompt = buildPrompt(logData);
+  const { analyticsPrompt } = await getFinalFileLLMConfig();
+  const basePrompt = buildPrompt(logData);
+  const prompt = analyticsPrompt ? `${analyticsPrompt}\n\n---\n\n${basePrompt}` : basePrompt;
   console.log(`[Analytics] Р вЂ”Р В°Р С—РЎР‚Р С•РЎРѓ Р С” LLM Р Т‘Р В»РЎРЏ ${logData.userName || 'participant'}...`);
   const analysisText = await callLLM(prompt);
   const normalizedAnalysisText = analysisText.replace(/МАЙК-ОКО/g, 'МАЯК-ОКО');

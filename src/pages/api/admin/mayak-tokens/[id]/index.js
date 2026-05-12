@@ -34,10 +34,24 @@ export default async function handler(req, res) {
                 return res.status(404).json({ success: false, error: "Токен не найден" });
             }
 
-            const { sectionId, taskRange } = req.body;
+            const { name, sectionId, taskRange, usageLimit } = req.body;
             const updates = {};
+            if (name !== undefined) {
+                const normalizedName = String(name || "").trim();
+                if (!normalizedName) {
+                    return res.status(400).json({ success: false, error: "Название токена обязательно" });
+                }
+                updates.name = normalizedName;
+            }
             if (sectionId !== undefined) updates.sectionId = sectionId || null;
             if (taskRange !== undefined) updates.taskRange = taskRange || null;
+            if (usageLimit !== undefined) {
+                const normalizedLimit = Number.parseInt(String(usageLimit), 10);
+                if (!Number.isFinite(normalizedLimit) || normalizedLimit < Math.max(1, existingToken.usedCount || 0)) {
+                    return res.status(400).json({ success: false, error: "Лимит не может быть меньше уже использованных входов" });
+                }
+                updates.usageLimit = normalizedLimit;
+            }
             const updated = updateToken(id, updates);
 
             if (!updated) {

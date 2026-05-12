@@ -45,6 +45,7 @@ export default function MayakDelegatedAccessPage() {
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
+    const [createFeedback, setCreateFeedback] = useState("");
     const [copiedKey, setCopiedKey] = useState("");
     const [overview, setOverview] = useState({ right: null, sessions: [] });
     const [nowTs, setNowTs] = useState(Date.now());
@@ -121,6 +122,21 @@ export default function MayakDelegatedAccessPage() {
         return () => window.removeEventListener("resize", updateCompact);
     }, []);
 
+    useEffect(() => {
+        if (!message && !error) return undefined;
+        const timeoutId = window.setTimeout(() => {
+            setMessage("");
+            setError("");
+        }, message ? 1800 : 2600);
+        return () => window.clearTimeout(timeoutId);
+    }, [message, error]);
+
+    useEffect(() => {
+        if (!createFeedback) return undefined;
+        const timeoutId = window.setTimeout(() => setCreateFeedback(""), 1800);
+        return () => window.clearTimeout(timeoutId);
+    }, [createFeedback]);
+
     const handleLogin = async (event) => {
         event.preventDefault();
         await loadOverview(password);
@@ -131,6 +147,7 @@ export default function MayakDelegatedAccessPage() {
         setCreating(true);
         setError("");
         setMessage("");
+        setCreateFeedback("");
 
         try {
             const data = await apiRequest({
@@ -143,7 +160,7 @@ export default function MayakDelegatedAccessPage() {
                 ...current,
                 sessionName: "",
             }));
-            setMessage("Сессия создана");
+            setCreateFeedback("Сессия создана");
         } catch (createError) {
             setError(createError.message || "Не удалось создать сессию");
         } finally {
@@ -256,12 +273,15 @@ export default function MayakDelegatedAccessPage() {
                         </select>
                     </label>
 
-                    <button
-                        type="submit"
-                        style={primaryButtonStyle}
-                        disabled={creating || (right?.remainingQuota || 0) < 1}>
-                        {creating ? "Создаём..." : "Создать сессию"}
-                    </button>
+                    <div style={createActionStyle}>
+                        <button
+                            type="submit"
+                            style={primaryButtonStyle}
+                            disabled={creating || (right?.remainingQuota || 0) < 1}>
+                            {creating ? "Создаём..." : "Создать сессию"}
+                        </button>
+                        <span style={createFeedbackStyle}>{createFeedback}</span>
+                    </div>
                 </form>
 
                 <div style={sessionsListStyle}>
@@ -291,17 +311,18 @@ export default function MayakDelegatedAccessPage() {
                                 <div style={{ ...shareGridStyle, ...(isCompact ? compactShareGridStyle : null) }}>
                                     <div style={shareBoxStyle}>
                                         <span style={labelStyle}>Ссылка</span>
-                                        <code style={codeStyle}>{participantLink}</code>
-                                        <button type="button" style={secondaryButtonStyle} onClick={() => copyText(`${item.sessionId}:link`, participantLink)}>
-                                            {copiedKey === `${item.sessionId}:link` ? "Скопировано" : "Копировать ссылку"}
-                                        </button>
-                                    </div>
-                                    <div style={shareBoxStyle}>
-                                        <span style={labelStyle}>Токен</span>
-                                        <code style={codeStyle}>{token.value}</code>
-                                        <button type="button" style={secondaryButtonStyle} onClick={() => copyText(`${item.sessionId}:token`, token.value)}>
-                                            {copiedKey === `${item.sessionId}:token` ? "Скопировано" : "Копировать токен"}
-                                        </button>
+                                        <div style={linkLineStyle}>
+                                            <code style={codeStyle}>{participantLink}</code>
+                                            <button
+                                                type="button"
+                                                title="Скопировать ссылку"
+                                                aria-label="Скопировать ссылку"
+                                                style={participantCopyButtonStyle}
+                                                onClick={() => copyText(`${item.sessionId}:link`, participantLink)}>
+                                                ⧉
+                                            </button>
+                                        </div>
+                                        <span style={copyHintStyle}>{copiedKey === `${item.sessionId}:link` ? "Скопировано" : ""}</span>
                                     </div>
                                 </div>
                             </article>
@@ -439,6 +460,21 @@ const compactCreatePanelStyle = {
     gridTemplateColumns: "minmax(0, 1fr)",
 };
 
+const createActionStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 245,
+};
+
+const createFeedbackStyle = {
+    minWidth: 104,
+    color: "#1c6b33",
+    fontSize: 13,
+    fontWeight: 700,
+    whiteSpace: "nowrap",
+};
+
 const fieldStyle = {
     display: "flex",
     flexDirection: "column",
@@ -482,6 +518,18 @@ const secondaryButtonStyle = {
     cursor: "pointer",
 };
 
+const participantCopyButtonStyle = {
+    width: 42,
+    minHeight: 34,
+    border: "1px solid #b9c4cc",
+    borderRadius: 8,
+    background: "#fff",
+    color: "#152022",
+    fontSize: 16,
+    fontWeight: 900,
+    cursor: "pointer",
+};
+
 const sessionsListStyle = {
     display: "flex",
     flexDirection: "column",
@@ -522,7 +570,7 @@ const sessionMetaStyle = {
 
 const shareGridStyle = {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "minmax(0, 1fr)",
     gap: 10,
     marginTop: 12,
 };
@@ -533,7 +581,7 @@ const compactShareGridStyle = {
 
 const shareBoxStyle = {
     display: "grid",
-    gridTemplateColumns: "1fr auto",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
     gap: 8,
     alignItems: "center",
     borderRadius: 8,
@@ -541,12 +589,26 @@ const shareBoxStyle = {
     padding: 10,
 };
 
-const codeStyle = {
+const linkLineStyle = {
     gridColumn: "1 / -1",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+    gap: 8,
+    alignItems: "center",
+};
+
+const codeStyle = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     fontSize: 13,
+};
+
+const copyHintStyle = {
+    minWidth: 92,
+    color: "#1c6b33",
+    fontSize: 13,
+    fontWeight: 700,
 };
 
 const emptyStyle = {
@@ -577,3 +639,4 @@ const noticeSuccessStyle = {
     color: "#1c6b33",
     padding: "10px 12px",
 };
+

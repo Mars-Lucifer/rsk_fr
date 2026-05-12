@@ -1,3 +1,22 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "runId": "0feb5535-73c5-407c-8f71-c5cb9350502a",
+      "portalUserId": "900002",
+      "fullName": "Проверкин Алексей Сергеевич",
+      "organization": "Тестовый контур МАЯК",
+      "organizationId": "local-org-2",
+      "completedAt": "2026-05-08T16:51:08.194Z",
+      "tokenType": "session",
+      "sectionId": "101-200",
+      "sessionId": "819f7e55-722d-4cd2-b937-d86f647bf9f3",
+      "sessionName": "Московское долголетие",
+      "tableNumber": "1",
+      "selectedRole": "",
+      "trainerName": "МАЯК ОКО",
+      "completedTaskCount": 0,
+      "totalTime": "25:16",
+      "artifactDir": "C:\\DISK D\\МАЯК\\mayak\\rsk_fr\\data\\mayak-user-artifacts\\900002\\0feb5535-73c5-407c-8f71-c5cb9350502a"
+    }
+  ]
 }

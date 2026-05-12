@@ -134,6 +134,39 @@ export function maskSecret(value) {
     return `${value.slice(0, 4)}...${value.slice(-3)}`;
 }
 
+function decodeJwtPayload(token) {
+    const parts = String(token || "").split(".");
+    if (parts.length < 2) return null;
+
+    try {
+        return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8"));
+    } catch {
+        return null;
+    }
+}
+
+export function getQwenTokenExpiryInfo(token, now = Date.now()) {
+    const payload = decodeJwtPayload(token);
+    const exp = Number(payload?.exp);
+    if (!Number.isFinite(exp)) {
+        return {
+            expiresAt: null,
+            expiresTs: null,
+            remainingMs: null,
+            status: "unknown",
+        };
+    }
+
+    const expiresTs = exp * 1000;
+    const remainingMs = expiresTs - now;
+    return {
+        expiresAt: new Date(expiresTs).toISOString(),
+        expiresTs,
+        remainingMs,
+        status: remainingMs <= 0 ? "expired" : remainingMs <= 5 * 24 * 60 * 60 * 1000 ? "expiring" : "active",
+    };
+}
+
 export function normalizeQwenTokenEntries(tokens) {
     const source = Array.isArray(tokens) ? tokens : typeof tokens === "string" ? tokens.split(/\r?\n/) : tokens && typeof tokens === "object" ? [tokens] : [];
     const seen = new Set();

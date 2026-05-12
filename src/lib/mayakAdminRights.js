@@ -290,6 +290,19 @@ export async function revokeMayakAdminRight(rightId) {
     return toPublicRight(nextRight);
 }
 
+export async function deleteMayakAdminRight(rightId) {
+    const normalizedId = normalizeString(String(rightId || ""));
+    const store = await readStore();
+    const index = store.rights.findIndex((item) => normalizeString(item.id) === normalizedId);
+    if (index === -1) {
+        throw new Error("Доступ не найден");
+    }
+
+    const [deleted] = store.rights.splice(index, 1);
+    await writeStore(store);
+    return toPublicRight(deleted);
+}
+
 async function createDelegatedMayakSessionForRightIndex(store, index, { sessionName, tableCount }) {
     const normalizedTableCount = normalizePositiveInteger(tableCount, 0);
     if (normalizedTableCount < 1 || normalizedTableCount > DEFAULT_MAX_TABLES) {

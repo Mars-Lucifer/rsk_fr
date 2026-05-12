@@ -19,6 +19,12 @@ const ARTIFACT_TYPE_META = {
     },
 };
 
+const ANALYTICS_STATUS = {
+    pending: "pending",
+    ready: "ready",
+    failed: "failed",
+};
+
 function createEmptyStore() {
     return { entries: [] };
 }
@@ -69,9 +75,16 @@ function buildArtifactUrls(runId) {
 
 export function serializeMayakHistoryEntry(entry) {
     const { artifactDir, ...safeEntry } = entry;
+    const analyticsStatus = String(entry?.analyticsStatus || "").trim() || ANALYTICS_STATUS.ready;
+    const files = buildArtifactUrls(entry.runId);
     return {
         ...safeEntry,
-        files: buildArtifactUrls(entry.runId),
+        analyticsStatus,
+        analyticsError: analyticsStatus === ANALYTICS_STATUS.failed ? String(entry?.analyticsError || "").trim() : "",
+        files: {
+            ...files,
+            analytics: analyticsStatus === ANALYTICS_STATUS.ready ? files.analytics : "",
+        },
     };
 }
 
@@ -84,7 +97,7 @@ export async function createMayakHistoryEntry({
     completedAt,
     certificateBuffer,
     logBuffer,
-    analyticsBuffer,
+    analyticsBuffer = null,
 }) {
     const runId = crypto.randomUUID();
     const completedIso = new Date(completedAt || new Date()).toISOString();
@@ -94,7 +107,9 @@ export async function createMayakHistoryEntry({
     await fs.mkdir(artifactDir, { recursive: true });
     await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.certificate.filename), Buffer.from(certificateBuffer));
     await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.log.filename), Buffer.from(logBuffer));
-    await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.analytics.filename), Buffer.from(analyticsBuffer));
+    if (analyticsBuffer) {
+        await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.analytics.filename), Buffer.from(analyticsBuffer));
+    }
 
     const entry = {
         runId,
@@ -112,6 +127,8 @@ export async function createMayakHistoryEntry({
         trainerName: "МАЯК ОКО",
         completedTaskCount: Array.isArray(logData.tasks) ? logData.tasks.length : 0,
         totalTime: String(logData.totalTime || "").trim(),
+        analyticsStatus: analyticsBuffer ? ANALYTICS_STATUS.ready : ANALYTICS_STATUS.pending,
+        analyticsError: "",
         artifactDir,
     };
 
@@ -133,6 +150,45 @@ export async function getMayakHistoryEntryForUser(portalUserId, runId) {
     return entries.find((entry) => String(entry.runId) === String(runId || "")) || null;
 }
 
+export async function attachAnalyticsToMayakHistoryEntry(runId, analyticsBuffer) {
+    const store = await readStore();
+    const entryIndex = store.entries.findIndex((entry) => String(entry.runId) === String(runId || ""));
+    if (entryIndex === -1) {
+        return null;
+    }
+
+    const entry = store.entries[entryIndex];
+    await fs.mkdir(entry.artifactDir, { recursive: true });
+    await fs.writeFile(
+        path.join(entry.artifactDir, ARTIFACT_TYPE_META.analytics.filename),
+        Buffer.from(analyticsBuffer)
+    );
+
+    store.entries[entryIndex] = {
+        ...entry,
+        analyticsStatus: ANALYTICS_STATUS.ready,
+        analyticsError: "",
+    };
+    await writeStore(store);
+    return store.entries[entryIndex];
+}
+
+export async function markMayakHistoryAnalyticsFailed(runId, errorMessage) {
+    const store = await readStore();
+    const entryIndex = store.entries.findIndex((entry) => String(entry.runId) === String(runId || ""));
+    if (entryIndex === -1) {
+        return null;
+    }
+
+    store.entries[entryIndex] = {
+        ...store.entries[entryIndex],
+        analyticsStatus: ANALYTICS_STATUS.failed,
+        analyticsError: String(errorMessage || "").trim(),
+    };
+    await writeStore(store);
+    return store.entries[entryIndex];
+}
+
 export async function readMayakHistoryArtifact({ portalUserId, runId, type }) {
     const entry = await getMayakHistoryEntryForUser(portalUserId, runId);
     if (!entry) {
@@ -141,6 +197,10 @@ export async function readMayakHistoryArtifact({ portalUserId, runId, type }) {
 
     const artifactMeta = ARTIFACT_TYPE_META[type];
     if (!artifactMeta) {
+        return null;
+    }
+
+    if (type === "analytics" && String(entry.analyticsStatus || "").trim() !== ANALYTICS_STATUS.ready) {
         return null;
     }
 

@@ -14,13 +14,11 @@ import {
     parseQwenEvaluation,
     releaseQwenToken,
 } from "../../../lib/mayakQwen.js";
-import { getMayakPromptEvaluationSettings, readMayakSettings } from "../../../lib/mayakSettings.js";
+import { readMayakSettings } from "../../../lib/mayakSettings.js";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1";
 const OPENROUTER_BACKUP_MODEL = "google/gemini-3-flash-preview";
 const TEMP_UNAVAILABLE_MESSAGE = "Проверка временно недоступна";
-const OLLAMA_TEMP_UNAVAILABLE_MESSAGE = "Локальная проверка Ollama временно недоступна";
-
 function isOpenRouterToken(token) {
     return typeof token === "string" && token.trim().startsWith("sk-or-v1");
 }
@@ -40,6 +38,7 @@ async function requestStructuredEvaluation({
     apiUrl,
     token,
     model,
+    systemPrompt,
     userMessageContent,
     responseFormat,
     extraHeaders = {},
@@ -56,7 +55,7 @@ async function requestStructuredEvaluation({
             messages: [
                 {
                     role: "system",
-                    content: QWEN_EVALUATION_SYSTEM_PROMPT,
+                    content: systemPrompt || QWEN_EVALUATION_SYSTEM_PROMPT,
                 },
                 {
                     role: "user",
@@ -96,62 +95,6 @@ async function requestStructuredEvaluation({
     };
 }
 
-async function requestOllamaEvaluation({ baseUrl, model, userMessageContent }) {
-    const response = await fetch(`${baseUrl}/api/chat`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            model,
-            stream: false,
-            format: "json",
-            messages: [
-                {
-                    role: "system",
-                    content: QWEN_EVALUATION_SYSTEM_PROMPT,
-                },
-                {
-                    role: "user",
-                    content: userMessageContent,
-                },
-            ],
-            options: {
-                temperature: 0.1,
-                num_predict: 700,
-                top_p: 0.95,
-                top_k: 64,
-            },
-        }),
-    });
-
-    if (!response.ok) {
-        return {
-            ok: false,
-            status: response.status,
-            errorText: await response.text(),
-        };
-    }
-
-    const data = await response.json();
-    const rawMessage = data?.message?.content || "";
-    const parsedEvaluation = parseQwenEvaluation(rawMessage);
-
-    if (!parsedEvaluation || !isValidQwenEvaluationShape(parsedEvaluation)) {
-        return {
-            ok: false,
-            status: 502,
-            errorText: rawMessage,
-            parseFailed: true,
-        };
-    }
-
-    return {
-        ok: true,
-        parsedEvaluation,
-    };
-}
-
 function buildNormalizedEvaluation(parsedEvaluation, { fields, taskContext }) {
     return normalizeQwenEvaluation(parsedEvaluation, {
         fields,
@@ -159,11 +102,18 @@ function buildNormalizedEvaluation(parsedEvaluation, { fields, taskContext }) {
     });
 }
 
-async function handleQwenPromptEvaluation({ res, userMessageContent, fields, taskContext }) {
+async function handleQwenPromptEvaluation({ res, userMessageContent, fields, taskContext, systemPrompt, settings }) {
     const tokenPool = await getQwenTokenPool();
     const backupToken = await getStoredQwenBackupToken();
+    const openRouterFallbackToken = String(
+        settings?.finalFileOpenrouterApiKey ||
+            settings?.openrouterApiKey ||
+            process.env.MAYAK_FINAL_FILE_OPENROUTER_API_KEY ||
+            process.env.OPENROUTER_API_KEY ||
+            ""
+    ).trim();
 
-    if (tokenPool.length === 0 && !backupToken) {
+    if (tokenPool.length === 0 && !backupToken && !openRouterFallbackToken) {
         return res.status(503).json({
             error: "Qwen tokens are not configured",
             message: TEMP_UNAVAILABLE_MESSAGE,
@@ -186,6 +136,7 @@ async function handleQwenPromptEvaluation({ res, userMessageContent, fields, tas
                 apiUrl: `${QWEN_API_URL}/v1/chat/completions`,
                 token,
                 model: QWEN_MODEL,
+                systemPrompt,
                 userMessageContent,
             });
 
@@ -249,6 +200,7 @@ async function handleQwenPromptEvaluation({ res, userMessageContent, fields, tas
                 apiUrl: backupApiUrl,
                 token: backupToken,
                 model: backupModel,
+                systemPrompt,
                 userMessageContent,
                 responseFormat: backupProvider === "openrouter" ? { type: "json_object" } : null,
                 extraHeaders:
@@ -287,73 +239,52 @@ async function handleQwenPromptEvaluation({ res, userMessageContent, fields, tas
         }
     }
 
+    if (openRouterFallbackToken) {
+        try {
+            const result = await requestStructuredEvaluation({
+                apiUrl: `${OPENROUTER_API_URL}/chat/completions`,
+                token: openRouterFallbackToken,
+                model: settings?.finalFileModel || OPENROUTER_BACKUP_MODEL,
+                systemPrompt,
+                userMessageContent,
+                responseFormat: { type: "json_object" },
+                extraHeaders: {
+                    "X-OpenRouter-Title": "MAYAK",
+                },
+            });
+
+            if (result.ok) {
+                const evaluation = buildNormalizedEvaluation(result.parsedEvaluation, {
+                    fields,
+                    taskContext,
+                });
+
+                return res.status(200).json(toClientPayload(evaluation));
+            }
+
+            failures.push({
+                provider: "openrouter",
+                status: result.status,
+                reason: result.parseFailed ? "openrouter_parse_failed" : "openrouter_failed",
+                token: maskSecret(openRouterFallbackToken),
+            });
+        } catch (err) {
+            failures.push({
+                provider: "openrouter",
+                status: 0,
+                reason: "openrouter_request_failed",
+                token: maskSecret(openRouterFallbackToken),
+            });
+            console.error("[PromptEvaluation] OpenRouter fallback request error:", maskSecret(openRouterFallbackToken), err.message);
+        }
+    }
+
     console.error("[PromptEvaluation] All configured Qwen tokens failed:", failures);
     return res.status(503).json({
         error: "Qwen token pool exhausted",
         message: TEMP_UNAVAILABLE_MESSAGE,
         details: failures,
     });
-}
-
-async function handleOllamaPromptEvaluation({
-    res,
-    userMessageContent,
-    fields,
-    taskContext,
-    promptEvaluationSettings,
-}) {
-    try {
-        const result = await requestOllamaEvaluation({
-            baseUrl: promptEvaluationSettings.ollamaBaseUrl,
-            model: promptEvaluationSettings.ollamaModel,
-            userMessageContent,
-        });
-
-        if (!result.ok) {
-            if (result.parseFailed) {
-                console.error("[PromptEvaluation] Invalid Ollama response:", result.errorText);
-                return res.status(502).json({
-                    error: "Ollama response parse failed",
-                    message: OLLAMA_TEMP_UNAVAILABLE_MESSAGE,
-                    details: result.errorText,
-                });
-            }
-
-            console.error(
-                "[PromptEvaluation] Ollama API error:",
-                promptEvaluationSettings.ollamaBaseUrl,
-                promptEvaluationSettings.ollamaModel,
-                result.status,
-                result.errorText
-            );
-
-            return res.status(502).json({
-                error: "Ollama API error",
-                message: OLLAMA_TEMP_UNAVAILABLE_MESSAGE,
-                details: result.errorText,
-            });
-        }
-
-        const evaluation = buildNormalizedEvaluation(result.parsedEvaluation, {
-            fields,
-            taskContext,
-        });
-
-        return res.status(200).json(toClientPayload(evaluation));
-    } catch (err) {
-        console.error(
-            "[PromptEvaluation] Ollama request error:",
-            promptEvaluationSettings.ollamaBaseUrl,
-            promptEvaluationSettings.ollamaModel,
-            err.message
-        );
-
-        return res.status(502).json({
-            error: "Ollama request failed",
-            message: OLLAMA_TEMP_UNAVAILABLE_MESSAGE,
-            details: err.message,
-        });
-    }
 }
 
 export default async function handler(req, res) {
@@ -372,22 +303,14 @@ export default async function handler(req, res) {
     });
 
     const settings = await readMayakSettings();
-    const promptEvaluationSettings = getMayakPromptEvaluationSettings(settings);
-
-    if (promptEvaluationSettings.provider === "ollama") {
-        return handleOllamaPromptEvaluation({
-            res,
-            userMessageContent,
-            fields,
-            taskContext,
-            promptEvaluationSettings,
-        });
-    }
+    const systemPrompt = typeof settings.sovaPrompt === "string" && settings.sovaPrompt.trim() ? settings.sovaPrompt.trim() : QWEN_EVALUATION_SYSTEM_PROMPT;
 
     return handleQwenPromptEvaluation({
         res,
         userMessageContent,
         fields,
         taskContext,
+        systemPrompt,
+        settings,
     });
 }
