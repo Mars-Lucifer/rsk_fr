@@ -1,3 +1,0 @@
-[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
-<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\server-development\42.pack.gz_' -> 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\server-development\42.pack.gz'
-<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\12.pack.gz_' -> 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\12.pack.gz'
