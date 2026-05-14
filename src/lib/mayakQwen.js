@@ -177,6 +177,9 @@ export function normalizeQwenTokenEntries(tokens) {
                 return {
                     name: "",
                     token: entry.trim(),
+                    email: "",
+                    account: "",
+                    sessionAccount: "",
                 };
             }
 
@@ -190,6 +193,9 @@ export function normalizeQwenTokenEntries(tokens) {
             return {
                 name: typeof entry.name === "string" ? entry.name.trim() : "",
                 token: typeof entry.token === "string" ? entry.token.trim() : "",
+                email: typeof entry.email === "string" ? entry.email.trim() : "",
+                account: typeof entry.account === "string" ? entry.account.trim() : "",
+                sessionAccount: typeof entry.sessionAccount === "string" ? entry.sessionAccount.trim() : "",
             };
         })
         .filter((entry) => entry.token)

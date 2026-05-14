@@ -55,6 +55,20 @@ function expiryTone(expiry) {
     return expiry.remainingMs > 7 * 24 * 60 * 60 * 1000 ? "active" : "expiring";
 }
 
+function formatSessionAccount(index) {
+    const accountNumber = Number(index) + 1;
+    if (!Number.isFinite(accountNumber) || accountNumber < 1) return "acc??";
+    return `acc${String(accountNumber).padStart(2, "0")}`;
+}
+
+function getTokenDisplayName(token) {
+    return token?.email || token?.name || formatSessionAccount(token?.index);
+}
+
+function getTokenAccountLabel(token) {
+    return token?.account || formatSessionAccount(token?.index);
+}
+
 function StatusMark({ active, value }) {
     return <span className={active ? "status ok" : "status warn"}>{active ? value || "задан" : "не задан"}</span>;
 }
@@ -94,6 +108,8 @@ export default function AdminMayakAiTokens() {
     const [tokensExpanded, setTokensExpanded] = useState(false);
     const [editingTokenIndex, setEditingTokenIndex] = useState(null);
     const [tokenEdits, setTokenEdits] = useState({ name: "", token: "" });
+    const [refreshingTokens, setRefreshingTokens] = useState(false);
+    const [refreshingTokenIndex, setRefreshingTokenIndex] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -144,7 +160,7 @@ export default function AdminMayakAiTokens() {
         const timeoutId = window.setTimeout(() => {
             setMessage("");
             setError("");
-        }, 2200);
+        }, 6000);
         return () => window.clearTimeout(timeoutId);
     }, [message, error]);
 
@@ -245,12 +261,57 @@ export default function AdminMayakAiTokens() {
 
         const nextTokens = settings.qwenTokens.map((entry) => ({
             name: entry.index === index ? name : entry.name,
+            email: entry.email || "",
+            account: entry.account || "",
             token: entry.index === index ? token : entry.token,
         }));
 
         await saveSettings({ qwenTokens: nextTokens }, "Qwen-токен обновлен, срок действия пересчитан");
         setEditingTokenIndex(null);
         setTokenEdits({ name: "", token: "" });
+    };
+
+    const refreshQwenTokens = async (index = null) => {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 130000);
+
+        try {
+            if (index === null) {
+                setRefreshingTokens(true);
+            } else {
+                setRefreshingTokenIndex(index);
+            }
+            setError("");
+            const payload = await parseJsonResponse(
+                await fetch("/api/admin/qwen-tokens/refresh", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(index === null ? {} : { index }),
+                    signal: controller.signal,
+                }),
+                "Не удалось обновить Qwen-токены"
+            );
+            const count = Array.isArray(payload.updated) ? payload.updated.length : 0;
+            setMessage(index === null ? `Qwen-токены обновлены: ${count}` : "Qwen-токен обновлен");
+            await loadSettings();
+        } catch (refreshError) {
+            setError(refreshError.name === "AbortError" ? "Qwen-обновление заняло слишком много времени" : refreshError.message || "Не удалось обновить Qwen-токены");
+        } finally {
+            window.clearTimeout(timeoutId);
+            setRefreshingTokens(false);
+            setRefreshingTokenIndex(null);
+        }
+    };
+
+    const copyText = async (value, successMessage) => {
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            setError("");
+            setMessage(successMessage);
+        } catch {
+            setError("Не удалось скопировать значение");
+        }
     };
 
     if (!isAuthenticated || loading) {
@@ -280,16 +341,23 @@ export default function AdminMayakAiTokens() {
                 {message ? <div className="notice success">{message}</div> : null}
                 {error ? <div className="notice error">{error}</div> : null}
 
-                <section className="grid two">
+                <section className="grid">
                     <article className="panel">
                         <div className="panel-head">
-                            <div className="panel-title-row">
-                                <h2>Единый пул Qwen</h2>
-                                <span>Qwen-токены</span>
+                            <h2>Qwen - токены</h2>
+                            <div className="panel-actions">
+                                <button
+                                    type="button"
+                                    className="refresh"
+                                    onClick={() => refreshQwenTokens()}
+                                    disabled={saving || refreshingTokens || refreshingTokenIndex !== null || settings.qwenTokens.length === 0}
+                                >
+                                    {refreshingTokens ? "Обновляем..." : "Обновить все"}
+                                </button>
+                                <button type="button" className="ghost" onClick={() => setTokensExpanded((current) => !current)}>
+                                    {tokensExpanded ? "Свернуть" : `Развернуть (${settings.qwenTokens.length})`}
+                                </button>
                             </div>
-                            <button type="button" className="ghost" onClick={() => setTokensExpanded((current) => !current)}>
-                                {tokensExpanded ? "Свернуть" : `Развернуть (${settings.qwenTokens.length})`}
-                            </button>
                         </div>
 
                         {tokensExpanded ? (
@@ -298,10 +366,11 @@ export default function AdminMayakAiTokens() {
                                 {settings.qwenTokens.map((token) => {
                                     const isEditing = editingTokenIndex === token.index;
                                     return (
-                                        <div key={`${token.index}:${token.name}`} className="token-row">
+                                        <div key={`${token.index}:${token.email || token.name}`} className="token-row">
                                             <div className={isEditing ? "token-info token-info-edit" : "token-info"}>
                                                 {isEditing ? (
                                                     <>
+                                                        <span className="account-badge">{getTokenAccountLabel(token)}</span>
                                                         <input value={tokenEdits.name} onChange={(event) => updateTokenEdit("name", event.target.value)} placeholder="Название токена" />
                                                         <input
                                                             type="password"
@@ -313,7 +382,8 @@ export default function AdminMayakAiTokens() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <strong>{token.name}</strong>
+                                                        <span className="account-badge">{getTokenAccountLabel(token)}</span>
+                                                        <strong title={getTokenDisplayName(token)}>{getTokenDisplayName(token)}</strong>
                                                         <code>{token.mask || token.token}</code>
                                                         <span className={`expiry ${expiryTone(token.expiry)}`}>{formatExpiry(token.expiry)}</span>
                                                     </>
@@ -348,6 +418,26 @@ export default function AdminMayakAiTokens() {
                                                     </>
                                                 ) : (
                                                     <>
+                                                        <button
+                                                            type="button"
+                                                            className="icon refresh-icon"
+                                                            onClick={() => refreshQwenTokens(token.index)}
+                                                            disabled={saving || refreshingTokens || refreshingTokenIndex !== null}
+                                                            title="Обновить токен"
+                                                            aria-label="Обновить токен"
+                                                        >
+                                                            {refreshingTokenIndex === token.index ? "..." : "↻"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="icon"
+                                                            onClick={() => copyText(token.token, "Qwen-токен скопирован")}
+                                                            disabled={saving}
+                                                            title="Скопировать токен"
+                                                            aria-label="Скопировать токен"
+                                                        >
+                                                            ⧉
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             className="icon edit"
@@ -391,7 +481,9 @@ export default function AdminMayakAiTokens() {
                             </button>
                         </div>
                     </article>
+                </section>
 
+                <section className="grid">
                     <article className="panel">
                         <h2>Резерв OpenRouter</h2>
                         <p className="panel-note">OpenRouter используется только как резерв, если Qwen-пул временно недоступен. Укажите API key и модель.</p>
@@ -419,7 +511,7 @@ export default function AdminMayakAiTokens() {
                     </article>
                 </section>
 
-                <section className="grid two">
+                <section className="grid">
                     <article className="panel">
                         <h2>Промпт СОВА</h2>
                         <p className="panel-note">Это текущий системный промпт для проверки полей СОВА.</p>
@@ -482,6 +574,15 @@ const pageStyles = `
         align-items: center;
         justify-content: space-between;
         gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .panel-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
     }
 
     .panel-title-row {
@@ -621,6 +722,13 @@ const pageStyles = `
         color: #0f172a;
     }
 
+    button.refresh,
+    .icon.refresh-icon {
+        border-color: #99f6e4;
+        background: #ccfbf1;
+        color: #0f766e;
+    }
+
     .icon.danger {
         border-color: #fecaca;
         background: #fef2f2;
@@ -695,19 +803,42 @@ const pageStyles = `
         gap: 6px;
         align-items: center;
         justify-content: flex-end;
-        min-width: 78px;
+        min-width: 162px;
     }
 
     .token-info {
         display: grid;
-        grid-template-columns: minmax(42px, 0.45fr) minmax(140px, 0.9fr) minmax(220px, 1.35fr);
+        grid-template-columns: 76px minmax(220px, 0.95fr) minmax(180px, 0.85fr) minmax(260px, 1.25fr);
         gap: 10px;
         align-items: center;
         min-width: 0;
     }
 
     .token-info-edit {
-        grid-template-columns: minmax(120px, 0.7fr) minmax(180px, 1fr) minmax(220px, 1.2fr);
+        grid-template-columns: 76px minmax(220px, 0.95fr) minmax(260px, 1.15fr) minmax(260px, 1fr);
+    }
+
+    .account-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        min-height: 30px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #fff;
+        color: #0f766e;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0;
+    }
+
+    .token-info strong {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     code {

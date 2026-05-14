@@ -87,6 +87,8 @@ export default async function handler(req, res) {
                 qwenTokens: qwenTokens.map((entry, index) => ({
                     index,
                     name: entry.name || `Токен ${index + 1}`,
+                    email: entry.email || "",
+                    account: entry.account || entry.sessionAccount || `acc${String(index + 1).padStart(2, "0")}`,
                     token: entry.token,
                     mask: maskSecret(entry.token),
                     expiry: getQwenTokenExpiryInfo(entry.token),

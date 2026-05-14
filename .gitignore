@@ -16,6 +16,7 @@ data/mayak-sessions.json
 data/mayak-session-tokens.json
 data/mayak-session-runtime.json
 data/mayak-admin-rights.json
+data/mayak-payments.json
 data/mayakTaskAttempts.json
 data/sessionLogs.json
 
@@ -64,6 +65,8 @@ data/prep-sessions/
 data/botAdmins.json
 data/tokenRequests.json
 data/mayak-settings.json
+data/qwen-sessions/
+data/qwen-tokens-cache.json
 data/mayak-onboarding-links.json
 data/mayak-onboarding-submissions.json
 data/.mayak-onboarding-*.tmp
