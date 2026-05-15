@@ -110,6 +110,7 @@ export default function AdminMayakAiTokens() {
     const [tokenEdits, setTokenEdits] = useState({ name: "", token: "" });
     const [refreshingTokens, setRefreshingTokens] = useState(false);
     const [refreshingTokenIndex, setRefreshingTokenIndex] = useState(null);
+    const [importingTokens, setImportingTokens] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -303,6 +304,33 @@ export default function AdminMayakAiTokens() {
         }
     };
 
+    const importQwenTokenFile = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+
+        try {
+            setImportingTokens(true);
+            setError("");
+            const parsed = JSON.parse(await file.text());
+            const payload = await parseJsonResponse(
+                await fetch("/api/admin/qwen-tokens/import", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(parsed),
+                }),
+                "Не удалось импортировать Qwen-токены"
+            );
+            setMessage(`Qwen-токены импортированы: ${payload.count || 0}`);
+            await loadSettings();
+            setTokensExpanded(true);
+        } catch (importError) {
+            setError(importError.message || "Не удалось импортировать Qwen-токены");
+        } finally {
+            setImportingTokens(false);
+        }
+    };
+
     const copyText = async (value, successMessage) => {
         if (!value) return;
         try {
@@ -346,6 +374,10 @@ export default function AdminMayakAiTokens() {
                         <div className="panel-head">
                             <h2>Qwen - токены</h2>
                             <div className="panel-actions">
+                                <label className={importingTokens || saving ? "import-button disabled" : "import-button"}>
+                                    {importingTokens ? "Импортируем..." : "Импорт JSON"}
+                                    <input type="file" accept="application/json,.json" onChange={importQwenTokenFile} disabled={importingTokens || saving} />
+                                </label>
                                 <button
                                     type="button"
                                     className="refresh"
@@ -727,6 +759,31 @@ const pageStyles = `
         border-color: #99f6e4;
         background: #ccfbf1;
         color: #0f766e;
+    }
+
+    .import-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #fff;
+        color: #0f172a;
+        font-size: 14px;
+        font-weight: 800;
+        padding: 8px 12px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .import-button.disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    .import-button input {
+        display: none;
     }
 
     .icon.danger {

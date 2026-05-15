@@ -165,7 +165,7 @@ export async function createMayakPayment(req, payload = {}) {
     const description =
         normalizeString(payload.description) ||
         normalizeString(process.env.MAYAK_PAYMENT_DEFAULT_DESCRIPTION) ||
-        `Доступ к MAYAK ${id.slice(0, 8)}`;
+        `Доступ к МАЯК ${id.slice(0, 8)}`;
 
     const payment = {
         id,

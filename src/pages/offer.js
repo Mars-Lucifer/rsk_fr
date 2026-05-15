@@ -9,14 +9,15 @@ export default function OfferPage({ legal, updatedAt }) {
     return (
         <LegalShell
             eyebrow="Публичная оферта"
-            title="Условия оказания цифровой услуги MAYAK"
-            lead="Оферта описывает порядок оплаты, получения доступа, поддержки и возвратов для пользователей цифрового тренажера MAYAK.">
+            title="Условия оказания цифровой услуги МАЯК"
+            lead="Оферта описывает порядок оплаты, получения доступа, поддержки и возвратов для пользователей цифрового тренажера МАЯК.">
             <div className="legal-grid">
                 <article className="legal-card wide">
                     <h2>1. Общие положения</h2>
                     <p>
-                        Настоящий документ является публичной офертой самозанятого исполнителя {legal.sellerName}, ИНН {legal.sellerInn},
-                        применяющего налог на профессиональный доход. Оплата услуги означает согласие пользователя с условиями оферты.
+                        Настоящий документ является публичной офертой самозанятого исполнителя {legal.sellerName || "—"}, ИНН{" "}
+                        {legal.sellerInn || "—"}, применяющего налог на профессиональный доход. Оплата услуги означает согласие
+                        пользователя с условиями оферты.
                     </p>
                     <p className="legal-muted">Дата редакции: {updatedAt}</p>
                 </article>
@@ -31,7 +32,7 @@ export default function OfferPage({ legal, updatedAt }) {
                 <article className="legal-card">
                     <h2>3. Стоимость и оплата</h2>
                     <p>
-                        Стоимость услуги составляет {legal.priceRub} ₽. Оплата проводится онлайн через платежную форму ЮKassa.
+                        Стоимость услуги указывается на странице оплаты и начинается от {legal.priceRub} ₽. Оплата проводится онлайн через платежную форму ЮKassa.
                         Обязанность пользователя по оплате считается исполненной после подтверждения успешного платежа платежным сервисом.
                     </p>
                 </article>
@@ -70,11 +71,11 @@ export default function OfferPage({ legal, updatedAt }) {
                     <dl>
                         <div>
                             <dt>ФИО</dt>
-                            <dd>{legal.sellerName}</dd>
+                            <dd>{legal.sellerName || "—"}</dd>
                         </div>
                         <div>
                             <dt>ИНН</dt>
-                            <dd>{legal.sellerInn}</dd>
+                            <dd>{legal.sellerInn || "—"}</dd>
                         </div>
                         <div>
                             <dt>Email</dt>
@@ -84,7 +85,7 @@ export default function OfferPage({ legal, updatedAt }) {
                         </div>
                         <div>
                             <dt>Телефон</dt>
-                            <dd>{legal.sellerPhone}</dd>
+                            <dd>{legal.sellerPhone || "—"}</dd>
                         </div>
                     </dl>
                 </article>

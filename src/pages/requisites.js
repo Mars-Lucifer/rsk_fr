@@ -6,24 +6,12 @@ export async function getServerSideProps() {
 }
 
 export default function RequisitesPage({ legal }) {
-    const hasPlaceholder = legal.sellerName.includes("Укажите") || legal.sellerInn.includes("Укажите");
-
     return (
         <LegalShell
             eyebrow="Реквизиты"
             title="Реквизиты самозанятого исполнителя"
             lead="Эта страница содержит сведения о продавце, контакты поддержки, описание услуги и условия получения доступа после оплаты. Ссылка на нее подходит для анкеты ЮKassa.">
             <div className="legal-grid">
-                {hasPlaceholder ? (
-                    <article className="legal-card legal-alert wide">
-                        <h2>Перед отправкой в ЮKassa заполните данные</h2>
-                        <p>
-                            В переменных окружения нужно указать реальные значения `MAYAK_SELLER_NAME`, `MAYAK_SELLER_INN`,
-                            `MAYAK_SELLER_PHONE` и при необходимости `MAYAK_SELLER_EMAIL`.
-                        </p>
-                    </article>
-                ) : null}
-
                 <article className="legal-card">
                     <h2>Исполнитель</h2>
                     <dl>
@@ -33,11 +21,11 @@ export default function RequisitesPage({ legal }) {
                         </div>
                         <div>
                             <dt>ФИО</dt>
-                            <dd>{legal.sellerName}</dd>
+                            <dd>{legal.sellerName || "—"}</dd>
                         </div>
                         <div>
                             <dt>ИНН</dt>
-                            <dd>{legal.sellerInn}</dd>
+                            <dd>{legal.sellerInn || "—"}</dd>
                         </div>
                         {legal.sellerAddress ? (
                             <div>
@@ -59,7 +47,7 @@ export default function RequisitesPage({ legal }) {
                         </div>
                         <div>
                             <dt>Телефон</dt>
-                            <dd>{legal.sellerPhone}</dd>
+                            <dd>{legal.sellerPhone || "—"}</dd>
                         </div>
                     </dl>
                 </article>
@@ -77,7 +65,7 @@ export default function RequisitesPage({ legal }) {
                         </div>
                         <div>
                             <dt>Стоимость</dt>
-                            <dd>{legal.priceRub} ₽</dd>
+                            <dd>{legal.priceLabel}</dd>
                         </div>
                         <div>
                             <dt>Получение доступа</dt>

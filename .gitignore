@@ -66,6 +66,7 @@ data/botAdmins.json
 data/tokenRequests.json
 data/mayak-settings.json
 data/qwen-sessions/
+data/qwen-sessions*.zip
 data/qwen-tokens-cache.json
 data/mayak-onboarding-links.json
 data/mayak-onboarding-submissions.json

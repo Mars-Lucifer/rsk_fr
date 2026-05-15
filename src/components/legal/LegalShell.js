@@ -4,7 +4,7 @@ export default function LegalShell({ title, eyebrow, lead, children }) {
     return (
         <main className="legal-page">
             <nav className="legal-nav" aria-label="Юридические страницы">
-                <Link href="/">MAYAK</Link>
+                <Link href="/">МАЯК</Link>
                 <span />
                 <Link href="/pay">Оплата</Link>
                 <Link href="/requisites">Реквизиты</Link>

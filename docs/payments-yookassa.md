@@ -1,6 +1,6 @@
 # YooKassa payments
 
-This project has a minimal YooKassa integration for MAYAK payments.
+This project has a minimal YooKassa integration for МАЯК payments.
 
 ## Environment
 
@@ -12,9 +12,9 @@ YOOKASSA_SECRET_KEY=your_secret_key
 YOOKASSA_WEBHOOK_SECRET=random_long_secret
 NEXT_PUBLIC_BASE_URL=https://your-domain.example
 MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB=990
-MAYAK_PAYMENT_DEFAULT_DESCRIPTION=Доступ к цифровому тренажеру MAYAK
-MAYAK_SERVICE_DESCRIPTION=Оплачиваемый доступ к цифровому образовательному тренажеру MAYAK
-MAYAK_SERVICE_DELIVERY_TERMS=После успешной оплаты пользователь получает доступ к цифровому продукту MAYAK.
+MAYAK_PAYMENT_DEFAULT_DESCRIPTION=Цифровой продукт МАЯК
+MAYAK_SERVICE_DESCRIPTION=Доступ к цифровому тренажеру МАЯК, сценариям, методическим материалам и сопровождению прохождения.
+MAYAK_SERVICE_DELIVERY_TERMS=После успешной оплаты пользователь получает доступ к цифровому продукту МАЯК.
 MAYAK_SERVICE_SUPPORT_TERMS=Вопросы по оплате и доступу принимаются по электронной почте исполнителя.
 MAYAK_SELLER_NAME=ФИО самозанятого
 MAYAK_SELLER_INN=ИНН самозанятого

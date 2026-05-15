@@ -97,8 +97,8 @@ export default function PayPage({ legal }) {
 
     return (
         <main className="pay-page">
-            <nav className="pay-nav" aria-label="Оплата MAYAK">
-                <Link href="/">MAYAK</Link>
+            <nav className="pay-nav" aria-label="Оплата МАЯК">
+                <Link href="/">МАЯК</Link>
                 <span />
                 <Link href="/requisites">Реквизиты</Link>
                 <Link href="/offer">Оферта</Link>
@@ -107,9 +107,9 @@ export default function PayPage({ legal }) {
             <section className="pay-shell">
                 <div className="pay-copy">
                     <p className="eyebrow">Онлайн-оплата</p>
-                    <h1>Оплата доступа к MAYAK</h1>
+                    <h1>Оплата продукта МАЯК</h1>
                     <p className="lead">
-                        Оплата проходит через ЮKassa. После успешного платежа доступ к цифровому тренажеру предоставляется по условиям
+                        Оплата проходит через ЮKassa. После успешного платежа доступ к цифровому продукту предоставляется по условиям
                         оферты.
                     </p>
                     <div className="service-summary">
