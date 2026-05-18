@@ -1,0 +1,20 @@
+
+> rsk@0.1.0 dev
+> next dev --webpack -p 1234
+
+▲ Next.js 16.1.1 (webpack)
+- Local:         http://localhost:1234
+- Network:       http://10.16.76.110:1234
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 2.5s
+[TG Bot] Бот работает в режиме webhook
+ HEAD /tools/mayak-trainer 200 in 2.9s (compile: 2.8s, render: 80ms)
+ GET /tools/mayak-trainer 200 in 2.9s (compile: 2.8s, render: 84ms)
+ GET /tools/mayak-trainer 200 in 58ms (compile: 6ms, render: 52ms)
+ GET /api/mayak/case-photos 200 in 628ms (compile: 595ms, render: 33ms)
+ GET /api/mayak/case-photo?filename=1777385927034-4a8e4cb3-a5bf-4ff8-bfe8-89932ad98869.png&variant=thumb 200 in 116ms (compile: 105ms, render: 12ms)
+ GET /api/mayak/case-photo?filename=1777385682378-680cbb19-6b91-4a82-91ed-d85614a9fba6.jpg&variant=thumb 200 in 117ms (compile: 105ms, render: 12ms)
+ GET /api/mayak/content-data 200 in 106ms (compile: 93ms, render: 13ms)
+ GET /api/mayak/case-photos 304 in 9ms (compile: 4ms, render: 5ms)

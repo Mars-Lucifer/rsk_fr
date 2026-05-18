@@ -26,7 +26,7 @@ const BASE_NAV_LINKS = [
     { label: "Проекты", disable: false, login: true, learn: true, href: "/projects", icon: dynamic(() => import("@/assets/nav/projects.svg")) },
     { label: "Обучение", disable: false, login: true, learn: false, href: "/cours", icon: dynamic(() => import("@/assets/nav/cours.svg")) },
     { label: "Маяк Око", href: "/tools/mayak-oko", login: false, learn: false, icon: dynamic(() => import("@/assets/nav/inst.svg")) },
-    { label: "Тренажер МАЯК", href: "/tools/mayak-trainer#overview", login: false, learn: false, inactive: true, icon: dynamic(() => import("@/assets/nav/mayak-trainer.svg")) },
+    { label: "Тренажер МАЯК", href: "/tools/mayak-trainer#overview", login: false, learn: false, icon: dynamic(() => import("@/assets/nav/mayak-trainer.svg")) },
     {
         label: "Админ панель",
         disable: true,

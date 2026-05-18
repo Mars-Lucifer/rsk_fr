@@ -1,0 +1,8 @@
+▲ Next.js 16.1.1 (webpack)
+- Local:         http://localhost:1235
+- Network:       http://10.16.76.110:1235
+- Environments: .env.local
+
+✓ Starting...
+  Suggestion: If you intended to restart next dev, terminate the other process, and then try again.
+[?25h
