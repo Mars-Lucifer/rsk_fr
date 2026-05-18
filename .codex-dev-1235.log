@@ -4,5 +4,21 @@
 - Environments: .env.local
 
 ✓ Starting...
-  Suggestion: If you intended to restart next dev, terminate the other process, and then try again.
-[?25h
+✓ Ready in 3.4s
+[TG Bot] Бот работает в режиме webhook
+ GET /tariffs 200 in 1531ms (compile: 1499ms, render: 32ms)
+ GET /tariffs 200 in 62ms (compile: 16ms, render: 46ms)
+ GET /tariffs 200 in 27ms (compile: 10ms, render: 17ms)
+ GET / 200 in 470ms (compile: 434ms, render: 37ms)
+ GET /pay 200 in 854ms (compile: 767ms, render: 87ms)
+ GET /tariffs 200 in 18ms (compile: 6ms, render: 13ms)
+ GET /pay 200 in 33ms (compile: 24ms, render: 9ms)
+ GET /requisites 200 in 656ms (compile: 633ms, render: 22ms)
+ GET /offer 200 in 665ms (compile: 633ms, render: 33ms)
+ GET /pay 200 in 22ms (compile: 8ms, render: 14ms)
+ GET /pay 200 in 27ms (compile: 5ms, render: 22ms)
+ GET /tariffs 200 in 25ms (compile: 8ms, render: 17ms)
+ GET /requisites 200 in 23ms (compile: 3ms, render: 20ms)
+ GET /tariffs 200 in 19ms (compile: 3ms, render: 16ms)
+ GET /tariffs 200 in 100ms (compile: 79ms, render: 22ms)
+ GET /tariffs 200 in 27ms (compile: 6ms, render: 21ms)

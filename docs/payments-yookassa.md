@@ -28,6 +28,7 @@ Do not expose `YOOKASSA_SECRET_KEY` to the browser.
 ## Routes
 
 - `GET /pay` opens the payment page.
+- `GET /tariffs` shows services and unit prices for YooKassa moderation.
 - `GET /requisites` shows seller requisites for YooKassa moderation.
 - `GET /offer` shows the public offer.
 - `POST /api/payments/create` creates a YooKassa payment and returns `confirmationUrl`.

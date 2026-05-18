@@ -100,6 +100,7 @@ export default function PayPage({ legal }) {
             <nav className="pay-nav" aria-label="Оплата МАЯК">
                 <Link href="/">МАЯК</Link>
                 <span />
+                <Link href="/tariffs">Тарифы</Link>
                 <Link href="/requisites">Реквизиты</Link>
                 <Link href="/offer">Оферта</Link>
             </nav>
@@ -156,7 +157,7 @@ export default function PayPage({ legal }) {
                         {loading ? "Создаем платеж..." : "Перейти к оплате"}
                     </button>
                     <p className="form-note">
-                        Нажимая кнопку, вы соглашаетесь с <Link href="/offer">публичной офертой</Link>. Реквизиты исполнителя
+                        Услуги и цены опубликованы на странице <Link href="/tariffs">тарифов</Link>. Нажимая кнопку, вы соглашаетесь с <Link href="/offer">публичной офертой</Link>. Реквизиты исполнителя
                         опубликованы на странице <Link href="/requisites">реквизитов</Link>.
                     </p>
                 </form>
