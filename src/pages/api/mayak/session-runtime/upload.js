@@ -4,6 +4,7 @@ import { IncomingForm } from "formidable";
 import { createMayakSessionReview, saveMayakSessionUploadFile, startMayakSessionBackgroundPreviewConversion } from "@/lib/mayakSessionRuntime";
 
 const MAX_SESSION_UPLOAD_FILE_SIZE = 30 * 1024 * 1024;
+const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 3000;
 
 export const config = {
     api: {
@@ -47,8 +48,8 @@ export default async function handler(req, res) {
         if (!file && !submissionText) {
             return res.status(400).json({ success: false, error: "\u041d\u0443\u0436\u043d\u043e \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0444\u0430\u0439\u043b \u0438\u043b\u0438 \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0442\u0435\u043a\u0441\u0442 \u043e\u0442\u0432\u0435\u0442\u0430" });
         }
-        if (submissionText.length > 1000) {
-            return res.status(400).json({ success: false, error: "\u0422\u0435\u043a\u0441\u0442 \u043e\u0442\u0432\u0435\u0442\u0430 \u043d\u0435 \u0434\u043e\u043b\u0436\u0435\u043d \u043f\u0440\u0435\u0432\u044b\u0448\u0430\u0442\u044c 1000 \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432" });
+        if (submissionText.length > MAX_SESSION_SUBMISSION_TEXT_LENGTH) {
+            return res.status(400).json({ success: false, error: `\u0422\u0435\u043a\u0441\u0442 \u043e\u0442\u0432\u0435\u0442\u0430 \u043d\u0435 \u0434\u043e\u043b\u0436\u0435\u043d \u043f\u0440\u0435\u0432\u044b\u0448\u0430\u0442\u044c ${MAX_SESSION_SUBMISSION_TEXT_LENGTH} \u0441\u0438\u043c\u0432\u043e\u043b\u043e\u0432` });
         }
 
         const sessionId = String(readField(fields, "sessionId") || "");

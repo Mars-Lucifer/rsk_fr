@@ -8,6 +8,12 @@ export const MAYAK_ADMIN_SECTIONS = [
         href: "/admin/mayak-content",
     },
     {
+        id: "services",
+        title: "Сервисы",
+        description: "Списки сервисов для типов контента и подразделов блока «Разное».",
+        href: "/admin/mayak-services",
+    },
+    {
         id: "tokens",
         title: "Токены",
         description: "Обычные токены, сессионные токены и внешние ссылки для организаторов в одном разделе.",

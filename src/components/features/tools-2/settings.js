@@ -398,6 +398,8 @@ export default function SettingsPage({ goTo }) {
     }, [router.isReady, router.query?.password, router.query?.token, validateToken]);
 
     useEffect(() => {
+        if (!router.isReady) return undefined;
+
         let isCancelled = false;
 
         const hydrate = async () => {
@@ -406,6 +408,23 @@ export default function SettingsPage({ goTo }) {
             try {
                 const keyInCookies = await getKeyFromCookies();
                 const tokenFromCookie = keyInCookies?.text || "";
+                const tokenFromUrl = String(router.query?.token || router.query?.password || "").trim();
+
+                if (tokenFromUrl) {
+                    skipNextTokenEffectRef.current = true;
+                    if (tokenFromCookie && tokenFromCookie !== tokenFromUrl) {
+                        await removeKeyCookie();
+                        await clearUserCookie();
+                    }
+
+                    if (!isCancelled) {
+                        setStoredToken(tokenFromCookie === tokenFromUrl ? tokenFromCookie : "");
+                        setToken(tokenFromUrl);
+                    }
+
+                    await Promise.all([validateToken(tokenFromUrl), fetchPortalProfile({ force: true })]);
+                    return;
+                }
 
                 if (tokenFromCookie === "ADMIN-BYPASS-TOKEN") {
                     await removeKeyCookie();
@@ -455,7 +474,7 @@ export default function SettingsPage({ goTo }) {
         return () => {
             isCancelled = true;
         };
-    }, [fetchPortalProfile, validateToken]);
+    }, [fetchPortalProfile, router.isReady, router.query?.password, router.query?.token, validateToken]);
 
     useEffect(() => {
         if (skipNextTokenEffectRef.current) {

@@ -3,6 +3,7 @@ import Header from "@/components/layout/Header";
 import Block from "@/components/features/public/Block";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input/Input";
+import { buildMayakAdminLoginUrl, getMayakAdminAuthStatus } from "@/lib/mayakAdminClient";
 
 // Иконка-стрелочка для аккордеона
 const ChevronIcon = ({ isOpen }) => (
@@ -27,7 +28,7 @@ const DeleteIcon = () => (
     </svg>
 );
 
-const AccordionItem = ({ type, links, onLinkChange, onAddLink, onDeleteLink, onTypeLabelChange, onDeleteType, isDeletable }) => {
+const AccordionItem = ({ type, links, onLinkChange, onAddLink, onDeleteLink, onTypeLabelChange, onDeleteType, onInstructionUpload, isUploadingInstruction, isDeletable }) => {
     const [isOpen, setIsOpen] = useState(false);
 
     // Список доступных иконок для выбора в админ-панели
@@ -72,29 +73,56 @@ const AccordionItem = ({ type, links, onLinkChange, onAddLink, onDeleteLink, onT
                     <div className="space-y-4">
                         {links && links.length > 0 ? (
                             links.map((link, index) => (
-                                // ИЗМЕНЕНО: Добавлена колонка для иконки, сетка стала 5-колоночной
-                                <div key={index} className="grid grid-cols-[auto_1fr_2fr_1.5fr_1fr_auto] items-center gap-3">
-                                    <Input type="number" value={link.order || ""} onChange={(e) => onLinkChange(type.key, index, "order", e.target.value)} placeholder="№" className="w-16 text-center" title="Порядковый номер" />
-                                    <Input value={link.name} onChange={(e) => onLinkChange(type.key, index, "name", e.target.value)} placeholder="Название сервиса" />
-                                    <Input value={link.url} onChange={(e) => onLinkChange(type.key, index, "url", e.target.value)} placeholder="URL-адрес" />
-                                    <Input value={link.description || ""} onChange={(e) => onLinkChange(type.key, index, "description", e.target.value)} placeholder="Описание (подсказка)" />
-                                    {/* НОВОЕ: Выпадающий список для выбора иконки */}
-                                    <select
-                                        value={link.iconType || "standard"}
-                                        onChange={(e) => onLinkChange(type.key, index, "iconType", e.target.value)}
-                                        className="w-full h-11 rounded-lg border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                        {iconOptions.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <button
-                                        onClick={() => onDeleteLink(type.key, index)}
-                                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-600 transition-colors"
-                                        title="Удалить сервис">
-                                        <DeleteIcon />
-                                    </button>
+                                <div key={index} className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                                    <div className="grid grid-cols-[auto_1fr_2fr_1.5fr_1fr_auto] items-center gap-3">
+                                        <Input type="number" value={link.order || ""} onChange={(e) => onLinkChange(type.key, index, "order", e.target.value)} placeholder="№" className="w-16 text-center" title="Порядковый номер" />
+                                        <Input value={link.name} onChange={(e) => onLinkChange(type.key, index, "name", e.target.value)} placeholder="Название сервиса" />
+                                        <Input value={link.url} onChange={(e) => onLinkChange(type.key, index, "url", e.target.value)} placeholder="URL-адрес" />
+                                        <Input value={link.description || ""} onChange={(e) => onLinkChange(type.key, index, "description", e.target.value)} placeholder="Описание (подсказка)" />
+                                        <select
+                                            value={link.iconType || "standard"}
+                                            onChange={(e) => onLinkChange(type.key, index, "iconType", e.target.value)}
+                                            className="w-full h-11 rounded-lg border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                            {iconOptions.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            onClick={() => onDeleteLink(type.key, index)}
+                                            className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                                            title="Удалить сервис">
+                                            <DeleteIcon />
+                                        </button>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-[120px_1fr_auto_auto] items-center gap-3">
+                                        <div className="h-16 w-28 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                                            {link.instructionImage ? (
+                                                <img src={link.instructionImage} alt="" className="h-full w-full object-cover" />
+                                            ) : (
+                                                <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">Нет фото</div>
+                                            )}
+                                        </div>
+                                        <Input value={link.instructionImage || ""} onChange={(e) => onLinkChange(type.key, index, "instructionImage", e.target.value)} placeholder="Фото инструкции" />
+                                        <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
+                                            {isUploadingInstruction(type.key, index) ? "Загрузка..." : link.instructionImage ? "Заменить фото" : "Добавить фото"}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                disabled={isUploadingInstruction(type.key, index)}
+                                                onChange={(event) => onInstructionUpload(type.key, index, event)}
+                                            />
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => onLinkChange(type.key, index, "instructionImage", "")}
+                                            disabled={!link.instructionImage}
+                                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40">
+                                            Убрать
+                                        </button>
+                                    </div>
                                 </div>
                             ))
                         ) : (
@@ -121,6 +149,32 @@ export default function AdminPanel({ goTo }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");
+    const [uploadingInstructionKey, setUploadingInstructionKey] = useState("");
+
+    useEffect(() => {
+        let cancelled = false;
+
+        getMayakAdminAuthStatus()
+            .then(({ authenticated }) => {
+                if (!cancelled && authenticated) {
+                    setIsAuthenticated(true);
+                }
+            })
+            .catch(() => {
+                if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin/")) {
+                    window.location.replace(buildMayakAdminLoginUrl(`${window.location.pathname}${window.location.search}`));
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -230,6 +284,40 @@ export default function AdminPanel({ goTo }) {
         });
     };
 
+    const handleInstructionUpload = async (typeKey, index, event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+
+        const uploadKey = `${typeKey}:${index}`;
+        setUploadingInstructionKey(uploadKey);
+        setStatus("Загрузка фото инструкции...");
+
+        try {
+            const currentLink = constants?.defaultLinks?.[typeKey]?.[index] || {};
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("typeKey", typeKey);
+            formData.append("serviceName", currentLink.name || `service-${index + 1}`);
+
+            const response = await fetch("/api/admin/mayak-services/upload", {
+                method: "POST",
+                body: formData,
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || "Не удалось загрузить фото");
+            }
+
+            handleLinkChange(typeKey, index, "instructionImage", payload.url);
+            setStatus("Фото загружено. Нажмите «Сохранить все изменения».");
+        } catch (error) {
+            setStatus(`Ошибка загрузки фото: ${error.message}`);
+        } finally {
+            setUploadingInstructionKey("");
+        }
+    };
+
     const handleDeleteLink = (typeKey, index) => {
         setConstants((prev) => {
             const newConstants = JSON.parse(JSON.stringify(prev));
@@ -318,9 +406,9 @@ export default function AdminPanel({ goTo }) {
         <div className="bg-gray-50 min-h-screen">
             <Header>
                 <div className="container mx-auto px-4">
-                    <Header.Heading className="mb-4 text-center text-xl md:text-2xl">Админ-панель: Сервисы и Ссылки</Header.Heading>
-                    <Button onClick={() => goTo("trainer")} className="w-full">
-                        Вернуться к тренажеру
+                    <Header.Heading className="mb-4 text-center text-xl md:text-2xl">Админ-панель: Сервисы</Header.Heading>
+                    <Button onClick={() => (goTo ? goTo("trainer") : window.location.assign("/admin?view=sections"))} className="w-full">
+                        {goTo ? "Вернуться к тренажеру" : "Вернуться в админ-панель"}
                     </Button>
                 </div>
             </Header>
@@ -342,6 +430,8 @@ export default function AdminPanel({ goTo }) {
                                                 onLinkChange={handleLinkChange}
                                                 onAddLink={handleAddLink}
                                                 onDeleteLink={handleDeleteLink}
+                                                onInstructionUpload={handleInstructionUpload}
+                                                isUploadingInstruction={(typeKey, index) => uploadingInstructionKey === `${typeKey}:${index}`}
                                                 // Разрешаем редактирование и удаление только для подтипов категории 'misc'
                                                 onTypeLabelChange={handleTypeLabelChange}
                                                 isDeletable={true}
@@ -366,6 +456,8 @@ export default function AdminPanel({ goTo }) {
                                     onLinkChange={handleLinkChange}
                                     onAddLink={handleAddLink}
                                     onDeleteLink={handleDeleteLink}
+                                    onInstructionUpload={handleInstructionUpload}
+                                    isUploadingInstruction={(typeKey, index) => uploadingInstructionKey === `${typeKey}:${index}`}
                                     onTypeLabelChange={null} // Запрещаем редактирование названия
                                     isDeletable={false} // Запрещаем удаление
                                 />

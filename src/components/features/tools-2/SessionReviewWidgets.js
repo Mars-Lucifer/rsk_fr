@@ -9,6 +9,7 @@ const REJECT_REASON_OPTIONS = [
     { value: "wrong_format", label: "Другой формат", comment: "Другой формат" },
     { value: "other", label: "Другое (указать)", comment: "" },
 ];
+const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 3000;
 
 function formatRemaining(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
@@ -196,11 +197,11 @@ export function SessionTaskReviewPopup({ taskData, elapsedTime, rejectedComment,
                     <div className="space-y-2">
                         <div className="flex items-center justify-between gap-3">
                             <label className="text-sm font-semibold text-slate-800">{"\u0422\u0435\u043a\u0441\u0442\u043e\u0432\u044b\u0439 \u043e\u0442\u0432\u0435\u0442"}</label>
-                            <span className="text-xs text-slate-500">{submissionText.length}/1000</span>
+                            <span className="text-xs text-slate-500">{submissionText.length}/{MAX_SESSION_SUBMISSION_TEXT_LENGTH}</span>
                         </div>
                         <textarea
                             value={submissionText}
-                            onChange={(event) => setSubmissionText(String(event.target.value || "").slice(0, 1000))}
+                            onChange={(event) => setSubmissionText(String(event.target.value || "").slice(0, MAX_SESSION_SUBMISSION_TEXT_LENGTH))}
                             className="min-h-[96px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
                             placeholder={"\u041c\u043e\u0436\u043d\u043e \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043a\u043e\u0440\u043e\u0442\u043a\u0438\u0439 \u0442\u0435\u043a\u0441\u0442\u043e\u0432\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u0434\u0430\u0436\u0435 \u0431\u0435\u0437 \u0444\u0430\u0439\u043b\u0430."}
                         />

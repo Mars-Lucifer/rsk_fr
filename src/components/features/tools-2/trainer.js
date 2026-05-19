@@ -59,6 +59,7 @@ const TRAINER_PREFIX = "trainer_v2"; // Уникальный префикс дл
 const PREVIEW_WIDTH_MIN = 320;
 const PREVIEW_WIDTH_MAX = 560;
 const PREVIEW_WIDTH_DEFAULT = 520;
+const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 3000;
 
 const QWEN_EVALUATION_LIMIT = 20;
 const getStorageKey = (key) => `${TRAINER_PREFIX}_${key}`;
@@ -845,8 +846,8 @@ export default function TrainerPage({ goTo }) {
                 setSessionUploadError("Нужно загрузить файл или добавить текст ответа.");
                 return;
             }
-            if (normalizedSubmissionText.length > 1000) {
-                setSessionUploadError("Текст ответа не должен превышать 1000 символов.");
+            if (normalizedSubmissionText.length > MAX_SESSION_SUBMISSION_TEXT_LENGTH) {
+                setSessionUploadError(`Текст ответа не должен превышать ${MAX_SESSION_SUBMISSION_TEXT_LENGTH} символов.`);
                 return;
             }
             if (!runtimeSessionId || !activeUserId || !currentTaskData) {

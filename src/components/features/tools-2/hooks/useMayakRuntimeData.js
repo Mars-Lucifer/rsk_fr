@@ -3,6 +3,27 @@
 import { STATIC_MAYAK_DATA } from "../../../../../data/mayakDataConst";
 import { getUserFromCookies } from "../actions";
 
+function mergeMayakRuntimeData(serverData) {
+    const serverDefaultTypes = Array.isArray(serverData?.defaultTypes) ? serverData.defaultTypes : [];
+    const serverMisc = serverDefaultTypes.find((type) => type?.key === "misc");
+    const defaultTypes = STATIC_MAYAK_DATA.defaultTypes.map((type) => {
+        if (type.key !== "misc" || !Array.isArray(serverMisc?.subCategories)) {
+            return type;
+        }
+
+        return {
+            ...type,
+            subCategories: serverMisc.subCategories,
+        };
+    });
+
+    return {
+        ...STATIC_MAYAK_DATA,
+        defaultTypes,
+        defaultLinks: serverData?.defaultLinks || {},
+    };
+}
+
 export const useMayakRuntimeData = () => {
     const [mayakData, setMayakData] = useState({ ...STATIC_MAYAK_DATA, defaultLinks: {} });
     const [isLoadingData, setIsLoadingData] = useState(true);
@@ -21,8 +42,8 @@ export const useMayakRuntimeData = () => {
                 if (!response.ok) {
                     throw new Error("Не удалось загрузить ссылки для тренажера");
                 }
-                const linksData = await response.json();
-                setMayakData({ ...STATIC_MAYAK_DATA, defaultLinks: linksData.defaultLinks || {} });
+                const serverData = await response.json();
+                setMayakData(mergeMayakRuntimeData(serverData));
             } catch (err) {
                 setErrorData(err.message);
                 setMayakData({ ...STATIC_MAYAK_DATA, defaultLinks: {} });
