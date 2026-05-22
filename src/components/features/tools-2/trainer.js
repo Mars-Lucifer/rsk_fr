@@ -59,7 +59,7 @@ const TRAINER_PREFIX = "trainer_v2"; // Уникальный префикс дл
 const PREVIEW_WIDTH_MIN = 320;
 const PREVIEW_WIDTH_MAX = 560;
 const PREVIEW_WIDTH_DEFAULT = 520;
-const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 3000;
+const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 10000;
 
 const QWEN_EVALUATION_LIMIT = 20;
 const getStorageKey = (key) => `${TRAINER_PREFIX}_${key}`;

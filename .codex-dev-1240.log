@@ -1,0 +1,11 @@
+▲ Next.js 16.1.1 (webpack)
+- Local:         http://localhost:1240
+- Network:       http://10.16.76.110:1240
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 2.1s
+[TG Bot] Бот работает в режиме webhook
+ GET /pay 200 in 1989ms (compile: 1952ms, render: 37ms)
+ GET /pay 200 in 11ms (compile: 3ms, render: 8ms)
+  Reload env: .env.local

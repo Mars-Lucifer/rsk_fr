@@ -7,7 +7,7 @@ import { createMayakSession, deleteMayakSession, listMayakSessions } from "@/lib
 import { listMayakSessionTokens } from "@/lib/mayakSessionTokens";
 
 const RIGHTS_FILE = path.join(process.cwd(), "data", "mayak-admin-rights.json");
-const DEFAULT_TOTAL_QUOTA = 10;
+const DEFAULT_TOTAL_QUOTA = 1000000;
 const DEFAULT_TOTAL_PARTICIPANT_LIMIT = 180;
 const DEFAULT_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_MAX_TABLES = 6;
@@ -105,16 +105,8 @@ function assertValidRightPayload(payload = {}) {
         throw new Error("Укажите колоду МАЯК");
     }
 
-    if (normalized.totalQuota < 1) {
-        throw new Error("Лимит сессий должен быть не меньше 1");
-    }
-
     if (normalized.totalParticipantLimit < 1) {
         throw new Error("Общий лимит входов должен быть не меньше 1");
-    }
-
-    if (normalized.usedQuota > normalized.totalQuota) {
-        throw new Error("Лимит сессий не может быть меньше уже созданных");
     }
 
     return normalized;
@@ -314,13 +306,9 @@ async function createDelegatedMayakSessionForRightIndex(store, index, { sessionN
         throw new Error("Доступ неактивен");
     }
 
-    if (currentRight.remainingQuota < 1) {
-        throw new Error("Лимит создания сессий исчерпан");
-    }
-
     const expiresAt = new Date(Date.now() + DEFAULT_TOKEN_TTL_MS).toISOString();
     const normalizedSessionName = normalizeString(sessionName);
-    const resolvedSessionName = normalizedSessionName || `Сессия ${currentRight.title || currentRight.accessId} #${currentRight.usedQuota + 1}`;
+    const resolvedSessionName = normalizedSessionName || `Сессия ${currentRight.title || currentRight.accessId}`;
 
     let createdSession = null;
 
@@ -338,10 +326,7 @@ async function createDelegatedMayakSessionForRightIndex(store, index, { sessionN
             participantLimit: currentRight.totalParticipantLimit,
         });
 
-        const nextRight = toStoredRight({
-            ...store.rights[index],
-            usedQuota: normalizeNonNegativeInteger(store.rights[index].usedQuota, 0) + 1,
-        });
+        const nextRight = toStoredRight(store.rights[index]);
         store.rights[index] = nextRight;
         await writeStore(store);
 

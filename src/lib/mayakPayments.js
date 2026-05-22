@@ -10,13 +10,27 @@ function normalizeString(value) {
     return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeAmount(value, fallback = process.env.MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB || "990") {
+function normalizeAmount(value, fallback = process.env.MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB || "200") {
     const normalized = String(value || fallback).replace(",", ".").trim();
     const parsed = Number(normalized);
     if (!Number.isFinite(parsed) || parsed <= 0) {
         throw new Error("Invalid payment amount");
     }
     return parsed.toFixed(2);
+}
+
+function normalizeQuantity(value) {
+    const parsed = Number.parseInt(String(value || "1"), 10);
+    if (!Number.isFinite(parsed) || parsed < 1) return 1;
+    return Math.min(parsed, 100);
+}
+
+function getEntryWord(quantity) {
+    const mod10 = quantity % 10;
+    const mod100 = quantity % 100;
+    if (mod10 === 1 && mod100 !== 11) return "вход";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "входа";
+    return "входов";
 }
 
 function getBaseUrl(req) {
@@ -69,6 +83,8 @@ function toPublicPayment(payment = {}) {
         amount: payment.amount || "0.00",
         currency: payment.currency || RUB_CURRENCY,
         description: payment.description || "",
+        quantity: payment.quantity || 1,
+        unitAmount: payment.unitAmount || payment.amount || "0.00",
         customerEmail: payment.customerEmail || "",
         customerName: payment.customerName || "",
         confirmationUrl: payment.confirmationUrl || "",
@@ -154,7 +170,9 @@ export async function getMayakPayment(paymentId) {
 export async function createMayakPayment(req, payload = {}) {
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
-    const amount = normalizeAmount(payload.amount);
+    const quantity = normalizeQuantity(payload.quantity);
+    const unitAmount = normalizeAmount(process.env.MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB || payload.unitAmount);
+    const amount = (Number(unitAmount) * quantity).toFixed(2);
     const baseUrl = getBaseUrl(req);
     const requestedReturnUrl = normalizeString(payload.returnUrl);
     const returnUrl = requestedReturnUrl
@@ -165,7 +183,8 @@ export async function createMayakPayment(req, payload = {}) {
     const description =
         normalizeString(payload.description) ||
         normalizeString(process.env.MAYAK_PAYMENT_DEFAULT_DESCRIPTION) ||
-        `Доступ к МАЯК ${id.slice(0, 8)}`;
+        `Вход в МАЯК ${id.slice(0, 8)}`;
+    const quantityDescription = `${description}, ${quantity} ${getEntryWord(quantity)}`;
 
     const payment = {
         id,
@@ -173,8 +192,10 @@ export async function createMayakPayment(req, payload = {}) {
         providerPaymentId: "",
         status: "pending",
         amount,
+        unitAmount,
+        quantity,
         currency: RUB_CURRENCY,
-        description,
+        description: quantityDescription,
         customerEmail: normalizeString(payload.customerEmail),
         customerName: normalizeString(payload.customerName),
         confirmationUrl: "",

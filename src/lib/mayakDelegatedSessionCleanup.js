@@ -1,5 +1,6 @@
 import path from "path";
 import { promises as fs } from "fs";
+import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 
 const SESSIONS_FILE = path.join(process.cwd(), "data", "mayak-sessions.json");
 const TOKENS_FILE = path.join(process.cwd(), "data", "mayak-session-tokens.json");
@@ -8,23 +9,6 @@ const SESSION_FILES_ROOT = path.join(process.cwd(), "data", "mayak-session-files
 
 function isObject(value) {
     return value && typeof value === "object" && !Array.isArray(value);
-}
-
-async function readJsonFile(filePath, fallbackValue) {
-    try {
-        const raw = await fs.readFile(filePath, "utf-8");
-        const parsed = JSON.parse(raw);
-        return parsed === null || parsed === undefined ? fallbackValue : parsed;
-    } catch {
-        return fallbackValue;
-    }
-}
-
-async function writeJsonFile(filePath, value) {
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    const tempFile = `${filePath}.tmp`;
-    await fs.writeFile(tempFile, JSON.stringify(value, null, 2), "utf-8");
-    await fs.rename(tempFile, filePath);
 }
 
 function isExpiredDelegatedItem(item, nowTs) {
@@ -74,15 +58,32 @@ export async function sweepExpiredDelegatedMayakSessions({ now = Date.now() } = 
     }
 
     if (nextSessions.length !== sessions.length) {
-        await writeJsonFile(SESSIONS_FILE, { sessions: nextSessions });
+        await withJsonFileLock(SESSIONS_FILE, async () => {
+            const latestStore = await readJsonFile(SESSIONS_FILE, { sessions: [] });
+            const latestSessions = Array.isArray(latestStore?.sessions) ? latestStore.sessions : [];
+            const latestNextSessions = latestSessions.filter((session) => !expiredSessionIds.has(String(session.id || "").trim()));
+            await writeJsonFileAtomic(SESSIONS_FILE, { sessions: latestNextSessions });
+        });
     }
 
     if (nextTokens.length !== tokens.length) {
-        await writeJsonFile(TOKENS_FILE, { tokens: nextTokens });
+        await withJsonFileLock(TOKENS_FILE, async () => {
+            const latestStore = await readJsonFile(TOKENS_FILE, { tokens: [] });
+            const latestTokens = Array.isArray(latestStore?.tokens) ? latestStore.tokens : [];
+            const latestNextTokens = latestTokens.filter((token) => !expiredTokenIds.has(String(token.id || "").trim()));
+            await writeJsonFileAtomic(TOKENS_FILE, { tokens: latestNextTokens });
+        });
     }
 
     if (runtimeChanged) {
-        await writeJsonFile(RUNTIME_FILE, { sessions: runtimeSessions });
+        await withJsonFileLock(RUNTIME_FILE, async () => {
+            const latestStore = await readJsonFile(RUNTIME_FILE, { sessions: {} });
+            const latestRuntimeSessions = isObject(latestStore?.sessions) ? latestStore.sessions : {};
+            for (const sessionId of expiredSessionIds) {
+                delete latestRuntimeSessions[sessionId];
+            }
+            await writeJsonFileAtomic(RUNTIME_FILE, { sessions: latestRuntimeSessions });
+        });
     }
 
     await Promise.all(

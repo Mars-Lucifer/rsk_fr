@@ -1,3 +1,9 @@
 [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
-⚠ Cross origin request detected from 10.16.76.110 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
 Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz_' -> 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz'
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz_' -> 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz'
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz_' -> 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz'
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz_' -> 'C:\DISK D\МАЯК\mayak\rsk_fr\.next\dev\cache\webpack\client-development\0.pack.gz'
+Could not find files for /pay in .next/build-manifest.json
+Could not find files for /pay in .next/build-manifest.json

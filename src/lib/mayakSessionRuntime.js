@@ -5,6 +5,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 
 import { completeMayakSession, getMayakSessionById } from "@/lib/mayakSessions";
+import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 
 const execFileAsync = promisify(execFile);
 
@@ -161,20 +162,31 @@ async function ensureStoreFile() {
 
 async function readStore() {
     await ensureStoreFile();
-    try {
-        const raw = await fs.readFile(SESSION_RUNTIME_FILE, "utf-8");
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === "object" ? parsed : createEmptyStore();
-    } catch {
-        return createEmptyStore();
-    }
+    const parsed = await readJsonFile(SESSION_RUNTIME_FILE, createEmptyStore());
+    return parsed && typeof parsed === "object" ? parsed : createEmptyStore();
 }
 
-async function writeStore(store) {
+async function writeStore(store, touchedSessionIds = null) {
     await fs.mkdir(path.dirname(SESSION_RUNTIME_FILE), { recursive: true });
-    const tempFile = `${SESSION_RUNTIME_FILE}.tmp`;
-    await fs.writeFile(tempFile, JSON.stringify(store, null, 2), "utf-8");
-    await fs.rename(tempFile, SESSION_RUNTIME_FILE);
+    await withJsonFileLock(SESSION_RUNTIME_FILE, async () => {
+        if (Array.isArray(touchedSessionIds)) {
+            const latest = await readJsonFile(SESSION_RUNTIME_FILE, createEmptyStore());
+            if (!latest.sessions || typeof latest.sessions !== "object") {
+                latest.sessions = {};
+            }
+            for (const sessionId of touchedSessionIds) {
+                if (store.sessions?.[sessionId]) {
+                    latest.sessions[sessionId] = store.sessions[sessionId];
+                } else {
+                    delete latest.sessions[sessionId];
+                }
+            }
+            await writeJsonFileAtomic(SESSION_RUNTIME_FILE, latest);
+            return;
+        }
+
+        await writeJsonFileAtomic(SESSION_RUNTIME_FILE, store);
+    });
 }
 
 function ensureSessionBucket(store, sessionId) {
@@ -295,7 +307,7 @@ async function expirePendingReviews(store, sessionId) {
     });
 
     if (changed) {
-        await writeStore(store);
+        await writeStore(store, [sessionId]);
     }
     return changed;
 }
@@ -459,7 +471,7 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
         updatedAt: new Date().toISOString(),
         tasks: existing.tasks || {},
     };
-    await writeStore(store);
+    await writeStore(store, [sessionId]);
     return bucket.participants[userId];
 }
 
@@ -493,7 +505,7 @@ export async function assignMayakSessionRole({ sessionId, userId, role }) {
 
     participant.role = normalizedRole;
     participant.updatedAt = new Date().toISOString();
-    await writeStore(store);
+    await writeStore(store, [sessionId]);
     return participant;
 }
 
@@ -533,7 +545,7 @@ export async function setMayakSessionParticipantRole({ sessionId, userId, role }
 
     participant.role = normalizedRole;
     participant.updatedAt = new Date().toISOString();
-    await writeStore(store);
+    await writeStore(store, [sessionId]);
     return participant;
 }
 
@@ -636,7 +648,7 @@ export async function createMayakSessionReview({
         description: normalizeString(description),
         taskText: normalizeString(taskText),
         secondsSpent: Number.isFinite(secondsSpent) ? secondsSpent : 0,
-        submissionText: normalizeString(submissionText).slice(0, 1000),
+        submissionText: normalizeString(submissionText).slice(0, 10000),
         file: storedFile,
         createdAt,
         durationSeconds: reviewDurationSeconds,
@@ -662,7 +674,7 @@ export async function createMayakSessionReview({
         updatedAt: createdAt,
     };
     participant.updatedAt = createdAt;
-    await writeStore(store);
+    await writeStore(store, [sessionId]);
     return serializeReviewSummary(sessionId, review);
 }
 
@@ -722,7 +734,7 @@ export async function resolveMayakSessionReview({ sessionId, reviewId, inspector
         durationSeconds: isApproved ? null : reworkDurationSeconds,
     };
     participant.updatedAt = resolvedAt;
-    await writeStore(store);
+    await writeStore(store, [sessionId]);
     return serializeReviewSummary(sessionId, review);
 }
 
@@ -872,7 +884,7 @@ export async function cleanupMayakSessionRuntime(sessionId) {
     const store = await readStore();
     if (store.sessions?.[sessionId]) {
         delete store.sessions[sessionId];
-        await writeStore(store);
+        await writeStore(store, [sessionId]);
     }
     await fs.rm(path.join(SESSION_FILES_ROOT, sessionId), { recursive: true, force: true });
 }
@@ -903,7 +915,7 @@ export async function startMayakSessionBackgroundPreviewConversion({ sessionId, 
         storedName: file.storedName,
         previewStatus: file.previewStatus,
     });
-    await writeStore(store);
+    await writeStore(store, [sessionId]);
 
     try {
         const userDir = path.join(SESSION_FILES_ROOT, sessionId, review.participantUserId);
@@ -920,7 +932,7 @@ export async function startMayakSessionBackgroundPreviewConversion({ sessionId, 
         freshReview.file.previewStatus = "ready";
         freshReview.file.previewError = "";
         freshReview.file.previewProcessingStartedAt = null;
-        await writeStore(freshStore);
+        await writeStore(freshStore, [sessionId]);
         logLibreOffice("background-preview-success", {
             sessionId,
             reviewId,
@@ -936,7 +948,7 @@ export async function startMayakSessionBackgroundPreviewConversion({ sessionId, 
             freshReview.file.previewStatus = "failed";
             freshReview.file.previewError = error.message || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u0438\u0442\u044c \u043f\u0440\u0435\u0434\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0444\u0430\u0439\u043b\u0430.";
             freshReview.file.previewProcessingStartedAt = null;
-            await writeStore(freshStore);
+            await writeStore(freshStore, [sessionId]);
         }
         logLibreOffice("background-preview-failed", {
             sessionId,

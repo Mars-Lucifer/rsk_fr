@@ -19,14 +19,33 @@ function formatPaymentStatus(status) {
     return "Ожидает оплаты";
 }
 
+function formatRub(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return "0 ₽";
+    return new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "RUB",
+        maximumFractionDigits: 0,
+    }).format(parsed);
+}
+
+function getEntryWord(quantity) {
+    const mod10 = quantity % 10;
+    const mod100 = quantity % 100;
+    if (mod10 === 1 && mod100 !== 11) return "вход";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "входа";
+    return "входов";
+}
+
 export async function getServerSideProps() {
     return { props: { legal: getMayakLegalData() } };
 }
 
 export default function PayPage({ legal }) {
     const router = useRouter();
+    const unitPrice = Number(legal.priceRub) || 0;
     const [form, setForm] = useState({
-        amount: legal.priceRub,
+        quantity: 1,
         description: legal.serviceName,
         customerEmail: "",
         customerName: "",
@@ -36,6 +55,7 @@ export default function PayPage({ legal }) {
     const [error, setError] = useState("");
 
     const paymentId = useMemo(() => String(router.query.paymentId || "").trim(), [router.query.paymentId]);
+    const totalAmount = useMemo(() => (unitPrice * form.quantity).toFixed(2), [form.quantity, unitPrice]);
 
     useEffect(() => {
         if (!paymentId) return undefined;
@@ -78,6 +98,7 @@ export default function PayPage({ legal }) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         ...form,
+                        amount: totalAmount,
                         returnUrl: `${window.location.origin}/pay`,
                     }),
                 }),
@@ -108,32 +129,50 @@ export default function PayPage({ legal }) {
             <section className="pay-shell">
                 <div className="pay-copy">
                     <p className="eyebrow">Онлайн-оплата</p>
-                    <h1>Оплата продукта МАЯК</h1>
+                    <h1>
+                        Увеличение лимитов
+                        <span>для входа по токену МАЯК</span>
+                    </h1>
                     <p className="lead">
-                        Оплата проходит через ЮKassa. После успешного платежа доступ к цифровому продукту предоставляется по условиям
-                        оферты.
+                        Выберите, сколько дополнительных входов нужно добавить к вашему токену доступа. Стоимость одного
+                        дополнительного входа — 200 ₽.
                     </p>
                     <div className="service-summary">
                         <span>{legal.serviceName}</span>
-                        <strong>{legal.priceRub} ₽</strong>
+                        <strong>{formatRub(unitPrice)} за 1 вход</strong>
                         <p>{legal.serviceDescription}</p>
                     </div>
                 </div>
 
                 <form className="pay-form" onSubmit={handleSubmit}>
                     <label>
-                        <span>Сумма, RUB</span>
+                        <span>Количество входов</span>
                         <input
-                            value={form.amount}
-                            inputMode="decimal"
-                            onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
+                            type="number"
+                            min="1"
+                            max="100"
+                            step="1"
+                            value={form.quantity}
+                            onChange={(event) =>
+                                setForm((current) => ({
+                                    ...current,
+                                    quantity: Math.max(1, Math.min(100, Number.parseInt(event.target.value || "1", 10) || 1)),
+                                }))
+                            }
                         />
                     </label>
+                    <div className="amount-summary">
+                        <span>Итого к оплате</span>
+                        <strong>{formatRub(totalAmount)}</strong>
+                        <p>
+                            {formatRub(unitPrice)} × {form.quantity} {getEntryWord(form.quantity)}
+                        </p>
+                    </div>
                     <label>
                         <span>Описание</span>
                         <input
                             value={form.description}
-                            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                            readOnly
                         />
                     </label>
                     <label>
@@ -236,9 +275,18 @@ export default function PayPage({ legal }) {
                 h1 {
                     max-width: 520px;
                     margin: 0;
-                    font-size: clamp(36px, 6vw, 68px);
-                    line-height: 0.98;
+                    font-size: clamp(34px, 5.2vw, 60px);
+                    line-height: 1.02;
                     letter-spacing: 0;
+                }
+
+                h1 span {
+                    display: block;
+                    max-width: 560px;
+                    margin-top: 6px;
+                    color: #172033;
+                    font-size: 0.78em;
+                    line-height: 1.08;
                 }
 
                 .lead {
@@ -250,6 +298,7 @@ export default function PayPage({ legal }) {
                 }
 
                 .service-summary,
+                .amount-summary,
                 .pay-form,
                 .payment-status,
                 .notice {
@@ -263,6 +312,32 @@ export default function PayPage({ legal }) {
                     gap: 10px;
                     max-width: 520px;
                     padding: 18px;
+                }
+
+                .amount-summary {
+                    display: grid;
+                    gap: 4px;
+                    padding: 14px;
+                    border-radius: 8px;
+                    background: #f7f8fb;
+                }
+
+                .amount-summary span {
+                    color: #546179;
+                    font-size: 12px;
+                    font-weight: 900;
+                    text-transform: uppercase;
+                }
+
+                .amount-summary strong {
+                    font-size: 30px;
+                    line-height: 1.1;
+                }
+
+                .amount-summary p {
+                    margin: 0;
+                    color: #68758a;
+                    font-size: 13px;
                 }
 
                 .service-summary span {

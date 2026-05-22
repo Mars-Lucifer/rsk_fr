@@ -48,6 +48,26 @@ async function buildValidationResponse(result, tokenType = "legacy") {
             ? await findActiveMayakSessionByTokenId(result.token.id)
             : null;
 
+    if (tokenType === "session" && result.token?.id && !session) {
+        return {
+            success: true,
+            valid: false,
+            error: "\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            remainingAttempts: 0,
+            usageLimit: result.token?.usageLimit || 0,
+            usedCount: result.token?.usedCount || 0,
+            taskRange: result.token?.taskRange || null,
+            sectionId: result.token?.sectionId || null,
+            isExhausted: false,
+            isActive: false,
+            isBypass: false,
+            tokenType: "session",
+            sessionId: null,
+            sessionName: null,
+            tableCount: 0,
+        };
+    }
+
     return {
         success: true,
         valid: result.valid,
@@ -84,13 +104,13 @@ export default async function handler(req, res) {
                 return res.status(200).json(buildBypassValidationResponse());
             }
 
-            const legacyResult = validateToken(token);
-            if (legacyResult.valid || legacyResult.token) {
-                return res.status(200).json(await buildValidationResponse(legacyResult, "legacy"));
+            const sessionResult = await validateMayakSessionToken(token);
+            if (sessionResult.valid || sessionResult.token) {
+                return res.status(200).json(await buildValidationResponse(sessionResult, "session"));
             }
 
-            const sessionResult = await validateMayakSessionToken(token);
-            return res.status(200).json(await buildValidationResponse(sessionResult, "session"));
+            const legacyResult = validateToken(token);
+            return res.status(200).json(await buildValidationResponse(legacyResult, "legacy"));
         } catch (error) {
             console.error("Error validating token:", error);
             return res.status(500).json({
@@ -122,6 +142,35 @@ export default async function handler(req, res) {
                 });
             }
 
+            const sessionValidationResult = await validateMayakSessionToken(token);
+            if (sessionValidationResult.valid || sessionValidationResult.token) {
+                const activeSession = sessionValidationResult.token?.id ? await findActiveMayakSessionByTokenId(sessionValidationResult.token.id) : null;
+                if (!activeSession) {
+                    return res.status(403).json({
+                        success: false,
+                        error: "\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u0438\u043b\u0438 \u0443\u0436\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+                        remainingAttempts: 0,
+                    });
+                }
+
+                const sessionResult = await consumeMayakSessionToken(token);
+                if (sessionResult.success) {
+                    return res.status(200).json({
+                        success: true,
+                        message: "Токен использован",
+                        remainingAttempts: sessionResult.remainingAttempts,
+                        isBypass: false,
+                        tokenType: "session",
+                    });
+                }
+
+                return res.status(403).json({
+                    success: false,
+                    error: sessionResult.error || sessionValidationResult.error,
+                    remainingAttempts: sessionResult.remainingAttempts || sessionValidationResult.remainingAttempts || 0,
+                });
+            }
+
             const legacyResult = consumeLegacyToken(token);
             if (legacyResult.success) {
                 return res.status(200).json({
@@ -133,21 +182,10 @@ export default async function handler(req, res) {
                 });
             }
 
-            const sessionResult = await consumeMayakSessionToken(token);
-            if (sessionResult.success) {
-                return res.status(200).json({
-                    success: true,
-                    message: "Токен использован",
-                    remainingAttempts: sessionResult.remainingAttempts,
-                    isBypass: false,
-                    tokenType: "session",
-                });
-            }
-
             return res.status(403).json({
                 success: false,
-                error: sessionResult.error || legacyResult.error,
-                remainingAttempts: sessionResult.remainingAttempts || 0,
+                error: legacyResult.error,
+                remainingAttempts: legacyResult.remainingAttempts || 0,
             });
         } catch (error) {
             console.error("Error using token:", error);

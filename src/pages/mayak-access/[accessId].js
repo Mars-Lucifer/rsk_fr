@@ -230,10 +230,6 @@ export default function MayakDelegatedAccessPage() {
                     </div>
                     <div style={{ ...metricGridStyle, ...(isCompact ? compactMetricGridStyle : null) }}>
                         <div style={metricStyle}>
-                            <span style={metricValueStyle}>{`${right?.remainingQuota ?? 0}/${right?.totalQuota ?? 0}`}</span>
-                            <span style={metricLabelStyle}>сессий осталось</span>
-                        </div>
-                        <div style={metricStyle}>
                             <span style={metricValueStyle}>{`${right?.remainingParticipantLimit ?? 0}/${right?.totalParticipantLimit ?? 0}`}</span>
                             <span style={metricLabelStyle}>входов осталось</span>
                         </div>
@@ -277,7 +273,7 @@ export default function MayakDelegatedAccessPage() {
                         <button
                             type="submit"
                             style={primaryButtonStyle}
-                            disabled={creating || (right?.remainingQuota || 0) < 1}>
+                            disabled={creating}>
                             {creating ? "Создаём..." : "Создать сессию"}
                         </button>
                         <span style={createFeedbackStyle}>{createFeedback}</span>

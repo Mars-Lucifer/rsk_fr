@@ -38,7 +38,7 @@ const initialExternalForm = {
     sectionId: "",
     taskRange: "",
     rangeName: "",
-    totalQuota: "10",
+    totalQuota: "1000000",
     totalParticipantLimit: "180",
 };
 
@@ -204,10 +204,6 @@ function CreateForm({ activeType, ranges, forms, setForms, onSubmit, saving }) {
                     ranges={ranges}
                     onChange={(nextRange) => setForms.setExternalForm((current) => ({ ...current, ...nextRange }))}
                 />
-            </label>
-            <label>
-                <span>Лимит сессий</span>
-                <input className="token-input" type="number" min="1" value={externalForm.totalQuota} onChange={(event) => setForms.setExternalForm((current) => ({ ...current, totalQuota: event.target.value }))} />
             </label>
             <label>
                 <span>Общий лимит входов</span>
@@ -407,7 +403,7 @@ export default function AdminMayakTokens() {
                             sectionId: externalForm.sectionId,
                             taskRange: externalForm.taskRange,
                             rangeName: externalForm.rangeName,
-                            totalQuota: normalizeNumberInput(externalForm.totalQuota, 10),
+                            totalQuota: normalizeNumberInput(externalForm.totalQuota, 1000000),
                             totalParticipantLimit: normalizeNumberInput(externalForm.totalParticipantLimit, 180),
                         }),
                     }),
@@ -442,7 +438,7 @@ export default function AdminMayakTokens() {
             tokenUsageLimit: String(item.sourceRef?.tokenUsageLimit || item.usageLimit || 1),
             reviewTimeoutSeconds: String(item.sourceRef?.reviewTimeoutSeconds || 130),
             reworkTimeoutSeconds: String(item.sourceRef?.reworkTimeoutSeconds || 180),
-            totalQuota: String(item.sourceRef?.totalQuota || 10),
+            totalQuota: String(item.sourceRef?.totalQuota || 1000000),
             totalParticipantLimit: String(item.sourceRef?.totalParticipantLimit || item.usageLimit || 180),
         });
     };
@@ -499,7 +495,7 @@ export default function AdminMayakTokens() {
                             sectionId: editDraft.sectionId,
                             taskRange: editDraft.taskRange,
                             rangeName: editDraft.rangeName || "",
-                            totalQuota: normalizeNumberInput(editDraft.totalQuota, item.sourceRef?.totalQuota || 10),
+                            totalQuota: normalizeNumberInput(editDraft.totalQuota, item.sourceRef?.totalQuota || 1000000),
                             totalParticipantLimit: normalizeNumberInput(editDraft.totalParticipantLimit, item.sourceRef?.totalParticipantLimit || 180),
                         }),
                     }),
@@ -700,10 +696,6 @@ export default function AdminMayakTokens() {
                                                     ) : null}
                                                     {item.type === "external_link" ? (
                                                         <>
-                                                            <label>
-                                                                <span>Сессии</span>
-                                                                <input className="token-input compact" type="number" min="1" value={editDraft.totalQuota || ""} onChange={(event) => setEditDraft((current) => ({ ...current, totalQuota: event.target.value }))} />
-                                                            </label>
                                                             <label>
                                                                 <span>Входы</span>
                                                                 <input className="token-input compact" type="number" min="1" value={editDraft.totalParticipantLimit || ""} onChange={(event) => setEditDraft((current) => ({ ...current, totalParticipantLimit: event.target.value }))} />

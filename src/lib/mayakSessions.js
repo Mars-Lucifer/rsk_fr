@@ -3,6 +3,7 @@ import path from "path";
 import crypto from "crypto";
 
 import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
+import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 import {
     createMayakSessionToken,
     deleteMayakSessionToken,
@@ -48,24 +49,34 @@ async function ensureStoreFile() {
     }
 }
 
-async function writeStore(store) {
-    await fs.mkdir(path.dirname(SESSIONS_FILE), { recursive: true });
-    const tempFile = `${SESSIONS_FILE}.tmp`;
-    await fs.writeFile(tempFile, JSON.stringify(store, null, 2), "utf-8");
-    await fs.rename(tempFile, SESSIONS_FILE);
+async function writeStore(store, touchedSessionIds = null) {
+    await withJsonFileLock(SESSIONS_FILE, async () => {
+        if (Array.isArray(touchedSessionIds)) {
+            const latest = await readJsonFile(SESSIONS_FILE, createEmptyStore());
+            latest.sessions = Array.isArray(latest?.sessions) ? latest.sessions : [];
+            const sessionById = new Map(latest.sessions.map((session) => [session.id, session]));
+            for (const sessionId of touchedSessionIds) {
+                const nextSession = store.sessions.find((session) => session.id === sessionId);
+                if (nextSession) {
+                    sessionById.set(sessionId, nextSession);
+                } else {
+                    sessionById.delete(sessionId);
+                }
+            }
+            await writeJsonFileAtomic(SESSIONS_FILE, { sessions: Array.from(sessionById.values()) });
+            return;
+        }
+
+        await writeJsonFileAtomic(SESSIONS_FILE, store);
+    });
 }
 
 export async function readMayakSessionsStore() {
     await ensureStoreFile();
-    try {
-        const raw = await fs.readFile(SESSIONS_FILE, "utf-8");
-        const parsed = JSON.parse(raw);
-        return {
-            sessions: Array.isArray(parsed?.sessions) ? parsed.sessions : [],
-        };
-    } catch {
-        return createEmptyStore();
-    }
+    const parsed = await readJsonFile(SESSIONS_FILE, createEmptyStore());
+    return {
+        sessions: Array.isArray(parsed?.sessions) ? parsed.sessions : [],
+    };
 }
 
 export function normalizeMayakSession(input = {}) {
@@ -258,7 +269,7 @@ export async function createMayakSession(payload) {
     };
 
     store.sessions.push(session);
-    await writeStore(store);
+    await writeStore(store, [session.id]);
     return session;
 }
 
@@ -310,7 +321,7 @@ export async function updateMayakSession(sessionId, payload) {
         status: current.status,
         completedAt: current.completedAt,
     };
-    await writeStore(store);
+    await writeStore(store, [current.id]);
     return store.sessions[index];
 }
 
@@ -322,7 +333,7 @@ export async function deleteMayakSession(sessionId) {
     }
 
     const [removed] = store.sessions.splice(index, 1);
-    await writeStore(store);
+    await writeStore(store, [removed.id]);
 
     for (const tokenId of Array.isArray(removed.tokenIds) ? removed.tokenIds : []) {
         try {
@@ -355,7 +366,7 @@ export async function completeMayakSession(sessionId) {
         completedAt,
         updatedAt: completedAt,
     };
-    await writeStore(store);
+    await writeStore(store, [current.id]);
 
     const sessionFilesDir = path.join(SESSION_FILES_ROOT, sessionId);
     await fs.rm(sessionFilesDir, { recursive: true, force: true });

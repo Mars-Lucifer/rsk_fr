@@ -9,7 +9,7 @@ const REJECT_REASON_OPTIONS = [
     { value: "wrong_format", label: "Другой формат", comment: "Другой формат" },
     { value: "other", label: "Другое (указать)", comment: "" },
 ];
-const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 3000;
+const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 10000;
 
 function formatRemaining(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);

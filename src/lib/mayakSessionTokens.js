@@ -3,6 +3,7 @@ import path from "path";
 import crypto from "crypto";
 
 import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
+import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 
 const SESSION_TOKENS_FILE = path.join(process.cwd(), "data", "mayak-session-tokens.json");
 const SESSIONS_FILE = path.join(process.cwd(), "data", "mayak-sessions.json");
@@ -36,24 +37,34 @@ async function ensureStoreFile() {
     }
 }
 
-async function writeStore(store) {
-    await fs.mkdir(path.dirname(SESSION_TOKENS_FILE), { recursive: true });
-    const tempFile = `${SESSION_TOKENS_FILE}.tmp`;
-    await fs.writeFile(tempFile, JSON.stringify(store, null, 2), "utf-8");
-    await fs.rename(tempFile, SESSION_TOKENS_FILE);
+async function writeStore(store, touchedTokenIds = null) {
+    await withJsonFileLock(SESSION_TOKENS_FILE, async () => {
+        if (Array.isArray(touchedTokenIds)) {
+            const latest = await readJsonFile(SESSION_TOKENS_FILE, createEmptyStore());
+            latest.tokens = Array.isArray(latest?.tokens) ? latest.tokens : [];
+            const tokenById = new Map(latest.tokens.map((token) => [token.id, token]));
+            for (const tokenId of touchedTokenIds) {
+                const nextToken = store.tokens.find((token) => token.id === tokenId);
+                if (nextToken) {
+                    tokenById.set(tokenId, nextToken);
+                } else {
+                    tokenById.delete(tokenId);
+                }
+            }
+            await writeJsonFileAtomic(SESSION_TOKENS_FILE, { tokens: Array.from(tokenById.values()) });
+            return;
+        }
+
+        await writeJsonFileAtomic(SESSION_TOKENS_FILE, store);
+    });
 }
 
 async function readStore() {
     await ensureStoreFile();
-    try {
-        const raw = await fs.readFile(SESSION_TOKENS_FILE, "utf-8");
-        const parsed = JSON.parse(raw);
-        return {
-            tokens: Array.isArray(parsed?.tokens) ? parsed.tokens : [],
-        };
-    } catch {
-        return createEmptyStore();
-    }
+    const parsed = await readJsonFile(SESSION_TOKENS_FILE, createEmptyStore());
+    return {
+        tokens: Array.isArray(parsed?.tokens) ? parsed.tokens : [],
+    };
 }
 
 async function readSessionsStore() {
@@ -259,7 +270,7 @@ export async function useMayakSessionToken(tokenValue) {
         usedCount: current.usedCount + 1,
         updatedAt: new Date().toISOString(),
     };
-    await writeStore(store);
+    await writeStore(store, [current.id]);
 
     const responseToken = delegatedUsageState
         ? {
@@ -290,7 +301,7 @@ export async function createMayakSessionToken(payload) {
     }
 
     store.tokens.push(normalized);
-    await writeStore(store);
+    await writeStore(store, [normalized.id]);
     return toTokenWithStats(normalized);
 }
 
@@ -317,7 +328,7 @@ export async function updateMayakSessionToken(tokenId, payload) {
     }
 
     store.tokens[index] = normalized;
-    await writeStore(store);
+    await writeStore(store, [normalized.id]);
     return toTokenWithStats(normalized);
 }
 
@@ -337,6 +348,6 @@ export async function deleteMayakSessionToken(tokenId) {
     }
 
     const [removed] = store.tokens.splice(index, 1);
-    await writeStore(store);
+    await writeStore(store, [removed.id]);
     return toTokenWithStats(removed);
 }

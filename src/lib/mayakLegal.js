@@ -1,7 +1,7 @@
-const DEFAULT_PRICE_RUB = "990";
-const DEFAULT_SERVICE_NAME = "Цифровой продукт МАЯК";
+const DEFAULT_PRICE_RUB = "200";
+const DEFAULT_SERVICE_NAME = "Вход в тренажер МАЯК";
 const DEFAULT_SERVICE_DESCRIPTION =
-    "Доступ к цифровому тренажеру МАЯК, сценариям, методическим материалам и сопровождению прохождения.";
+    "Один вход в цифровой тренажер МАЯК с доступом к сценарию и материалам прохождения. Каждый вход действует 1 сутки.";
 
 function clean(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -17,10 +17,10 @@ export function getMayakLegalData() {
         serviceName: clean(process.env.MAYAK_PAYMENT_DEFAULT_DESCRIPTION) || DEFAULT_SERVICE_NAME,
         serviceDescription: clean(process.env.MAYAK_SERVICE_DESCRIPTION) || DEFAULT_SERVICE_DESCRIPTION,
         priceRub: clean(process.env.MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB) || DEFAULT_PRICE_RUB,
-        priceLabel: clean(process.env.MAYAK_PRICE_LABEL) || `от ${clean(process.env.MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB) || DEFAULT_PRICE_RUB} ₽`,
+        priceLabel: clean(process.env.MAYAK_PRICE_LABEL) || `${clean(process.env.MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB) || DEFAULT_PRICE_RUB} ₽ за 1 вход`,
         deliveryTerms:
             clean(process.env.MAYAK_SERVICE_DELIVERY_TERMS) ||
-            "После успешной оплаты пользователь получает доступ к цифровому продукту МАЯК на сайте, по ссылке или через согласованный с исполнителем канал связи.",
+            "После успешной оплаты пользователь получает выбранное количество входов в цифровой тренажер МАЯК на сайте, по ссылке или через согласованный с исполнителем канал связи. Каждый вход действует 1 сутки.",
         supportTerms:
             clean(process.env.MAYAK_SERVICE_SUPPORT_TERMS) ||
             "Вопросы по оплате, доступу и прохождению тренажера принимаются по электронной почте исполнителя.",

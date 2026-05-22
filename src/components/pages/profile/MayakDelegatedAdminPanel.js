@@ -192,11 +192,11 @@ export default function MayakDelegatedAdminPanel() {
             <div className="flex items-center justify-between gap-[0.75rem] flex-wrap">
                 <div className="flex flex-col gap-[0.25rem]">
                     <h6>Админ-права МАЯК</h6>
-                    <p className="small text-(--color-gray-black)">Личный лимит токенов и ваши активные сессии.</p>
+                    <p className="small text-(--color-gray-black)">Ваши активные сессии и доступные входы.</p>
                 </div>
                 {activeRight ? (
                     <span className="small rounded-full bg-(--color-white-gray) px-3 py-2 text-(--color-gray-black) whitespace-nowrap">
-                        {`Осталось ${activeRight.remainingQuota}/${activeRight.totalQuota}`}
+                        {`Входы: ${activeRight.remainingParticipantLimit}/${activeRight.totalParticipantLimit}`}
                     </span>
                 ) : null}
             </div>
@@ -241,14 +241,10 @@ export default function MayakDelegatedAdminPanel() {
                                     roundeful
                                     className="w-fit! shrink-0 border border-(--color-gray-plus) shadow-none! px-4! max-[760px]:w-full!"
                                     onClick={handleCreate}
-                                    disabled={creating || activeRight.remainingQuota < 1}>
+                                    disabled={creating}>
                                     {creating ? "Создаём..." : "Создать"}
                                 </Button>
                             </div>
-                        ) : null}
-
-                        {activeRight && activeRight.remainingQuota < 1 ? (
-                            <p className="small mt-[0.75rem] text-(--color-gray-black)">Лимит создания токенов исчерпан.</p>
                         ) : null}
                     </div>
                 ) : null}

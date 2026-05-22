@@ -4,7 +4,7 @@ import { IncomingForm } from "formidable";
 import { createMayakSessionReview, saveMayakSessionUploadFile, startMayakSessionBackgroundPreviewConversion } from "@/lib/mayakSessionRuntime";
 
 const MAX_SESSION_UPLOAD_FILE_SIZE = 30 * 1024 * 1024;
-const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 3000;
+const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 10000;
 
 export const config = {
     api: {
