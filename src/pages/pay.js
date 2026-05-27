@@ -44,11 +44,10 @@ export async function getServerSideProps() {
 export default function PayPage({ legal }) {
     const router = useRouter();
     const unitPrice = Number(legal.priceRub) || 0;
+    const targetAccessId = useMemo(() => String(router.query.accessId || "").trim(), [router.query.accessId]);
     const [form, setForm] = useState({
         quantity: 1,
         description: legal.serviceName,
-        customerEmail: "",
-        customerName: "",
     });
     const [payment, setPayment] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -92,6 +91,13 @@ export default function PayPage({ legal }) {
         setPayment(null);
 
         try {
+            const accessPassword =
+                targetAccessId && typeof window !== "undefined"
+                    ? window.sessionStorage.getItem(`mayak_delegated_access_${targetAccessId}`) || ""
+                    : "";
+            const returnUrl = targetAccessId
+                ? `${window.location.origin}/mayak-access/${encodeURIComponent(targetAccessId)}`
+                : `${window.location.origin}/pay`;
             const payload = await parseJsonResponse(
                 await fetch("/api/payments/create", {
                     method: "POST",
@@ -99,7 +105,10 @@ export default function PayPage({ legal }) {
                     body: JSON.stringify({
                         ...form,
                         amount: totalAmount,
-                        returnUrl: `${window.location.origin}/pay`,
+                        targetType: targetAccessId ? "delegated_access" : "",
+                        accessId: targetAccessId,
+                        password: accessPassword,
+                        returnUrl,
                     }),
                 }),
                 "Не удалось создать платеж"
@@ -121,7 +130,6 @@ export default function PayPage({ legal }) {
             <nav className="pay-nav" aria-label="Оплата МАЯК">
                 <Link href="/">МАЯК</Link>
                 <span />
-                <Link href="/tariffs">Тарифы</Link>
                 <Link href="/requisites">Реквизиты</Link>
                 <Link href="/offer">Оферта</Link>
             </nav>
@@ -137,6 +145,7 @@ export default function PayPage({ legal }) {
                         Выберите, сколько дополнительных входов нужно добавить к вашему токену доступа. Стоимость одного
                         дополнительного входа — 200 ₽.
                     </p>
+                    {targetAccessId ? <p className="target-note">Оплата будет привязана к текущему токену доступа.</p> : null}
                     <div className="service-summary">
                         <span>{legal.serviceName}</span>
                         <strong>{formatRub(unitPrice)} за 1 вход</strong>
@@ -175,29 +184,11 @@ export default function PayPage({ legal }) {
                             readOnly
                         />
                     </label>
-                    <label>
-                        <span>Email клиента</span>
-                        <input
-                            type="email"
-                            value={form.customerEmail}
-                            onChange={(event) => setForm((current) => ({ ...current, customerEmail: event.target.value }))}
-                            placeholder="client@example.com"
-                        />
-                    </label>
-                    <label>
-                        <span>Имя клиента</span>
-                        <input
-                            value={form.customerName}
-                            onChange={(event) => setForm((current) => ({ ...current, customerName: event.target.value }))}
-                            placeholder="Иван"
-                        />
-                    </label>
                     <button type="submit" disabled={loading}>
                         {loading ? "Создаем платеж..." : "Перейти к оплате"}
                     </button>
                     <p className="form-note">
-                        Услуги и цены опубликованы на странице <Link href="/tariffs">тарифов</Link>. Нажимая кнопку, вы соглашаетесь с <Link href="/offer">публичной офертой</Link>. Реквизиты исполнителя
-                        опубликованы на странице <Link href="/requisites">реквизитов</Link>.
+                        Нажимая кнопку, вы соглашаетесь с <Link href="/offer">публичной офертой</Link>. Реквизиты исполнителя опубликованы на странице <Link href="/requisites">реквизитов</Link>.
                     </p>
                 </form>
 
@@ -295,6 +286,14 @@ export default function PayPage({ legal }) {
                     color: #536074;
                     font-size: 17px;
                     line-height: 1.58;
+                }
+
+                .target-note {
+                    max-width: 520px;
+                    margin: -4px 0 0;
+                    color: #1c6b33;
+                    font-size: 14px;
+                    font-weight: 800;
                 }
 
                 .service-summary,

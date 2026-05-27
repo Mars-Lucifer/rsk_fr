@@ -2,6 +2,12 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 
+import {
+    addMayakAdminRightParticipantLimit,
+    getMayakAdminRightByAccessId,
+    validateDelegatedAccessPassword,
+} from "@/lib/mayakAdminRights";
+
 const PAYMENTS_FILE = path.join(process.cwd(), "data", "mayak-payments.json");
 const YOOKASSA_API_BASE_URL = "https://api.yookassa.ru/v3";
 const RUB_CURRENCY = "RUB";
@@ -90,6 +96,9 @@ function toPublicPayment(payment = {}) {
         confirmationUrl: payment.confirmationUrl || "",
         paidAt: payment.paidAt || null,
         canceledAt: payment.canceledAt || null,
+        targetType: payment.targetType || "",
+        targetAccessId: payment.targetAccessId || "",
+        appliedAt: payment.appliedAt || null,
         createdAt: payment.createdAt || null,
         updatedAt: payment.updatedAt || null,
     };
@@ -147,9 +156,50 @@ async function createYooKassaPayment({ payment, returnUrl }) {
             metadata: {
                 local_payment_id: payment.id,
                 source: "mayak",
+                target_type: payment.targetType || "",
+                target_access_id: payment.targetAccessId || "",
             },
         },
     });
+}
+
+function normalizePaymentTarget(payload = {}) {
+    const targetType = normalizeString(payload.targetType);
+    if (targetType !== "delegated_access") {
+        return {
+            targetType: "",
+            targetRightId: "",
+            targetAccessId: "",
+            targetTitle: "",
+        };
+    }
+
+    return {
+        targetType,
+        targetRightId: normalizeString(payload.targetRightId),
+        targetAccessId: normalizeString(payload.accessId || payload.targetAccessId),
+        targetTitle: normalizeString(payload.targetTitle),
+    };
+}
+
+async function resolvePaymentTarget(payload = {}) {
+    const target = normalizePaymentTarget(payload);
+    if (target.targetType !== "delegated_access") {
+        return target;
+    }
+
+    const right = await getMayakAdminRightByAccessId(target.targetAccessId);
+    const password = normalizeString(payload.password || payload.accessPassword);
+    if (!right || !validateDelegatedAccessPassword(right, password)) {
+        throw new Error("Не удалось подтвердить доступ для пополнения входов");
+    }
+
+    return {
+        ...target,
+        targetRightId: right.id,
+        targetAccessId: right.accessId,
+        targetTitle: right.title || right.fullName || right.accessId,
+    };
 }
 
 export async function listMayakPayments() {
@@ -173,6 +223,7 @@ export async function createMayakPayment(req, payload = {}) {
     const quantity = normalizeQuantity(payload.quantity);
     const unitAmount = normalizeAmount(process.env.MAYAK_PAYMENT_DEFAULT_AMOUNT_RUB || payload.unitAmount);
     const amount = (Number(unitAmount) * quantity).toFixed(2);
+    const target = await resolvePaymentTarget(payload);
     const baseUrl = getBaseUrl(req);
     const requestedReturnUrl = normalizeString(payload.returnUrl);
     const returnUrl = requestedReturnUrl
@@ -198,6 +249,8 @@ export async function createMayakPayment(req, payload = {}) {
         description: quantityDescription,
         customerEmail: normalizeString(payload.customerEmail),
         customerName: normalizeString(payload.customerName),
+        ...target,
+        appliedAt: null,
         confirmationUrl: "",
         rawProviderStatus: "",
         rawProviderPayload: null,
@@ -229,12 +282,26 @@ async function updateMayakPayment(paymentId, updates = {}) {
     if (index === -1) {
         return null;
     }
-    store.payments[index] = {
+    const nextPayment = {
         ...store.payments[index],
         ...updates,
         updatedAt: new Date().toISOString(),
     };
+
+    const shouldApply =
+        nextPayment.status === "paid" &&
+        !nextPayment.appliedAt &&
+        nextPayment.targetType === "delegated_access" &&
+        nextPayment.targetRightId;
+
+    if (shouldApply) {
+        await addMayakAdminRightParticipantLimit(nextPayment.targetRightId, nextPayment.quantity || 1);
+        nextPayment.appliedAt = new Date().toISOString();
+    }
+
+    store.payments[index] = nextPayment;
     await writeStore(store);
+
     return toPublicPayment(store.payments[index]);
 }
 

@@ -35,6 +35,13 @@ function buildTableOptions() {
     return Array.from({ length: 6 }, (_, index) => String(index + 1));
 }
 
+function formatFileSize(value) {
+    const size = Number(value) || 0;
+    if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} МБ`;
+    if (size >= 1024) return `${Math.round(size / 1024)} КБ`;
+    return `${size} Б`;
+}
+
 export default function MayakDelegatedAccessPage() {
     const router = useRouter();
     const accessId = String(router.query?.accessId || "");
@@ -58,6 +65,7 @@ export default function MayakDelegatedAccessPage() {
     const tableOptions = useMemo(() => buildTableOptions(), []);
     const right = overview.right || null;
     const sessions = Array.isArray(overview.sessions) ? overview.sessions : [];
+    const materials = Array.isArray(overview.materials) ? overview.materials : [];
 
     const apiRequest = useCallback(
         async (body, passwordOverride) => {
@@ -136,6 +144,45 @@ export default function MayakDelegatedAccessPage() {
         const timeoutId = window.setTimeout(() => setCreateFeedback(""), 1800);
         return () => window.clearTimeout(timeoutId);
     }, [createFeedback]);
+
+    useEffect(() => {
+        if (!router.isReady || !isUnlocked || !accessId || !router.query.paymentId) return undefined;
+        let cancelled = false;
+        let timeoutId = null;
+        const paymentId = String(router.query.paymentId || "").trim();
+
+        async function checkPaymentStatus() {
+            try {
+                const response = await fetch(`/api/payments/status/${encodeURIComponent(paymentId)}`);
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || payload?.success === false) {
+                    throw new Error(payload?.error || "Не удалось проверить оплату");
+                }
+                if (cancelled) return;
+                const status = payload?.data?.status;
+                if (status === "paid") {
+                    await loadOverview(password);
+                    setMessage("Входы пополнены");
+                    router.replace(`/mayak-access/${encodeURIComponent(accessId)}`, undefined, { shallow: true });
+                    return;
+                }
+                if (status === "canceled") {
+                    setError("Оплата отменена");
+                    router.replace(`/mayak-access/${encodeURIComponent(accessId)}`, undefined, { shallow: true });
+                    return;
+                }
+                timeoutId = window.setTimeout(checkPaymentStatus, 3000);
+            } catch (statusError) {
+                if (!cancelled) setError(statusError.message || "Не удалось проверить оплату");
+            }
+        }
+
+        checkPaymentStatus();
+        return () => {
+            cancelled = true;
+            if (timeoutId) window.clearTimeout(timeoutId);
+        };
+    }, [accessId, isUnlocked, loadOverview, password, router, router.isReady, router.query.paymentId]);
 
     const handleLogin = async (event) => {
         event.preventDefault();
@@ -232,6 +279,9 @@ export default function MayakDelegatedAccessPage() {
                         <div style={metricStyle}>
                             <span style={metricValueStyle}>{`${right?.remainingParticipantLimit ?? 0}/${right?.totalParticipantLimit ?? 0}`}</span>
                             <span style={metricLabelStyle}>входов осталось</span>
+                            <a href={`/pay?accessId=${encodeURIComponent(accessId)}`} style={metricTopUpLinkStyle}>
+                                Пополнить
+                            </a>
                         </div>
                     </div>
                 </header>
@@ -279,6 +329,22 @@ export default function MayakDelegatedAccessPage() {
                         <span style={createFeedbackStyle}>{createFeedback}</span>
                     </div>
                 </form>
+
+                {materials.length ? (
+                    <section style={materialsPanelStyle}>
+                        <h2 style={panelTitleStyle}>Материалы</h2>
+                        <div style={materialsGridStyle}>
+                            {materials.map((material) => (
+                                <a key={material.id} href={material.url} download style={materialLinkStyle}>
+                                    <span style={materialTitleStyle}>{material.title || material.originalName || "Материал"}</span>
+                                    <span style={materialMetaStyle}>
+                                        {String(material.extension || "").replace(".", "").toUpperCase() || "Файл"} · {formatFileSize(material.size)}
+                                    </span>
+                                </a>
+                            ))}
+                        </div>
+                    </section>
+                ) : null}
 
                 <div style={sessionsListStyle}>
                     {sessions.length === 0 ? <div style={emptyStyle}>Активных сессий нет</div> : null}
@@ -381,7 +447,7 @@ const headerStyle = {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) auto",
     gap: 18,
-    alignItems: "end",
+    alignItems: "center",
 };
 
 const compactHeaderStyle = {
@@ -404,19 +470,19 @@ const titleStyle = {
 
 const metricGridStyle = {
     display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(140px, 1fr))",
+    gridTemplateColumns: "minmax(140px, 180px)",
+    justifyContent: "end",
     gap: 10,
 };
 
 const compactMetricGridStyle = {
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gridTemplateColumns: "minmax(0, 1fr)",
+    justifyContent: "stretch",
 };
 
 const metricStyle = {
-    border: "1px solid #d9e0e5",
-    borderRadius: 8,
-    background: "#fff",
-    padding: 14,
+    padding: 0,
+    textAlign: "right",
 };
 
 const metricValueStyle = {
@@ -431,6 +497,22 @@ const metricLabelStyle = {
     marginTop: 6,
     color: "#627178",
     fontSize: 13,
+};
+
+const metricTopUpLinkStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 34,
+    marginTop: 12,
+    border: "1px solid #152022",
+    borderRadius: 8,
+    background: "#152022",
+    color: "#fff",
+    padding: "0 14px",
+    fontSize: 13,
+    fontWeight: 800,
+    textDecoration: "none",
 };
 
 const metaLineStyle = {
@@ -450,6 +532,12 @@ const createPanelStyle = {
     borderRadius: 8,
     background: "#fff",
     padding: 14,
+};
+
+const panelTitleStyle = {
+    margin: 0,
+    fontSize: 18,
+    lineHeight: 1.25,
 };
 
 const compactCreatePanelStyle = {
@@ -530,6 +618,44 @@ const sessionsListStyle = {
     display: "flex",
     flexDirection: "column",
     gap: 12,
+};
+
+const materialsPanelStyle = {
+    display: "grid",
+    gap: 12,
+    border: "1px solid #d9e0e5",
+    borderRadius: 8,
+    background: "#fff",
+    padding: 16,
+};
+
+const materialsGridStyle = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 10,
+};
+
+const materialLinkStyle = {
+    display: "grid",
+    gap: 6,
+    border: "1px solid #d9e0e5",
+    borderRadius: 8,
+    background: "#f5f7f8",
+    padding: 12,
+    color: "#152022",
+    textDecoration: "none",
+};
+
+const materialTitleStyle = {
+    fontSize: 14,
+    fontWeight: 800,
+    overflowWrap: "anywhere",
+};
+
+const materialMetaStyle = {
+    color: "#627178",
+    fontSize: 12,
+    fontWeight: 700,
 };
 
 const sessionRowStyle = {

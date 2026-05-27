@@ -6,6 +6,7 @@ import {
     validateDelegatedAccessPassword,
 } from "@/lib/mayakAdminRights";
 import { getMayakSessionById } from "@/lib/mayakSessions";
+import { listMayakTokenMaterials } from "@/lib/mayakTokenMaterials";
 
 function serializeOverviewItem(item = {}) {
     const session = item.session || {};
@@ -42,6 +43,7 @@ function serializeOverview(overview = {}) {
     return {
         right: overview.right,
         sessions: Array.isArray(overview.sessions) ? overview.sessions.map(serializeOverviewItem) : [],
+        materials: Array.isArray(overview.materials) ? overview.materials : [],
     };
 }
 
@@ -57,7 +59,8 @@ export default async function handler(req, res) {
     try {
         if (action === "login" || action === "overview") {
             const overview = await getMayakDelegatedAccessOverviewByAccess({ accessId, password });
-            return res.status(200).json({ success: true, data: serializeOverview(overview) });
+            const materials = await listMayakTokenMaterials();
+            return res.status(200).json({ success: true, data: serializeOverview({ ...overview, materials }) });
         }
 
         if (action === "create_session") {
@@ -69,11 +72,14 @@ export default async function handler(req, res) {
                 participantLimit: req.body?.participantLimit,
             });
 
-            const overview = await getMayakDelegatedAccessOverviewByAccess({ accessId, password });
+            const [overview, materials] = await Promise.all([
+                getMayakDelegatedAccessOverviewByAccess({ accessId, password }),
+                listMayakTokenMaterials(),
+            ]);
             return res.status(200).json({
                 success: true,
                 data: {
-                    ...serializeOverview(overview),
+                    ...serializeOverview({ ...overview, materials }),
                     createdSession: serializeOverviewItem({ session: created.session, token: created.token }),
                 },
             });
@@ -96,8 +102,11 @@ export default async function handler(req, res) {
             }
 
             await completeMayakSessionWithRuntimeCleanup(sessionId);
-            const overview = await getMayakDelegatedAccessOverviewByAccess({ accessId, password });
-            return res.status(200).json({ success: true, data: serializeOverview(overview) });
+            const [overview, materials] = await Promise.all([
+                getMayakDelegatedAccessOverviewByAccess({ accessId, password }),
+                listMayakTokenMaterials(),
+            ]);
+            return res.status(200).json({ success: true, data: serializeOverview({ ...overview, materials }) });
         }
 
         return res.status(400).json({ success: false, error: "Неизвестное действие" });

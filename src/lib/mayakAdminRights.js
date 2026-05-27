@@ -261,6 +261,35 @@ export async function updateMayakAdminRight(_req, rightId, payload = {}) {
     return toPublicRight(normalized);
 }
 
+export async function addMayakAdminRightParticipantLimit(rightId, quantity) {
+    const normalizedId = normalizeString(String(rightId || ""));
+    const increment = normalizePositiveInteger(quantity, 0);
+    if (!normalizedId) {
+        throw new Error("Доступ не найден");
+    }
+    if (increment < 1) {
+        throw new Error("Количество входов должно быть не меньше 1");
+    }
+
+    const store = await readStore();
+    const index = store.rights.findIndex((item) => normalizeString(item.id) === normalizedId);
+    if (index === -1) {
+        throw new Error("Доступ не найден");
+    }
+
+    const current = toStoredRight(store.rights[index]);
+    const now = new Date().toISOString();
+    const nextRight = toStoredRight({
+        ...current,
+        totalParticipantLimit: normalizePositiveInteger(current.totalParticipantLimit, DEFAULT_TOTAL_PARTICIPANT_LIMIT) + increment,
+        updatedAt: now,
+    });
+
+    store.rights[index] = nextRight;
+    await writeStore(store);
+    return toPublicRight(nextRight);
+}
+
 export async function revokeMayakAdminRight(rightId) {
     const normalizedId = normalizeString(String(rightId || ""));
     const store = await readStore();

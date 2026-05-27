@@ -20,6 +20,12 @@ export const MAYAK_ADMIN_SECTIONS = [
         href: "/admin/mayak-tokens",
     },
     {
+        id: "token-materials",
+        title: "Материалы для токенов",
+        description: "PDF и PPTX файлы, которые будут доступны для скачивания во внешних ссылках токенов.",
+        href: "/admin/mayak-token-materials",
+    },
+    {
         id: "ai-tokens",
         title: "AI токены",
         description: "Единый пул Qwen, резерв OpenRouter и промпты для СОВА и итоговой аналитики.",
