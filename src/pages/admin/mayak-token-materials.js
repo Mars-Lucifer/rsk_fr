@@ -27,14 +27,22 @@ export default function AdminMayakTokenMaterialsPage() {
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
 
+    const redirectToLogin = useCallback(() => {
+        router.replace(buildMayakAdminLoginUrl("/admin/mayak-token-materials"));
+    }, [router]);
+
     const loadMaterials = useCallback(async () => {
         const response = await fetch("/api/admin/mayak-token-materials");
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload?.success === false) {
+            if (response.status === 401) {
+                redirectToLogin();
+                throw new Error("Сессия администратора истекла. Войдите снова.");
+            }
             throw new Error(payload?.error || "Не удалось загрузить материалы");
         }
         setMaterials(Array.isArray(payload.data) ? payload.data : []);
-    }, []);
+    }, [redirectToLogin]);
 
     useEffect(() => {
         let cancelled = false;
@@ -79,6 +87,10 @@ export default function AdminMayakTokenMaterialsPage() {
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || payload?.success === false) {
+                if (response.status === 401) {
+                    redirectToLogin();
+                    throw new Error("Сессия администратора истекла. Войдите снова.");
+                }
                 throw new Error(payload?.error || "Не удалось загрузить материал");
             }
             setTitle("");
@@ -106,6 +118,10 @@ export default function AdminMayakTokenMaterialsPage() {
             });
             const payload = await response.json().catch(() => ({}));
             if (!response.ok || payload?.success === false) {
+                if (response.status === 401) {
+                    redirectToLogin();
+                    throw new Error("Сессия администратора истекла. Войдите снова.");
+                }
                 throw new Error(payload?.error || "Не удалось удалить материал");
             }
             await loadMaterials();
@@ -332,4 +348,3 @@ const emptyStyle = {
     color: "#64748b",
     padding: 18,
 };
-
