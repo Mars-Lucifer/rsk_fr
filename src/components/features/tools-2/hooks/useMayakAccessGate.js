@@ -3,11 +3,16 @@ import { useEffect, useState } from "react";
 import { getKeyFromCookies, getUserFromCookies } from "../actions";
 
 const MAYAK_GUEST_SUFFIX = "aaaaa";
+const MAYAK_TEMP_GUEST_TOKEN = "aaaaa";
 
 function normalizeMayakToken(rawToken) {
     const token = String(rawToken || "").trim();
     if (!token) {
         return "";
+    }
+
+    if (token.toLowerCase() === MAYAK_TEMP_GUEST_TOKEN) {
+        return MAYAK_TEMP_GUEST_TOKEN;
     }
 
     if (token.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX)) {

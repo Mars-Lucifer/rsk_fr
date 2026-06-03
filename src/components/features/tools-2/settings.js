@@ -33,6 +33,12 @@ const EMPTY_SESSION_INFO = {
 };
 
 const MAYAK_GUEST_SUFFIX = "aaaaa";
+const MAYAK_TEMP_GUEST_TOKEN = "aaaaa";
+const TEMP_GUEST_PROFILE = {
+    firstName: "МАЯК",
+    lastName: "Участник",
+    patronymic: "",
+};
 const EMPTY_GUEST_FORM = {
     firstName: "",
     lastName: "",
@@ -50,11 +56,21 @@ function parseMayakGuestToken(tokenValue) {
         return { rawToken: "", baseToken: "", isGuestMode: false };
     }
 
+    if (normalized.toLowerCase() === MAYAK_TEMP_GUEST_TOKEN) {
+        return {
+            rawToken: normalized,
+            baseToken: MAYAK_TEMP_GUEST_TOKEN,
+            isGuestMode: true,
+            isTemporaryGuestToken: true,
+        };
+    }
+
     if (normalized.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX)) {
         return {
             rawToken: normalized,
             baseToken: normalized.slice(0, -MAYAK_GUEST_SUFFIX.length).trim(),
             isGuestMode: true,
+            isTemporaryGuestToken: false,
         };
     }
 
@@ -62,6 +78,7 @@ function parseMayakGuestToken(tokenValue) {
         rawToken: normalized,
         baseToken: normalized,
         isGuestMode: false,
+        isTemporaryGuestToken: false,
     };
 }
 
@@ -215,6 +232,7 @@ export default function SettingsPage({ goTo }) {
     const portalProfile = portalProfilePayload ? normalizePortalProfile(portalProfilePayload) : null;
     const isStoredTokenActive = Boolean(token && storedToken && storedToken === token);
     const hasPortalIdentity = hasPortalIdentityFields(portalProfilePayload);
+    const isTemporaryGuestToken = parseMayakGuestToken(token).isTemporaryGuestToken;
 
     useEffect(() => {
         setPortalIdentityForm({
@@ -360,6 +378,7 @@ export default function SettingsPage({ goTo }) {
             setIsGuestMode(nextGuestMode);
             setSessionInfo(nextSessionInfo);
             setShowNotification(isAccessible);
+            setGuestForm(tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE : EMPTY_GUEST_FORM);
 
             if (!result.isBypass) {
                 setBypassPassword("");
@@ -590,9 +609,10 @@ export default function SettingsPage({ goTo }) {
             return;
         }
 
-        const firstName = String(guestForm.firstName || "").trim();
-        const lastName = String(guestForm.lastName || "").trim();
-        const patronymic = String(guestForm.patronymic || "").trim();
+        const tokenMeta = parseMayakGuestToken(token);
+        const firstName = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.firstName : guestForm.firstName) || "").trim();
+        const lastName = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.lastName : guestForm.lastName) || "").trim();
+        const patronymic = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.patronymic : guestForm.patronymic) || "").trim();
 
         if (!lastName || !firstName) {
             setGuestFormError("Р”Р»СЏ РІС…РѕРґР° Р·Р°РїРѕР»РЅРёС‚Рµ С„Р°РјРёР»РёСЋ Рё РёРјСЏ.");
@@ -621,7 +641,7 @@ export default function SettingsPage({ goTo }) {
                 setStoredToken(token);
             }
 
-            const baseToken = parseMayakGuestToken(token).baseToken || String(token || "").trim();
+            const baseToken = tokenMeta.baseToken || String(token || "").trim();
             const userId = buildMayakGuestUserId(sessionInfo);
             const fullName = [lastName, firstName, patronymic].filter(Boolean).join(" ").trim();
 
@@ -700,6 +720,14 @@ export default function SettingsPage({ goTo }) {
             setIsLoading(false);
         }
     }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isStoredTokenActive, isTokenValid, sessionInfo, tableNumber, token]);
+
+    useEffect(() => {
+        if (!showNotification || !isTokenValid || !isGuestMode || !isTemporaryGuestToken || hasRegisteredUser || isLoading || isValidating) {
+            return;
+        }
+
+        activateGuestUser();
+    }, [activateGuestUser, hasRegisteredUser, isGuestMode, isLoading, isTemporaryGuestToken, isTokenValid, isValidating, showNotification]);
 
     const savePortalIdentity = useCallback(async () => {
         const firstName = String(portalIdentityForm.firstName || "").trim();
@@ -874,6 +902,16 @@ export default function SettingsPage({ goTo }) {
         }
 
         if (isGuestMode) {
+            if (isTemporaryGuestToken) {
+                return (
+                    <div className="flex flex-col gap-[1rem] items-center">
+                        <span className="big p-3 bg-green-100 text-green-700 rounded-md">
+                            {isLoading ? "Подключаем гостевой вход..." : "Гостевой вход активирован"}
+                        </span>
+                    </div>
+                );
+            }
+
             if (hasRegisteredUser) {
                 const activeUser = getUserFromCookies();
                 return (

@@ -14,6 +14,8 @@ const TOKEN_TYPES = [
     { id: "external_link", label: "Внешняя ссылка" },
 ];
 
+const MAYAK_GUEST_SUFFIX = "aaaaa";
+
 const CREATE_TOKEN_TYPES = TOKEN_TYPES.filter((type) => type.id !== "all");
 
 const initialLegacyForm = {
@@ -84,8 +86,15 @@ function buildAbsoluteUrl(path) {
     return `${window.location.origin}${path}`;
 }
 
+function buildGuestToken(token) {
+    if (!token) return "";
+    const tokenValue = String(token).trim();
+    return tokenValue.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX) ? tokenValue : `${tokenValue}${MAYAK_GUEST_SUFFIX}`;
+}
+
 function buildTrainerLink(token) {
-    return token ? `/tools/mayak-oko?token=${encodeURIComponent(token)}` : "";
+    const guestToken = buildGuestToken(token);
+    return guestToken ? `/tools/mayak-oko?token=${encodeURIComponent(guestToken)}` : "";
 }
 
 async function parseJsonResponse(response, fallbackMessage) {
@@ -373,7 +382,7 @@ export default function AdminMayakTokens() {
                     "Не удалось создать обычный токен"
                 );
                 setLegacyForm(initialLegacyForm);
-                setLastCreated({ type: "legacy", token: payload.data?.token || "", link: buildTrainerLink(payload.data?.token || "") });
+                setLastCreated({ type: "legacy", token: buildGuestToken(payload.data?.token || ""), link: buildTrainerLink(payload.data?.token || "") });
             } else if (activeType === "session") {
                 payload = await parseJsonResponse(
                     await fetch("/api/admin/mayak-sessions", {

@@ -4,11 +4,16 @@ import { findActiveMayakSessionByTokenId } from "@/lib/mayakSessions";
 
 const DEV_BYPASS_TOKEN = "fffff";
 const MAYAK_GUEST_SUFFIX = "aaaaa";
+const MAYAK_TEMP_GUEST_TOKEN = "aaaaa";
 
 function normalizeMayakToken(rawToken) {
     const token = String(rawToken || "").trim();
     if (!token) {
         return "";
+    }
+
+    if (token.toLowerCase() === MAYAK_TEMP_GUEST_TOKEN) {
+        return MAYAK_TEMP_GUEST_TOKEN;
     }
 
     if (token.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX)) {
@@ -39,6 +44,26 @@ function buildBypassValidationResponse() {
         isActive: true,
         isBypass: true,
         tokenType: "bypass",
+    };
+}
+
+function buildGuestValidationResponse() {
+    return {
+        success: true,
+        valid: true,
+        error: null,
+        remainingAttempts: 1,
+        usageLimit: 1,
+        usedCount: 0,
+        taskRange: null,
+        sectionId: null,
+        isExhausted: false,
+        isActive: true,
+        isBypass: false,
+        tokenType: "guest",
+        sessionId: null,
+        sessionName: null,
+        tableCount: 0,
     };
 }
 
@@ -102,6 +127,10 @@ export default async function handler(req, res) {
 
             if (token === DEV_BYPASS_TOKEN && isLocalMayakBypassEnabled(req)) {
                 return res.status(200).json(buildBypassValidationResponse());
+            }
+
+            if (token === MAYAK_TEMP_GUEST_TOKEN) {
+                return res.status(200).json(buildGuestValidationResponse());
             }
 
             const sessionResult = await validateMayakSessionToken(token);
@@ -168,6 +197,16 @@ export default async function handler(req, res) {
                     success: false,
                     error: sessionResult.error || sessionValidationResult.error,
                     remainingAttempts: sessionResult.remainingAttempts || sessionValidationResult.remainingAttempts || 0,
+                });
+            }
+
+            if (token === MAYAK_TEMP_GUEST_TOKEN) {
+                return res.status(200).json({
+                    success: true,
+                    message: "Временный гостевой токен использован",
+                    remainingAttempts: 1,
+                    isBypass: false,
+                    tokenType: "guest",
                 });
             }
 

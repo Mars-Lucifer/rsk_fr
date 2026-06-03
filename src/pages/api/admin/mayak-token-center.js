@@ -4,6 +4,8 @@ import { listMayakSessions } from "@/lib/mayakSessions";
 import { listMayakSessionTokens } from "@/lib/mayakSessionTokens";
 import { getAllTokensWithStats } from "@/utils/mayakTokens";
 
+const MAYAK_GUEST_SUFFIX = "aaaaa";
+
 function toIsoSortValue(value) {
     return value ? String(value) : "";
 }
@@ -13,8 +15,15 @@ function normalizeNumber(value, fallback = 0) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function buildGuestToken(token) {
+    if (!token) return "";
+    const tokenValue = String(token).trim();
+    return tokenValue.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX) ? tokenValue : `${tokenValue}${MAYAK_GUEST_SUFFIX}`;
+}
+
 function buildTrainerLink(token) {
-    return token ? `/tools/mayak-oko?token=${encodeURIComponent(token)}` : "";
+    const guestToken = buildGuestToken(token);
+    return guestToken ? `/tools/mayak-oko?token=${encodeURIComponent(guestToken)}` : "";
 }
 
 function mapLegacyToken(token) {
@@ -25,7 +34,7 @@ function mapLegacyToken(token) {
         id: token.id,
         type: "legacy",
         title: token.name || "Обычный токен",
-        token: token.token || "",
+        token: buildGuestToken(token.token),
         link: buildTrainerLink(token.token),
         password: "",
         sectionId: token.sectionId || "",
@@ -52,7 +61,7 @@ function mapSession(session, tokenMap) {
         id: session.id,
         type: "session",
         title: session.name || "Сессионный токен",
-        token: primaryToken?.token || "",
+        token: buildGuestToken(primaryToken?.token),
         link: buildTrainerLink(primaryToken?.token),
         password: "",
         sectionId: session.sectionId || primaryToken?.sectionId || "",

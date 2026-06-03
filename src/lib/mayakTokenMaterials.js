@@ -3,9 +3,14 @@ import path from "path";
 import crypto from "crypto";
 
 const MATERIALS_FILE = path.join(process.cwd(), "data", "mayak-token-materials.json");
+const MATERIALS_DIR = path.join(process.cwd(), "data", "mayak-token-material-files");
 const PUBLIC_DIR = path.join(process.cwd(), "public", "mayak-token-materials");
-const PUBLIC_URL_PREFIX = "/mayak-token-materials";
+const FILE_API_PREFIX = "/api/mayak/token-materials/file";
 const ALLOWED_EXTENSIONS = new Set([".pdf", ".pptx"]);
+const CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
 
 function normalizeString(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -53,7 +58,7 @@ function toPublicMaterial(material = {}) {
         title: material.title || material.originalName || "Материал",
         originalName: material.originalName || "",
         fileName: material.fileName || "",
-        url: material.url || "",
+        url: material.id ? `${FILE_API_PREFIX}?id=${encodeURIComponent(material.id)}` : material.url || "",
         size: material.size || 0,
         extension: material.extension || "",
         createdAt: material.createdAt || null,
@@ -74,12 +79,12 @@ export async function uploadMayakTokenMaterial({ filePath, originalName, size, t
         throw new Error("Можно загружать только PDF и PPTX");
     }
 
-    await fs.mkdir(PUBLIC_DIR, { recursive: true });
+    await fs.mkdir(MATERIALS_DIR, { recursive: true });
 
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
     const fileName = `${safeFilename(normalizedOriginalName)}-${Date.now()}${extension}`;
-    const targetPath = path.join(PUBLIC_DIR, fileName);
+    const targetPath = path.join(MATERIALS_DIR, fileName);
     await fs.copyFile(filePath, targetPath);
 
     const material = {
@@ -87,7 +92,7 @@ export async function uploadMayakTokenMaterial({ filePath, originalName, size, t
         title: normalizeString(title) || path.parse(normalizedOriginalName).name || "Материал",
         originalName: normalizedOriginalName,
         fileName,
-        url: `${PUBLIC_URL_PREFIX}/${fileName}`,
+        url: `${FILE_API_PREFIX}?id=${encodeURIComponent(id)}`,
         size: Number(size) || 0,
         extension,
         createdAt: now,
@@ -110,7 +115,41 @@ export async function deleteMayakTokenMaterial(materialId) {
     const [deleted] = store.materials.splice(index, 1);
     await writeStore(store);
     if (deleted?.fileName) {
+        await fs.rm(path.join(MATERIALS_DIR, deleted.fileName), { force: true }).catch(() => {});
         await fs.rm(path.join(PUBLIC_DIR, deleted.fileName), { force: true }).catch(() => {});
     }
     return toPublicMaterial(deleted);
+}
+
+export async function getMayakTokenMaterialFile(materialId) {
+    const normalizedId = normalizeString(materialId);
+    if (!normalizedId) return null;
+
+    const store = await readStore();
+    const material = store.materials.find((item) => item.id === normalizedId) || null;
+    if (!material?.fileName) return null;
+
+    const fileName = path.basename(material.fileName);
+    const extension = path.extname(fileName).toLowerCase();
+    const candidates = [path.join(MATERIALS_DIR, fileName), path.join(PUBLIC_DIR, fileName)];
+
+    for (const filePath of candidates) {
+        try {
+            const stat = await fs.stat(filePath);
+            if (stat.isFile()) {
+                return {
+                    material: toPublicMaterial(material),
+                    filePath,
+                    fileName,
+                    downloadName: material.originalName || fileName,
+                    contentType: CONTENT_TYPES[extension] || "application/octet-stream",
+                    size: stat.size,
+                };
+            }
+        } catch {
+            // Try the next storage location.
+        }
+    }
+
+    return null;
 }

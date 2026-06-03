@@ -1,3 +1,14 @@
 {
-  "materials": []
+  "materials": [
+    {
+      "id": "83c3cc31-cd01-4787-a2a3-fabdafb70925",
+      "title": "1",
+      "originalName": "Подробное_описание_МАЯК_для_Мастера_от_03_10_2025.pdf",
+      "fileName": "Подробное_описание_МАЯК_для_Мастера_от_03_10_2025-1780492150794.pdf",
+      "url": "/api/mayak/token-materials/file?id=83c3cc31-cd01-4787-a2a3-fabdafb70925",
+      "size": 4152889,
+      "extension": ".pdf",
+      "createdAt": "2026-06-03T13:09:10.792Z"
+    }
+  ]
 }

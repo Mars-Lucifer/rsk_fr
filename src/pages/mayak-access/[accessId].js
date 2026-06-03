@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
-
 import Layout from "@/components/layout/Layout";
+
+const MAYAK_GUEST_SUFFIX = "aaaaa";
 
 function formatDateTime(value) {
     const parsed = value ? new Date(value) : null;
@@ -240,7 +241,9 @@ export default function MayakDelegatedAccessPage() {
 
     const buildParticipantLink = (tokenValue) => {
         if (!tokenValue || typeof window === "undefined") return "";
-        return `${window.location.origin}/tools/mayak-oko?token=${encodeURIComponent(tokenValue)}`;
+        const token = String(tokenValue).trim();
+        const guestToken = token.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX) ? token : `${token}${MAYAK_GUEST_SUFFIX}`;
+        return `${window.location.origin}/tools/mayak-oko?token=${encodeURIComponent(guestToken)}`;
     };
 
     if (!isUnlocked) {
