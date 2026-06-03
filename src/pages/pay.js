@@ -4,6 +4,8 @@ import { useRouter } from "next/router";
 
 import { getMayakLegalData } from "@/lib/mayakLegal";
 
+const PENDING_PAYMENT_STORAGE_KEY = "mayak_pending_payment";
+
 async function parseJsonResponse(response, fallbackMessage) {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.success === false) {
@@ -37,6 +39,38 @@ function getEntryWord(quantity) {
     return "входов";
 }
 
+function readPendingPayment() {
+    if (typeof window === "undefined") return null;
+    try {
+        const parsed = JSON.parse(window.sessionStorage.getItem(PENDING_PAYMENT_STORAGE_KEY) || "null");
+        return parsed?.id ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function writePendingPayment(payment, fallbackAccessId = "") {
+    if (typeof window === "undefined" || !payment?.id) return;
+    const targetAccessId = payment.targetAccessId || fallbackAccessId || "";
+    window.sessionStorage.setItem(
+        PENDING_PAYMENT_STORAGE_KEY,
+        JSON.stringify({
+            id: payment.id,
+            targetAccessId,
+            confirmationUrl: payment.confirmationUrl || "",
+            createdAt: payment.createdAt || new Date().toISOString(),
+        })
+    );
+}
+
+function clearPendingPayment(paymentId) {
+    if (typeof window === "undefined") return;
+    const pendingPayment = readPendingPayment();
+    if (!pendingPayment || pendingPayment.id === paymentId) {
+        window.sessionStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY);
+    }
+}
+
 export async function getServerSideProps() {
     return { props: { legal: getMayakLegalData() } };
 }
@@ -52,26 +86,45 @@ export default function PayPage({ legal }) {
     const [payment, setPayment] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [storedPaymentId, setStoredPaymentId] = useState("");
 
     const paymentId = useMemo(() => String(router.query.paymentId || "").trim(), [router.query.paymentId]);
+    const effectivePaymentId = paymentId || storedPaymentId;
     const totalAmount = useMemo(() => (unitPrice * form.quantity).toFixed(2), [form.quantity, unitPrice]);
 
     useEffect(() => {
-        if (!paymentId) return undefined;
+        if (!router.isReady) return;
+        if (paymentId) {
+            setStoredPaymentId(paymentId);
+            return;
+        }
+        const pendingPayment = readPendingPayment();
+        if (!pendingPayment?.id) return;
+        if (targetAccessId && pendingPayment.targetAccessId && pendingPayment.targetAccessId !== targetAccessId) return;
+        setStoredPaymentId(pendingPayment.id);
+        setPayment((current) => current || pendingPayment);
+    }, [paymentId, router.isReady, targetAccessId]);
+
+    useEffect(() => {
+        if (!effectivePaymentId) return undefined;
         let cancelled = false;
         let timeoutId = null;
 
         async function loadStatus() {
             try {
                 const payload = await parseJsonResponse(
-                    await fetch(`/api/payments/status/${encodeURIComponent(paymentId)}`),
+                    await fetch(`/api/payments/status/${encodeURIComponent(effectivePaymentId)}`),
                     "Не удалось получить статус платежа"
                 );
                 if (cancelled) return;
-                setPayment(payload.data || null);
-                if (!["paid", "canceled"].includes(payload.data?.status)) {
+                const nextPayment = payload.data || null;
+                setPayment(nextPayment);
+                if (nextPayment?.id && !["paid", "canceled"].includes(nextPayment.status)) {
+                    writePendingPayment(nextPayment, targetAccessId);
                     timeoutId = window.setTimeout(loadStatus, 5000);
+                    return;
                 }
+                clearPendingPayment(nextPayment?.id || effectivePaymentId);
             } catch (statusError) {
                 if (!cancelled) setError(statusError.message);
             }
@@ -82,7 +135,15 @@ export default function PayPage({ legal }) {
             cancelled = true;
             if (timeoutId) window.clearTimeout(timeoutId);
         };
-    }, [paymentId]);
+    }, [effectivePaymentId, targetAccessId]);
+
+    useEffect(() => {
+        if (payment?.status !== "paid" || !payment.targetAccessId) return undefined;
+        const timeoutId = window.setTimeout(() => {
+            router.push(`/mayak-access/${encodeURIComponent(payment.targetAccessId)}`);
+        }, 1200);
+        return () => window.clearTimeout(timeoutId);
+    }, [payment, router]);
 
     async function handleSubmit(event) {
         event.preventDefault();
@@ -115,6 +176,8 @@ export default function PayPage({ legal }) {
             );
             const createdPayment = payload.data;
             setPayment(createdPayment);
+            writePendingPayment(createdPayment, targetAccessId);
+            setStoredPaymentId(createdPayment?.id || "");
             if (createdPayment?.confirmationUrl) {
                 window.location.href = createdPayment.confirmationUrl;
             }
