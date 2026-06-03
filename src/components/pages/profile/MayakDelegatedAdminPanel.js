@@ -196,7 +196,7 @@ export default function MayakDelegatedAdminPanel() {
                 </div>
                 {activeRight ? (
                     <span className="small rounded-full bg-(--color-white-gray) px-3 py-2 text-(--color-gray-black) whitespace-nowrap">
-                        {`Входы: ${activeRight.remainingParticipantLimit}/${activeRight.totalParticipantLimit}`}
+                        {`Входы: ${activeRight.usedParticipantLimit}/${activeRight.totalParticipantLimit}`}
                     </span>
                 ) : null}
             </div>

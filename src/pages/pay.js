@@ -14,13 +14,6 @@ async function parseJsonResponse(response, fallbackMessage) {
     return payload;
 }
 
-function formatPaymentStatus(status) {
-    if (status === "paid") return "Оплачено";
-    if (status === "canceled") return "Отменено";
-    if (status === "waiting_for_capture") return "Ожидает подтверждения";
-    return "Ожидает оплаты";
-}
-
 function formatRub(value) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return "0 ₽";
@@ -257,16 +250,6 @@ export default function PayPage({ legal }) {
 
                 {error ? <div className="notice error">{error}</div> : null}
 
-                {payment ? (
-                    <section className={`payment-status ${payment.status}`}>
-                        <span>Статус</span>
-                        <strong>{formatPaymentStatus(payment.status)}</strong>
-                        <code>{payment.id}</code>
-                        {payment.confirmationUrl && payment.status !== "paid" ? (
-                            <a href={payment.confirmationUrl}>Открыть страницу оплаты</a>
-                        ) : null}
-                    </section>
-                ) : null}
             </section>
 
             <style jsx>{`
