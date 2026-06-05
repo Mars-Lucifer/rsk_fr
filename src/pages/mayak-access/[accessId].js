@@ -280,8 +280,8 @@ export default function MayakDelegatedAccessPage() {
                     </div>
                     <div style={{ ...metricGridStyle, ...(isCompact ? compactMetricGridStyle : null) }}>
                         <div style={metricStyle}>
-                            <span style={metricValueStyle}>{`${right?.usedParticipantLimit ?? 0}/${right?.totalParticipantLimit ?? 0}`}</span>
-                            <span style={metricLabelStyle}>входов использовано</span>
+                            <span style={metricValueStyle}>{`${right?.remainingParticipantLimit ?? 0}/${right?.totalParticipantLimit ?? 0}`}</span>
+                            <span style={metricLabelStyle}>входов осталось</span>
                             <a href={`/pay?accessId=${encodeURIComponent(accessId)}`} style={metricTopUpLinkStyle}>
                                 Пополнить
                             </a>

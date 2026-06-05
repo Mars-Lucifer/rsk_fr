@@ -170,6 +170,8 @@ Main portal/user-facing areas observed in this repo:
 - `/cours/*`
 - `/tools/mayak-oko`
 - `/admin` MAYAK admin hub
+- `/rosdk/confrencia` Conference delegate selection protocol form
+- `/rosdk/confrencia/admin` Admin panel for delegate protocols
 
 Shared navigation is defined in:
 - `src/components/layout/Aside/Nav.js`
