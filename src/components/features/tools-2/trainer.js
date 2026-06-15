@@ -350,6 +350,32 @@ export default function TrainerPage({ goTo }) {
                 taskElapsedTime: 0,
                 sectionId: tokenSectionId,
             });
+
+            if (isSessionMode && runtimeSessionId && activeUserId) {
+                const res = await fetch("/api/mayak/session-runtime/auto-approve", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        sessionId: runtimeSessionId,
+                        userId: activeUserId,
+                        taskNumber: taskNumber || String(currentTaskIndex + 1),
+                        taskIndex: currentTaskIndex,
+                        taskName,
+                    }),
+                });
+                const payload = await res.json().catch(() => ({}));
+                if (res.ok && payload.success) {
+                    const refreshResponse = await fetch(`/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`, {
+                        cache: "no-store",
+                    });
+                    const refreshPayload = await refreshResponse.json().catch(() => ({}));
+                    if (refreshResponse.ok && refreshPayload.success) {
+                        setSessionRuntimeState(refreshPayload.data || null);
+                    }
+                }
+            }
         } catch (err) {
             console.error("Error saving intro task:", err);
         }
@@ -358,7 +384,7 @@ export default function TrainerPage({ goTo }) {
         if (timerState.isRunning) {
             stopTimer();
         }
-    }, [currentTask, currentTaskIndex, tasksTexts, type, userType, who, timerState.isRunning, stopTimer]);
+    }, [currentTask, currentTaskIndex, tasksTexts, type, userType, who, timerState.isRunning, stopTimer, isSessionMode, runtimeSessionId, activeUserId, setSessionRuntimeState]);
 
 
     useEffect(() => {

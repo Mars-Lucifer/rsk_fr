@@ -1040,4 +1040,43 @@ export async function setMayakSessionParticipantYaDirection({ sessionId, userId,
     return participant;
 }
 
+export async function autoApproveMayakSessionTask({ sessionId, userId, taskNumber, taskIndex, taskName }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const store = await readStore();
+    const bucket = ensureSessionBucket(store, sessionId);
+    const participant = bucket.participants?.[userId];
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    const taskKey = buildTaskKey(taskNumber);
+    if (!taskKey) {
+        throw new Error("Не удалось определить номер задания");
+    }
+
+    const createdAt = new Date().toISOString();
+    participant.tasks[taskKey] = {
+        taskKey,
+        taskNumber: normalizeString(taskNumber),
+        taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
+        taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
+        status: "approved",
+        reviewId: null,
+        isBlocking: false,
+        expiresAt: null,
+        reworkExpiresAt: null,
+        durationSeconds: 0,
+        comment: "",
+        updatedAt: createdAt,
+    };
+    participant.updatedAt = createdAt;
+    await writeStore(store, [sessionId]);
+    return participant.tasks[taskKey];
+}
+
+
 
