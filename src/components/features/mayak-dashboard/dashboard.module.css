@@ -662,10 +662,11 @@
 
 /* --- Analytics (Overview Panel) --- */
 .overviewBody {
-    padding: 12px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex-grow: 1;
 }
 
 .analyticsRow {
@@ -1517,6 +1518,7 @@
     justify-content: center;
     gap: 12px;
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.01);
+    flex-grow: 1;
 }
 
 .compactTimerDisplay {
@@ -1703,9 +1705,9 @@
 
 .compactTimerRingContainer {
     position: relative;
-    width: 120px;
-    height: 120px;
-    margin: 0 auto;
+    width: 150px;
+    height: 150px;
+    margin: 12px auto 4px auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1735,7 +1737,7 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 26px;
+    font-size: 32px;
     font-weight: 800;
     color: #08090a;
     font-family: monospace;

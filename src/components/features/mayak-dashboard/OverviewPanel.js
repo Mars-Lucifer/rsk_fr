@@ -197,6 +197,12 @@ export default function OverviewPanel({
     const strokeDashoffset = 565.48 * (1 - pct);
     const danger = timer.running && timer.remainingSeconds <= 10 && timer.remainingSeconds > 0;
 
+    const totalWeTasks = useMemo(() => {
+        return tables.reduce((sum, t) => {
+            return sum + (t.participants?.reduce((pSum, p) => pSum + (p.we?.approvedCount || 0), 0) || 0);
+        }, 0);
+    }, [tables]);
+
     return (
         <section className={`${styles.panel} ${styles.overviewPanel} ${expanded ? styles.panelExpanded : ""}`}>
             <header className={`${styles.panelHead} ${styles.overviewHead}`} onClick={onExpand} style={{ cursor: "pointer" }}>
@@ -218,7 +224,7 @@ export default function OverviewPanel({
                 </button>
             </header>
 
-            <div className={styles.overviewBody}>
+            <div className={`${styles.panelBody} ${styles.overviewBody}`}>
                 {!expanded ? (
                     <>
                         <div className={styles.compactTimerCard}>
@@ -323,7 +329,7 @@ export default function OverviewPanel({
                                 <div className={styles.statInfo} style={{ gap: "2px" }}>
                                     <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
                                     <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
-                                        {mode === "we" ? `${totalTasks} из ${tables.length * 36}` : totalTasks}
+                                        {mode === "we" ? `${totalWeTasks} из ${tables.length * 36}` : totalTasks}
                                     </span>
                                 </div>
                             </div>
