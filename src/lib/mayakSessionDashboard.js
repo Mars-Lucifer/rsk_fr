@@ -345,7 +345,7 @@ export async function getMayakSessionDashboardData(sessionId) {
         });
 
     const reviews = await readSessionReviews(sessionId);
-    const approvedReviews = reviews.filter((r) => r.status === "approved");
+    const approvedReviews = reviews.filter((r) => r.status === "approved" || r.status === "expired");
 
     const tables = [];
     for (let tableNumber = 1; tableNumber <= tableCount; tableNumber += 1) {
