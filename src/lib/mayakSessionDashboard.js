@@ -312,7 +312,7 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
             stars: weStars,
             directions,
         },
-        approvedTotal: approvedTasks.length,
+        approvedTotal: yaApprovedCount + weApprovedCount,
         registeredAt: participant.registeredAt || null,
         updatedAt: participant.updatedAt || null,
     };
