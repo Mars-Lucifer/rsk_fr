@@ -6,7 +6,9 @@ import { buildMayakCertificateBlob, buildMayakQrDataUrl, buildMayakSessionLogBlo
 import { getKeyFromCookies, getUserFromCookies } from "../actions";
 
 const ENABLE_MAYAK_TELEGRAM_COMPLETION_DELIVERY = false;
-const ENABLE_MAYAK_FINAL_ANALYTICS = true;
+// Временно отключено: при завершении сессии скачиваются только сертификат и лог,
+// итоговая аналитика пропускается. Вернуть в true, чтобы снова генерировать аналитику.
+const ENABLE_MAYAK_FINAL_ANALYTICS = false;
 
 function repairUtf8AsCp1251(value) {
     const source = String(value || "");
@@ -224,11 +226,22 @@ export const useMayakCompletionActions = ({
                 tasks: enrichedTasks,
             };
 
-            const response = await fetch("/api/mayak/session-analytics", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ logData }),
-            });
+            // Аналитика — необязательный артефакт. Жёсткий таймаут не даёт ей
+            // заблокировать завершение сессии, если генерация на сервере зависнет.
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+            let response;
+            try {
+                response = await fetch("/api/mayak/session-analytics", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ logData }),
+                    signal: controller.signal,
+                });
+            } finally {
+                clearTimeout(timeoutId);
+            }
 
             if (!response.ok) {
                 const payload = await response.json().catch(() => ({}));

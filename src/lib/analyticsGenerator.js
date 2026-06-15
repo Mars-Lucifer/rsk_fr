@@ -4,14 +4,8 @@ import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { readMayakSettings } from './mayakSettings.js';
-import {
-  QWEN_API_URL,
-  QWEN_MODEL,
-  acquireLeastLoadedQwenToken,
-  getQwenTokenPool,
-  maskSecret,
-  releaseQwenToken,
-} from './mayakQwen.js';
+import { maskSecret } from './mayakQwen.js';
+import { CODEX_API_URL, getStoredCodexConfig } from './mayakCodex.js';
 
 const DEFAULT_FINAL_FILE_MODEL = 'google/gemini-3-flash-preview';
 
@@ -403,9 +397,21 @@ ${tasksStr}
 Р Р…Р Вµ Р С—Р С•Р Т‘Р Т‘Р ВµРЎР‚Р В¶Р С‘Р Р†Р В°РЎР‹РЎвЂљРЎРѓРЎРЏ. Р вЂ™Р СР ВµРЎРѓРЎвЂљР С• РЎРЊР СР С•Р Т‘Р В·Р С‘ Р С‘РЎРѓР С—Р С•Р В»РЎРЉР В·РЎС“Р в„– РЎвЂљР ВµР С”РЎРѓРЎвЂљР С•Р Р†РЎвЂ№Р Вµ Р СР В°РЎР‚Р С”Р ВµРЎР‚РЎвЂ№: [+], [~], [-].`;
 }
 
+const LLM_REQUEST_TIMEOUT_MS = 90000;
+
+async function fetchWithTimeout(url, options, timeoutMs = LLM_REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function getFinalFileLLMConfig() {
   const settings = await readMayakSettings();
-  const qwenTokenPool = await getQwenTokenPool();
+  const codex = await getStoredCodexConfig();
   const openRouterApiKey =
     settings.finalFileOpenrouterApiKey ||
     settings.openrouterApiKey ||
@@ -415,7 +421,8 @@ async function getFinalFileLLMConfig() {
   const model = settings.finalFileModel || process.env.MAYAK_FINAL_FILE_MODEL || DEFAULT_FINAL_FILE_MODEL;
 
   return {
-    qwenTokenPool,
+    codexToken: codex.token,
+    codexModel: codex.model,
     openRouterApiKey: String(openRouterApiKey || '').trim(),
     model: String(model || '').trim() || DEFAULT_FINAL_FILE_MODEL,
     analyticsPrompt: typeof settings.analyticsPrompt === 'string' ? settings.analyticsPrompt.trim() : '',
@@ -423,23 +430,19 @@ async function getFinalFileLLMConfig() {
 }
 
 async function callLLM(prompt) {
-  const { qwenTokenPool, openRouterApiKey, model } = await getFinalFileLLMConfig();
+  const { codexToken, codexModel, openRouterApiKey, model } = await getFinalFileLLMConfig();
 
-  const triedQwenTokens = new Set();
-  while (triedQwenTokens.size < qwenTokenPool.length) {
-    const qwenToken = acquireLeastLoadedQwenToken(qwenTokenPool, Array.from(triedQwenTokens));
-    if (!qwenToken) break;
-    triedQwenTokens.add(qwenToken);
-
+  // Основной провайдер итоговой аналитики — Codex Sale (как и оценка в тренажёре).
+  if (codexToken) {
     try {
-      const res = await fetch(`${QWEN_API_URL}/v1/chat/completions`, {
+      const res = await fetchWithTimeout(`${CODEX_API_URL}/chat/completions`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${qwenToken}`,
+          Authorization: `Bearer ${codexToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: QWEN_MODEL,
+          model: codexModel,
           messages: [{ role: 'user', content: prompt }],
           max_tokens: 8000,
         }),
@@ -450,19 +453,17 @@ async function callLLM(prompt) {
         return data.choices?.[0]?.message?.content || 'Не удалось получить анализ';
       }
 
-      console.error('[Analytics] Qwen API error:', res.status, maskSecret(qwenToken), await res.text());
+      console.error('[Analytics] Codex Sale API error:', res.status, maskSecret(codexToken), await res.text());
     } catch (error) {
-      console.error('[Analytics] Qwen request error:', maskSecret(qwenToken), error.message);
-    } finally {
-      releaseQwenToken(qwenToken);
+      console.error('[Analytics] Codex Sale request error:', maskSecret(codexToken), error.message);
     }
   }
 
   if (!openRouterApiKey) {
-    throw new Error('Не задан Qwen-токен или резервный OpenRouter API Key для итоговой аналитики. Укажите его в /admin/mayak-ai-tokens.');
+    throw new Error('Не задан Codex Sale токен или резервный OpenRouter API Key для итоговой аналитики. Укажите его в /admin/mayak-ai-tokens.');
   }
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${openRouterApiKey}`,
