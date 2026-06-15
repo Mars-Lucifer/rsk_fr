@@ -147,6 +147,8 @@ export const TrainerControls = memo(function TrainerControls({
     taskActionLabel,
     materialDownloadNotice,
     onTaskFileDownloaded,
+    yaProgress,
+    isSessionMode,
 }) {
     const formatTaskTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -218,6 +220,26 @@ export const TrainerControls = memo(function TrainerControls({
                         <Switcher.Option value="im">Я</Switcher.Option>
                         <Switcher.Option value="we">Мы</Switcher.Option>
                     </Switcher>
+                </div>
+            )}
+
+            {isSessionMode && who === "im" && yaProgress && (
+                <div className="flex flex-col gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex justify-between items-center text-xs font-semibold text-slate-600">
+                        <span>Личный прогресс (Часть «Я»)</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-800">{yaProgress.count} из {yaProgress.target}</span>
+                            <svg className={`w-4 h-4 transition-colors duration-300 ${yaProgress.hasStar ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]" : "text-slate-300 fill-slate-300"}`} viewBox="0 0 24 24">
+                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full transition-all duration-500 rounded-full ${yaProgress.hasStar ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-blue-400 to-indigo-500"}`}
+                            style={{ width: `${yaProgress.percentage}%` }}
+                        />
+                    </div>
                 </div>
             )}
 

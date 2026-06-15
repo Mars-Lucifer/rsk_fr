@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import Header from "@/components/layout/Header";
 import Buffer from "./addons/popup";
 import RankingTestPopup from "./addons/RankingTestPopup";
@@ -502,6 +502,56 @@ export default function TrainerPage({ goTo }) {
     const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
     const isSessionMode = tokenType === "session" && !!runtimeSessionId;
     const effectiveTableNumber = sessionRuntimeState?.participant?.tableNumber || tableNumber;
+
+    const yaProgress = useMemo(() => {
+        if (!sessionRuntimeState?.participant?.taskStates || !tasks.length) {
+            return { count: 0, target: 4, hasStar: false, percentage: 0 };
+        }
+
+        const activeSectionId = sessionRuntimeState.participant.sectionId || "";
+        const match = String(activeSectionId).match(/^(\d+)-/);
+        const rangeStart = match ? parseInt(match[1], 10) : 1;
+        const startPos = rangeStart - 1;
+
+        const YA_VALID_CONTENT_TYPES = new Set([
+            "текст",
+            "аудио",
+            "изображение",
+            "интерактив",
+            "видео",
+            "данные",
+            "карта настроения"
+        ]);
+
+        let yaApprovedCount = 0;
+        const YA_STAR_TARGET = 4;
+
+        const completedTasks = sessionRuntimeState.participant.taskStates.filter(
+            (ts) => ts.status === "approved" || ts.status === "expired"
+        );
+
+        completedTasks.forEach((ts) => {
+            const taskIndex = Number(ts.taskIndex);
+            const indexInSection = taskIndex - startPos;
+            const baseNumber = indexInSection + 1;
+
+            if (baseNumber >= 10 && baseNumber <= 50) {
+                const taskObj = tasks[taskIndex];
+                const contentType = String(taskObj?.contentType || "").trim().toLowerCase();
+
+                if (YA_VALID_CONTENT_TYPES.has(contentType)) {
+                    yaApprovedCount += 1;
+                }
+            }
+        });
+
+        return {
+            count: yaApprovedCount,
+            target: YA_STAR_TARGET,
+            hasStar: yaApprovedCount >= YA_STAR_TARGET,
+            percentage: Math.min(100, Math.round((yaApprovedCount / YA_STAR_TARGET) * 100))
+        };
+    }, [sessionRuntimeState?.participant?.taskStates, tasks, sessionRuntimeState?.participant?.sectionId]);
 
     const {
         activeTypeKey,
@@ -1222,6 +1272,8 @@ export default function TrainerPage({ goTo }) {
         taskActionLabel: isCurrentTaskPendingReview ? "\u041d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435" : isCurrentTaskRejected ? "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c" : "\u041d\u0430\u0447\u0430\u0442\u044c \u0437\u0430\u0434\u0430\u043d\u0438\u0435",
         materialDownloadNotice,
         onTaskFileDownloaded: handleTaskFileDownloaded,
+        yaProgress,
+        isSessionMode,
     };
 
     const trainerFieldsBlock = (
