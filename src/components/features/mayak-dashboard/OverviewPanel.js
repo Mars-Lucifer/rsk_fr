@@ -280,6 +280,20 @@ export default function OverviewPanel({
                                             <button
                                                 type="button"
                                                 className={styles.compactTimerPresetBtn}
+                                                onClick={() => timerHandlers.setMinutes(Math.min(180, Math.max(0, (parseInt(timer.inputMinutes || "0", 10) || 0) - 5)))}
+                                            >
+                                                -5м
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles.compactTimerPresetBtn}
+                                                onClick={() => timerHandlers.setMinutes(Math.min(180, Math.max(0, (parseInt(timer.inputMinutes || "0", 10) || 0) - 1)))}
+                                            >
+                                                -1м
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles.compactTimerPresetBtn}
                                                 onClick={() => timerHandlers.setMinutes(Math.min(180, Math.max(0, (parseInt(timer.inputMinutes || "0", 10) || 0) + 1)))}
                                             >
                                                 +1м

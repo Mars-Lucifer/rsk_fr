@@ -1705,9 +1705,9 @@
 
 .compactTimerRingContainer {
     position: relative;
-    width: 150px;
-    height: 150px;
-    margin: 12px auto 4px auto;
+    width: 110px;
+    height: 110px;
+    margin: 4px auto 4px auto;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1737,7 +1737,7 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 32px;
+    font-size: 24px;
     font-weight: 800;
     color: #08090a;
     font-family: monospace;

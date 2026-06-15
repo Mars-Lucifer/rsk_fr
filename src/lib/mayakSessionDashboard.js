@@ -202,8 +202,21 @@ async function readTaskTypeMap(sectionId) {
         return new Map();
     }
     const map = new Map();
+    
+    let rangeStart = 1;
+    if (Number.isFinite(bundle.meta?.rangeStart)) {
+        rangeStart = bundle.meta.rangeStart;
+    } else {
+        const match = String(sectionId || "").match(/^(\d+)-/);
+        if (match) {
+            rangeStart = parseInt(match[1], 10);
+        }
+    }
+    const startPos = rangeStart - 1;
+
     (bundle.tasks || []).forEach((task, index) => {
-        map.set(index, { contentType: task?.contentType || "", base: index + 1 });
+        const globalIndex = startPos + index;
+        map.set(globalIndex, { contentType: task?.contentType || "", base: index + 1 });
     });
     return map;
 }
