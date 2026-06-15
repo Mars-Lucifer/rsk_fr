@@ -19,7 +19,7 @@ import ResetIcon from "@/assets/general/ResetIcon.svg";
 import CloseIcon from "@/assets/general/close.svg";
 
 // Добавляем getUserFromCookies
-import { clearUserCookie, removeKeyCookie } from "./actions";
+import { clearUserCookie, removeKeyCookie, addUserToCookies, getUserFromCookies } from "./actions";
 // Добавляем эти две строки для работы сертификата
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import CourseIcon from "@/assets/nav/course.svg";
@@ -499,8 +499,9 @@ export default function TrainerPage({ goTo }) {
         }
     }, [goTo]);
 
-    const { activeUserId, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
+    const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
     const isSessionMode = tokenType === "session" && !!runtimeSessionId;
+    const effectiveTableNumber = sessionRuntimeState?.participant?.tableNumber || tableNumber;
 
     const {
         activeTypeKey,
@@ -683,6 +684,14 @@ export default function TrainerPage({ goTo }) {
                     localStorage.setItem(getStorageKey("userRole"), nextState.participant.role);
                 }
 
+                if (nextState?.participant?.tableNumber !== undefined && String(nextState.participant.tableNumber) !== String(tableNumber)) {
+                    const currentUser = getUserFromCookies() || {};
+                    await addUserToCookies(activeUserId, activeUserName, {
+                        ...currentUser,
+                        tableNumber: nextState.participant.tableNumber
+                    });
+                }
+
                 if (nextState && nextState.sessionActive === false) {
                     await removeKeyCookie();
                     await clearUserCookie();
@@ -702,7 +711,7 @@ export default function TrainerPage({ goTo }) {
             cancelled = true;
             window.clearInterval(intervalId);
         };
-    }, [activeUserId, getStorageKey, isSessionMode, removeKeyCookie, runtimeSessionId, selectedRole, setSelectedRole]);
+    }, [activeUserId, activeUserName, tableNumber, getStorageKey, isSessionMode, removeKeyCookie, runtimeSessionId, selectedRole, setSelectedRole]);
 
     const handleChange = useCallback(
         (code, value) => {
@@ -1146,7 +1155,7 @@ export default function TrainerPage({ goTo }) {
         allowedMinIndex,
         allowedMaxIndex,
         selectedRole,
-        tableNumber,
+        tableNumber: effectiveTableNumber,
         rankingDelta5,
         onWhoChange: (value) => {
             // Сначала обновляем состояние, чтобы UI отреагировал
@@ -1393,9 +1402,9 @@ export default function TrainerPage({ goTo }) {
         <>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
-                {tableNumber ? (
+                {effectiveTableNumber ? (
                     <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
-                        Стол №{tableNumber}
+                        Стол №{effectiveTableNumber}
                     </div>
                 ) : null}
                 <Button

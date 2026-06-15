@@ -217,7 +217,7 @@ function emptyDirectionCounts() {
 }
 
 function isApprovedTask(task) {
-    return task && task.status === "approved";
+    return task && (task.status === "approved" || task.status === "expired");
 }
 
 function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, sectionId) {
