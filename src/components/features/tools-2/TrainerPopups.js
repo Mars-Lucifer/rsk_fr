@@ -465,3 +465,41 @@ export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData,
         </div>
     );
 });
+
+export const YaDirectionSelectionPopup = ({ onConfirm }) => {
+    const directions = ["текст", "аудио", "изображение", "интерактив", "видео", "данные"];
+    const [currentSelection, setCurrentSelection] = useState(null);
+
+    const handleConfirm = () => {
+        if (currentSelection) {
+            onConfirm(currentSelection);
+        } else {
+            alert("Пожалуйста, выберите направление.");
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 pointer-events-auto">
+                <div className="mb-4">
+                    <h3 className="text-xl font-bold text-slate-800">Выберите направление специализации</h3>
+                    <p className="text-sm text-slate-500 mt-1">Вы успешно освоили все 6 типов контента! Теперь выберите направление, которое за вами закрепится для части «Я».</p>
+                </div>
+                <div className="space-y-2 mb-6 max-h-[300px] overflow-y-auto pr-1">
+                    {directions.map((direction) => (
+                        <label key={direction} className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${currentSelection === direction ? "border-blue-500 bg-blue-50/50" : "border-slate-100 hover:bg-slate-50"}`}>
+                            <input type="radio" name="direction" value={direction} checked={currentSelection === direction} onChange={() => setCurrentSelection(direction)} className="form-radio h-5 w-5 text-blue-600" />
+                            <span className="font-semibold text-slate-700 capitalize">{direction}</span>
+                        </label>
+                    ))}
+                </div>
+                <div className="flex justify-end">
+                    <Button onClick={handleConfirm} className="w-full !bg-blue-600 !text-white hover:!bg-blue-700 py-2.5 rounded-xl font-bold">
+                        Подтвердить выбор
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+

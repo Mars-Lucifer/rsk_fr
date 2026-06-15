@@ -234,11 +234,107 @@ function isApprovedTask(task) {
     return task && (task.status === "approved" || task.status === "expired");
 }
 
+function computeYaProgress(approvedTasks, taskTypeMap, yaDirection) {
+    // 1. Считаем выполненные задачи в диапазоне Старт (base 1..10)
+    let startApprovedCount = 0;
+    approvedTasks.forEach((task) => {
+        const taskIndex = Number(task.taskIndex);
+        const typeInfo = Number.isFinite(taskIndex) ? taskTypeMap.get(taskIndex) : null;
+        const base = typeInfo ? typeInfo.base : Number(task.taskNumber) || null;
+        if (base && base >= 1 && base <= 10) {
+            startApprovedCount += 1;
+        }
+    });
+
+    const isStartPhaseDone = startApprovedCount >= 4;
+
+    if (!isStartPhaseDone) {
+        return {
+            phase: "START",
+            count: startApprovedCount,
+            target: 4,
+            percentage: Math.min(100, Math.round((startApprovedCount / 4) * 100)),
+            hasStar: false,
+        };
+    }
+
+    // 2. Считаем выполненные типы контента в диапазоне Я (base 10..50)
+    const YA_VALID_CONTENT_TYPES = new Set([
+        "текст",
+        "аудио",
+        "изображение",
+        "интерактив",
+        "видео",
+        "данные"
+    ]);
+
+    const completedContentTypes = new Set();
+    approvedTasks.forEach((task) => {
+        const taskIndex = Number(task.taskIndex);
+        const typeInfo = Number.isFinite(taskIndex) ? taskTypeMap.get(taskIndex) : null;
+        const base = typeInfo ? typeInfo.base : Number(task.taskNumber) || null;
+        if (base && base >= 10 && base <= 50) {
+            const ct = String(typeInfo?.contentType || "").trim().toLowerCase();
+            if (YA_VALID_CONTENT_TYPES.has(ct)) {
+                completedContentTypes.add(ct);
+            }
+        }
+    });
+
+    const isContentTypesPhaseDone = completedContentTypes.size >= 6;
+
+    if (!isContentTypesPhaseDone) {
+        return {
+            phase: "CONTENT_TYPES",
+            count: completedContentTypes.size,
+            target: 6,
+            percentage: Math.min(100, Math.round((completedContentTypes.size / 6) * 100)),
+            hasStar: false,
+        };
+    }
+
+    // 3. Фаза специализации
+    if (!yaDirection) {
+        return {
+            phase: "CHOOSING_DIRECTION",
+            count: 0,
+            target: 4,
+            percentage: 0,
+            hasStar: false,
+        };
+    }
+
+    let specApprovedCount = 0;
+    approvedTasks.forEach((task) => {
+        const taskIndex = Number(task.taskIndex);
+        const typeInfo = Number.isFinite(taskIndex) ? taskTypeMap.get(taskIndex) : null;
+        const base = typeInfo ? typeInfo.base : Number(task.taskNumber) || null;
+        if (base && base >= 10 && base <= 50) {
+            const ct = String(typeInfo?.contentType || "").trim().toLowerCase();
+            if (ct === String(yaDirection).trim().toLowerCase()) {
+                specApprovedCount += 1;
+            }
+        }
+    });
+
+    const YA_STAR_TARGET = 4;
+    return {
+        phase: "SPECIALIZATION",
+        direction: yaDirection,
+        count: specApprovedCount,
+        target: YA_STAR_TARGET,
+        percentage: Math.min(100, Math.round((specApprovedCount / YA_STAR_TARGET) * 100)),
+        hasStar: specApprovedCount >= YA_STAR_TARGET,
+    };
+}
+
 function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, sectionId) {
     const tasks = participant.tasks && typeof participant.tasks === "object" ? Object.values(participant.tasks) : [];
     const approvedTasks = tasks.filter(isApprovedTask);
 
-    let yaApprovedCount = 0;
+    const yaProgress = computeYaProgress(approvedTasks, taskTypeMap, participant.yaDirection);
+
+    let yaApprovedCount = yaProgress.phase === "SPECIALIZATION" ? yaProgress.count : 0;
     let weApprovedCount = 0;
     const directionCounts = emptyDirectionCounts();
 
@@ -248,12 +344,7 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
         const base = typeInfo ? typeInfo.base : Number(task.taskNumber) || null;
         if (!base) return;
 
-        if (base >= YA_RANGE.from && base <= YA_RANGE.to) {
-            const ct = String(typeInfo?.contentType || "").trim().toLowerCase();
-            if (YA_VALID_CONTENT_TYPES.has(ct)) {
-                yaApprovedCount += 1;
-            }
-        } else if (base >= WE_RANGE.from && base <= WE_RANGE.to) {
+        if (base >= WE_RANGE.from && base <= WE_RANGE.to) {
             weApprovedCount += 1;
             const directionKey = typeInfo ? resolveDirectionKey(typeInfo.contentType) : null;
             if (directionKey) {
@@ -303,10 +394,12 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
         inspectorTargetTable: participant.inspectorTargetTable || null,
         delta: findDeltaForUser(deltaByUser, participant.userId, participant.name),
         ya: {
-            approvedCount: yaApprovedCount,
-            target: YA_STAR_TARGET,
-            progress: Math.min(yaApprovedCount, YA_STAR_TARGET) / YA_STAR_TARGET,
-            star: yaApprovedCount >= YA_STAR_TARGET,
+            approvedCount: yaProgress.count,
+            target: yaProgress.target,
+            progress: yaProgress.percentage / 100,
+            star: yaProgress.hasStar,
+            phase: yaProgress.phase,
+            direction: yaProgress.direction || null,
         },
         we: {
             approvedCount: weApprovedCount,

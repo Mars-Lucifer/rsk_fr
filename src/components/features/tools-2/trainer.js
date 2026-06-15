@@ -7,7 +7,7 @@ import InstructionImageModal from "./InstructionImageModal";
 import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
 import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
-import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup } from "./TrainerPopups";
+import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup, YaDirectionSelectionPopup } from "./TrainerPopups";
 
 import InfoIcon from "@/assets/general/info.svg";
 import CopyIcon from "@/assets/general/copy.svg";
@@ -505,7 +505,7 @@ export default function TrainerPage({ goTo }) {
 
     const yaProgress = useMemo(() => {
         if (!sessionRuntimeState?.participant?.taskStates || !tasks.length) {
-            return { count: 0, target: 4, hasStar: false, percentage: 0 };
+            return { phase: "START", count: 0, target: 4, hasStar: false, percentage: 0 };
         }
 
         const activeSectionId = sessionRuntimeState.participant.sectionId || "";
@@ -513,23 +513,44 @@ export default function TrainerPage({ goTo }) {
         const rangeStart = match ? parseInt(match[1], 10) : 1;
         const startPos = rangeStart - 1;
 
+        const completedTasks = sessionRuntimeState.participant.taskStates.filter(
+            (ts) => ts.status === "approved" || ts.status === "expired"
+        );
+
+        // 1. Считаем выполненные задачи в диапазоне Старт (base 1..10)
+        let startApprovedCount = 0;
+        completedTasks.forEach((ts) => {
+            const taskIndex = Number(ts.taskIndex);
+            const indexInSection = taskIndex - startPos;
+            const baseNumber = indexInSection + 1;
+            if (baseNumber >= 1 && baseNumber <= 10) {
+                startApprovedCount += 1;
+            }
+        });
+
+        const isStartPhaseDone = startApprovedCount >= 4;
+
+        if (!isStartPhaseDone) {
+            return {
+                phase: "START",
+                count: startApprovedCount,
+                target: 4,
+                percentage: Math.min(100, Math.round((startApprovedCount / 4) * 100)),
+                hasStar: false,
+            };
+        }
+
+        // 2. Считаем выполненные типы контента в диапазоне Я (base 10..50)
         const YA_VALID_CONTENT_TYPES = new Set([
             "текст",
             "аудио",
             "изображение",
             "интерактив",
             "видео",
-            "данные",
-            "карта настроения"
+            "данные"
         ]);
 
-        let yaApprovedCount = 0;
-        const YA_STAR_TARGET = 4;
-
-        const completedTasks = sessionRuntimeState.participant.taskStates.filter(
-            (ts) => ts.status === "approved" || ts.status === "expired"
-        );
-
+        const completedContentTypes = new Set();
         completedTasks.forEach((ts) => {
             const taskIndex = Number(ts.taskIndex);
             const indexInSection = taskIndex - startPos;
@@ -537,21 +558,63 @@ export default function TrainerPage({ goTo }) {
 
             if (baseNumber >= 10 && baseNumber <= 50) {
                 const taskObj = tasks[taskIndex];
-                const contentType = String(taskObj?.contentType || "").trim().toLowerCase();
-
-                if (YA_VALID_CONTENT_TYPES.has(contentType)) {
-                    yaApprovedCount += 1;
+                const ct = String(taskObj?.contentType || "").trim().toLowerCase();
+                if (YA_VALID_CONTENT_TYPES.has(ct)) {
+                    completedContentTypes.add(ct);
                 }
             }
         });
 
+        const isContentTypesPhaseDone = completedContentTypes.size >= 6;
+
+        if (!isContentTypesPhaseDone) {
+            return {
+                phase: "CONTENT_TYPES",
+                count: completedContentTypes.size,
+                target: 6,
+                percentage: Math.min(100, Math.round((completedContentTypes.size / 6) * 100)),
+                hasStar: false,
+            };
+        }
+
+        // 3. Фаза специализации (yaDirection)
+        const yaDirection = sessionRuntimeState.participant.yaDirection;
+
+        if (!yaDirection) {
+            return {
+                phase: "CHOOSING_DIRECTION",
+                count: 0,
+                target: 4,
+                percentage: 0,
+                hasStar: false,
+            };
+        }
+
+        let specApprovedCount = 0;
+        completedTasks.forEach((ts) => {
+            const taskIndex = Number(ts.taskIndex);
+            const indexInSection = taskIndex - startPos;
+            const baseNumber = indexInSection + 1;
+
+            if (baseNumber >= 10 && baseNumber <= 50) {
+                const taskObj = tasks[taskIndex];
+                const ct = String(taskObj?.contentType || "").trim().toLowerCase();
+                if (ct === String(yaDirection).trim().toLowerCase()) {
+                    specApprovedCount += 1;
+                }
+            }
+        });
+
+        const YA_STAR_TARGET = 4;
         return {
-            count: yaApprovedCount,
+            phase: "SPECIALIZATION",
+            direction: yaDirection,
+            count: specApprovedCount,
             target: YA_STAR_TARGET,
-            hasStar: yaApprovedCount >= YA_STAR_TARGET,
-            percentage: Math.min(100, Math.round((yaApprovedCount / YA_STAR_TARGET) * 100))
+            percentage: Math.min(100, Math.round((specApprovedCount / YA_STAR_TARGET) * 100)),
+            hasStar: specApprovedCount >= YA_STAR_TARGET,
         };
-    }, [sessionRuntimeState?.participant?.taskStates, tasks, sessionRuntimeState?.participant?.sectionId]);
+    }, [sessionRuntimeState?.participant?.taskStates, sessionRuntimeState?.participant?.yaDirection, tasks, sessionRuntimeState?.participant?.sectionId]);
 
     const {
         activeTypeKey,
@@ -684,6 +747,41 @@ export default function TrainerPage({ goTo }) {
         handleSubmitSecondQuestionnaire,
         setShowRolePopup,
     });
+
+    const handleYaDirectionConfirm = useCallback(
+        async (direction) => {
+            if (runtimeSessionId && activeUserId) {
+                const response = await fetch("/api/mayak/session-runtime/ya-direction", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        sessionId: runtimeSessionId,
+                        userId: activeUserId,
+                        direction,
+                    }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.success) {
+                    alert(payload.error || "Не удалось сохранить направление в сессии");
+                    return;
+                }
+            }
+
+            setSessionRuntimeState((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    participant: {
+                        ...prev.participant,
+                        yaDirection: direction,
+                    },
+                };
+            });
+        },
+        [activeUserId, runtimeSessionId]
+    );
 
     const {
         handleCloseInstructionModal,
@@ -1488,6 +1586,11 @@ export default function TrainerPage({ goTo }) {
                         <style>{`.role-tooltip-wrap:hover .role-tooltip { opacity: 1 !important; visibility: visible !important; }`}</style>
                     </div>
                 )}
+                {sessionRuntimeState?.participant?.yaDirection && (
+                    <div className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-700 whitespace-nowrap capitalize cursor-default">
+                        Направление: {sessionRuntimeState.participant.yaDirection}
+                    </div>
+                )}
                 <div className="flex items-center gap-2 ml-auto">
                     <Button
                         icon
@@ -1614,6 +1717,9 @@ export default function TrainerPage({ goTo }) {
                     }}
                 />
             ) : null}
+            {isSessionMode && who === "im" && yaProgress.phase === "CHOOSING_DIRECTION" && (
+                <YaDirectionSelectionPopup onConfirm={handleYaDirectionConfirm} />
+            )}
         </>
     );
 }

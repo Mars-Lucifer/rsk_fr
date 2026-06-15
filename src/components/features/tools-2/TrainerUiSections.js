@@ -182,7 +182,12 @@ export const TrainerControls = memo(function TrainerControls({
             {isSessionMode && who === "im" && yaProgress && (
                 <div className="flex flex-col gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="flex justify-between items-center text-xs font-semibold text-slate-600">
-                        <span>Личный прогресс (Часть «Я»)</span>
+                        <span>
+                            {yaProgress.phase === "START" && "Личный прогресс: Старт"}
+                            {yaProgress.phase === "CONTENT_TYPES" && "Личный прогресс: Освоение типов контента"}
+                            {yaProgress.phase === "CHOOSING_DIRECTION" && "Личный прогресс: Выбор специализации"}
+                            {yaProgress.phase === "SPECIALIZATION" && `Личный прогресс (Специализация: ${yaProgress.direction})`}
+                        </span>
                         <div className="flex items-center gap-1.5">
                             <span className="font-bold text-slate-800">{yaProgress.count} из {yaProgress.target}</span>
                             <svg className={`w-4 h-4 transition-colors duration-300 ${yaProgress.hasStar ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]" : "text-slate-300 fill-slate-300"}`} viewBox="0 0 24 24">

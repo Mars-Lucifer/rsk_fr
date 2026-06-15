@@ -1021,3 +1021,23 @@ export async function startMayakSessionBackgroundPreviewConversion({ sessionId, 
     }
 }
 
+export async function setMayakSessionParticipantYaDirection({ sessionId, userId, direction }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const store = await readStore();
+    const bucket = ensureSessionBucket(store, sessionId);
+    const participant = bucket.participants?.[userId];
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    participant.yaDirection = direction;
+    participant.updatedAt = new Date().toISOString();
+    await writeStore(store, [sessionId]);
+    return participant;
+}
+
+
