@@ -6,8 +6,7 @@ import TablePanel from "./TablePanel";
 import OverviewPanel from "./OverviewPanel";
 import ParticipantRow from "./ParticipantRow";
 import DashboardTimer from "./DashboardTimer";
-import { RefreshIcon, PencilIcon, BackIcon, CloseIcon, StarIcon } from "./icons";
-import { ROLE_OPTIONS, roleLabel } from "./dashboardConstants";
+import { RefreshIcon, PencilIcon, BackIcon, CloseIcon } from "./icons";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -116,19 +115,6 @@ const getDemoData = (sessionId) => {
         overall,
         generatedAt: new Date().toISOString()
     };
-};
-
-const getRoleClass = (role) => {
-    switch (role) {
-        case "ИНСПЕКТОР": return styles.roleInspector;
-        case "АДМИНИСТРАТОР": return styles.roleAdmin;
-        case "Капитан": return styles.roleCaptain;
-        case "Инженер": return styles.roleEngineer;
-        case "Медиатор": return styles.roleMediator;
-        case "Хранитель Маяка": return styles.roleKeeper;
-        case "Летописец": return styles.roleChronicler;
-        default: return styles.roleDefault;
-    }
 };
 
 export default function SessionDashboard({ sessionId, onAuthFail }) {
@@ -501,91 +487,38 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                         <div className={styles.panelBody}>
                             <div className={styles.tableResponsive}>
                                 <table className={styles.participantTable}>
-                                    {mode === "ya" ? (
-                                        <>
-                                            <thead>
-                                                <tr>
-                                                    <th>УЧАСТНИК</th>
-                                                    <th>РОЛЬ</th>
+                                    <thead>
+                                        <tr>
+                                            <th>УЧАСТНИК</th>
+                                            <th>РОЛЬ</th>
+                                            {mode === "ya" ? (
+                                                <>
                                                     <th className={styles.thCenter}>ДЕЛЬТА 5 УР.</th>
                                                     <th>Прогресс Я</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {data.unassigned.map((participant) => (
-                                                    <ParticipantRow
-                                                        key={participant.userId}
-                                                        participant={participant}
-                                                        mode={mode}
-                                                        editorMode={editorMode}
-                                                        dragging={draggingUserId === participant.userId}
-                                                        onChangeRole={handleChangeRole}
-                                                        onDragStart={handlePersonDragStart}
-                                                        onDragEnd={handlePersonDragEnd}
-                                                    />
-                                                ))}
-                                            </tbody>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <thead>
-                                                <tr>
-                                                    <th>НАПРАВЛЕНИЕ</th>
-                                                    {data.unassigned.map((p) => (
-                                                        <th
-                                                            key={p.userId}
-                                                            className={`${styles.thParticipantCol} ${editorMode ? styles.personDraggable : ""} ${draggingUserId === p.userId ? styles.personDragging : ""}`}
-                                                            draggable={editorMode}
-                                                            onDragStart={editorMode ? (e) => handlePersonDragStart?.(e, p) : undefined}
-                                                            onDragEnd={editorMode ? handlePersonDragEnd : undefined}
-                                                        >
-                                                            <div className={styles.participantColWrap}>
-                                                                <span className={styles.personName}>{p.name || "Без имени"}</span>
-                                                                {editorMode ? (
-                                                                    <select
-                                                                        className={styles.roleSelect}
-                                                                        value={p.role || "Участник"}
-                                                                        onChange={(event) => handleChangeRole?.(p, event.target.value)}
-                                                                        onClick={(event) => event.stopPropagation()}
-                                                                    >
-                                                                        {ROLE_OPTIONS.map((option) => (
-                                                                            <option key={option.value || "participant"} value={option.value}>
-                                                                                {option.label}
-                                                                            </option>
-                                                                        ))}
-                                                                    </select>
-                                                                ) : (
-                                                                    <span className={`${styles.roleLabelText} ${getRoleClass(p.role)}`}>
-                                                                        {roleLabel(p.role)}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {(data.directions || []).map((dir, dirIndex) => (
-                                                    <tr key={dir.key} className={styles.personRow}>
-                                                        <td className={styles.tdDirLabel}>
-                                                            <span className={styles.dirLabelText}>{dir.label}</span>
-                                                        </td>
-                                                        {data.unassigned.map((p) => {
-                                                            const participantDir = p.we?.directions?.[dirIndex] || dir;
-                                                            return (
-                                                                <td key={p.userId} className={styles.tdCenter} title={`${p.name}: ${participantDir.label}`}>
-                                                                    <StarIcon
-                                                                        className={`${styles.dirStar} ${participantDir.lit ? styles.dirStarLit : ""}`}
-                                                                        filled={participantDir.lit}
-                                                                    />
-                                                                </td>
-                                                            );
-                                                        })}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </>
-                                    )}
+                                                </>
+                                            ) : (
+                                                (data.directions || []).map((dir) => (
+                                                    <th key={dir.key} className={styles.thVertical} title={dir.label}>
+                                                        <span className={styles.verticalText}>{dir.label}</span>
+                                                    </th>
+                                                ))
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.unassigned.map((participant) => (
+                                            <ParticipantRow
+                                                key={participant.userId}
+                                                participant={participant}
+                                                mode={mode}
+                                                editorMode={editorMode}
+                                                dragging={draggingUserId === participant.userId}
+                                                onChangeRole={handleChangeRole}
+                                                onDragStart={handlePersonDragStart}
+                                                onDragEnd={handlePersonDragEnd}
+                                            />
+                                        ))}
+                                    </tbody>
                                 </table>
                             </div>
                         </div>

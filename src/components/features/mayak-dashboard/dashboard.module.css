@@ -463,30 +463,20 @@
     width: 1% !important;
 }
 
-.thParticipantCol {
-    vertical-align: top !important;
-    text-transform: none !important;
-}
-
-.participantColWrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
+.thVertical {
+    height: 140px;
+    vertical-align: bottom !important;
+    padding: 10px 4px !important;
     text-align: center;
 }
 
-.tdDirLabel {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    white-space: nowrap !important;
-    padding-right: 20px !important;
-    vertical-align: middle !important;
-}
-
-.dirLabelText {
-    font-size: 11px;
+.verticalText {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    display: inline-block;
+    text-transform: none;
+    font-size: 10px;
     font-weight: 700;
     color: var(--text-secondary);
 }
