@@ -221,7 +221,7 @@ export function useMayakQwenEvaluation({ getStorageKey, buildPromptDraft, curren
         resetQwenFeedback();
         setQwenLoading(true);
 
-        fetch("/api/mayak/qwen-check", {
+        fetch("/api/mayak/codex-check", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

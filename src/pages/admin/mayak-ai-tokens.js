@@ -6,10 +6,16 @@ import Header from "@/components/layout/Header";
 import MayakAdminBackLink from "@/components/mayak-admin/MayakAdminBackLink";
 import { buildMayakAdminLoginUrl, getMayakAdminAuthStatus } from "@/lib/mayakAdminClient";
 
+const CODEX_DEFAULT_MODEL = "gpt-5.4-mini";
+const CODEX_MODELS = ["gpt-5.3-codex", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5"];
+
 const initialSettings = {
     finalFileOpenrouterApiKey: "",
     finalFileOpenrouterApiKeyIsSet: false,
     finalFileModel: "google/gemini-3-flash-preview",
+    codexToken: "",
+    codexTokenIsSet: false,
+    codexModel: CODEX_DEFAULT_MODEL,
     qwenTokens: [],
     qwenTokensCount: 0,
     qwenTokensIsSet: false,
@@ -100,6 +106,8 @@ export default function AdminMayakAiTokens() {
     const [drafts, setDrafts] = useState({
         finalFileOpenrouterApiKey: "",
         finalFileModel: "",
+        codexToken: "",
+        codexModel: CODEX_DEFAULT_MODEL,
         sovaPrompt: "",
         analyticsPrompt: "",
         qwenTokenName: "",
@@ -146,6 +154,7 @@ export default function AdminMayakAiTokens() {
         setDrafts((current) => ({
             ...current,
             finalFileModel: nextSettings.finalFileModel || "",
+            codexModel: nextSettings.codexModel || CODEX_DEFAULT_MODEL,
             sovaPrompt: nextSettings.sovaPrompt || "",
             analyticsPrompt: nextSettings.analyticsPrompt || "",
         }));
@@ -220,6 +229,20 @@ export default function AdminMayakAiTokens() {
             return;
         }
         saveSettings({ [field]: value }, successMessage, field.includes("Key") ? [field] : []);
+    };
+
+    const saveCodexToken = () => {
+        const value = String(drafts.codexToken || "").trim();
+        if (!value) {
+            setError("Укажите Codex Sale API Key");
+            return;
+        }
+        saveSettings({ codexToken: value }, "Codex Sale API Key сохранен", ["codexToken"]);
+    };
+
+    const saveCodexModel = () => {
+        const value = String(drafts.codexModel || "").trim() || CODEX_DEFAULT_MODEL;
+        saveSettings({ codexModel: value }, "Модель Codex Sale сохранена");
     };
 
     const addQwenToken = () => {
@@ -371,6 +394,43 @@ export default function AdminMayakAiTokens() {
 
                 <section className="grid">
                     <article className="panel">
+                        <h2>Codex Sale (основная проверка)</h2>
+                        <p className="panel-note">
+                            Активный провайдер оценки полей МАЯК-ОКО. Запросы идут через codex.sale (OpenAI-совместимый). Укажите API-ключ и выберите модель — изменения применяются без передеплоя.
+                        </p>
+                        <SecretRow
+                            label="Codex Sale API Key"
+                            statusActive={settings.codexTokenIsSet}
+                            statusValue={settings.codexToken}
+                            value={drafts.codexToken}
+                            placeholder="sk-clb-..."
+                            onChange={(value) => updateDraft("codexToken", value)}
+                            onSave={saveCodexToken}
+                            disabled={saving}
+                        />
+                        <div className="field-row">
+                            <label>
+                                <span>
+                                    Модель Codex Sale
+                                    <StatusMark active={Boolean(settings.codexModel)} value={settings.codexModel} />
+                                </span>
+                                <select value={drafts.codexModel || CODEX_DEFAULT_MODEL} onChange={(event) => updateDraft("codexModel", event.target.value)}>
+                                    {CODEX_MODELS.map((modelId) => (
+                                        <option key={modelId} value={modelId}>
+                                            {modelId}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <button type="button" onClick={saveCodexModel} disabled={saving}>
+                                Сохранить
+                            </button>
+                        </div>
+                    </article>
+                </section>
+
+                <section className="grid">
+                    <article className="panel">
                         <div className="panel-head">
                             <h2>Qwen - токены</h2>
                             <div className="panel-actions">
@@ -518,7 +578,7 @@ export default function AdminMayakAiTokens() {
                 <section className="grid">
                     <article className="panel">
                         <h2>Резерв OpenRouter</h2>
-                        <p className="panel-note">OpenRouter используется только как резерв, если Qwen-пул временно недоступен. Укажите API key и модель.</p>
+                        <p className="panel-note">OpenRouter используется только как резерв, если Codex Sale временно недоступен. Укажите API key и модель.</p>
                         <SecretRow
                             label="Резервный OpenRouter API Key"
                             statusActive={settings.finalFileOpenrouterApiKeyIsSet}

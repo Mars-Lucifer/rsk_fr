@@ -9,6 +9,7 @@ import {
     writeMayakSettings,
 } from "../../../lib/mayakSettings.js";
 import { QWEN_EVALUATION_SYSTEM_PROMPT, getQwenTokenExpiryInfo, maskSecret, normalizeQwenTokenEntries } from "../../../lib/mayakQwen.js";
+import { CODEX_DEFAULT_MODEL, normalizeCodexModel, normalizeCodexToken } from "../../../lib/mayakCodex.js";
 
 const DEFAULT_ANALYTICS_PROMPT_FOR_ADMIN = `Ты — эксперт-аналитик тренажера МАЯК.
 
@@ -29,6 +30,8 @@ export default async function handler(req, res) {
         const finalFileOpenrouterApiKey =
             settings.finalFileOpenrouterApiKey || process.env.MAYAK_FINAL_FILE_OPENROUTER_API_KEY || openrouterApiKey || "";
         const finalFileModel = settings.finalFileModel || process.env.MAYAK_FINAL_FILE_MODEL || "google/gemini-3-flash-preview";
+        const codexToken = settings.codexToken || process.env.CODEX_SALE_API_KEY || "";
+        const codexModel = settings.codexModel || process.env.CODEX_SALE_MODEL || CODEX_DEFAULT_MODEL;
         const qwenReminderCronSecret =
             settings.qwenReminderCronSecret || process.env.MAYAK_QWEN_REMINDER_CRON_SECRET || "";
         const telegramBotUsername = settings.telegramBotUsername || process.env.TELEGRAM_BOT_USERNAME || "";
@@ -61,6 +64,9 @@ export default async function handler(req, res) {
                 finalFileOpenrouterApiKey: maskSecret(finalFileOpenrouterApiKey),
                 finalFileOpenrouterApiKeyIsSet: !!finalFileOpenrouterApiKey,
                 finalFileModel,
+                codexToken: maskSecret(codexToken),
+                codexTokenIsSet: !!codexToken,
+                codexModel,
                 qwenReminderCronSecret: maskSecret(qwenReminderCronSecret),
                 qwenReminderCronSecretIsSet: !!qwenReminderCronSecret,
                 telegramBotUsername,
@@ -112,6 +118,8 @@ export default async function handler(req, res) {
             openrouterApiKey,
             finalFileOpenrouterApiKey,
             finalFileModel,
+            codexToken,
+            codexModel,
             qwenReminderCronSecret,
             telegramBotUsername,
             telegramWebhookUrl,
@@ -159,6 +167,16 @@ export default async function handler(req, res) {
         if (finalFileModel !== undefined) {
             settings.finalFileModel = typeof finalFileModel === "string" ? finalFileModel.trim() : "";
             process.env.MAYAK_FINAL_FILE_MODEL = settings.finalFileModel;
+        }
+
+        if (codexToken !== undefined) {
+            settings.codexToken = normalizeCodexToken(codexToken);
+            process.env.CODEX_SALE_API_KEY = settings.codexToken;
+        }
+
+        if (codexModel !== undefined) {
+            settings.codexModel = normalizeCodexModel(codexModel);
+            process.env.CODEX_SALE_MODEL = settings.codexModel;
         }
 
         if (qwenReminderCronSecret !== undefined) {
