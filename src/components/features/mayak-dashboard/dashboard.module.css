@@ -463,23 +463,6 @@
     width: 1% !important;
 }
 
-.thVertical {
-    height: 140px;
-    vertical-align: bottom !important;
-    padding: 10px 4px !important;
-    text-align: center;
-}
-
-.verticalText {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-    white-space: nowrap;
-    display: inline-block;
-    text-transform: none;
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--text-secondary);
-}
 
 .tdDirections {
     padding: 6px 14px !important;
@@ -559,6 +542,7 @@
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 6px;
+    white-space: nowrap !important;
 }
 
 .roleAdmin {
@@ -1521,4 +1505,200 @@
     display: flex;
     align-items: center;
     gap: 4px;
+}
+
+/* --- Compact Timer & Analytics (Overview Panel) --- */
+.compactTimerCard {
+    background: #fafbfc;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.01);
+}
+
+.compactTimerDisplay {
+    font-size: 38px;
+    font-weight: 800;
+    color: #08090a;
+    font-family: monospace;
+    letter-spacing: -0.5px;
+    user-select: none;
+    line-height: 1;
+}
+
+.compactTimerControls {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.compactTimerSetup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    flex-wrap: wrap;
+}
+
+.compactTimerInputGroup {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2px 6px;
+    height: 30px;
+    box-sizing: border-box;
+}
+
+.compactTimerInput {
+    width: 28px;
+    background: transparent;
+    border: none;
+    color: #08090a;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+    outline: none;
+}
+
+.compactTimerInput::-webkit-outer-spin-button,
+.compactTimerInput::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.compactTimerInputLabel {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    margin-left: 1px;
+}
+
+.compactTimerStartBtn {
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%) !important;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+    height: 30px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
+    transition: all 0.2s;
+}
+
+.compactTimerStartBtn:hover {
+    filter: brightness(1.05);
+}
+
+.compactTimerPresets {
+    display: flex;
+    gap: 4px;
+}
+
+.compactTimerPresetBtn {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    color: var(--accent-blue);
+    font-size: 11px;
+    font-weight: 800;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.compactTimerPresetBtn:hover {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+}
+
+.compactTimerActions {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+}
+
+.compactTimerPauseBtn {
+    background: var(--accent-yellow) !important;
+    color: #ffffff !important;
+    font-size: 12px;
+    font-weight: 800;
+    height: 30px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.compactTimerPauseBtn:hover {
+    filter: brightness(1.05);
+}
+
+.compactTimerResetBtn {
+    background: #ffffff !important;
+    border: 1px solid var(--border-color) !important;
+    color: #334155 !important;
+    font-size: 12px;
+    font-weight: 800;
+    height: 30px;
+    padding: 0 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.compactTimerResetBtn:hover {
+    background: #f1f5f9 !important;
+}
+
+.compactAnalyticsRow {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.compactAnalyticsCard {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.compactAnalyticsCard:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.compactAnalyticsLabel {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.compactAnalyticsValue {
+    font-size: 18px;
+    font-weight: 800;
+    color: #08090a;
 }

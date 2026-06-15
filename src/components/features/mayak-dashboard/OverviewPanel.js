@@ -217,20 +217,84 @@ export default function OverviewPanel({
             <div className={styles.overviewBody}>
                 {!expanded ? (
                     <>
-                        <div className={styles.analyticsRow}>
-                            <div className={styles.analyticsCard}>
-                                <span className={styles.analyticsLabel}>СР. ДЕЛЬТА 5 УР.</span>
-                                <span className={styles.analyticsValue}>{avgDelta}</span>
+                        <div className={styles.compactTimerCard}>
+                            <div
+                                className={styles.compactTimerDisplay}
+                                onClick={onExpandTimer}
+                                style={{ cursor: "pointer" }}
+                                title="Развернуть таймер"
+                            >
+                                {formatTime(timer.remainingSeconds)}
                             </div>
-                            <div className={styles.analyticsCard}>
-                                <span className={styles.analyticsLabel}>ВСЕГО ЗАДАЧ</span>
-                                <span className={styles.analyticsValue}>{totalTasks}</span>
+                            <div className={styles.compactTimerControls}>
+                                {timer.running ? (
+                                    <div className={styles.compactTimerActions}>
+                                        <button type="button" className={styles.compactTimerPauseBtn} onClick={timerHandlers.pause}>
+                                            Пауза
+                                        </button>
+                                        <button type="button" className={styles.compactTimerResetBtn} onClick={timerHandlers.reset}>
+                                            Остановить
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className={styles.compactTimerSetup}>
+                                        <div className={styles.compactTimerInputGroup}>
+                                            <input
+                                                className={styles.compactTimerInput}
+                                                type="number"
+                                                min="0"
+                                                max="180"
+                                                value={timer.inputMinutes}
+                                                onChange={(event) => timerHandlers.setMinutes(event.target.value)}
+                                                aria-label="Минуты"
+                                            />
+                                            <span className={styles.compactTimerInputLabel}>мин</span>
+                                        </div>
+                                        <button type="button" className={styles.compactTimerStartBtn} onClick={timerHandlers.start}>
+                                            Старт
+                                        </button>
+                                        <div className={styles.compactTimerPresets}>
+                                            <button
+                                                type="button"
+                                                className={styles.compactTimerPresetBtn}
+                                                onClick={() => timerHandlers.setMinutes(Math.min(180, Math.max(0, (parseInt(timer.inputMinutes || "0", 10) || 0) + 1)))}
+                                            >
+                                                +1м
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className={styles.compactTimerPresetBtn}
+                                                onClick={() => timerHandlers.setMinutes(Math.min(180, Math.max(0, (parseInt(timer.inputMinutes || "0", 10) || 0) + 5)))}
+                                            >
+                                                +5м
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        <div className={styles.timerRow} onClick={onExpandTimer} style={{ cursor: "pointer" }}>
-                            <span className={styles.timerLabel}>Осталось времени:</span>
-                            <span className={styles.timerTime}>{formatTime(timer.remainingSeconds)}</span>
+                        <div className={styles.compactAnalyticsRow} style={{
+                            gridTemplateColumns: mode === "we" ? "repeat(2, 1fr)" : "repeat(3, 1fr)"
+                        }}>
+                            {mode !== "we" && (
+                                <div className={styles.compactAnalyticsCard}>
+                                    <span className={styles.compactAnalyticsLabel}>СР. ДЕЛЬТА 5 УР.</span>
+                                    <span className={styles.compactAnalyticsValue}>{avgDelta}</span>
+                                </div>
+                            )}
+                            <div className={styles.compactAnalyticsCard}>
+                                <span className={styles.compactAnalyticsLabel}>ВСЕГО ВЫПОЛНЕНО</span>
+                                <span className={styles.compactAnalyticsValue}>
+                                    {mode === "we" ? `${totalTasks} из ${tables.length * 36}` : totalTasks}
+                                </span>
+                            </div>
+                            <div className={styles.compactAnalyticsCard}>
+                                <span className={styles.compactAnalyticsLabel}>СР. ВРЕМЯ НА ЗАДАНИЕ</span>
+                                <span className={styles.compactAnalyticsValue}>
+                                    {formatTime(overall?.averageTaskTime || 0)}
+                                </span>
+                            </div>
                         </div>
                     </>
                 ) : (
