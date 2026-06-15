@@ -274,6 +274,9 @@ export default function TrainerPage({ goTo }) {
     const [previewMode, setPreviewMode] = useState(null);
     const [previewDismissedTaskKey, setPreviewDismissedTaskKey] = useState("");
 
+    const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
+    const isSessionMode = tokenType === "session" && !!runtimeSessionId;
+
     const {
         isAdmin,
         isTokenValid,
@@ -525,8 +528,6 @@ export default function TrainerPage({ goTo }) {
         }
     }, [goTo]);
 
-    const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
-    const isSessionMode = tokenType === "session" && !!runtimeSessionId;
     const effectiveTableNumber = sessionRuntimeState?.participant?.tableNumber || tableNumber;
 
     const yaProgress = useMemo(() => {
