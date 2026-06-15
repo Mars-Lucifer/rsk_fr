@@ -178,7 +178,7 @@ export default function TablePanel({
 
                         {/* Table specific metrics under table */}
                         <div className={styles.statsRow} style={{
-                            marginTop: "14px",
+                            marginTop: "auto",
                             padding: "0 4px",
                             display: "grid",
                             gridTemplateColumns: mode === "we" ? "repeat(2, 1fr)" : "repeat(3, 1fr)",

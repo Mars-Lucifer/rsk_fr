@@ -312,7 +312,8 @@ export default function OverviewPanel({
                         </div>
 
                         <div className={styles.statsRow} style={{
-                            marginTop: "12px",
+                            marginTop: "auto",
+                            padding: "0 4px",
                             display: "grid",
                             gridTemplateColumns: mode === "we" ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
                             gap: "12px"

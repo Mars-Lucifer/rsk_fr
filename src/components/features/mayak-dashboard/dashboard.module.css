@@ -662,10 +662,10 @@
 
 /* --- Analytics (Overview Panel) --- */
 .overviewBody {
-    padding: 10px 12px;
+    padding: 4px 8px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     flex-grow: 1;
 }
 
