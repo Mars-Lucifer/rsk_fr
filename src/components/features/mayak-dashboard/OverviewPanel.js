@@ -193,6 +193,10 @@ export default function OverviewPanel({
     const avgDelta = overall?.averageDelta !== undefined ? overall.averageDelta : 0;
     const totalTasks = overall?.approvedTotal !== undefined ? overall.approvedTotal : 0;
 
+    const pct = timer.totalSeconds > 0 ? timer.remainingSeconds / timer.totalSeconds : 1;
+    const strokeDashoffset = 565.48 * (1 - pct);
+    const danger = timer.running && timer.remainingSeconds <= 10 && timer.remainingSeconds > 0;
+
     return (
         <section className={`${styles.panel} ${styles.overviewPanel} ${expanded ? styles.panelExpanded : ""}`}>
             <header className={`${styles.panelHead} ${styles.overviewHead}`} onClick={onExpand} style={{ cursor: "pointer" }}>
@@ -219,12 +223,25 @@ export default function OverviewPanel({
                     <>
                         <div className={styles.compactTimerCard}>
                             <div
-                                className={styles.compactTimerDisplay}
+                                className={styles.compactTimerRingContainer}
                                 onClick={onExpandTimer}
                                 style={{ cursor: "pointer" }}
                                 title="Развернуть таймер"
                             >
-                                {formatTime(timer.remainingSeconds)}
+                                <svg className={styles.timerRingSvg} viewBox="0 0 200 200">
+                                    <circle className={styles.timerRingBg} cx="100" cy="100" r="90" />
+                                    <circle
+                                        className={`${styles.timerRingFill} ${danger ? styles.timerRingFillDanger : ""}`}
+                                        cx="100"
+                                        cy="100"
+                                        r="90"
+                                        strokeDasharray="565.48"
+                                        strokeDashoffset={strokeDashoffset}
+                                    />
+                                </svg>
+                                <div className={`${styles.compactTimerRingDisplay} ${danger ? styles.compactTimerRingDisplayDanger : ""}`}>
+                                    {formatTime(timer.remainingSeconds)}
+                                </div>
                             </div>
                             <div className={styles.compactTimerControls}>
                                 {timer.running ? (
@@ -274,26 +291,56 @@ export default function OverviewPanel({
                             </div>
                         </div>
 
-                        <div className={styles.compactAnalyticsRow} style={{
-                            gridTemplateColumns: mode === "we" ? "repeat(2, 1fr)" : "repeat(3, 1fr)"
+                        <div className={styles.statsRow} style={{
+                            marginTop: "12px",
+                            display: "grid",
+                            gridTemplateColumns: mode === "we" ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
+                            gap: "12px"
                         }}>
                             {mode !== "we" && (
-                                <div className={styles.compactAnalyticsCard}>
-                                    <span className={styles.compactAnalyticsLabel}>СР. ДЕЛЬТА 5 УР.</span>
-                                    <span className={styles.compactAnalyticsValue}>{avgDelta}</span>
+                                <div className={styles.statCard} style={{ padding: "10px 12px", gap: "10px", borderRadius: "12px", boxShadow: "none", border: "1px solid var(--border-color)", width: "100%", boxSizing: "border-box" }}>
+                                    <div className={`${styles.statIconWrapper} ${styles.statIconWrapperGreen}`} style={{ width: "36px", height: "36px" }}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                                            <polyline points="17 6 23 6 23 12" />
+                                        </svg>
+                                    </div>
+                                    <div className={styles.statInfo} style={{ gap: "2px" }}>
+                                        <span className={styles.statLabel} style={{ fontSize: "11px" }}>Ср. дельта</span>
+                                        <span className={`${styles.statValue} ${styles.statValueGreen}`} style={{ fontSize: "18px" }}>
+                                            {avgDelta}
+                                        </span>
+                                    </div>
                                 </div>
                             )}
-                            <div className={styles.compactAnalyticsCard}>
-                                <span className={styles.compactAnalyticsLabel}>ВСЕГО ВЫПОЛНЕНО</span>
-                                <span className={styles.compactAnalyticsValue}>
-                                    {mode === "we" ? `${totalTasks} из ${tables.length * 36}` : totalTasks}
-                                </span>
+
+                            <div className={styles.statCard} style={{ padding: "10px 12px", gap: "10px", borderRadius: "12px", boxShadow: "none", border: "1px solid var(--border-color)", width: "100%", boxSizing: "border-box" }}>
+                                <div className={`${styles.statIconWrapper} ${styles.statIconWrapperPurple}`} style={{ width: "36px", height: "36px" }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                </div>
+                                <div className={styles.statInfo} style={{ gap: "2px" }}>
+                                    <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
+                                    <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
+                                        {mode === "we" ? `${totalTasks} из ${tables.length * 36}` : totalTasks}
+                                    </span>
+                                </div>
                             </div>
-                            <div className={styles.compactAnalyticsCard}>
-                                <span className={styles.compactAnalyticsLabel}>СР. ВРЕМЯ НА ЗАДАНИЕ</span>
-                                <span className={styles.compactAnalyticsValue}>
-                                    {formatTime(overall?.averageTaskTime || 0)}
-                                </span>
+
+                            <div className={styles.statCard} style={{ padding: "10px 12px", gap: "10px", borderRadius: "12px", boxShadow: "none", border: "1px solid var(--border-color)", width: "100%", boxSizing: "border-box" }}>
+                                <div className={`${styles.statIconWrapper} ${styles.statIconWrapperBlue}`} style={{ width: "36px", height: "36px" }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                    </svg>
+                                </div>
+                                <div className={styles.statInfo} style={{ gap: "2px" }}>
+                                    <span className={styles.statLabel} style={{ fontSize: "11px" }}>Среднее время выполнения задания</span>
+                                    <span className={`${styles.statValue} ${styles.statValueBlue}`} style={{ fontSize: "18px" }}>
+                                        {formatTime(overall?.averageTaskTime || 0)}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </>
