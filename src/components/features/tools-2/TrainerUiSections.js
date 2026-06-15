@@ -10,7 +10,7 @@ import CopyIcon from "@/assets/general/copy.svg";
 import Plusicon from "@/assets/general/plus.svg";
 import RandomIcon from "@/assets/general/random.svg";
 
-const ROLE_DESCRIPTIONS = {
+export const ROLE_DESCRIPTIONS = {
     ЛЕТОПИСЕЦ: "Превращает рабочий процесс в историю. Фиксирует не только факты, но и эмоции команды. Делает фото и видео ярких моментов, создает итоговый ролик о пути команды.",
     ИНСПЕКТОР: "Страж качества и правил. Следит за объективностью оценки, анализирует работу соседних команд и предоставляет им аргументированную обратную связь.",
     МЕДИАТОР: "Хранитель гармонии и атмосферы безопасности. Отвечает за то, чтобы голос каждого участника был услышан. Проводит сессии рефлексии и вовлекает «тихих» участников в обсуждение.",
@@ -132,7 +132,6 @@ export const TrainerControls = memo(function TrainerControls({
     onToggleTaskTimer,
     onToggleMapPreview,
     onToggleInstructionPreview,
-    onCompleteSession,
     onShowRolePopup,
     onToolLink1Click,
     mayakData,
@@ -170,50 +169,7 @@ export const TrainerControls = memo(function TrainerControls({
     };
 
     return (
-        <div className="flex flex-col gap-[1.6rem]">
-            <div className="flex justify-between items-center w-full">
-                <div className="flex items-center gap-4 lg:gap-[1.6rem]">
-                    <h3>Тренажёр</h3>
-                    {selectedRole && (
-                        <div style={{ position: "relative" }} className="role-tooltip-wrap">
-                            <div className="text-sm font-bold text-blue-600 p-2 bg-blue-100 rounded-lg whitespace-nowrap cursor-default">{selectedRole}</div>
-                            <div
-                                className="role-tooltip"
-                                style={{
-                                    position: "absolute",
-                                    left: 0,
-                                    top: "100%",
-                                    marginTop: "8px",
-                                    width: "380px",
-                                    padding: "12px",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e5e7eb",
-                                    background: "#fff",
-                                    color: "#111",
-                                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                                    opacity: 0,
-                                    visibility: "hidden",
-                                    transition: "opacity 0.2s, visibility 0.2s",
-                                    zIndex: 50,
-                                    pointerEvents: "none",
-                                }}>
-                                <p style={{ fontSize: "12px", color: "#666", lineHeight: "1.5" }}>{ROLE_DESCRIPTIONS[selectedRole] || ""}</p>
-                            </div>
-                            <style>{`.role-tooltip-wrap:hover .role-tooltip { opacity: 1 !important; visibility: visible !important; }`}</style>
-                        </div>
-                    )}
-                    {rankingDelta5 !== null && (
-                        <span className="text-sm whitespace-nowrap" style={{ color: "var(--color-black)" }}>
-                            ур.5 Δ {rankingDelta5}
-                        </span>
-                    )}
-                </div>
-                <div className="flex gap-[0.5rem]">
-                    <Button inverted className="!bg-(--color-red-noise) !text-(--color-red)" onClick={onCompleteSession}>
-                        Завершить&nbsp;сессию
-                    </Button>
-                </div>
-            </div>
+        <div className="flex flex-col gap-[0.75rem]">
             {taskVersion !== "v2" && (
                 <div className="flex gap-[0.5rem]">
                     <Switcher value={who} onChange={onWhoChange} className="!w-full">
@@ -245,9 +201,16 @@ export const TrainerControls = memo(function TrainerControls({
 
             <div className="flex flex-col gap-[0.75rem]">
                 <div className="flex flex-col gap-[0.75rem]">
-                    <div className="flex items-center gap-[0.5rem]">
-                        <span className="text-sm text-gray-500">Задание №{tasks.length > 0 && tasks[currentTaskIndex] ? tasks[currentTaskIndex].number || currentTaskIndex + 1 : 0}</span>
-                        {isCurrentTaskApproved ? <span className="text-sm font-medium text-emerald-600">Задание выполнено</span> : null}
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-[0.5rem]">
+                            <span className="text-sm text-gray-500">Задание №{tasks.length > 0 && tasks[currentTaskIndex] ? tasks[currentTaskIndex].number || currentTaskIndex + 1 : 0}</span>
+                            {isCurrentTaskApproved ? <span className="text-sm font-medium text-emerald-600">Задание выполнено</span> : null}
+                        </div>
+                        {rankingDelta5 !== null && (
+                            <span className="text-sm font-semibold whitespace-nowrap" style={{ color: "var(--color-black)" }}>
+                                ур.5 Δ {rankingDelta5}
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Button className="!w-10 !h-10 !p-0 flex items-center justify-center" onClick={onPrevTask} disabled={currentTaskIndex <= allowedMinIndex || isTaskRunning || isTaskNavigationLocked}>

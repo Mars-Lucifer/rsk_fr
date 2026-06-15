@@ -6,7 +6,7 @@ import MayakServicesPanel from "./MayakServicesPanel";
 import InstructionImageModal from "./InstructionImageModal";
 import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
-import { MayakField, TrainerControls } from "./TrainerUiSections";
+import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
 import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup } from "./TrainerPopups";
 
 import InfoIcon from "@/assets/general/info.svg";
@@ -1257,7 +1257,6 @@ export default function TrainerPage({ goTo }) {
         onToggleTaskTimer: guardedToggleTaskTimer,
         onToggleMapPreview: handleToggleMapPreview,
         onToggleInstructionPreview: handleToggleInstructionPreview,
-        onCompleteSession: handleCompleteSession,
         onShowRolePopup: handleShowRolePopup,
         onToolLink1Click: handleToolLink1Click,
         mayakData,
@@ -1459,24 +1458,64 @@ export default function TrainerPage({ goTo }) {
                         Стол №{effectiveTableNumber}
                     </div>
                 ) : null}
-                <Button
-                    icon
-                    disabled={timerState.isRunning}
-                    className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
-                    onClick={handleOpenHistory}
-                    title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
-                    <TimeIcon />
-                </Button>
-                {isAdmin && (
+                {selectedRole && (
+                    <div style={{ position: "relative" }} className="role-tooltip-wrap">
+                        <div className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700 whitespace-nowrap cursor-default">
+                            {selectedRole}
+                        </div>
+                        <div
+                            className="role-tooltip"
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                top: "100%",
+                                marginTop: "8px",
+                                width: "380px",
+                                padding: "12px",
+                                borderRadius: "12px",
+                                border: "1px solid #e5e7eb",
+                                background: "#fff",
+                                color: "#111",
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                                opacity: 0,
+                                visibility: "hidden",
+                                transition: "opacity 0.2s, visibility 0.2s",
+                                zIndex: 50,
+                                pointerEvents: "none",
+                            }}>
+                            <p style={{ fontSize: "12px", color: "#666", lineHeight: "1.5" }}>{ROLE_DESCRIPTIONS[selectedRole] || ""}</p>
+                        </div>
+                        <style>{`.role-tooltip-wrap:hover .role-tooltip { opacity: 1 !important; visibility: visible !important; }`}</style>
+                    </div>
+                )}
+                <div className="flex items-center gap-2 ml-auto">
                     <Button
                         icon
                         disabled={timerState.isRunning}
                         className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
-                        onClick={handleAdminResetSession}
-                        title={timerState.isRunning ? "Недоступно во время выполнения задания" : "Сбросить сессию (админ)"}>
-                        <ResetIcon />
+                        onClick={handleOpenHistory}
+                        title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
+                        <TimeIcon />
                     </Button>
-                )}
+                    {isAdmin && (
+                        <Button
+                            icon
+                            disabled={timerState.isRunning}
+                            className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
+                            onClick={handleAdminResetSession}
+                            title={timerState.isRunning ? "Недоступно во время выполнения задания" : "Сбросить сессию (админ)"}>
+                            <ResetIcon />
+                        </Button>
+                    )}
+                    {isSessionMode && (
+                        <Button
+                            inverted
+                            className="!bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !text-sm whitespace-nowrap"
+                            onClick={handleCompleteSession}>
+                            Завершить&nbsp;сессию
+                        </Button>
+                    )}
+                </div>
             </Header>
 
             {showSecondQuestionnaire && (
