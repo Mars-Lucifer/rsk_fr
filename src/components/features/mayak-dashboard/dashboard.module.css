@@ -463,6 +463,34 @@
     width: 1% !important;
 }
 
+.thParticipantCol {
+    vertical-align: top !important;
+    text-transform: none !important;
+}
+
+.participantColWrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+}
+
+.tdDirLabel {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    white-space: nowrap !important;
+    padding-right: 20px !important;
+    vertical-align: middle !important;
+}
+
+.dirLabelText {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
 .tdDirections {
     padding: 6px 14px !important;
     vertical-align: middle !important;

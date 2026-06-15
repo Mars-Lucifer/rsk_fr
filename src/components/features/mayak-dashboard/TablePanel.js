@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import styles from "./dashboard.module.css";
 import ParticipantRow from "./ParticipantRow";
-import { FolderIcon, ExpandIcon, CloseIcon } from "./icons";
+import { FolderIcon, ExpandIcon, CloseIcon, StarIcon } from "./icons";
+import { ROLE_OPTIONS, roleLabel } from "./dashboardConstants";
 
 function formatDuration(totalSeconds) {
     if (!totalSeconds || totalSeconds <= 0) return "—";
@@ -11,6 +12,19 @@ function formatDuration(totalSeconds) {
     const ss = String(seconds).padStart(2, "0");
     return `${mm}:${ss}`;
 }
+
+const getRoleClass = (role) => {
+    switch (role) {
+        case "ИНСПЕКТОР": return styles.roleInspector;
+        case "АДМИНИСТРАТОР": return styles.roleAdmin;
+        case "Капитан": return styles.roleCaptain;
+        case "Инженер": return styles.roleEngineer;
+        case "Медиатор": return styles.roleMediator;
+        case "Хранитель Маяка": return styles.roleKeeper;
+        case "Летописец": return styles.roleChronicler;
+        default: return styles.roleDefault;
+    }
+};
 
 // Панель одного стола. mode: "ya" | "we".
 export default function TablePanel({
@@ -61,39 +75,92 @@ export default function TablePanel({
                     <>
                         <div className={styles.tableResponsive}>
                             <table className={styles.participantTable}>
-                                <thead>
-                                    <tr>
-                                        <th>УЧАСТНИК</th>
-                                        <th>РОЛЬ</th>
-                                        {mode === "ya" ? (
-                                            <>
+                                {mode === "ya" ? (
+                                    <>
+                                        <thead>
+                                            <tr>
+                                                <th>УЧАСТНИК</th>
+                                                <th>РОЛЬ</th>
                                                 <th className={styles.thCenter}>ДЕЛЬТА 5 УР.</th>
                                                 <th>Прогресс Я</th>
-                                            </>
-                                        ) : (
-                                            (directionsMeta || []).map((dir) => (
-                                                <th key={dir.key} className={styles.thCenter} title={dir.label}>
-                                                    {dir.label}
-                                                </th>
-                                            ))
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {table.participants.map((participant) => (
-                                        <ParticipantRow
-                                            key={participant.userId}
-                                            participant={participant}
-                                            mode={mode}
-                                            editorMode={editorMode}
-                                            big={expanded}
-                                            dragging={draggingUserId === participant.userId}
-                                            onChangeRole={onChangeRole}
-                                            onDragStart={onPersonDragStart}
-                                            onDragEnd={onPersonDragEnd}
-                                        />
-                                    ))}
-                                </tbody>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {table.participants.map((participant) => (
+                                                <ParticipantRow
+                                                    key={participant.userId}
+                                                    participant={participant}
+                                                    mode={mode}
+                                                    editorMode={editorMode}
+                                                    big={expanded}
+                                                    dragging={draggingUserId === participant.userId}
+                                                    onChangeRole={onChangeRole}
+                                                    onDragStart={onPersonDragStart}
+                                                    onDragEnd={onPersonDragEnd}
+                                                />
+                                            ))}
+                                        </tbody>
+                                    </>
+                                ) : (
+                                    <>
+                                        <thead>
+                                            <tr>
+                                                <th>НАПРАВЛЕНИЕ</th>
+                                                {table.participants.map((p) => (
+                                                    <th
+                                                        key={p.userId}
+                                                        className={`${styles.thParticipantCol} ${editorMode ? styles.personDraggable : ""} ${draggingUserId === p.userId ? styles.personDragging : ""}`}
+                                                        draggable={editorMode}
+                                                        onDragStart={editorMode ? (e) => onPersonDragStart?.(e, p) : undefined}
+                                                        onDragEnd={editorMode ? onPersonDragEnd : undefined}
+                                                    >
+                                                        <div className={styles.participantColWrap}>
+                                                            <span className={styles.personName}>{p.name || "Без имени"}</span>
+                                                            {editorMode ? (
+                                                                <select
+                                                                    className={styles.roleSelect}
+                                                                    value={p.role || "Участник"}
+                                                                    onChange={(event) => onChangeRole?.(p, event.target.value)}
+                                                                    onClick={(event) => event.stopPropagation()}
+                                                                >
+                                                                    {ROLE_OPTIONS.map((option) => (
+                                                                        <option key={option.value || "participant"} value={option.value}>
+                                                                            {option.label}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : (
+                                                                <span className={`${styles.roleLabelText} ${getRoleClass(p.role)}`}>
+                                                                    {roleLabel(p.role)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(directionsMeta || []).map((dir, dirIndex) => (
+                                                <tr key={dir.key} className={styles.personRow}>
+                                                    <td className={styles.tdDirLabel}>
+                                                        <span className={styles.dirLabelText}>{dir.label}</span>
+                                                    </td>
+                                                    {table.participants.map((p) => {
+                                                        const participantDir = p.we?.directions?.[dirIndex] || dir;
+                                                        return (
+                                                            <td key={p.userId} className={styles.tdCenter} title={`${p.name}: ${participantDir.label}`}>
+                                                                <StarIcon
+                                                                    className={`${styles.dirStar} ${participantDir.lit ? styles.dirStarLit : ""}`}
+                                                                    filled={participantDir.lit}
+                                                                />
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </>
+                                )}
                             </table>
                         </div>
 
