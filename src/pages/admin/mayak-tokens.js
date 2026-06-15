@@ -762,6 +762,22 @@ export default function AdminMayakTokens() {
                                             </>
                                         ) : (
                                             <>
+                                                {item.type === "session" && item.status !== "completed" ? (
+                                                    <button
+                                                        type="button"
+                                                        className="icon-button dashboard"
+                                                        title="Дашборд аналитики"
+                                                        aria-label="Дашборд аналитики"
+                                                        onClick={() => router.push(`/admin/mayak-sessions/${item.sourceRef?.sessionId || item.id}/dashboard`)}
+                                                    >
+                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <path d="M3 3v18h18" />
+                                                            <rect x="7" y="11" width="3" height="6" />
+                                                            <rect x="12" y="7" width="3" height="10" />
+                                                            <rect x="17" y="13" width="3" height="4" />
+                                                        </svg>
+                                                    </button>
+                                                ) : null}
                                                 <button type="button" className="icon-button" title="Скопировать" aria-label="Скопировать" onClick={() => copyAccess(item)} disabled={!item.link}>
                                                     ⧉
                                                 </button>
@@ -1253,6 +1269,20 @@ export default function AdminMayakTokens() {
                     color: #b91c1c;
                     font-size: 16px;
                     line-height: 1;
+                }
+
+                .icon-button.dashboard {
+                    border-color: #c7d2fe;
+                    background: #eef2ff;
+                    color: #4338ca;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .icon-button.dashboard:hover {
+                    border-color: #6366f1;
+                    background: #e0e7ff;
                 }
 
                 @media (max-width: 1160px) {

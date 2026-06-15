@@ -1,4 +1,4 @@
-﻿import { promises as fs } from "fs";
+import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execFile } from "child_process";
@@ -549,10 +549,72 @@ export async function setMayakSessionParticipantRole({ sessionId, userId, role }
     return participant;
 }
 
+// Возвращает сырые объекты участников рантайма (включая карту tasks) для аналитики дашборда.
+export async function readSessionRuntimeParticipants(sessionId) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session) {
+        throw new Error("Сессия не найдена");
+    }
+    const store = await readStore();
+    await expirePendingReviews(store, sessionId);
+    const freshStore = await readStore();
+    const bucket = ensureSessionBucket(freshStore, sessionId);
+    return Object.values(bucket.participants || {}).map((participant) => ({ ...participant }));
+}
+
+// Перемещает участника за другой стол (режим редактора дашборда).
+export async function moveMayakSessionParticipantTable({ sessionId, userId, tableNumber }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const totalTables = Math.max(1, normalizeTableNumber(session.tableCount) || 1);
+    const targetTable = normalizeTableNumber(tableNumber);
+    if (targetTable < 1 || targetTable > totalTables) {
+        throw new Error("Недопустимый номер стола");
+    }
+
+    const store = await readStore();
+    const bucket = ensureSessionBucket(store, sessionId);
+    const participant = bucket.participants?.[userId];
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    if (participant.tableNumber === targetTable) {
+        return participant;
+    }
+
+    // Проверяем уникальность роли-ревьюера на новом столе.
+    if (isReviewerRole(participant.role)) {
+        const conflict = Object.values(bucket.participants || {}).find(
+            (candidate) => candidate.userId !== userId && candidate.tableNumber === targetTable && candidate.role === participant.role
+        );
+        if (conflict) {
+            throw new Error(`Для стола ${targetTable} такая роль уже занята`);
+        }
+    }
+
+    participant.tableNumber = targetTable;
+    participant.inspectorTargetTable = isReviewerRole(participant.role)
+        ? getInspectorTargetTable(targetTable, totalTables)
+        : null;
+    participant.updatedAt = new Date().toISOString();
+    await writeStore(store, [sessionId]);
+    return participant;
+}
+
+export async function readSessionReviews(sessionId) {
+    const store = await readStore();
+    const bucket = store.sessions?.[sessionId] || { reviews: {} };
+    return Object.values(bucket.reviews || {});
+}
+
 export async function listMayakSessionParticipants(sessionId) {
     const session = await getMayakSessionById(sessionId);
     if (!session) {
-        throw new Error("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430");
+        throw new Error("Сессия не найдена");
     }
 
     const store = await readStore();
@@ -642,7 +704,7 @@ export async function createMayakSessionReview({
         taskKey,
         taskNumber: normalizeString(taskNumber),
         taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
-        taskName: normalizeString(taskName) || `Р—Р°РґР°РЅРёРµ ${taskNumber}`,
+        taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
         taskTitle: normalizeString(taskTitle),
         contentType: normalizeString(contentType),
         description: normalizeString(description),
@@ -864,12 +926,12 @@ export async function getMayakSessionReviewFile({ sessionId, reviewId, type, fil
     const bucket = ensureSessionBucket(store, sessionId);
     const review = bucket.reviews?.[reviewId];
     if (!review?.file) {
-        throw new Error("Р¤Р°Р№Р» РїСЂРѕРІРµСЂРєРё РЅРµ РЅР°Р№РґРµРЅ");
+        throw new Error("Файл проверки не найден");
     }
 
     const selectedName = type === "converted" ? review.file.previewStoredName : review.file.storedName;
     if (!selectedName || selectedName !== filename) {
-        throw new Error("Р¤Р°Р№Р» РїСЂРѕРІРµСЂРєРё РЅРµ РЅР°Р№РґРµРЅ");
+        throw new Error("Файл проверки не найден");
     }
 
     const fullPath = path.join(SESSION_FILES_ROOT, sessionId, review.participantUserId, selectedName);
