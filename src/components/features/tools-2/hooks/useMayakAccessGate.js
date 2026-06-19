@@ -63,12 +63,19 @@ export const useMayakAccessGate = ({ getStorageKey, goTo }) => {
 
                 let isAuthenticatedAdminBypass = false;
                 if (data.isBypass) {
-                    const adminResponse = await fetch("/api/admin/mayak-auth");
-                    const adminData = await adminResponse.json().catch(() => ({}));
-                    isAuthenticatedAdminBypass = Boolean(adminResponse.ok && adminData.authenticated);
-                    if (!isAuthenticatedAdminBypass) {
-                        goTo("settings");
-                        return;
+                    if (data.adminBypass) {
+                        // Сервер уже авторизовал админ-bypass по суффиксу/секрету
+                        // (см. validate-token detectAdminBypass) — доверяем без
+                        // дополнительной проверки mayak-auth.
+                        isAuthenticatedAdminBypass = true;
+                    } else {
+                        const adminResponse = await fetch("/api/admin/mayak-auth");
+                        const adminData = await adminResponse.json().catch(() => ({}));
+                        isAuthenticatedAdminBypass = Boolean(adminResponse.ok && adminData.authenticated);
+                        if (!isAuthenticatedAdminBypass) {
+                            goTo("settings");
+                            return;
+                        }
                     }
                 }
 
@@ -80,6 +87,9 @@ export const useMayakAccessGate = ({ getStorageKey, goTo }) => {
                     const nextSessionStartTime = Date.now().toString();
                     localStorage.setItem(getStorageKey("sessionStartTime"), nextSessionStartTime);
                     localStorage.removeItem(getStorageKey("session_tasks_log"));
+                    localStorage.removeItem(getStorageKey("mayak_achieved_start"));
+                    localStorage.removeItem(getStorageKey("mayak_achieved_content_types"));
+                    localStorage.removeItem(getStorageKey("mayak_achieved_specialization"));
                     setSessionStartTime(nextSessionStartTime);
                 } else {
                     setSessionStartTime(existingSessionStartTime);

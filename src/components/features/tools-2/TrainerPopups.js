@@ -466,8 +466,19 @@ export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData,
     );
 });
 
-export const YaDirectionSelectionPopup = ({ onConfirm }) => {
-    const directions = ["текст", "аудио", "изображение", "интерактив", "видео", "данные"];
+export const YaDirectionSelectionPopup = ({ onClose, onConfirm, takenDirections = [], options = null }) => {
+    // options — фактические форматы текущей колоды: [{ key, label }].
+    // Если не переданы, используем канонический набор из 6 форматов как fallback.
+    const directions = Array.isArray(options) && options.length > 0
+        ? options
+        : [
+            { key: "текст", label: "Текст" },
+            { key: "аудио", label: "Аудио" },
+            { key: "изображение", label: "Изображение" },
+            { key: "интерактив", label: "Интерактив" },
+            { key: "видео", label: "Видео" },
+            { key: "данные", label: "Данные" },
+        ];
     const [currentSelection, setCurrentSelection] = useState(null);
 
     const handleConfirm = () => {
@@ -479,22 +490,52 @@ export const YaDirectionSelectionPopup = ({ onConfirm }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white p-6 rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 pointer-events-auto">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
+            <div className="bg-white p-6 rounded-lg max-w-md w-full shadow-2xl border border-gray-200 pointer-events-auto">
                 <div className="mb-4">
                     <h3 className="text-xl font-bold text-slate-800">Выберите направление специализации</h3>
-                    <p className="text-sm text-slate-500 mt-1">Вы успешно освоили все 6 типов контента! Теперь выберите направление, которое за вами закрепится для части «Я».</p>
+                    <p className="text-sm text-slate-500 mt-1">Теперь выберите направление, которое за вами закрепится для части «Я».</p>
                 </div>
-                <div className="space-y-2 mb-6 max-h-[300px] overflow-y-auto pr-1">
-                    {directions.map((direction) => (
-                        <label key={direction} className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${currentSelection === direction ? "border-blue-500 bg-blue-50/50" : "border-slate-100 hover:bg-slate-50"}`}>
-                            <input type="radio" name="direction" value={direction} checked={currentSelection === direction} onChange={() => setCurrentSelection(direction)} className="form-radio h-5 w-5 text-blue-600" />
-                            <span className="font-semibold text-slate-700 capitalize">{direction}</span>
-                        </label>
-                    ))}
+                <div className="space-y-2.5 mb-6">
+                    {directions.map((direction) => {
+                        const value = direction.key;
+                        const label = direction.label || direction.key;
+                        const isTaken = Array.isArray(takenDirections)
+                            && takenDirections.map((d) => String(d).toLowerCase()).includes(String(value).toLowerCase());
+                        return (
+                            <label
+                                key={value}
+                                className={`flex items-center gap-3 p-2.5 border rounded-lg transition-all ${
+                                    isTaken
+                                        ? "border-slate-100 bg-slate-50/70 opacity-50 cursor-not-allowed"
+                                        : currentSelection === value
+                                            ? "border-blue-500 bg-blue-50/50 cursor-pointer"
+                                            : "border-slate-100 hover:bg-slate-50 cursor-pointer"
+                                }`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="direction"
+                                    value={value}
+                                    disabled={isTaken}
+                                    checked={currentSelection === value}
+                                    onChange={() => !isTaken && setCurrentSelection(value)}
+                                    className="form-radio h-4 w-4 text-blue-600 disabled:opacity-50"
+                                />
+                                <span className={`font-semibold text-slate-700 capitalize text-sm ${isTaken ? "line-through text-slate-400" : ""}`}>
+                                    {label} {isTaken && " (занято)"}
+                                </span>
+                            </label>
+                        );
+                    })}
                 </div>
-                <div className="flex justify-end">
-                    <Button onClick={handleConfirm} className="w-full !bg-blue-600 !text-white hover:!bg-blue-700 py-2.5 rounded-xl font-bold">
+                <div className="flex justify-end gap-2">
+                    {onClose && (
+                        <Button onClick={onClose} className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200">
+                            Отмена
+                        </Button>
+                    )}
+                    <Button onClick={handleConfirm} className="!bg-blue-500 !text-white hover:!bg-blue-600">
                         Подтвердить выбор
                     </Button>
                 </div>

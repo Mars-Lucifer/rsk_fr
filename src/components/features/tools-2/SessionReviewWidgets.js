@@ -114,7 +114,7 @@ function ReviewFilePreview({ file, title, submissionText }) {
     return <iframe title={title} src={file.fileUrl} className="h-[70vh] w-full rounded-lg border border-slate-200 bg-white" />;
 }
 
-export function SessionTaskReviewPopup({ taskData, elapsedTime, rejectedComment, uploadLoading, uploadError, onClose, onSubmit }) {
+export function SessionTaskReviewPopup({ taskData, elapsedTime, rejectedComment, uploadLoading, uploadError, canUseJoker = false, jokerBalance = 0, onUseJoker, onClose, onSubmit }) {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isDragActive, setIsDragActive] = useState(false);
     const [submissionText, setSubmissionText] = useState("");
@@ -212,7 +212,17 @@ export function SessionTaskReviewPopup({ taskData, elapsedTime, rejectedComment,
 
                 </div>
 
-                <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">
+                    {canUseJoker ? (
+                        <Button
+                            inverted
+                            onClick={onUseJoker}
+                            disabled={uploadLoading}
+                            className="mr-auto !border-rose-300 !text-rose-700 !bg-rose-50 hover:!bg-rose-100"
+                            title="Мгновенно засчитать задание без инспектора, потратив звезду-джокер">
+                            ⭐ Использовать звезду-джокер ({jokerBalance})
+                        </Button>
+                    ) : null}
                     <Button inverted onClick={onClose} disabled={uploadLoading}>
                         Позже
                     </Button>

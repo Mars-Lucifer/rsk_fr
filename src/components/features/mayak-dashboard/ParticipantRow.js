@@ -1,22 +1,27 @@
+import { memo } from "react";
+
 import styles from "./dashboard.module.css";
 import { ROLE_OPTIONS, roleLabel } from "./dashboardConstants";
 import { StarIcon } from "./icons";
 
-export default function ParticipantRow({
+function ParticipantRow({
     participant,
     mode,
     editorMode = false,
     big = false,
     dragging = false,
+    rowIndex = 0,
+    directionsMeta = [],
     onChangeRole,
     onDragStart,
     onDragEnd,
 }) {
     const deltaText = participant.delta === null || participant.delta === undefined ? "—" : participant.delta;
-    
-    // Calculate progress
-    const approvedCount = mode === "ya" ? (participant.ya?.approvedCount || 0) : (participant.we?.approvedCount || 0);
-    const targetCount = mode === "ya" ? (participant.ya?.target || 4) : 4;
+
+    // Прогресс-бар используется только в режиме «Я» (в «Мы» показывается стрип
+    // из 6 звёзд направлений, а не бар), поэтому считаем по части «Я».
+    const approvedCount = participant.ya?.approvedCount || 0;
+    const targetCount = participant.ya?.target || 4;
     const pct = Math.min(approvedCount, targetCount) / Math.max(targetCount, 1);
     const done = approvedCount >= targetCount;
 
@@ -26,10 +31,11 @@ export default function ParticipantRow({
     let starFilled = false;
 
     if (showStar) {
-        if (approvedCount >= 4) {
+        const star = participant.ya?.star;
+        if (star === "gold" || star === true) {
             starColorClass = styles.starRed;
             starFilled = true;
-        } else if (approvedCount === 3) {
+        } else if (star === "joker") {
             starColorClass = styles.starYellow;
             starFilled = true;
         }
@@ -83,6 +89,15 @@ export default function ParticipantRow({
                     <td className={styles.tdDelta}>
                         <span className={styles.deltaValue}>{deltaText}</span>
                     </td>
+                    <td className={styles.tdName}>
+                        {participant.ya?.direction ? (
+                            <span className={styles.dirChip} title={`Выбранная специализация: ${participant.ya.direction}`}>
+                                {participant.ya.direction}
+                            </span>
+                        ) : (
+                            <span className={styles.dirChipEmpty}>—</span>
+                        )}
+                    </td>
                     <td className={styles.tdProgress}>
                         <div className={styles.progressCellWrap}>
                             <span className={styles.progressText}>
@@ -99,15 +114,37 @@ export default function ParticipantRow({
                     </td>
                 </>
             ) : (
-                (participant.we?.directions || []).map((dir) => (
-                    <td key={dir.key} className={styles.tdCenter} title={`${dir.label}: ${dir.count}`}>
-                        <StarIcon
-                            className={`${styles.dirStar} ${dir.lit ? styles.dirStarLit : ""}`}
-                            filled={dir.lit}
-                        />
+                <>
+                    <td className={styles.tdName}>
+                        {directionsMeta?.[rowIndex]?.label ? (
+                            <span className={styles.weDirectionLabel}>
+                                {directionsMeta[rowIndex].label}
+                            </span>
+                        ) : (
+                            <span className={styles.dirChipEmpty}>—</span>
+                        )}
                     </td>
-                ))
+                    <td className={styles.tdProgress}>
+                        <div className={styles.dirStarsRow}>
+                            {(participant.we?.directions || []).map((dir) => (
+                                <span
+                                    key={dir.key}
+                                    title={`${dir.label}: ${dir.count || 0}${dir.viaJoker ? " (звезда-джокер)" : ""}`}
+                                >
+                                    <StarIcon
+                                        className={`${styles.dirStar} ${dir.viaJoker ? styles.dirStarJoker : dir.lit ? styles.dirStarLit : ""}`}
+                                        filled={dir.lit}
+                                    />
+                                </span>
+                            ))}
+                        </div>
+                    </td>
+                </>
             )}
         </tr>
     );
 }
+
+// memo: при поллинге каждые 5с участники, чьи данные не изменились, не
+// перерисовываются (props стабильны — callbacks обёрнуты в useCallback выше).
+export default memo(ParticipantRow);

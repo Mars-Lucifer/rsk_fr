@@ -1,8 +1,7 @@
-import { useMemo } from "react";
+import { memo } from "react";
 import styles from "./dashboard.module.css";
 import ParticipantRow from "./ParticipantRow";
-import { FolderIcon, ExpandIcon, CloseIcon, StarIcon } from "./icons";
-import { ROLE_OPTIONS, roleLabel } from "./dashboardConstants";
+import { FolderIcon } from "./icons";
 
 function formatDuration(totalSeconds) {
     if (!totalSeconds || totalSeconds <= 0) return "—";
@@ -13,21 +12,8 @@ function formatDuration(totalSeconds) {
     return `${mm}:${ss}`;
 }
 
-const getRoleClass = (role) => {
-    switch (role) {
-        case "ИНСПЕКТОР": return styles.roleInspector;
-        case "АДМИНИСТРАТОР": return styles.roleAdmin;
-        case "Капитан": return styles.roleCaptain;
-        case "Инженер": return styles.roleEngineer;
-        case "Медиатор": return styles.roleMediator;
-        case "Хранитель Маяка": return styles.roleKeeper;
-        case "Летописец": return styles.roleChronicler;
-        default: return styles.roleDefault;
-    }
-};
-
 // Панель одного стола. mode: "ya" | "we".
-export default function TablePanel({
+function TablePanel({
     table,
     mode,
     directionsMeta = [],
@@ -35,7 +21,6 @@ export default function TablePanel({
     expanded = false,
     draggingUserId = null,
     dropActive = false,
-    onExpand,
     onChangeRole,
     onPersonDragStart,
     onPersonDragEnd,
@@ -55,15 +40,6 @@ export default function TablePanel({
                     <FolderIcon className={styles.panelFolderIcon} />
                     <h3 className={styles.panelTitle}>Стол №{table.tableNumber}</h3>
                 </div>
-                <button
-                    type="button"
-                    className={styles.expandButton}
-                    onClick={() => onExpand?.(table.tableNumber)}
-                    title={expanded ? "Свернуть" : "Развернуть"}
-                    aria-label={expanded ? "Свернуть" : "Развернуть"}
-                >
-                    {expanded ? <CloseIcon /> : <ExpandIcon />}
-                </button>
             </header>
 
             <div className={styles.panelBody}>
@@ -82,6 +58,7 @@ export default function TablePanel({
                                                 <th>УЧАСТНИК</th>
                                                 <th>РОЛЬ</th>
                                                 <th className={styles.thCenter}>ДЕЛЬТА 5 УР.</th>
+                                                <th>СПЕЦИАЛИЗАЦИЯ</th>
                                                 <th>Прогресс Я</th>
                                             </tr>
                                         </thead>
@@ -107,69 +84,26 @@ export default function TablePanel({
                                             <tr>
                                                 <th>УЧАСТНИК</th>
                                                 <th>РОЛЬ</th>
-                                                <th>НАПРАВЛЕНИЕ</th>
-                                                <th colSpan={table.participants.length} className={styles.thCenter}>Индекс цифровой зрелости</th>
+                                                <th>Направление</th>
+                                                <th>Индекс цифровой зрелости</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(directionsMeta || []).map((dir, dirIndex) => {
-                                                const p = table.participants[dirIndex];
-                                                return (
-                                                    <tr key={dir.key} className={styles.personRow}>
-                                                        {p ? (
-                                                            <>
-                                                                <td
-                                                                    className={`${styles.tdName} ${editorMode ? styles.personDraggable : ""} ${draggingUserId === p.userId ? styles.personDragging : ""}`}
-                                                                    draggable={editorMode}
-                                                                    onDragStart={editorMode ? (e) => onPersonDragStart?.(e, p) : undefined}
-                                                                    onDragEnd={editorMode ? onPersonDragEnd : undefined}
-                                                                >
-                                                                    <span className={styles.personName}>{p.name || "Без имени"}</span>
-                                                                </td>
-                                                                <td className={styles.tdRole}>
-                                                                    {editorMode ? (
-                                                                        <select
-                                                                            className={styles.roleSelect}
-                                                                            value={p.role || "Участник"}
-                                                                            onChange={(event) => onChangeRole?.(p, event.target.value)}
-                                                                            onClick={(event) => event.stopPropagation()}
-                                                                        >
-                                                                            {ROLE_OPTIONS.map((option) => (
-                                                                                <option key={option.value || "participant"} value={option.value}>
-                                                                                    {option.label}
-                                                                                </option>
-                                                                            ))}
-                                                                        </select>
-                                                                    ) : (
-                                                                        <span className={`${styles.roleLabelText} ${getRoleClass(p.role)}`}>
-                                                                            {roleLabel(p.role)}
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <td className={styles.tdName}>—</td>
-                                                                <td className={styles.tdRole}>—</td>
-                                                            </>
-                                                        )}
-                                                        <td className={styles.tdName}>
-                                                            <span className={styles.dirLabelText}>{dir.label}</span>
-                                                        </td>
-                                                        {table.participants.map((pAll) => {
-                                                            const pDir = pAll.we?.directions?.[dirIndex] || dir;
-                                                            return (
-                                                                <td key={pAll.userId} className={styles.tdCenter} title={`${pAll.name}: ${pDir.label}`}>
-                                                                    <StarIcon
-                                                                        className={`${styles.dirStar} ${pDir.lit ? styles.dirStarLit : ""}`}
-                                                                        filled={pDir.lit}
-                                                                    />
-                                                                </td>
-                                                            );
-                                                        })}
-                                                    </tr>
-                                                );
-                                            })}
+                                            {table.participants.map((participant, index) => (
+                                                <ParticipantRow
+                                                    key={participant.userId}
+                                                    participant={participant}
+                                                    mode={mode}
+                                                    rowIndex={index}
+                                                    directionsMeta={directionsMeta}
+                                                    editorMode={editorMode}
+                                                    big={expanded}
+                                                    dragging={draggingUserId === participant.userId}
+                                                    onChangeRole={onChangeRole}
+                                                    onDragStart={onPersonDragStart}
+                                                    onDragEnd={onPersonDragEnd}
+                                                />
+                                            ))}
                                         </tbody>
                                     </>
                                 )}
@@ -211,7 +145,7 @@ export default function TablePanel({
                                     <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
                                     <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
                                         {mode === "we"
-                                            ? `${table.totals.approvedTotal !== undefined ? table.totals.approvedTotal : "0"} из 36`
+                                            ? `${table.totals.weApproved !== undefined ? table.totals.weApproved : "0"} из ${(table.totals.participantCount || 0) * 6}`
                                             : (table.totals.approvedTotal !== undefined ? table.totals.approvedTotal : "0")}
                                     </span>
                                 </div>
@@ -238,3 +172,7 @@ export default function TablePanel({
         </section>
     );
 }
+
+// memo: перетаскивание/таймер/тик в других панелях не перерисовывают
+// неизменившиеся столы. Props стабильны (callbacks из useCallback родителя).
+export default memo(TablePanel);

@@ -4,6 +4,13 @@ import path from "path";
 import { getMayakSessionById } from "@/lib/mayakSessions";
 import { getSectionBundle } from "@/lib/mayakContentStorage";
 import { readSessionRuntimeParticipants, readSessionReviews } from "@/lib/mayakSessionRuntime";
+import {
+    WE_DIRECTIONS,
+    resolveFormatKey,
+    resolveDirectionKey,
+    classifyMoodCard,
+    validateDeckStandard,
+} from "@/lib/mayakProgressModel";
 
 const DELTA_TEST_FILE = path.join(process.cwd(), "data", "DeltaTest.json");
 
@@ -14,48 +21,11 @@ const WE_RANGE = { from: 51, to: 99 };
 // Сколько одобренных заданий части «Я» нужно для зажжённой звезды.
 export const YA_STAR_TARGET = 4;
 
-const YA_VALID_CONTENT_TYPES = new Set([
-    "текст",
-    "аудио",
-    "изображение",
-    "интерактив",
-    "видео",
-    "данные",
-    "карта настроения"
-]);
-
 // Шесть направлений части «Мы» (снизу вверх — в порядке отображения звёзд).
 // key — стабильный идентификатор, label — подпись, match — нормализованные значения contentType.
-export const WE_DIRECTIONS = [
-    { key: "KNOWLEDGE", label: "Знания и навыки", match: ["знания и навыки", "знания", "навыки"] },
-    { key: "INTERACTION", label: "Внешние взаимодействия", match: ["внешние взаимодействия", "внешнее взаимодействие"] },
-    { key: "ENVIRONMENT", label: "Единое цифровое пространство", match: ["единое цифровое пространство"] },
-    { key: "PROTECTION", label: "Защита данных", match: ["защита данных"] },
-    { key: "DATA", label: "Данные и аналитика", match: ["данные и аналитика"] },
-    { key: "AUTOMATION", label: "Автоматизация", match: ["автоматизация"] },
-];
+// WE_DIRECTIONS импортируется из mayakProgressModel (единый источник истины).
 
-function normalizeContentType(value) {
-    return String(value || "")
-        .trim()
-        .toLowerCase()
-        .replace(/ /g, " ")
-        .replace(/\s+/g, " ");
-}
-
-const DIRECTION_LOOKUP = (() => {
-    const map = new Map();
-    WE_DIRECTIONS.forEach((direction) => {
-        direction.match.forEach((variant) => {
-            map.set(normalizeContentType(variant), direction.key);
-        });
-    });
-    return map;
-})();
-
-function resolveDirectionKey(contentType) {
-    return DIRECTION_LOOKUP.get(normalizeContentType(contentType)) || null;
-}
+// normalizeContentType / DIRECTION_LOOKUP / resolveDirectionKey вынесены в mayakProgressModel.
 
 function normalizeTableNumber(value) {
     const parsed = parseInt(value, 10);
@@ -217,7 +187,9 @@ async function readTaskTypeMap(sectionId) {
 
     (bundle.tasks || []).forEach((task, index) => {
         const globalIndex = startPos + index;
-        map.set(globalIndex, { contentType: task?.contentType || "", base: index + 1 });
+        const info = { contentType: task?.contentType || "", base: index + 1 };
+        map.set(globalIndex, info);
+        map.set(index, info);
     });
     return map;
 }
@@ -231,7 +203,7 @@ function emptyDirectionCounts() {
 }
 
 function isApprovedTask(task) {
-    return task && (task.status === "approved" || task.status === "expired");
+    return task && (task.status === "approved" || task.status === "expired" || task.status === "rework_expired");
 }
 
 function computeYaProgress(approvedTasks, taskTypeMap, yaDirection) {
@@ -258,25 +230,27 @@ function computeYaProgress(approvedTasks, taskTypeMap, yaDirection) {
         };
     }
 
-    // 2. Считаем выполненные типы контента в диапазоне Я (base 10..50)
-    const YA_VALID_CONTENT_TYPES = new Set([
-        "текст",
-        "аудио",
-        "изображение",
-        "интерактив",
-        "видео",
-        "данные"
-    ]);
-
+    // 2. Считаем освоенные форматы части «Я» (base 10..50).
+    // Тип распознаётся через общий словарь (Статика→изображение, Динамика→видео).
+    // Карта настроения засчитывается только если названа по стандарту
+    // «<Формат> - Карта настроения» (тогда даёт соответствующий формат).
     const completedContentTypes = new Set();
     approvedTasks.forEach((task) => {
         const taskIndex = Number(task.taskIndex);
         const typeInfo = Number.isFinite(taskIndex) ? taskTypeMap.get(taskIndex) : null;
         const base = typeInfo ? typeInfo.base : Number(task.taskNumber) || null;
         if (base && base >= 10 && base <= 50) {
-            const ct = String(typeInfo?.contentType || "").trim().toLowerCase();
-            if (YA_VALID_CONTENT_TYPES.has(ct)) {
-                completedContentTypes.add(ct);
+            const rawType = typeInfo?.contentType || "";
+            const mood = classifyMoodCard(rawType);
+            if (mood.isMood) {
+                if (mood.standard && mood.section === "ya" && mood.key) {
+                    completedContentTypes.add(mood.key);
+                }
+                return;
+            }
+            const fmtKey = resolveFormatKey(rawType);
+            if (fmtKey) {
+                completedContentTypes.add(fmtKey);
             }
         }
     });
@@ -305,17 +279,42 @@ function computeYaProgress(approvedTasks, taskTypeMap, yaDirection) {
     }
 
     let specApprovedCount = 0;
+    const specTasks = [];
+    // yaDirection — canonical-ключ формата (резолвится через общий словарь),
+    // поэтому сравниваем нормализованные ключи, а не сырые строки.
+    const targetFormatKey = resolveFormatKey(yaDirection) || resolveFormatKey(String(yaDirection));
     approvedTasks.forEach((task) => {
         const taskIndex = Number(task.taskIndex);
         const typeInfo = Number.isFinite(taskIndex) ? taskTypeMap.get(taskIndex) : null;
         const base = typeInfo ? typeInfo.base : Number(task.taskNumber) || null;
         if (base && base >= 10 && base <= 50) {
-            const ct = String(typeInfo?.contentType || "").trim().toLowerCase();
-            if (ct === String(yaDirection).trim().toLowerCase()) {
-                specApprovedCount += 1;
+            const rawType = typeInfo?.contentType || "";
+            const mood = classifyMoodCard(rawType);
+            const fmtKey = mood.isMood
+                ? (mood.standard && mood.section === "ya" ? mood.key : null)
+                : resolveFormatKey(rawType);
+            if (fmtKey && targetFormatKey && fmtKey === targetFormatKey) {
+                specTasks.push(task);
             }
         }
     });
+
+    specTasks.sort((a, b) => {
+        const timeA = a.updatedAt ? Date.parse(a.updatedAt) : 0;
+        const timeB = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+        if (timeA !== timeB) return timeA - timeB;
+        return (Number(a.taskIndex) || 0) - (Number(b.taskIndex) || 0);
+    });
+
+    // -1: одно «вводное» задание этого формата уже зачтено на фазе «Типы
+    // контента» (по одному заданию каждого из 6 форматов). Специализация
+    // считает только 4 НОВЫХ задания после выбора направления; звезда на 4.
+    // Та же формула в trainer.js (yaProgress) — держать синхронно.
+    if (specTasks.length > 1) {
+        specApprovedCount = specTasks.length - 1;
+    } else {
+        specApprovedCount = 0;
+    }
 
     const YA_STAR_TARGET = 4;
     return {
@@ -334,9 +333,22 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
 
     const yaProgress = computeYaProgress(approvedTasks, taskTypeMap, participant.yaDirection);
 
-    let yaApprovedCount = yaProgress.phase === "SPECIALIZATION" ? yaProgress.count : 0;
+    let yaApprovedCount = yaProgress.count;
+    let yaTarget = yaProgress.target;
+    let yaStarType = null;
+    if (yaProgress.phase === "SPECIALIZATION") {
+        if (yaProgress.count >= 4) {
+            yaStarType = "gold";
+        } else if (yaProgress.count === 3) {
+            yaStarType = "joker";
+        }
+    }
+
     let weApprovedCount = 0;
     const directionCounts = emptyDirectionCounts();
+    // Направления, закрытые звездой-джокером (авто-зачёт) — в дашборде они
+    // показываются красной звездой, в отличие от обычных выполненных.
+    const directionViaJoker = {};
 
     approvedTasks.forEach((task) => {
         const taskIndex = Number(task.taskIndex);
@@ -346,9 +358,18 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
 
         if (base >= WE_RANGE.from && base <= WE_RANGE.to) {
             weApprovedCount += 1;
-            const directionKey = typeInfo ? resolveDirectionKey(typeInfo.contentType) : null;
-            if (directionKey) {
+            const rawType = typeInfo?.contentType || "";
+            const mood = classifyMoodCard(rawType);
+            // Карта настроения засчитывается направлению только если названа
+            // по стандарту «<Направление> - Карта настроения».
+            const directionKey = mood.isMood
+                ? (mood.standard && mood.section === "we" ? mood.key : null)
+                : resolveDirectionKey(rawType);
+            if (directionKey && directionCounts[directionKey] !== undefined) {
                 directionCounts[directionKey] += 1;
+                if (task.viaJoker) {
+                    directionViaJoker[directionKey] = true;
+                }
             }
         }
     });
@@ -358,6 +379,7 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
         label: direction.label,
         count: directionCounts[direction.key],
         lit: directionCounts[direction.key] > 0,
+        viaJoker: Boolean(directionViaJoker[direction.key]),
     }));
     const weStars = directions.filter((direction) => direction.lit).length;
 
@@ -395,9 +417,9 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
         delta: findDeltaForUser(deltaByUser, participant.userId, participant.name),
         ya: {
             approvedCount: yaApprovedCount,
-            target: YA_STAR_TARGET,
-            progress: Math.min(yaApprovedCount, YA_STAR_TARGET) / YA_STAR_TARGET,
-            star: yaProgress.hasStar,
+            target: yaTarget,
+            progress: Math.min(yaApprovedCount, yaTarget) / yaTarget,
+            star: yaStarType,
             phase: yaProgress.phase,
             direction: yaProgress.direction || null,
         },
@@ -406,10 +428,58 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
             stars: weStars,
             directions,
         },
-        approvedTotal: yaApprovedCount + weApprovedCount,
+        approvedTotal: approvedTasks.length,
         registeredAt: participant.registeredAt || null,
         updatedAt: participant.updatedAt || null,
     };
+}
+
+// Валидация колоды сессии по стандарту (для баннера/скрытия прогресса).
+async function readDeckValidation(sectionId) {
+    if (!sectionId) {
+        return { dashboardReady: false, issues: ["У сессии не задана колода"], warnings: [] };
+    }
+    try {
+        const bundle = await getSectionBundle(sectionId, { includeTexts: false });
+        return validateDeckStandard(bundle.tasks || []);
+    } catch {
+        return { dashboardReady: false, issues: ["Не удалось загрузить колоду"], warnings: [] };
+    }
+}
+
+// Контекст для расхода звезды-джокера: сколько джокеров заработано (1, если в
+// части «Я» зажжена звезда специализации, иначе 0), сколько уже потрачено, и
+// относится ли указанное задание к направлению части «Мы». Источник истины
+// сервера: вычисляется по тому же прогрессу, что и дашборд.
+export async function getJokerSpendContext(sessionId, userId, taskIndex) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session) {
+        throw new Error("Сессия не найдена");
+    }
+    const taskTypeMap = await readTaskTypeMap(session.sectionId);
+    const participantsRaw = await readSessionRuntimeParticipants(sessionId);
+    const participant = participantsRaw.find((p) => p.userId === userId);
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    const tasks = participant.tasks && typeof participant.tasks === "object" ? Object.values(participant.tasks) : [];
+    const approvedTasks = tasks.filter(isApprovedTask);
+    const yaProgress = computeYaProgress(approvedTasks, taskTypeMap, participant.yaDirection);
+    const earned = yaProgress.phase === "SPECIALIZATION" && yaProgress.hasStar ? 1 : 0;
+    const jokerSpent = Number(participant.jokerSpent) || 0;
+
+    const idx = Number(taskIndex);
+    const typeInfo = Number.isFinite(idx) ? taskTypeMap.get(idx) : null;
+    const base = typeInfo ? typeInfo.base : null;
+    const rawType = typeInfo?.contentType || "";
+    const mood = classifyMoodCard(rawType);
+    const directionKey = mood.isMood
+        ? (mood.standard && mood.section === "we" ? mood.key : null)
+        : resolveDirectionKey(rawType);
+    const isWeDirectionTask = Boolean(base && base >= WE_RANGE.from && base <= WE_RANGE.to && directionKey);
+
+    return { earned, jokerSpent, balance: Math.max(0, earned - jokerSpent), base, directionKey, isWeDirectionTask, contentType: rawType };
 }
 
 // Главная агрегация дашборда сессии.
@@ -419,14 +489,20 @@ export async function getMayakSessionDashboardData(sessionId) {
         throw new Error("Сессия не найдена");
     }
 
-    const [taskTypeMap, deltaByUser, allAttempts] = await Promise.all([
+    const [taskTypeMap, deltaByUser, allAttempts, deckValidation] = await Promise.all([
         readTaskTypeMap(session.sectionId),
         readDeltaByUser(),
         readAttempts(),
+        readDeckValidation(session.sectionId),
     ]);
 
     // Сырые участники рантайма (с задачами) для подсчёта звёзд/прогресса.
-    const participantsRaw = await readSessionRuntimeParticipants(sessionId);
+    // Администратор-отладка (userId "dev-bypass") заходит в сессию для проверки
+    // инспектора/отладки и НЕ должен попадать в дашборд и учитываться в
+    // столах/счётчиках/средних — отсекаем его на уровне источника данных.
+    const participantsRaw = (await readSessionRuntimeParticipants(sessionId)).filter(
+        (participant) => participant.userId !== "dev-bypass"
+    );
 
     const tableCount = Math.max(1, normalizeTableNumber(session.tableCount) || 1);
 
@@ -452,7 +528,7 @@ export async function getMayakSessionDashboardData(sessionId) {
 
         const tableParticipantIds = new Set(members.map((m) => m.userId));
         const tableApprovedReviews = approvedReviews.filter((r) => tableParticipantIds.has(r.participantUserId));
-        const tableTotalSeconds = reviews.filter((r) => tableParticipantIds.has(r.participantUserId)).reduce((sum, r) => sum + (r.secondsSpent || 0), 0);
+        const tableTotalSeconds = tableApprovedReviews.reduce((sum, r) => sum + (r.secondsSpent || 0), 0);
         const tableAverageTaskTime = tableApprovedReviews.length > 0 ? Math.round(tableTotalSeconds / tableApprovedReviews.length) : 0;
 
         const tableMembersWithDelta = members.filter((m) => typeof m.delta === "number" && m.delta !== null);
@@ -487,7 +563,7 @@ export async function getMayakSessionDashboardData(sessionId) {
         : 0;
     const totalApproved = participants.reduce((sum, p) => sum + (p.approvedTotal || 0), 0);
 
-    const totalSecondsSpent = reviews.reduce((sum, r) => sum + (r.secondsSpent || 0), 0);
+    const totalSecondsSpent = approvedReviews.reduce((sum, r) => sum + (r.secondsSpent || 0), 0);
     const averageTaskTime = approvedReviews.length > 0 ? Math.round(totalSecondsSpent / approvedReviews.length) : 0;
 
     const overall = {
@@ -514,6 +590,11 @@ export async function getMayakSessionDashboardData(sessionId) {
         },
         directions: WE_DIRECTIONS.map(({ key, label }) => ({ key, label })),
         yaStarTarget: YA_STAR_TARGET,
+        deck: {
+            dashboardReady: deckValidation.dashboardReady,
+            issues: deckValidation.issues || [],
+            warnings: deckValidation.warnings || [],
+        },
         tables,
         unassigned,
         overall,

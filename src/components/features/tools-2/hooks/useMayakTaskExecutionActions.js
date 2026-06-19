@@ -1,4 +1,4 @@
-﻿import { useCallback } from "react";
+import { useCallback } from "react";
 
 import { saveMayakTaskAttempt } from "../utils/saveMayakTaskAttempt";
 
@@ -25,6 +25,7 @@ export const useMayakTaskExecutionActions = ({
     userType,
     who,
     sessionUploadRequired,
+    isCurrentTaskApproved,
 }) => {
     const buildCompletionTaskData = useCallback(() => {
         const taskNumber = currentTask?.number?.toString();
@@ -136,6 +137,11 @@ export const useMayakTaskExecutionActions = ({
         }
         if (timerState.isRunning) {
             const timeWhenStopped = timerState.elapsedTime;
+            if (isCurrentTaskApproved) {
+                stopTimer();
+                await finalizeTaskExecution({ timeWhenStopped });
+                return;
+            }
             setCurrentTaskData(buildCompletionTaskData());
             setShowCompletionPopup(true);
             if (sessionUploadRequired) {
@@ -152,6 +158,7 @@ export const useMayakTaskExecutionActions = ({
         buildCompletionTaskData,
         finalizeTaskExecution,
         isIntroTask,
+        isCurrentTaskApproved,
         setCurrentTaskData,
         setShowCompletionPopup,
         sessionUploadRequired,

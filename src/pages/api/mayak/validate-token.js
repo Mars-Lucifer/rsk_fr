@@ -30,7 +30,29 @@ function isLocalMayakBypassEnabled(req) {
     return (process.env.NODE_ENV !== "production" && isLocalHost) || isServerBypassEnabled;
 }
 
-function buildBypassValidationResponse() {
+// Админ-bypass: вход администратором с режимом «Отладка».
+// Политика «везде, но с секретом»:
+//   - на любом хосте (включая прод) суффикс токена должен совпадать с
+//     MAYAK_ADMIN_BYPASS_SECRET из env — без env-секрета бэкдора нет;
+//   - на localhost / при MAYAK_ENABLE_SERVER_BYPASS дополнительно работает
+//     встроенный суффикс "fffff" без секрета (удобство локальной отладки).
+// Токен сюда приходит уже нормализованным (суффикс гостя "aaaaa" снят).
+function detectAdminBypass(req, token) {
+    const t = String(token || "");
+    const secret = String(process.env.MAYAK_ADMIN_BYPASS_SECRET || "").trim();
+    if (secret && t.length > secret.length && t.endsWith(secret)) {
+        return true;
+    }
+    if (isLocalMayakBypassEnabled(req)) {
+        if (t === DEV_BYPASS_TOKEN) return true;
+        if (t.length > DEV_BYPASS_TOKEN.length && t.toLowerCase().endsWith(DEV_BYPASS_TOKEN)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function buildBypassValidationResponse(sessionData = null) {
     return {
         success: true,
         valid: true,
@@ -38,13 +60,80 @@ function buildBypassValidationResponse() {
         remainingAttempts: 1,
         usageLimit: 1,
         usedCount: 0,
-        taskRange: null,
-        sectionId: null,
+        taskRange: sessionData?.taskRange || null,
+        sectionId: sessionData?.sectionId || null,
         isExhausted: false,
         isActive: true,
         isBypass: true,
-        tokenType: "bypass",
+        adminBypass: true,
+        // Если под суффиксом админ-байпаса лежит активный сессионный токен,
+        // отдаём режим "session" — тогда тренажёр поднимет сессию (роли,
+        // очередь инспектора), как при обычном входе по токену, но с правами
+        // администратора. Иначе остаётся обычный generic-байпас.
+        tokenType: sessionData ? "session" : "bypass",
+        sessionId: sessionData?.sessionId || null,
+        sessionName: sessionData?.sessionName || null,
+        tableCount: sessionData?.tableCount || 0,
     };
+}
+
+// Восстанавливает «базовый» токен из-под суффикса админ-байпаса: снимает
+// admin-суффикс (env-секрет или встроенный "fffff"), затем — гостевой суффикс
+// "aaaaa", если суффиксы были наложены друг на друга. Возвращает "" если под
+// байпасом нет содержательного токена (например, голый "fffff").
+function getAdminBypassBaseToken(req, token) {
+    const t = String(token || "");
+    const secret = String(process.env.MAYAK_ADMIN_BYPASS_SECRET || "").trim();
+    let base = null;
+
+    if (secret && t.length > secret.length && t.endsWith(secret)) {
+        base = t.slice(0, -secret.length);
+    } else if (isLocalMayakBypassEnabled(req)) {
+        if (t === DEV_BYPASS_TOKEN) {
+            base = "";
+        } else if (t.length > DEV_BYPASS_TOKEN.length && t.toLowerCase().endsWith(DEV_BYPASS_TOKEN)) {
+            base = t.slice(0, -DEV_BYPASS_TOKEN.length);
+        }
+    }
+
+    if (base === null) {
+        return "";
+    }
+
+    // Снимаем возможный гостевой суффикс, наложенный поверх базового токена.
+    return normalizeMayakToken(base.trim());
+}
+
+// Если под админ-байпасом лежит активный сессионный токен — возвращает данные
+// этой сессии, иначе null (тогда вход остаётся обычным generic-байпасом).
+async function resolveAdminBypassSession(req, token) {
+    const baseToken = getAdminBypassBaseToken(req, token);
+    if (!baseToken) {
+        return null;
+    }
+
+    try {
+        const sessionResult = await validateMayakSessionToken(baseToken);
+        if (!sessionResult.token?.id) {
+            return null;
+        }
+
+        const session = await findActiveMayakSessionByTokenId(sessionResult.token.id);
+        if (!session) {
+            return null;
+        }
+
+        return {
+            sessionId: session.id,
+            sessionName: session.name || "",
+            tableCount: session.tableCount || 0,
+            sectionId: sessionResult.token?.sectionId || null,
+            taskRange: sessionResult.token?.taskRange || null,
+        };
+    } catch (error) {
+        console.error("Error resolving admin bypass session:", error);
+        return null;
+    }
 }
 
 function buildGuestValidationResponse() {
@@ -125,8 +214,9 @@ export default async function handler(req, res) {
                 });
             }
 
-            if (token === DEV_BYPASS_TOKEN && isLocalMayakBypassEnabled(req)) {
-                return res.status(200).json(buildBypassValidationResponse());
+            if (detectAdminBypass(req, token)) {
+                const sessionData = await resolveAdminBypassSession(req, token);
+                return res.status(200).json(buildBypassValidationResponse(sessionData));
             }
 
             if (token === MAYAK_TEMP_GUEST_TOKEN) {
@@ -161,12 +251,13 @@ export default async function handler(req, res) {
                 });
             }
 
-            if (token === DEV_BYPASS_TOKEN && isLocalMayakBypassEnabled(req)) {
+            if (detectAdminBypass(req, token)) {
                 return res.status(200).json({
                     success: true,
-                    message: "Локальный bypass-токен использован",
+                    message: "Bypass-доступ предоставлен",
                     remainingAttempts: 1,
                     isBypass: true,
+                    adminBypass: true,
                     tokenType: "bypass",
                 });
             }

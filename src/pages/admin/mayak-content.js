@@ -6,6 +6,54 @@ import { useRouter } from "next/router";
 import Header from "@/components/layout/Header";
 import MayakAdminBackLink from "@/components/mayak-admin/MayakAdminBackLink";
 import { buildMayakAdminLoginUrl, getMayakAdminAuthStatus } from "@/lib/mayakAdminClient";
+import { classifyTask, validateDeckStandard } from "@/lib/mayakProgressModel";
+
+// Распознан ли contentType по стандарту (старт / формат «Я» / направление «Мы»
+// / карта настроения с префиксом). Используется для подсветки ячеек «Тип».
+function isStandardContentType(value) {
+    const info = classifyTask(value);
+    if (info.kind === "mood") return info.standard === true;
+    return info.kind === "start" || info.kind === "ya-format" || info.kind === "we-direction";
+}
+
+// Парсер табличного буфера обмена (формат Excel/Google Sheets).
+// Ячейки, содержащие таб/перевод строки/кавычку, обёрнуты в "...", внутренние
+// кавычки удвоены ("" -> "). Прежний наивный split("\n")/split("\t") ломал
+// многострочные ячейки («Описание»/«Задание») — из-за этого «плохо копировалось».
+function parseClipboardTable(text) {
+    const s = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    const rows = [];
+    let row = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                if (s[i + 1] === '"') { field += '"'; i++; }
+                else { inQuotes = false; }
+            } else {
+                field += ch;
+            }
+        } else if (ch === '"' && field === "") {
+            inQuotes = true;
+        } else if (ch === "\t") {
+            row.push(field); field = "";
+        } else if (ch === "\n") {
+            row.push(field); rows.push(row); row = []; field = "";
+        } else {
+            field += ch;
+        }
+    }
+    row.push(field);
+    rows.push(row);
+    // Убираем финальную пустую строку от завершающего перевода строки.
+    if (rows.length > 1) {
+        const last = rows[rows.length - 1];
+        if (last.length === 1 && last[0] === "") rows.pop();
+    }
+    return rows;
+}
 
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
@@ -55,7 +103,7 @@ function useAutoResize(ref, value) {
 }
 
 // ============ Ячейка таблицы ============
-const Cell = memo(function Cell({ value, onChange, onCellChange, readOnly, multiline, error, colIdx, rowIdx, onPasteMulti, fileCol, fileExists, fileSize, onUploadFile, onDeleteFile, taskNumber, checkbox, autoCheckbox, autoCheckboxState, checkboxEnabled, fileLabel, range, selected, isActive, onMouseDownCell, onMouseEnterCell }) {
+const Cell = memo(function Cell({ value, onChange, onCellChange, readOnly, multiline, error, warn, warnTitle, colIdx, rowIdx, onPasteMulti, fileCol, fileExists, fileSize, onUploadFile, onDeleteFile, taskNumber, checkbox, autoCheckbox, autoCheckboxState, checkboxEnabled, fileLabel, range, selected, isActive, onMouseDownCell, onMouseEnterCell }) {
     const ref = useRef(null);
     const fileRef = useRef(null);
     const [uploading, setUploading] = useState(false);
@@ -64,10 +112,14 @@ const Cell = memo(function Cell({ value, onChange, onCellChange, readOnly, multi
 
     const handlePaste = (e) => {
         const text = e.clipboardData.getData("text/plain");
-        if (text.includes("\t") || text.includes("\n")) {
-            e.preventDefault();
-            onPasteMulti(rowIdx, colIdx, text);
-        }
+        if (!text.includes("\t") && !text.includes("\n")) return; // обычная вставка
+        // Многоячеечная вставка — только если буфер реально табличный (>1 строки
+        // или >1 колонки). Одиночная многострочная ячейка остаётся в этом поле.
+        const table = parseClipboardTable(text);
+        const isTabular = table.length > 1 || (table[0] && table[0].length > 1);
+        if (!isTabular) return;
+        e.preventDefault();
+        onPasteMulti(rowIdx, colIdx, text);
     };
 
     const handleChange = (e) => {
@@ -84,9 +136,9 @@ const Cell = memo(function Cell({ value, onChange, onCellChange, readOnly, multi
         return stem !== String(taskNumber);
     })() : false;
 
-    // Стиль ячейки
-    const cellBg = error ? "#fff0f0" : selected && !isActive ? "#d3e3fd" : fileCol && fileNumberMismatch && value ? "#fef2f2" : fileCol && fileExists === true && !fileNumberMismatch ? "#f0fdf4" : fileCol && fileExists === false && value ? "#fefce8" : "#fff";
-    const cellBorder = error ? "1px solid #f87171" : fileCol && fileNumberMismatch && value ? "1px solid #f87171" : isActive ? "2px solid #1a73e8" : selected ? "1px solid #1a73e8" : "1px solid #e2e8f0";
+    // Стиль ячейки (warn — янтарная подсветка «нужно исправить», напр. тип не по стандарту)
+    const cellBg = error ? "#fff0f0" : warn && !selected ? "#fff7ed" : selected && !isActive ? "#d3e3fd" : fileCol && fileNumberMismatch && value ? "#fef2f2" : fileCol && fileExists === true && !fileNumberMismatch ? "#f0fdf4" : fileCol && fileExists === false && value ? "#fefce8" : "#fff";
+    const cellBorder = error ? "1px solid #f87171" : isActive ? "2px solid #1a73e8" : warn ? "1px solid #f59e0b" : fileCol && fileNumberMismatch && value ? "1px solid #f87171" : selected ? "1px solid #1a73e8" : "1px solid #e2e8f0";
     const col = COLUMNS[colIdx];
     const isLastCol = colIdx === COLUMNS.length - 1;
     const borderRight = isLastCol ? cellBorder : undefined;
@@ -243,6 +295,7 @@ const Cell = memo(function Cell({ value, onChange, onCellChange, readOnly, multi
 
     return (
         <td
+            title={error || warnTitle || undefined}
             style={{ ...cellStyle, background: cellBg, borderLeft: cellBorder, borderBottom: cellBorder, borderRight, width: col?.width, maxWidth: col?.width, cursor: "text" }}
             {...cellMouseProps}
         >
@@ -552,27 +605,22 @@ function RangeEditor({ range, onBack }) {
                 return;
             }
 
-            // Ctrl+V — вставить из буфера в ячейки начиная с selStart
+            // Ctrl+V — вставить из буфера в ячейки начиная с selStart.
+            // Если фокус в ячейке (inInput) — вставку обрабатывает нативный
+            // onPaste самой ячейки; здесь НЕ дублируем (раньше был двойной paste).
             if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+                if (inInput) return;
                 if (!selStart) return;
-                if (!isMulti && inInput) {
-                    navigator.clipboard.readText().then((text) => {
-                        if (text && (text.includes("\t") || text.includes("\n"))) {
-                            saveSnapshotRef.current?.();
-                            handlePasteMultiRef.current?.(selStart.row, selStart.col, text);
-                        }
-                    }).catch(() => {});
-                    return;
-                }
                 e.preventDefault();
                 navigator.clipboard.readText().then((text) => {
                     if (!text) return;
-                    saveSnapshotRef.current?.();
                     if (text.includes("\t") || text.includes("\n")) {
+                        // saveSnapshot выполняется внутри handlePasteMulti
                         handlePasteMultiRef.current?.(selStart.row, selStart.col, text);
                     } else {
                         const col = COLUMNS[selStart.col];
-                        if (col && !col.readOnly && !col.fileCol && !col.checkbox) {
+                        if (col && !col.readOnly && !col.fileCol && !col.checkbox && !col.autoCheckbox) {
+                            saveSnapshotRef.current?.();
                             setCellValueRef.current?.(selStart.row, col, text);
                         }
                     }
@@ -677,6 +725,9 @@ function RangeEditor({ range, onBack }) {
         return task[col.key] || "";
     }
 
+    // Валидация колоды по стандарту (для баннера «что исправить»).
+    const deckStandard = useMemo(() => validateDeckStandard(tasks), [tasks]);
+
     // Мемоизированные счётчики для тулбара
     const toolbarCounts = useMemo(() => ({
         instrNeeded: tasks.filter((t) => (t.instructionText || "").trim()).length,
@@ -756,30 +807,58 @@ function RangeEditor({ range, onBack }) {
         setValidationErrors((prev) => prev.filter((e) => e.index !== rowIdx));
     }, []);
 
-    // --- Вставка из Google Sheets (Tab + Enter) ---
+    // --- Вставка из Google Sheets / Excel (TSV с кавычками) ---
+    // Колонки мапятся 1:1 по физическому смещению от startCol — симметрично
+    // с Ctrl+C (который выгружает ВСЕ колонки диапазона). Нередактируемые
+    // колонки (№/файлы/галочки) пропускаются при записи, но НЕ сдвигают
+    // выравнивание — иначе copy↔paste рассинхронизировал столбцы.
     function handlePasteMulti(startRow, startCol, text) {
-        const rows = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-        if (rows.length > 1 && rows[rows.length - 1].trim() === "") rows.pop();
+        const rows = parseClipboardTable(text);
+        if (rows.length === 0) return;
 
-        // Собираем индексы редактируемых колонок начиная со startCol
-        const editableColIndices = [];
-        for (let i = startCol; i < COLUMNS.length; i++) {
-            const col = COLUMNS[i];
-            if (!col.readOnly && !col.fileCol && !col.checkbox) {
-                editableColIndices.push(i);
+        saveSnapshot(); // undo-точка для любой ветки вставки (нативной и клавиатурной)
+
+        // Строим следующие массивы за один проход — без пер-ячейкового setState
+        // (раньше это давало O(rows×cols) обновлений state и тормозило).
+        const nextTasks = tasksRef.current.map((t) => ({ ...t }));
+        const nextTexts = textsRef.current.map((t) => ({ ...t }));
+        const textIdxByNumber = new Map();
+        nextTexts.forEach((t, i) => textIdxByNumber.set(String(t.number), i));
+
+        const writeCell = (rowIdx, col, value) => {
+            const task = nextTasks[rowIdx];
+            if (!task) return;
+            if (col.source === "text") {
+                const key = String(task.number);
+                let idx = textIdxByNumber.get(key);
+                if (idx === undefined) {
+                    idx = nextTexts.length;
+                    nextTexts.push({ number: key, description: "", task: "" });
+                    textIdxByNumber.set(key, idx);
+                }
+                nextTexts[idx] = { ...nextTexts[idx], [col.key]: value };
+            } else {
+                nextTasks[rowIdx] = { ...nextTasks[rowIdx], [col.key]: value };
             }
-        }
+        };
 
         for (let r = 0; r < rows.length; r++) {
-            const cells = rows[r].split("\t");
+            const targetRow = startRow + r;
+            if (targetRow >= nextTasks.length) break;
+            const cells = rows[r];
             for (let c = 0; c < cells.length; c++) {
-                const targetRow = startRow + r;
-                if (targetRow >= tasksRef.current.length) continue;
-                if (c >= editableColIndices.length) break;
-                const colIdx = editableColIndices[c];
-                setCellValue(targetRow, COLUMNS[colIdx], cells[c]);
+                const colIdx = startCol + c;
+                if (colIdx >= COLUMNS.length) break;
+                const col = COLUMNS[colIdx];
+                if (!col || col.readOnly || col.fileCol || col.checkbox || col.autoCheckbox) continue;
+                writeCell(targetRow, col, cells[c]);
             }
         }
+
+        isDirty.current = true;
+        setTasks(nextTasks);
+        setTexts(nextTexts);
+        setValidationErrors([]);
     }
 
     useEffect(() => {
@@ -795,11 +874,17 @@ function RangeEditor({ range, onBack }) {
         const finalName = renamedFilename || file.name;
         try {
             const base64 = await fileToBase64(file);
-            await fetch("/api/admin/mayak-content/upload", {
+            const res = await fetch("/api/admin/mayak-content/upload", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ range, type, filename: finalName, data: base64 }),
             });
+            // HTTP-ошибка не бросает исключение — проверяем явно, иначе UI
+            // покажет ложный успех (файл «добавлен», а на диске его нет).
+            if (!res.ok) {
+                const payload = await res.json().catch(() => ({}));
+                throw new Error(payload.error || `сервер вернул ${res.status}`);
+            }
             // Загрузка успешна — теперь безопасно удалить старый файл
             if (oldFilename && oldFilename !== finalName) {
                 try {
@@ -827,20 +912,33 @@ function RangeEditor({ range, onBack }) {
             }
             // Обновляем размер файла в state
             setFileSizes((prev) => ({ ...prev, [finalName]: file.size }));
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: `Не удалось загрузить файл «${finalName}»: ${err.message}` });
+        }
     }, [range]);
 
     // --- Удаление файла ---
     const handleDeleteFile = useCallback(async (type, filename) => {
         try {
-            await fetch("/api/admin/mayak-content/upload", {
+            const res = await fetch("/api/admin/mayak-content/upload", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ range, type, filename }),
             });
-        } catch (err) { console.error(err); }
+            if (!res.ok) {
+                const payload = await res.json().catch(() => ({}));
+                throw new Error(payload.error || `сервер вернул ${res.status}`);
+            }
+        } catch (err) {
+            console.error(err);
+            // НЕ чистим state, если файл не удалён с диска — иначе UI и диск
+            // разъезжаются (оператор думает, что файл удалён, а он остался).
+            setSaveMsg({ type: "error", text: `Не удалось удалить файл «${filename}»: ${err.message}. Состояние не изменено.` });
+            return;
+        }
 
-        // Всегда убираем из state — даже если файл уже удалён с диска
+        // Файл реально удалён с диска — теперь безопасно убрать из state
         if (type === "files") {
             setExistingFiles((prev) => prev.filter((f) => f !== filename));
         } else if (type === "maps") {
@@ -866,17 +964,22 @@ function RangeEditor({ range, onBack }) {
         let uploaded = 0;
         let matched = 0;
         const skipped = [];
+        const failed = [];
         for (const file of files) {
             const stem = file.name.replace(/\.[^.]+$/, "");
             const taskIdx = tasks.findIndex((t) => String(t.number) === stem);
             if (taskIdx < 0) { skipped.push(file.name); continue; }
             try {
                 const base64 = await fileToBase64(file);
-                await fetch("/api/admin/mayak-content/upload", {
+                const res = await fetch("/api/admin/mayak-content/upload", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ range, type, filename: file.name, data: base64 }),
                 });
+                if (!res.ok) {
+                    const payload = await res.json().catch(() => ({}));
+                    throw new Error(payload.error || `сервер вернул ${res.status}`);
+                }
                 uploaded++;
                 if (type === "files") {
                     setExistingFiles((prev) => prev.includes(file.name) ? prev : [...prev, file.name]);
@@ -885,6 +988,7 @@ function RangeEditor({ range, onBack }) {
                 } else {
                     setExistingInstructions((prev) => prev.includes(file.name) ? prev : [...prev, file.name]);
                 }
+                setFileSizes((prev) => ({ ...prev, [file.name]: file.size }));
                 const field = type === "files" ? "file" : type === "maps" ? "map" : "instruction";
                 setTasks((prev) => {
                     const copy = [...prev];
@@ -892,21 +996,25 @@ function RangeEditor({ range, onBack }) {
                     return copy;
                 });
                 matched++;
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error(err);
+                failed.push(file.name);
+            }
         }
         setBulkUploading(false);
         if (matched > 0) isDirty.current = true;
         let msg = `Загружено: ${uploaded}, привязано: ${matched}`;
+        if (failed.length > 0) {
+            msg += `. Ошибка загрузки: ${failed.join(", ")}`;
+        }
         if (skipped.length > 0) {
             msg += `. Пропущено (нет задания с таким номером): ${skipped.join(", ")}`;
-            setSaveMsg({ type: "error", text: msg });
-        } else {
-            setSaveMsg({ type: "success", text: msg });
         }
+        setSaveMsg({ type: (failed.length > 0 || skipped.length > 0) ? "error" : "success", text: msg });
     };
 
     // --- Валидация ---
-    const handleValidate = () => {
+    const handleValidate = (opts = {}) => {
         const errors = [];
         setSaveMsg(null);
 
@@ -967,15 +1075,29 @@ function RangeEditor({ range, onBack }) {
 
         setValidationErrors(errors);
         if (errors.length === 0) {
-            setSaveMsg({ type: "success", text: "Проверка пройдена — ошибок не найдено" });
+            if (!opts.silentOnSuccess) {
+                setSaveMsg({ type: "success", text: "Проверка пройдена — ошибок не найдено" });
+            }
         } else {
             const summary = errors.map((e) => e.message).join("\n");
             setSaveMsg({ type: "error", text: `Найдено проблем: ${errors.length}\n${summary}` });
         }
+        return errors;
     };
 
     // --- Сохранение ---
     const handleSave = async () => {
+        // Прогоняем валидацию перед записью. Если есть проблемы (битые ссылки
+        // на файлы, пустые описания при загруженном файле, несовпадение номера) —
+        // не сохраняем молча, а требуем явного подтверждения оператора.
+        const validationIssues = handleValidate({ silentOnSuccess: true });
+        if (validationIssues.length > 0) {
+            const proceed = window.confirm(
+                `Найдено проблем: ${validationIssues.length}. Они могут привести к битым ссылкам на файлы или пустым описаниям. Всё равно сохранить?`
+            );
+            if (!proceed) return;
+        }
+
         setSaving(true);
         setSaveMsg(null);
         setValidationErrors([]);
@@ -1103,6 +1225,32 @@ function RangeEditor({ range, onBack }) {
                 </div>
             )}
 
+            {/* Стандарт колоды: что нужно исправить (подсветка типов — ниже, в ячейках «Тип») */}
+            {!loading && tasks.length > 0 && (deckStandard.issues.length > 0 || deckStandard.warnings.length > 0) && (
+                <div style={{
+                    padding: "8px 14px", borderRadius: 6, marginBottom: 8, fontSize: 12,
+                    background: deckStandard.dashboardReady ? "#fffbeb" : "#fef2f2",
+                    border: `1px solid ${deckStandard.dashboardReady ? "#fde68a" : "#fca5a5"}`,
+                    color: deckStandard.dashboardReady ? "#92400e" : "#991b1b",
+                }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        {deckStandard.dashboardReady
+                            ? "Колода распознаётся, но есть замечания по стандарту:"
+                            : "Колода НЕ по стандарту — дашборд прогресса для неё не строится:"}
+                    </div>
+                    {deckStandard.issues.map((msg, i) => (
+                        <div key={`iss-${i}`}>• {msg}</div>
+                    ))}
+                    {deckStandard.warnings.map((msg, i) => (
+                        <div key={`warn-${i}`} style={{ color: "#92400e" }}>⚠ {msg}</div>
+                    ))}
+                    <div style={{ marginTop: 4, opacity: 0.8 }}>
+                        Распознано форматов «Я»: {deckStandard.formats.length}/6 · направлений «Мы»: {deckStandard.directions.length}/6.
+                        Проблемные значения в колонке «Тип» подсвечены янтарным.
+                    </div>
+                </div>
+            )}
+
             {/* Таблица-гугл */}
             <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 160px)", border: "1px solid #c0c0c0", borderRadius: 0 }}>
                 <table style={{ borderCollapse: "collapse", fontSize: 12, fontFamily: "'Arial', sans-serif", tableLayout: "fixed", width: COLUMNS.reduce((s, c) => s + c.width, 0) }}>
@@ -1214,6 +1362,8 @@ function RangeEditor({ range, onBack }) {
                                             );
                                         }
 
+                                        // Подсветка типа не по стандарту (нераспознан / карта без префикса).
+                                        const typeWarn = col.key === "contentType" && String(val).trim() !== "" && !isStandardContentType(val);
                                         return (
                                             <Cell
                                                 key={ci}
@@ -1225,6 +1375,8 @@ function RangeEditor({ range, onBack }) {
                                                 rowIdx={ri}
                                                 onPasteMulti={handlePasteMulti}
                                                 error={cellError?.message}
+                                                warn={typeWarn}
+                                                warnTitle={typeWarn ? "Тип не по стандарту: не распознан как Старт/формат «Я»/направление «Мы» или карта настроения без префикса «<Тип> - Карта настроения»" : undefined}
                                                 selected={sel}
                                                 isActive={active}
                                                 onMouseDownCell={handleMouseDownCell}

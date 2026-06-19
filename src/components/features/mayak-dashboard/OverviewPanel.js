@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import styles from "./dashboard.module.css";
-import { MonitorIcon, StarIcon, ExpandIcon, CloseIcon } from "./icons";
+import { MonitorIcon, StarIcon, PlayIcon, PauseIcon, StopIcon } from "./icons";
 
 function formatTime(totalSeconds) {
     const safe = Math.max(0, Math.floor(totalSeconds));
@@ -65,17 +65,17 @@ function AttractiveTimer({ timer, timerHandlers }) {
                 </div>
 
                 {timer.running ? (
-                    <button type="button" className={styles.timerPauseBtn} onClick={timerHandlers.pause}>
-                        Пауза
+                    <button type="button" className={`${styles.iconCircleBtn} ${styles.iconCircleBtnPrimary}`} onClick={timerHandlers.pause} title="Пауза" aria-label="Пауза">
+                        <PauseIcon className={styles.iconCircleGlyph} />
                     </button>
                 ) : (
-                    <button type="button" className={styles.timerStartBtn} onClick={timerHandlers.start}>
-                        Старт
+                    <button type="button" className={`${styles.iconCircleBtn} ${styles.iconCircleBtnPrimary}`} onClick={timerHandlers.start} title="Старт" aria-label="Старт">
+                        <PlayIcon className={styles.iconCircleGlyph} />
                     </button>
                 )}
 
-                <button type="button" className={styles.timerResetBtn} onClick={timerHandlers.reset}>
-                    Сброс
+                <button type="button" className={`${styles.iconCircleBtn} ${styles.iconCircleBtnGhost}`} onClick={timerHandlers.reset} title="Сброс" aria-label="Сброс">
+                    <StopIcon className={styles.iconCircleGlyph} />
                 </button>
             </div>
         </div>
@@ -88,10 +88,12 @@ function TableOverviewCard({ table, mode, directionsMeta }) {
     
     const yaStars = useMemo(() => {
         const stars = (table.participants || []).map((p) => {
+            const star = p.ya?.star;
+            if (star === "gold" || star === true) return { type: "gold", lit: true, title: `${p.name}: Золотая звезда (4/4)` };
+            if (star === "joker") return { type: "joker", lit: true, title: `${p.name}: Джокер (3/4)` };
             const count = p.ya?.approvedCount || 0;
-            if (count >= 4) return { type: "gold", lit: true, title: `${p.name}: Золотая звезда (4/4)` };
-            if (count === 3) return { type: "joker", lit: true, title: `${p.name}: Джокер (3/4)` };
-            return { type: "empty", lit: false, title: `${p.name}: В процессе (${count}/4)` };
+            const target = p.ya?.target || 4;
+            return { type: "empty", lit: false, title: `${p.name}: В процессе (${count}/${target})` };
         });
         
         // Sort: gold first, then jokers, then empty
@@ -100,11 +102,11 @@ function TableOverviewCard({ table, mode, directionsMeta }) {
             return score(b) - score(a);
         });
 
-        // Clamp or pad to exactly 6 stars
+        // Pad to at least 6 stars, do not clamp if more
         while (stars.length < 6) {
             stars.push({ type: "empty", lit: false, title: "Свободное место" });
         }
-        return stars.slice(0, 6);
+        return stars;
     }, [table.participants]);
 
     // Stage "Мы" stats
@@ -113,16 +115,19 @@ function TableOverviewCard({ table, mode, directionsMeta }) {
         if (!directionsMeta || !table.participants) return [];
         return directionsMeta.map((dirMeta) => {
             let totalCount = 0;
+            let viaJoker = false;
             table.participants.forEach((p) => {
                 const found = p.we?.directions?.find((d) => d.key === dirMeta.key);
                 if (found) {
                     totalCount += found.count || 0;
+                    if (found.viaJoker) viaJoker = true;
                 }
             });
             return {
                 key: dirMeta.key,
                 label: dirMeta.label,
                 lit: totalCount > 0,
+                viaJoker,
             };
         });
     }, [directionsMeta, table.participants]);
@@ -159,20 +164,22 @@ function TableOverviewCard({ table, mode, directionsMeta }) {
                     </div>
                 </div>
             ) : (
-                <div className={styles.overviewTableStats} style={{ justifyContent: "flex-start" }}>
-                    <div className={styles.overviewTableStarsHorizontal}>
-                        <span className={styles.overviewStatLabel} style={{ marginRight: "12px" }}>Направления:</span>
-                        <div className={styles.overviewTableStarsStrip}>
-                            {tableDirections.map((dir) => (
-                                <span key={dir.key} title={dir.label}>
-                                    <StarIcon
-                                        className={`${styles.overviewTableStar} ${dir.lit ? styles.overviewTableStarLit : ""}`}
-                                        filled={dir.lit}
-                                    />
-                                </span>
-                            ))}
-                        </div>
-                    </div>
+                <div className={styles.overviewDirList}>
+                    {tableDirections.map((dir) => (
+                        <span
+                            key={dir.key}
+                            className={styles.overviewDirItem}
+                            title={`${dir.label}${dir.viaJoker ? " (звезда-джокер)" : ""}`}
+                        >
+                            <StarIcon
+                                className={`${styles.overviewTableStar} ${dir.viaJoker ? styles.overviewTableStarLitRed : dir.lit ? styles.overviewTableStarLit : ""}`}
+                                filled={dir.lit}
+                            />
+                            <span className={`${styles.overviewDirLabel} ${dir.lit ? styles.overviewDirLabelLit : ""}`}>
+                                {dir.label}
+                            </span>
+                        </span>
+                    ))}
                 </div>
             )}
         </div>
@@ -185,11 +192,14 @@ export default function OverviewPanel({
     mode = "ya",
     directionsMeta = [],
     expanded = false,
+    wide = false,
     timer,
-    timerHandlers,
-    onExpand,
-    onExpandTimer
+    timerHandlers
 }) {
+    // wide: «Общий экран» растянут на всю ширину строки сетки (когда столов
+    // чётное число и иначе осталась бы пустая ячейка). Тогда таймер и
+    // статистика раскладываются горизонтально.
+    const compactWide = wide && !expanded;
     const avgDelta = overall?.averageDelta !== undefined ? overall.averageDelta : 0;
     const totalTasks = overall?.approvedTotal !== undefined ? overall.approvedTotal : 0;
 
@@ -204,36 +214,19 @@ export default function OverviewPanel({
     }, [tables]);
 
     return (
-        <section className={`${styles.panel} ${styles.overviewPanel} ${expanded ? styles.panelExpanded : ""}`}>
-            <header className={`${styles.panelHead} ${styles.overviewHead}`} onClick={onExpand} style={{ cursor: "pointer" }}>
+        <section className={`${styles.panel} ${styles.overviewPanel} ${expanded ? styles.panelExpanded : ""} ${compactWide ? styles.overviewWide : ""}`}>
+            <header className={`${styles.panelHead} ${styles.overviewHead}`}>
                 <div className={styles.panelHeadLeft}>
                     <MonitorIcon className={styles.panelIcon} />
                     <h3 className={styles.panelTitle}>Общий экран</h3>
                 </div>
-                <button
-                    type="button"
-                    className={styles.expandButton}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onExpand?.();
-                    }}
-                    title={expanded ? "Свернуть" : "Развернуть"}
-                    aria-label={expanded ? "Свернуть" : "Развернуть"}
-                >
-                    {expanded ? <CloseIcon /> : <ExpandIcon />}
-                </button>
             </header>
 
-            <div className={`${styles.panelBody} ${styles.overviewBody}`}>
+            <div className={`${styles.panelBody} ${styles.overviewBody} ${compactWide ? styles.overviewBodyWide : ""}`}>
                 {!expanded ? (
                     <>
                         <div className={styles.compactTimerCard}>
-                            <div
-                                className={styles.compactTimerRingContainer}
-                                onClick={onExpandTimer}
-                                style={{ cursor: "pointer" }}
-                                title="Развернуть таймер"
-                            >
+                            <div className={styles.compactTimerRingContainer}>
                                 <svg className={styles.timerRingSvg} viewBox="0 0 200 200">
                                     <circle className={styles.timerRingBg} cx="100" cy="100" r="90" />
                                     <circle
@@ -252,11 +245,11 @@ export default function OverviewPanel({
                             <div className={styles.compactTimerControls}>
                                 {timer.running ? (
                                     <div className={styles.compactTimerActions}>
-                                        <button type="button" className={styles.compactTimerPauseBtn} onClick={timerHandlers.pause}>
-                                            Пауза
+                                        <button type="button" className={`${styles.iconCircleBtn} ${styles.iconCircleBtnSm} ${styles.iconCircleBtnPrimary}`} onClick={timerHandlers.pause} title="Пауза" aria-label="Пауза">
+                                            <PauseIcon className={styles.iconCircleGlyph} />
                                         </button>
-                                        <button type="button" className={styles.compactTimerResetBtn} onClick={timerHandlers.reset}>
-                                            Остановить
+                                        <button type="button" className={`${styles.iconCircleBtn} ${styles.iconCircleBtnSm} ${styles.iconCircleBtnGhost}`} onClick={timerHandlers.reset} title="Остановить" aria-label="Остановить">
+                                            <StopIcon className={styles.iconCircleGlyph} />
                                         </button>
                                     </div>
                                 ) : (
@@ -273,8 +266,8 @@ export default function OverviewPanel({
                                             />
                                             <span className={styles.compactTimerInputLabel}>мин</span>
                                         </div>
-                                        <button type="button" className={styles.compactTimerStartBtn} onClick={timerHandlers.start}>
-                                            Старт
+                                        <button type="button" className={`${styles.iconCircleBtn} ${styles.iconCircleBtnSm} ${styles.iconCircleBtnPrimary}`} onClick={timerHandlers.start} title="Старт" aria-label="Старт">
+                                            <PlayIcon className={styles.iconCircleGlyph} />
                                         </button>
                                         <div className={styles.compactTimerPresets}>
                                             <button
@@ -312,11 +305,12 @@ export default function OverviewPanel({
                         </div>
 
                         <div className={styles.statsRow} style={{
-                            marginTop: "auto",
+                            marginTop: compactWide ? 0 : "auto",
                             padding: "0 4px",
                             display: "grid",
-                            gridTemplateColumns: mode === "we" ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
-                            gap: "12px"
+                            gridTemplateColumns: compactWide ? "1fr" : (mode === "we" ? "repeat(2, 1fr)" : "repeat(3, 1fr)"),
+                            gap: "12px",
+                            ...(compactWide ? { flex: "0 0 36%", alignContent: "center" } : {}),
                         }}>
                             {mode !== "we" && (
                                 <div className={styles.statCard} style={{ padding: "10px 12px", gap: "10px", borderRadius: "12px", boxShadow: "none", border: "1px solid var(--border-color)", width: "100%", boxSizing: "border-box" }}>
@@ -344,7 +338,7 @@ export default function OverviewPanel({
                                 <div className={styles.statInfo} style={{ gap: "2px" }}>
                                     <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
                                     <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
-                                        {mode === "we" ? `${totalWeTasks} из ${tables.length * 36}` : totalTasks}
+                                        {mode === "we" ? `${totalWeTasks} из ${overall?.participantCount * 6}` : totalTasks}
                                     </span>
                                 </div>
                             </div>

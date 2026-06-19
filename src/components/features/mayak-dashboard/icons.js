@@ -87,6 +87,31 @@ export function MonitorIcon({ className }) {
     );
 }
 
+export function PlayIcon({ className }) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M8 5.5v13a1 1 0 0 0 1.52.85l10.5-6.5a1 1 0 0 0 0-1.7L9.52 4.65A1 1 0 0 0 8 5.5z" />
+        </svg>
+    );
+}
+
+export function PauseIcon({ className }) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <rect x="6.5" y="5" width="3.6" height="14" rx="1.2" />
+            <rect x="13.9" y="5" width="3.6" height="14" rx="1.2" />
+        </svg>
+    );
+}
+
+export function StopIcon({ className }) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <rect x="6" y="6" width="12" height="12" rx="2.2" />
+        </svg>
+    );
+}
+
 export function CompassStarIcon({ className }) {
     return (
         <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">

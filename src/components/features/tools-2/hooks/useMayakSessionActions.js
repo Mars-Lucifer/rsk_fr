@@ -55,7 +55,7 @@ export function useMayakSessionActions({
 
     const handleAdminResetSession = useCallback(() => {
         if (!isAdmin) return;
-        if (!confirm("???????? ??????? ??? ?????? ??????? ?????? ????? ???????.")) return;
+        if (!confirm("Вы действительно хотите сбросить текущую сессию и начать заново? Все локальные данные будут очищены.")) return;
 
         if (timerIsRunning) stopTimer();
 
@@ -65,6 +65,9 @@ export function useMayakSessionActions({
         localStorage.removeItem(getStorageKey("completedTasks"));
         localStorage.removeItem(getStorageKey("qwenEvaluationQuota"));
         localStorage.removeItem(getStorageKey("hasCompletedSecondQuestionnaire"));
+        localStorage.removeItem(getStorageKey("mayak_achieved_start"));
+        localStorage.removeItem(getStorageKey("mayak_achieved_content_types"));
+        localStorage.removeItem(getStorageKey("mayak_achieved_specialization"));
         localStorage.removeItem(getStorageKey("taskVersion"));
         localStorage.removeItem("trainer_v2_rankingTestResults");
         localStorage.removeItem("trainer_v2_rankingTestResults_previous");

@@ -1,5 +1,6 @@
 ﻿import { requireMayakAdmin } from "../../../../lib/mayakAdminAuth.js";
 import { readSectionJson, readManifest, writeManifest, writeSectionJson, listSectionFiles, getSectionBundle, ensureSectionDir } from "../../../../lib/mayakContentStorage.js";
+import { validateDeckStandard } from "../../../../lib/mayakProgressModel.js";
 
 async function saveSortedManifest(slugs) {
     const sorted = [...slugs].sort((a, b) => {
@@ -40,6 +41,9 @@ export default async function handler(req, res) {
                     const texts = await readSectionJson(sectionId, "TaskText.json", []);
                     const tasksCount = bundle.tasks.filter((t) => t.file || t.instruction || t.toolLink1 || t.toolName1).length;
                     const baseRange = sectionId.match(/^(\d+-\d+)/)?.[1] || sectionId;
+                    // Валидация по стандарту: распознаны ли типы части «Я»/«Мы».
+                    // dashboardReady=false → колода не передаётся в дашборд (помечается в селекторе).
+                    const standard = validateDeckStandard(bundle.tasks || []);
                     return {
                         sectionId,
                         range: baseRange,
@@ -49,6 +53,13 @@ export default async function handler(req, res) {
                         rangeName: bundle.meta?.rangeName || "",
                         rangeStart: bundle.meta?.rangeStart || parseInt(baseRange.split("-")[0], 10),
                         rangeEnd: bundle.meta?.rangeEnd || parseInt(baseRange.split("-")[1], 10),
+                        standard: {
+                            dashboardReady: standard.dashboardReady,
+                            issues: standard.issues,
+                            warnings: standard.warnings,
+                            formats: standard.formats,
+                            directions: standard.directions,
+                        },
                     };
                 })
             );

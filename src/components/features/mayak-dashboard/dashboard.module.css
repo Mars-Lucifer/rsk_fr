@@ -173,39 +173,6 @@
     background-color: var(--border-color);
 }
 
-/* --- Segmented toggles (Real / Demo) --- */
-.segment {
-    display: inline-flex;
-    padding: 3px;
-    background: #ebedf0;
-    border-radius: 20px;
-}
-
-.segmentBtn {
-    border: none;
-    background: transparent;
-    color: #909399;
-    font-weight: 800;
-    font-size: 13px;
-    padding: 6px 16px;
-    border-radius: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.segmentBtn:hover {
-    color: var(--text-primary);
-}
-
-.segmentBtnActive {
-    color: #ffffff;
-    background: var(--accent-blue);
-    box-shadow: 0 3px 10px rgba(58, 107, 255, 0.3);
-}
-
 /* --- Action / Icon Buttons --- */
 .iconBtn {
     display: inline-flex;
@@ -303,8 +270,7 @@
 
 .panel:hover {
     border-color: var(--border-hover);
-    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
-    transform: translateY(-3px);
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.06), 0 4px 12px -2px rgba(0, 0, 0, 0.02);
 }
 
 .panelDropActive {
@@ -536,19 +502,13 @@
 /* --- Role Badges (Platform .tag styles) --- */
 .roleLabelText {
     display: inline-block;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 6px;
     white-space: nowrap !important;
 }
 
-.roleAdmin {
-    background: #f0f4ff;
-    color: var(--accent-blue);
-    border: 1px solid #dbe4ff;
-}
-
+/* Роль — простой текст без плашки и обводки (единый нейтральный тон). */
+.roleAdmin,
 .roleInspector,
 .roleCaptain,
 .roleEngineer,
@@ -556,20 +516,45 @@
 .roleKeeper,
 .roleChronicler,
 .roleDefault {
-    background: #f8fafc;
-    color: #64748b;
-    border: 1px solid #e2e8f0;
+    color: #475569;
 }
 
-/* Styled delta number */
+/* Дельта — простой текст без плашки. */
 .deltaValue {
     font-size: 13px;
     font-weight: 800;
-    color: var(--accent-blue);
-    background: #e0e8ff;
-    padding: 2px 6px;
-    border-radius: 6px;
-    border: 1px solid #b5c8ff;
+    color: #0f172a;
+}
+
+/* Выбранная специализация части «Я» (тип контента, который выбрал участник) */
+.dirChip {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-transform: capitalize;
+    color: #334155;
+}
+
+.dirChipEmpty {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+/* Направление части «Мы» — текстовая подпись (легенда столбца звёзд). */
+.weDirectionLabel {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+}
+
+.personRowBig .weDirectionLabel {
+    font-size: 14px;
+}
+
+.personRowBig .dirChip {
+    font-size: 14px;
 }
 
 /* --- Progress display --- */
@@ -597,14 +582,14 @@
 
 .progressBarFill {
     height: 100%;
-    background: linear-gradient(90deg, var(--accent-blue), #6b90ff);
+    background: linear-gradient(90deg, #64748b, #94a3b8);
     border-radius: 999px;
     transition: width 0.35s ease, background 0.35s ease;
 }
 
 /* Цель достигнута (4+ одобренных заданий) — зелёный */
 .progressBarFillDone {
-    background: linear-gradient(90deg, var(--accent-green), #b5e34d);
+    background: linear-gradient(90deg, var(--accent-yellow), #ffc06b);
 }
 
 /* --- Stars without backgrounds --- */
@@ -624,6 +609,7 @@
     height: 100%;
 }
 
+/* Звезда «Я»: 4/4 — красная, 3/4 (джокер) — золотая. */
 .starRed {
     color: #ff3a3a;
     filter: drop-shadow(0 1px 3px rgba(255, 58, 58, 0.3));
@@ -667,6 +653,18 @@
     flex-direction: column;
     gap: 8px;
     flex-grow: 1;
+}
+
+/* «Общий экран» во всю ширину строки (чётное число столов): таймер слева,
+   статистика справа — без пустой ячейки и без пустого места. */
+.overviewWide {
+    grid-column: 1 / -1;
+}
+
+.overviewBodyWide {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 16px;
 }
 
 .analyticsRow {
@@ -899,8 +897,43 @@
     filter: drop-shadow(0 1px 3px rgba(255, 163, 58, 0.3));
 }
 
+/* Направление, закрытое звездой-джокером (авто-зачёт) — красная звезда. */
+.dirStarJoker {
+    color: #ff3a3a;
+    filter: drop-shadow(0 1px 3px rgba(255, 58, 58, 0.3));
+}
+
 .dirStar:hover {
     transform: scale(1.15);
+}
+
+/* Список направлений «Мы»: звезда + подпись названия, с переносом. */
+.dirItemsWrap {
+    display: flex;
+    align-items: center;
+    gap: 10px 14px;
+    flex-wrap: wrap;
+}
+
+.dirItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.dirItemLabel {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.dirItemLabelJoker {
+    color: #dc2626;
+}
+
+.personRowBig .dirItemLabel {
+    font-size: 13px;
 }
 
 .dirLegend {
@@ -961,12 +994,13 @@
 /* --- Overview Panel Fullscreen layout (Split) --- */
 .overviewSplit {
     display: grid;
-    grid-template-columns: 1.15fr 0.85fr;
-    gap: 24px;
+    grid-template-columns: 0.85fr 1.15fr; /* таймер-герой шире */
+    gap: 28px;
     width: 100%;
-    align-items: stretch;
+    flex: 1; /* Заполнить высоту развёрнутого экрана */
+    align-items: stretch; /* Столбцы во всю высоту — без пустоты */
     box-sizing: border-box;
-    padding: 16px 28px 28px 28px;
+    padding: 24px 32px 32px 32px;
 }
 
 @media (max-width: 1024px) {
@@ -978,29 +1012,26 @@
 .overviewLeftCol {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    height: 100%;
+    gap: 16px;
 }
 
 .overviewRightCol {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    height: 100%;
-    justify-content: center;
 }
 
 /* Overview Table Card */
 .overviewTableCard {
     background: #ffffff;
     border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 14px 20px;
+    border-radius: 16px;
+    padding: 18px 24px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    flex-grow: 1;
+    justify-content: center;
+    gap: 12px;
+    flex: 1; /* Карточки столов заполняют высоту колонки поровну */
 }
 
 .overviewTableHead {
@@ -1008,7 +1039,7 @@
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 8px;
+    padding-bottom: 6px;
 }
 
 .overviewTableTitle {
@@ -1053,8 +1084,8 @@
 
 /* Star styles inside overview strip */
 .overviewTableStar {
-    width: 20px;
-    height: 20px;
+    width: 26px;
+    height: 26px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1077,26 +1108,62 @@
     filter: drop-shadow(0 1px 3px rgba(255, 163, 58, 0.3));
 }
 
+/* Направление «Мы», закрытое звездой-джокером — красная звезда в овервью. */
+.overviewTableStarLitRed {
+    color: #ff3a3a;
+    filter: drop-shadow(0 1px 3px rgba(255, 58, 58, 0.3));
+}
+
+/* Полная картина направлений «Мы» по столу: название + звезда, в две колонки. */
+.overviewDirList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 24px;
+    width: 100%;
+}
+
+.overviewDirItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.overviewDirLabel {
+    font-size: 14px;
+    font-weight: 600;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.overviewDirLabelLit {
+    color: #334155;
+    font-weight: 700;
+}
+
 /* --- Attractive Centered Timer Card --- */
 .attractiveTimerCard {
-    background: #ffffff;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
     border: 1px solid var(--border-color);
-    border-radius: 20px;
-    padding: 24px;
+    border-radius: 24px;
+    padding: 40px 32px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+    gap: 8px;
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.06);
     color: #08090a;
-    flex-grow: 1;
+    flex: 1; /* Таймер заполняет всю высоту правой колонки */
 }
 
 .timerRingContainer {
     position: relative;
-    width: 160px;
-    height: 160px;
-    margin: 0 auto 16px auto; /* Force perfect horizontal alignment */
+    width: clamp(280px, 42vh, 480px);
+    height: clamp(280px, 42vh, 480px);
+    margin: 0 auto 28px auto; /* Force perfect horizontal alignment */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1142,11 +1209,11 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%); /* Zero offset centering guarantee */
-    font-size: 34px;
+    font-size: clamp(48px, 8vh, 92px);
     font-weight: 800;
-    color: #08090a;
+    color: #0f172a;
     font-family: monospace;
-    letter-spacing: -0.5px;
+    letter-spacing: -2px;
     user-select: none;
 }
 
@@ -1219,6 +1286,75 @@
     font-size: 12px;
     font-weight: 700;
     margin-left: 1px;
+}
+
+/* --- Круглые иконочные кнопки управления таймером --- */
+.iconCircleBtn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.2s, filter 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+}
+
+.iconCircleBtn:hover {
+    background: #f1f5f9;
+}
+
+/* Иконка строго по центру круга, мелкая. */
+.iconCircleGlyph {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.iconCircleBtnPrimary {
+    background: #1e293b;
+    border-color: transparent;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+}
+
+.iconCircleBtnPrimary:hover {
+    background: #0f172a;
+}
+
+.iconCircleBtnGhost {
+    background: #f3f4f5;
+    border-color: var(--border-color);
+    color: #475569;
+}
+
+.iconCircleBtnGhost:hover {
+    background: #e9ebef;
+}
+
+.iconCircleBtnSm {
+    width: 34px;
+    height: 34px;
+}
+
+.iconCircleBtnSm .iconCircleGlyph {
+    width: 15px;
+    height: 15px;
+}
+
+.iconCircleBtnLg {
+    width: 56px;
+    height: 56px;
+}
+
+.iconCircleBtnLg .iconCircleGlyph {
+    width: 24px;
+    height: 24px;
 }
 
 /* Button style mapping to platform styles */
@@ -1455,19 +1591,12 @@
     flex-shrink: 0;
 }
 
-.statIconWrapperGreen {
-    background: #ecfdf5;
-    color: #10b981;
-}
-
-.statIconWrapperPurple {
-    background: #f5f3ff;
-    color: #7c3aed;
-}
-
+/* Монохром: все кружки статистики — единый нейтральный slate-тон. */
+.statIconWrapperGreen,
+.statIconWrapperPurple,
 .statIconWrapperBlue {
-    background: #eff6ff;
-    color: #3b82f6;
+    background: #f1f5f9;
+    color: #475569;
 }
 
 .statInfo {
@@ -1488,16 +1617,10 @@
     line-height: 1;
 }
 
-.statValueGreen {
-    color: #10b981;
-}
-
-.statValuePurple {
-    color: #7c3aed;
-}
-
+.statValueGreen,
+.statValuePurple,
 .statValueBlue {
-    color: #3b82f6;
+    color: #0f172a;
 }
 
 .dirStarsRow {
@@ -1705,13 +1828,14 @@
 
 .compactTimerRingContainer {
     position: relative;
-    width: 110px;
-    height: 110px;
-    margin: 4px auto 4px auto;
+    width: clamp(140px, 10.5vw, 180px);
+    height: clamp(140px, 10.5vw, 180px);
+    margin: 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    cursor: pointer;
 }
 
 .compactTimerRingContainer :global(.timerRingSvg) {
@@ -1737,14 +1861,43 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 24px;
+    font-size: clamp(28px, 2.4vw, 38px);
     font-weight: 800;
     color: #08090a;
     font-family: monospace;
-    letter-spacing: -0.5px;
+    letter-spacing: -1px;
     user-select: none;
 }
 
 .compactTimerRingDisplayDanger {
     color: var(--accent-red);
+}
+
+/* --- Deck standard banners --- */
+.deckWarningBanner {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: #fdecea;
+    border: 1px solid #f4b860;
+    color: #8a4b00;
+    font-size: 13px;
+}
+
+.deckWarningBanner strong {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.deckInfoBanner {
+    margin-bottom: 12px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    color: #3730a3;
+    font-size: 12px;
 }

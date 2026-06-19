@@ -122,10 +122,15 @@ function RangeSelect({ value, ranges, onChange }) {
             <option value="">Выберите раздел</option>
             {ranges.map((range) => {
                 const key = range.sectionId || range.range;
+                // Колоды не по стандарту (типы части «Я»/«Мы» не распознаны)
+                // помечаются ⚠ — они не дают корректный дашборд прогресса.
+                const notStandard = range.standard && range.standard.dashboardReady === false;
                 return (
                     <option key={key} value={key}>
+                        {notStandard ? "⚠ " : ""}
                         {key}
                         {range.rangeName ? ` - ${range.rangeName}` : ""}
+                        {notStandard ? " — не по стандарту" : ""}
                     </option>
                 );
             })}
