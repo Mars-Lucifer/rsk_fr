@@ -311,6 +311,20 @@ export default function TrainerPage({ goTo }) {
         return 0;
     });
 
+    // Отладочный override прогресса части «Я» для админа в СЕССИИ — строго
+    // КЛИЕНТСКИЙ (localStorage), на сервер не пишется. Так панель отладки меняет
+    // только экран самого администратора и НЕ влияет на других участников,
+    // дашборд и реальные задачи/ревью. Отдельное состояние нужно, чтобы override
+    // переживал 5-сек. рефреш sessionRuntimeState.
+    const [sessionDebugOverride, setSessionDebugOverride] = useState(() => {
+        if (typeof window === "undefined") return null;
+        try {
+            return JSON.parse(window.localStorage.getItem("mayak_session_debug_override")) || null;
+        } catch {
+            return null;
+        }
+    });
+
     const [showBypassMenu, setShowBypassMenu] = useState(false);
     const [bypassPosition, setBypassPosition] = useState(() => {
         if (typeof window !== "undefined") {
@@ -376,36 +390,23 @@ export default function TrainerPage({ goTo }) {
     const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
     const isSessionMode = tokenType === "session" && !!runtimeSessionId;
 
-    // Отладка в сессии: панель отладки правит не локальное bypass-состояние, а
-    // серверный override прогресса участника (debugProgress). Так панель работает
-    // для админа в сессионном режиме, переживает 5-сек. рефреш состояния и не
-    // подменяет реальные задачи/ревью. Текущий override берём из рантайма и
-    // мёржим патч, оптимистично обновляя UI и отправляя на сервер.
-    const pushSessionDebugProgress = useCallback(
-        (patch) => {
-            const current = sessionRuntimeState?.participant?.debugProgress || {
-                phase: "START",
-                progress: 0,
-                weProgress: 0,
-                direction: "",
-                jokerSpent: 0,
-            };
+    // Отладка в сессии: панель меняет ТОЛЬКО клиентский override (localStorage),
+    // на сервер ничего не пишется. Это гарантирует, что отладка администратора
+    // не влияет ни на других участников, ни на дашборд, ни на реальные задачи.
+    const pushSessionDebugProgress = useCallback((patch) => {
+        setSessionDebugOverride((prev) => {
+            const current = prev || { phase: "START", progress: 0, weProgress: 0, direction: "", jokerSpent: 0 };
             const merged = patch === null ? null : { ...current, ...patch };
-
-            setSessionRuntimeState((prev) =>
-                prev ? { ...prev, participant: { ...prev.participant, debugProgress: merged } } : prev
-            );
-
-            if (runtimeSessionId && activeUserId) {
-                fetch("/api/mayak/session-runtime/debug-progress", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sessionId: runtimeSessionId, userId: activeUserId, debugProgress: merged }),
-                }).catch(() => {});
-            }
-        },
-        [sessionRuntimeState, runtimeSessionId, activeUserId]
-    );
+            try {
+                if (merged === null) {
+                    window.localStorage.removeItem("mayak_session_debug_override");
+                } else {
+                    window.localStorage.setItem("mayak_session_debug_override", JSON.stringify(merged));
+                }
+            } catch {}
+            return merged;
+        });
+    }, []);
 
     const handleBypassPhaseChange = useCallback((phase) => {
         if (isSessionMode) {
@@ -727,9 +728,9 @@ export default function TrainerPage({ goTo }) {
 
     const yaProgress = useMemo(() => {
         // Источник «ручного» прогресса части «Я»: bypass-режим (локальное
-        // состояние) ИЛИ админ-override в сессии (debugProgress с сервера). Если
-        // он есть — прогресс рисуем из него; иначе считаем из реальных задач.
-        const sessionDebug = isSessionMode ? sessionRuntimeState?.participant?.debugProgress : null;
+        // состояние) ИЛИ клиентский админ-override в сессии (sessionDebugOverride,
+        // не уходит на сервер). Если есть — рисуем из него, иначе считаем из задач.
+        const sessionDebug = isSessionMode ? sessionDebugOverride : null;
         const manualSource =
             tokenType === "bypass"
                 ? { phase: bypassPhase, progress: bypassProgress, weProgress: bypassWeProgress, direction: bypassDirection }
@@ -986,7 +987,7 @@ export default function TrainerPage({ goTo }) {
             hasStar: true,
             yaStarEarned: true,
         };
-    }, [sessionRuntimeState?.participant?.taskStates, sessionRuntimeState?.participant?.yaDirection, sessionRuntimeState?.participant?.debugProgress, isSessionMode, tasks, sessionRuntimeState?.participant?.sectionId, tokenSectionId, tokenType, bypassPhase, bypassProgress, bypassDirection, bypassWeProgress]);
+    }, [sessionRuntimeState?.participant?.taskStates, sessionRuntimeState?.participant?.yaDirection, sessionDebugOverride, isSessionMode, tasks, sessionRuntimeState?.participant?.sectionId, tokenSectionId, tokenType, bypassPhase, bypassProgress, bypassDirection, bypassWeProgress]);
 
     // Баланс звёзд-джокеров: 1 начисляется за зажжённую звезду специализации
     // части «Я» минус уже потраченные (jokerSpent из рантайма). earned берётся
@@ -994,10 +995,9 @@ export default function TrainerPage({ goTo }) {
     const jokerBalance = useMemo(() => {
         const earned = yaProgress?.hasStar ? 1 : 0;
         if (isSessionMode) {
-            // При активном админ-override берём «потрачено» из него (чтобы в
-            // панели отладки вживую видеть смену 1↔0), иначе — реальный jokerSpent.
-            const override = sessionRuntimeState?.participant?.debugProgress;
-            const spent = override ? Number(override.jokerSpent) || 0 : Number(sessionRuntimeState?.participant?.jokerSpent) || 0;
+            // При активном клиентском админ-override берём «потрачено» из него
+            // (чтобы в панели отладки вживую видеть смену 1↔0), иначе — реальный.
+            const spent = sessionDebugOverride ? Number(sessionDebugOverride.jokerSpent) || 0 : Number(sessionRuntimeState?.participant?.jokerSpent) || 0;
             return Math.max(0, earned - spent);
         }
         // Bypass: показываем заработанный джокер от звезды «Я» минус условно
@@ -1006,12 +1006,12 @@ export default function TrainerPage({ goTo }) {
             return Math.max(0, earned - bypassJokerSpent);
         }
         return 0;
-    }, [isSessionMode, tokenType, yaProgress?.hasStar, sessionRuntimeState?.participant?.jokerSpent, sessionRuntimeState?.participant?.debugProgress, bypassJokerSpent]);
+    }, [isSessionMode, tokenType, yaProgress?.hasStar, sessionRuntimeState?.participant?.jokerSpent, sessionDebugOverride, bypassJokerSpent]);
 
     // Состояние переключателя «Потратить джокер» в панели отладки: в сессии —
-    // из админ-override, иначе — из локального bypass-состояния.
+    // из клиентского админ-override, иначе — из локального bypass-состояния.
     const panelJokerSpent = isSessionMode
-        ? (sessionRuntimeState?.participant?.debugProgress?.jokerSpent ? 1 : 0)
+        ? (sessionDebugOverride?.jokerSpent ? 1 : 0)
         : bypassJokerSpent;
 
     // Панель отладки доступна в чистом bypass-режиме И администратору в сессии.

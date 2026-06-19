@@ -474,8 +474,6 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
         // направления и счётчик потраченных звёзд-джокеров.
         yaDirection: existing.yaDirection || "",
         jokerSpent: Number(existing.jokerSpent) || 0,
-        // Отладочный override прогресса (админ-режим) — переживает повторный вход.
-        debugProgress: existing.debugProgress || null,
     };
     await writeStore(store, [sessionId]);
     return bucket.participants[userId];
@@ -1060,43 +1058,6 @@ export async function setMayakSessionParticipantYaDirection({ sessionId, userId,
     }
 
     participant.yaDirection = direction;
-    participant.updatedAt = new Date().toISOString();
-    await writeStore(store, [sessionId]);
-    return participant;
-}
-
-// Нормализует отладочный override прогресса части «Я» для админ-режима.
-// Это ТОЛЬКО витринное переопределение прогресса (этап/счётчик/направление/
-// джокер) для UI тренажёра администратора: реальные задачи/ревью не трогаются,
-// серверный расчёт прогресса/джокера (mayakSessionDashboard) его игнорирует,
-// поэтому обойти инспектора через него нельзя.
-function normalizeDebugProgress(input) {
-    if (!input || typeof input !== "object") {
-        return null;
-    }
-    const allowedPhases = ["START", "CONTENT_TYPES", "SPECIALIZATION", "WE_INDEX"];
-    const phase = allowedPhases.includes(input.phase) ? input.phase : "START";
-    const progress = Math.max(0, Math.min(99, Math.floor(Number(input.progress) || 0)));
-    const weProgress = Math.max(0, Math.min(36, Math.floor(Number(input.weProgress) || 0)));
-    const direction = normalizeString(input.direction || "");
-    const jokerSpent = input.jokerSpent ? 1 : 0;
-    return { phase, progress, weProgress, direction, jokerSpent };
-}
-
-export async function setMayakSessionParticipantDebugProgress({ sessionId, userId, debugProgress }) {
-    const session = await getMayakSessionById(sessionId);
-    if (!session || session.status !== "active") {
-        throw new Error("Сессия недоступна или уже завершена");
-    }
-
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    const participant = bucket.participants?.[userId];
-    if (!participant) {
-        throw new Error("Участник не зарегистрирован в этой сессии");
-    }
-
-    participant.debugProgress = normalizeDebugProgress(debugProgress);
     participant.updatedAt = new Date().toISOString();
     await writeStore(store, [sessionId]);
     return participant;
