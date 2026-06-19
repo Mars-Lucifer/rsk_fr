@@ -1,4 +1,4 @@
-﻿import { promises as fs } from "fs";
+import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { execFile } from "child_process";
@@ -470,6 +470,12 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
         registeredAt: existing.registeredAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         tasks: existing.tasks || {},
+        // Сохраняем при повторной регистрации, иначе обнулятся прогресс
+        // направления и счётчик потраченных звёзд-джокеров.
+        yaDirection: existing.yaDirection || "",
+        jokerSpent: Number(existing.jokerSpent) || 0,
+        // Отладочный override прогресса (админ-режим) — переживает повторный вход.
+        debugProgress: existing.debugProgress || null,
     };
     await writeStore(store, [sessionId]);
     return bucket.participants[userId];
@@ -549,10 +555,72 @@ export async function setMayakSessionParticipantRole({ sessionId, userId, role }
     return participant;
 }
 
+// Возвращает сырые объекты участников рантайма (включая карту tasks) для аналитики дашборда.
+export async function readSessionRuntimeParticipants(sessionId) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session) {
+        throw new Error("Сессия не найдена");
+    }
+    const store = await readStore();
+    await expirePendingReviews(store, sessionId);
+    const freshStore = await readStore();
+    const bucket = ensureSessionBucket(freshStore, sessionId);
+    return Object.values(bucket.participants || {}).map((participant) => ({ ...participant }));
+}
+
+// Перемещает участника за другой стол (режим редактора дашборда).
+export async function moveMayakSessionParticipantTable({ sessionId, userId, tableNumber }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const totalTables = Math.max(1, normalizeTableNumber(session.tableCount) || 1);
+    const targetTable = normalizeTableNumber(tableNumber);
+    if (targetTable < 1 || targetTable > totalTables) {
+        throw new Error("Недопустимый номер стола");
+    }
+
+    const store = await readStore();
+    const bucket = ensureSessionBucket(store, sessionId);
+    const participant = bucket.participants?.[userId];
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    if (participant.tableNumber === targetTable) {
+        return participant;
+    }
+
+    // Проверяем уникальность роли-ревьюера на новом столе.
+    if (isReviewerRole(participant.role)) {
+        const conflict = Object.values(bucket.participants || {}).find(
+            (candidate) => candidate.userId !== userId && candidate.tableNumber === targetTable && candidate.role === participant.role
+        );
+        if (conflict) {
+            throw new Error(`Для стола ${targetTable} такая роль уже занята`);
+        }
+    }
+
+    participant.tableNumber = targetTable;
+    participant.inspectorTargetTable = isReviewerRole(participant.role)
+        ? getInspectorTargetTable(targetTable, totalTables)
+        : null;
+    participant.updatedAt = new Date().toISOString();
+    await writeStore(store, [sessionId]);
+    return participant;
+}
+
+export async function readSessionReviews(sessionId) {
+    const store = await readStore();
+    const bucket = store.sessions?.[sessionId] || { reviews: {} };
+    return Object.values(bucket.reviews || {});
+}
+
 export async function listMayakSessionParticipants(sessionId) {
     const session = await getMayakSessionById(sessionId);
     if (!session) {
-        throw new Error("\u0421\u0435\u0441\u0441\u0438\u044f \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430");
+        throw new Error("Сессия не найдена");
     }
 
     const store = await readStore();
@@ -642,7 +710,7 @@ export async function createMayakSessionReview({
         taskKey,
         taskNumber: normalizeString(taskNumber),
         taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
-        taskName: normalizeString(taskName) || `Р—Р°РґР°РЅРёРµ ${taskNumber}`,
+        taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
         taskTitle: normalizeString(taskTitle),
         contentType: normalizeString(contentType),
         description: normalizeString(description),
@@ -795,13 +863,19 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
             updatedAt: task.updatedAt || null,
         }));
 
+    const tableDirections = Object.values(bucket.participants || {})
+        .filter((p) => p.userId !== userId && p.tableNumber === participant.tableNumber && p.yaDirection)
+        .map((p) => String(p.yaDirection).trim().toLowerCase());
+
     return {
         sessionActive: true,
         participant: {
             ...participant,
+            sectionId: session.sectionId,
             tasks: undefined,
             taskStates,
         },
+        tableDirections,
         blockingTask: blockingTask
             ? {
                   taskKey: blockingTask.taskKey,
@@ -864,12 +938,12 @@ export async function getMayakSessionReviewFile({ sessionId, reviewId, type, fil
     const bucket = ensureSessionBucket(store, sessionId);
     const review = bucket.reviews?.[reviewId];
     if (!review?.file) {
-        throw new Error("Р¤Р°Р№Р» РїСЂРѕРІРµСЂРєРё РЅРµ РЅР°Р№РґРµРЅ");
+        throw new Error("Файл проверки не найден");
     }
 
     const selectedName = type === "converted" ? review.file.previewStoredName : review.file.storedName;
     if (!selectedName || selectedName !== filename) {
-        throw new Error("Р¤Р°Р№Р» РїСЂРѕРІРµСЂРєРё РЅРµ РЅР°Р№РґРµРЅ");
+        throw new Error("Файл проверки не найден");
     }
 
     const fullPath = path.join(SESSION_FILES_ROOT, sessionId, review.participantUserId, selectedName);
@@ -958,4 +1032,168 @@ export async function startMayakSessionBackgroundPreviewConversion({ sessionId, 
         return false;
     }
 }
+
+export async function setMayakSessionParticipantYaDirection({ sessionId, userId, direction }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const store = await readStore();
+    const bucket = ensureSessionBucket(store, sessionId);
+    const participant = bucket.participants?.[userId];
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    const normalizedDirection = String(direction || "").trim().toLowerCase();
+    if (normalizedDirection) {
+        const takenByAnother = Object.values(bucket.participants || {}).find(
+            (candidate) =>
+                candidate.userId !== userId &&
+                candidate.tableNumber === participant.tableNumber &&
+                String(candidate.yaDirection || "").trim().toLowerCase() === normalizedDirection
+        );
+        if (takenByAnother) {
+            throw new Error(`Направление "${direction}" уже выбрано другим участником за вашим столом (${takenByAnother.name}).`);
+        }
+    }
+
+    participant.yaDirection = direction;
+    participant.updatedAt = new Date().toISOString();
+    await writeStore(store, [sessionId]);
+    return participant;
+}
+
+// Нормализует отладочный override прогресса части «Я» для админ-режима.
+// Это ТОЛЬКО витринное переопределение прогресса (этап/счётчик/направление/
+// джокер) для UI тренажёра администратора: реальные задачи/ревью не трогаются,
+// серверный расчёт прогресса/джокера (mayakSessionDashboard) его игнорирует,
+// поэтому обойти инспектора через него нельзя.
+function normalizeDebugProgress(input) {
+    if (!input || typeof input !== "object") {
+        return null;
+    }
+    const allowedPhases = ["START", "CONTENT_TYPES", "SPECIALIZATION", "WE_INDEX"];
+    const phase = allowedPhases.includes(input.phase) ? input.phase : "START";
+    const progress = Math.max(0, Math.min(99, Math.floor(Number(input.progress) || 0)));
+    const weProgress = Math.max(0, Math.min(36, Math.floor(Number(input.weProgress) || 0)));
+    const direction = normalizeString(input.direction || "");
+    const jokerSpent = input.jokerSpent ? 1 : 0;
+    return { phase, progress, weProgress, direction, jokerSpent };
+}
+
+export async function setMayakSessionParticipantDebugProgress({ sessionId, userId, debugProgress }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const store = await readStore();
+    const bucket = ensureSessionBucket(store, sessionId);
+    const participant = bucket.participants?.[userId];
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    participant.debugProgress = normalizeDebugProgress(debugProgress);
+    participant.updatedAt = new Date().toISOString();
+    await writeStore(store, [sessionId]);
+    return participant;
+}
+
+export async function autoApproveMayakSessionTask({ sessionId, userId, taskNumber, taskIndex, taskName }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const store = await readStore();
+    const bucket = ensureSessionBucket(store, sessionId);
+    const participant = bucket.participants?.[userId];
+    if (!participant) {
+        throw new Error("Участник не зарегистрирован в этой сессии");
+    }
+
+    const taskKey = buildTaskKey(taskNumber);
+    if (!taskKey) {
+        throw new Error("Не удалось определить номер задания");
+    }
+
+    const createdAt = new Date().toISOString();
+    participant.tasks[taskKey] = {
+        taskKey,
+        taskNumber: normalizeString(taskNumber),
+        taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
+        taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
+        status: "approved",
+        reviewId: null,
+        isBlocking: false,
+        expiresAt: null,
+        reworkExpiresAt: null,
+        durationSeconds: 0,
+        comment: "",
+        updatedAt: createdAt,
+    };
+    participant.updatedAt = createdAt;
+    await writeStore(store, [sessionId]);
+    return participant.tasks[taskKey];
+}
+
+// Атомарный расход звезды-джокера: уменьшает баланс и мгновенно одобряет
+// задание части «Мы» без инспектора (status "approved", viaJoker:true).
+// earnedJokerStars вычисляется вызывающим (роутом) по прогрессу «Я».
+// Весь read-modify-write обёрнут в один withJsonFileLock: при двух
+// одновременных нажатиях второй увидит увеличенный jokerSpent и получит отказ.
+export async function spendJokerStarAndApproveTask({ sessionId, userId, taskNumber, taskIndex, taskName, earnedJokerStars }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+    const taskKey = buildTaskKey(taskNumber);
+    if (!taskKey) {
+        throw new Error("Не удалось определить номер задания");
+    }
+
+    return await withJsonFileLock(SESSION_RUNTIME_FILE, async () => {
+        const store = await readJsonFile(SESSION_RUNTIME_FILE, createEmptyStore());
+        const bucket = ensureSessionBucket(store, sessionId);
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
+        }
+
+        const spent = Number(participant.jokerSpent) || 0;
+        const earned = Number(earnedJokerStars) || 0;
+        if (earned - spent < 1) {
+            throw new Error("Нет доступных звёзд-джокеров");
+        }
+
+        const createdAt = new Date().toISOString();
+        participant.jokerSpent = spent + 1;
+        participant.tasks[taskKey] = {
+            taskKey,
+            taskNumber: normalizeString(taskNumber),
+            taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
+            taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
+            status: "approved",
+            reviewId: null,
+            isBlocking: false,
+            expiresAt: null,
+            reworkExpiresAt: null,
+            durationSeconds: 0,
+            comment: "Одобрено звездой-джокером",
+            viaJoker: true,
+            updatedAt: createdAt,
+        };
+        participant.updatedAt = createdAt;
+        await writeJsonFileAtomic(SESSION_RUNTIME_FILE, store);
+        return {
+            jokerBalance: earned - participant.jokerSpent,
+            taskState: participant.tasks[taskKey],
+        };
+    });
+}
+
+
 

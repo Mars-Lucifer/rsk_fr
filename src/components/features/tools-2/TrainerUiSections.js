@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import Button from "@/components/ui/Button";
@@ -10,7 +10,7 @@ import CopyIcon from "@/assets/general/copy.svg";
 import Plusicon from "@/assets/general/plus.svg";
 import RandomIcon from "@/assets/general/random.svg";
 
-const ROLE_DESCRIPTIONS = {
+export const ROLE_DESCRIPTIONS = {
     ЛЕТОПИСЕЦ: "Превращает рабочий процесс в историю. Фиксирует не только факты, но и эмоции команды. Делает фото и видео ярких моментов, создает итоговый ролик о пути команды.",
     ИНСПЕКТОР: "Страж качества и правил. Следит за объективностью оценки, анализирует работу соседних команд и предоставляет им аргументированную обратную связь.",
     МЕДИАТОР: "Хранитель гармонии и атмосферы безопасности. Отвечает за то, чтобы голос каждого участника был услышан. Проводит сессии рефлексии и вовлекает «тихих» участников в обсуждение.",
@@ -18,6 +18,24 @@ const ROLE_DESCRIPTIONS = {
     ИНЖЕНЕР: "Мастер технологий. Устраняет технический хаос, помогает участникам с настройкой ноутбуков и цифровых инструментов, обеспечивая стабильную работу всей команды.",
     КАПИТАН: "Стратег и лидер. Ведет команду к цели через продуктивные дебаты, гарантирует внутреннюю дисциплину и проверяет выполнение ролевых задач каждым участником.",
     "\u0410\u0414\u041c\u0418\u041d\u0418\u0421\u0422\u0420\u0410\u0422\u041e\u0420": "\u0420\u0435\u0437\u0435\u0440\u0432\u043d\u044b\u0439 \u043f\u0440\u043e\u0432\u0435\u0440\u044f\u044e\u0449\u0438\u0439 \u0432 \u0441\u0435\u0441\u0441\u0438\u0438. \u041c\u043e\u0436\u0435\u0442 \u043f\u0440\u043e\u0432\u0435\u0440\u044f\u0442\u044c \u0437\u0430\u0434\u0430\u043d\u0438\u044f \u0442\u0430\u043a \u0436\u0435, \u043a\u0430\u043a \u0438 \u0438\u043d\u0441\u043f\u0435\u043a\u0442\u043e\u0440, \u043d\u043e \u043d\u0430\u0437\u043d\u0430\u0447\u0430\u0435\u0442\u0441\u044f \u0430\u0434\u043c\u0438\u043d\u043e\u043c \u0432\u0440\u0443\u0447\u043d\u0443\u044e.",
+};
+
+const contentTypesOrder = [
+    { key: "текст", label: "Текст" },
+    { key: "аудио", label: "Аудио" },
+    { key: "изображение", label: "Изображение", shortLabel: "Изобр." },
+    { key: "интерактив", label: "Интерактив", shortLabel: "Интеракт." },
+    { key: "данные", label: "Данные" },
+    { key: "видео", label: "Видео" }
+];
+
+const contentTypeColors = {
+    "текст": { bg: "bg-[#00a0e3]", border: "border-[#00a0e3]", text: "text-white" },
+    "аудио": { bg: "bg-[#e3563e]", border: "border-[#e3563e]", text: "text-white" },
+    "изображение": { bg: "bg-[#1d4f91]", border: "border-[#1d4f91]", text: "text-white" },
+    "интерактив": { bg: "bg-[#8bbad3]", border: "border-[#8bbad3]", text: "text-white" },
+    "данные": { bg: "bg-[#84bd00]", border: "border-[#84bd00]", text: "text-white" },
+    "видео": { bg: "bg-[#e09a1c]", border: "border-[#e09a1c]", text: "text-white" }
 };
 
 export const MayakField = memo(function MayakField({ field, value, isMobile, disabled, onChange, onShowBuffer, onAddToBuffer, onRandom, savedField }) {
@@ -132,7 +150,6 @@ export const TrainerControls = memo(function TrainerControls({
     onToggleTaskTimer,
     onToggleMapPreview,
     onToggleInstructionPreview,
-    onCompleteSession,
     onShowRolePopup,
     onToolLink1Click,
     mayakData,
@@ -147,7 +164,12 @@ export const TrainerControls = memo(function TrainerControls({
     taskActionLabel,
     materialDownloadNotice,
     onTaskFileDownloaded,
+    yaProgress,
+    isSessionMode,
+    onShowYaDirectionSelection,
+    tokenType,
 }) {
+
     const formatTaskTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -168,50 +190,7 @@ export const TrainerControls = memo(function TrainerControls({
     };
 
     return (
-        <div className="flex flex-col gap-[1.6rem]">
-            <div className="flex justify-between items-center w-full">
-                <div className="flex items-center gap-4 lg:gap-[1.6rem]">
-                    <h3>Тренажёр</h3>
-                    {selectedRole && (
-                        <div style={{ position: "relative" }} className="role-tooltip-wrap">
-                            <div className="text-sm font-bold text-blue-600 p-2 bg-blue-100 rounded-lg whitespace-nowrap cursor-default">{selectedRole}</div>
-                            <div
-                                className="role-tooltip"
-                                style={{
-                                    position: "absolute",
-                                    left: 0,
-                                    top: "100%",
-                                    marginTop: "8px",
-                                    width: "380px",
-                                    padding: "12px",
-                                    borderRadius: "12px",
-                                    border: "1px solid #e5e7eb",
-                                    background: "#fff",
-                                    color: "#111",
-                                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                                    opacity: 0,
-                                    visibility: "hidden",
-                                    transition: "opacity 0.2s, visibility 0.2s",
-                                    zIndex: 50,
-                                    pointerEvents: "none",
-                                }}>
-                                <p style={{ fontSize: "12px", color: "#666", lineHeight: "1.5" }}>{ROLE_DESCRIPTIONS[selectedRole] || ""}</p>
-                            </div>
-                            <style>{`.role-tooltip-wrap:hover .role-tooltip { opacity: 1 !important; visibility: visible !important; }`}</style>
-                        </div>
-                    )}
-                    {rankingDelta5 !== null && (
-                        <span className="text-sm whitespace-nowrap" style={{ color: "var(--color-black)" }}>
-                            ур.5 Δ {rankingDelta5}
-                        </span>
-                    )}
-                </div>
-                <div className="flex gap-[0.5rem]">
-                    <Button inverted className="!bg-(--color-red-noise) !text-(--color-red)" onClick={onCompleteSession}>
-                        Завершить&nbsp;сессию
-                    </Button>
-                </div>
-            </div>
+        <div className="flex flex-col gap-[0.75rem]">
             {taskVersion !== "v2" && (
                 <div className="flex gap-[0.5rem]">
                     <Switcher value={who} onChange={onWhoChange} className="!w-full">
@@ -221,11 +200,98 @@ export const TrainerControls = memo(function TrainerControls({
                 </div>
             )}
 
+            {(isSessionMode || tokenType === "bypass") && who === "im" && yaProgress && (
+                <div className="flex flex-col gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 relative">
+                    <div className="flex justify-between items-center text-xs font-semibold text-slate-600">
+                        <span className="flex items-center gap-1 flex-wrap">
+                            {yaProgress.phase === "START" && "Личный прогресс: Старт"}
+                            {yaProgress.phase === "CONTENT_TYPES" && "Личный прогресс: Освоение типов контента"}
+                            {yaProgress.phase === "CHOOSING_DIRECTION" && "Личный прогресс: Выбор специализации"}
+                            {yaProgress.phase === "WE_INDEX" && "Индекс цифровой зрелости"}
+                            {yaProgress.phase === "SPECIALIZATION" && (
+                                <>
+                                    Личный прогресс (Специализация: <span className="capitalize text-teal-700 font-bold">{yaProgress.direction}</span>)
+                                    <button
+                                        type="button"
+                                        onClick={onShowYaDirectionSelection}
+                                        className="inline-flex items-center justify-center !p-0.5 !bg-transparent !text-black hover:!text-slate-600 cursor-pointer !shadow-none !border-none !w-auto !h-auto !min-h-0 !min-w-0"
+                                        title="Изменить специализацию"
+                                    >
+                                        ✎
+                                    </button>
+                                </>
+                            )}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="font-bold text-slate-800">{yaProgress.count} из {yaProgress.target}</span>
+                        </div>
+                    </div>
+                    {yaProgress.phase === "CONTENT_TYPES" ? (
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 flex w-full gap-1 sm:gap-1.5">
+                                {contentTypesOrder.map((type) => {
+                                    const isCompleted = Array.isArray(yaProgress.completedTypes) && yaProgress.completedTypes.includes(type.key);
+                                    const colorStyles = contentTypeColors[type.key] || { bg: "bg-blue-500", border: "border-blue-500", text: "text-white" };
+                                    return (
+                                        <div 
+                                            key={type.key}
+                                            className={`flex-1 flex items-center justify-center py-1.5 px-0.5 sm:px-1 text-[9px] sm:text-[10.5px] font-bold rounded-lg border transition-all duration-300 ${
+                                                isCompleted 
+                                                    ? `${colorStyles.bg} ${colorStyles.border} ${colorStyles.text} shadow-sm` 
+                                                    : "bg-white border-slate-200 text-slate-400"
+                                            }`}
+                                        >
+                                            <span className="hidden sm:inline">{type.label}</span>
+                                            <span className="inline sm:hidden">{type.shortLabel || type.label}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                                <div 
+                                    className={`h-full transition-all duration-500 rounded-full ${yaProgress.hasStar ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-blue-400 to-indigo-500"}`}
+                                    style={{ width: `${yaProgress.percentage}%` }}
+                                />
+                            </div>
+                            {yaProgress.phase === "SPECIALIZATION" && (
+                                <svg className={`w-6 h-6 flex-shrink-0 transition-colors duration-300 ${
+                                    yaProgress.count >= 4
+                                        ? "text-red-500 fill-red-500 drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]"
+                                        : yaProgress.count === 3
+                                        ? "text-amber-400 fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]"
+                                        : "text-slate-300 fill-slate-300"
+                                }`} viewBox="0 0 24 24">
+                                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                                </svg>
+                            )}
+                        </div>
+                    )}
+                    {yaProgress.phase === "CHOOSING_DIRECTION" && (
+                        <Button
+                            className="w-full !bg-blue-600 !text-white hover:!bg-blue-700 py-1.5 px-3 rounded-lg font-bold text-sm mt-1 flex items-center justify-center gap-1.5"
+                            onClick={onShowYaDirectionSelection}
+                        >
+                            Выбрать специализацию
+                        </Button>
+                    )}
+                </div>
+            )}
+
             <div className="flex flex-col gap-[0.75rem]">
                 <div className="flex flex-col gap-[0.75rem]">
-                    <div className="flex items-center gap-[0.5rem]">
-                        <span className="text-sm text-gray-500">Задание №{tasks.length > 0 && tasks[currentTaskIndex] ? tasks[currentTaskIndex].number || currentTaskIndex + 1 : 0}</span>
-                        {isCurrentTaskApproved ? <span className="text-sm font-medium text-emerald-600">Задание выполнено</span> : null}
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-[0.5rem]">
+                            <span className="text-sm text-gray-500">Задание №{tasks.length > 0 && tasks[currentTaskIndex] ? tasks[currentTaskIndex].number || currentTaskIndex + 1 : 0}</span>
+                            {isCurrentTaskApproved ? <span className="text-sm font-medium text-emerald-600">Задание выполнено</span> : null}
+                        </div>
+                        {rankingDelta5 !== null && (
+                            <span className="text-sm font-semibold whitespace-nowrap" style={{ color: "var(--color-black)" }}>
+                                ур.5 Δ {rankingDelta5}
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Button className="!w-10 !h-10 !p-0 flex items-center justify-center" onClick={onPrevTask} disabled={currentTaskIndex <= allowedMinIndex || isTaskRunning || isTaskNavigationLocked}>

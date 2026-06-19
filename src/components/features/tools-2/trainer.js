@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import Header from "@/components/layout/Header";
 import Buffer from "./addons/popup";
 import RankingTestPopup from "./addons/RankingTestPopup";
@@ -6,8 +6,8 @@ import MayakServicesPanel from "./MayakServicesPanel";
 import InstructionImageModal from "./InstructionImageModal";
 import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
-import { MayakField, TrainerControls } from "./TrainerUiSections";
-import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup } from "./TrainerPopups";
+import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
+import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup, YaDirectionSelectionPopup } from "./TrainerPopups";
 
 import InfoIcon from "@/assets/general/info.svg";
 import CopyIcon from "@/assets/general/copy.svg";
@@ -19,9 +19,10 @@ import ResetIcon from "@/assets/general/ResetIcon.svg";
 import CloseIcon from "@/assets/general/close.svg";
 
 // Добавляем getUserFromCookies
-import { clearUserCookie, removeKeyCookie } from "./actions";
+import { clearUserCookie, removeKeyCookie, addUserToCookies, getUserFromCookies } from "./actions";
 // Добавляем эти две строки для работы сертификата
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { resolveFormatKey, resolveDirectionKey, classifyMoodCard, YA_FORMAT_TARGET, YA_FORMAT_TYPES } from "@/lib/mayakProgressModel";
 import CourseIcon from "@/assets/nav/course.svg";
 import Button from "@/components/ui/Button";
 import Switcher from "@/components/ui/Switcher";
@@ -274,6 +275,201 @@ export default function TrainerPage({ goTo }) {
     const [previewMode, setPreviewMode] = useState(null);
     const [previewDismissedTaskKey, setPreviewDismissedTaskKey] = useState("");
 
+    // States for bypass mode (token fffff)
+    const [bypassPhase, setBypassPhase] = useState(() => {
+        if (typeof window !== "undefined") {
+            return window.localStorage.getItem("mayak_bypass_phase") || "START";
+        }
+        return "START";
+    });
+    const [bypassProgress, setBypassProgress] = useState(() => {
+        if (typeof window !== "undefined") {
+            return parseInt(window.localStorage.getItem("mayak_bypass_progress"), 10) || 0;
+        }
+        return 0;
+    });
+    const [bypassDirection, setBypassDirection] = useState(() => {
+        if (typeof window !== "undefined") {
+            return window.localStorage.getItem("mayak_bypass_direction") || "";
+        }
+        return "";
+    });
+    // Прогресс части «Мы» (Индекс цифровой зрелости) для отладки: сколько
+    // заданий направлений «выполнено» из 36.
+    const [bypassWeProgress, setBypassWeProgress] = useState(() => {
+        if (typeof window !== "undefined") {
+            return parseInt(window.localStorage.getItem("mayak_bypass_we_progress"), 10) || 0;
+        }
+        return 0;
+    });
+    // Сколько звёзд-джокеров «потрачено» в отладке (0 или 1). Заработанная
+    // звезда — 1, баланс = earned - spent, чтобы вживую видеть смену 1↔0.
+    const [bypassJokerSpent, setBypassJokerSpent] = useState(() => {
+        if (typeof window !== "undefined") {
+            return parseInt(window.localStorage.getItem("mayak_bypass_joker_spent"), 10) || 0;
+        }
+        return 0;
+    });
+
+    const [showBypassMenu, setShowBypassMenu] = useState(false);
+    const [bypassPosition, setBypassPosition] = useState(() => {
+        if (typeof window !== "undefined") {
+            try {
+                const saved = window.localStorage.getItem("mayak_bypass_pos");
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) {
+                        return parsed;
+                    }
+                }
+            } catch {}
+        }
+        return { x: 400, y: 80 };
+    });
+
+    const dragStartRef = useRef(null);
+
+    const handleDragStart = useCallback((e) => {
+        // Мы перетаскиваем только за заголовок, предотвращаем поведение браузера по умолчанию
+        e.preventDefault();
+        dragStartRef.current = {
+            startX: e.clientX,
+            startY: e.clientY,
+            startPos: { ...bypassPosition }
+        };
+
+        const handleDragMove = (moveEvent) => {
+            if (!dragStartRef.current) return;
+            const deltaX = moveEvent.clientX - dragStartRef.current.startX;
+            const deltaY = moveEvent.clientY - dragStartRef.current.startY;
+            const nextPos = {
+                x: dragStartRef.current.startPos.x + deltaX,
+                y: dragStartRef.current.startPos.y + deltaY
+            };
+            setBypassPosition(nextPos);
+        };
+
+        const handleDragEnd = (endEvent) => {
+            if (!dragStartRef.current) return;
+            const deltaX = endEvent.clientX - dragStartRef.current.startX;
+            const deltaY = endEvent.clientY - dragStartRef.current.startY;
+            const finalPos = {
+                x: dragStartRef.current.startPos.x + deltaX,
+                y: dragStartRef.current.startPos.y + deltaY
+            };
+            setBypassPosition(finalPos);
+            try {
+                window.localStorage.setItem("mayak_bypass_pos", JSON.stringify(finalPos));
+            } catch {}
+            dragStartRef.current = null;
+            document.removeEventListener("pointermove", handleDragMove);
+            document.removeEventListener("pointerup", handleDragEnd);
+        };
+
+        document.addEventListener("pointermove", handleDragMove);
+        document.addEventListener("pointerup", handleDragEnd, { once: true });
+    }, [bypassPosition]);
+
+    // Queue for achievements to display sequentially without conflicts
+    const [achievementsQueue, setAchievementsQueue] = useState([]);
+
+    const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
+    const isSessionMode = tokenType === "session" && !!runtimeSessionId;
+
+    // Отладка в сессии: панель отладки правит не локальное bypass-состояние, а
+    // серверный override прогресса участника (debugProgress). Так панель работает
+    // для админа в сессионном режиме, переживает 5-сек. рефреш состояния и не
+    // подменяет реальные задачи/ревью. Текущий override берём из рантайма и
+    // мёржим патч, оптимистично обновляя UI и отправляя на сервер.
+    const pushSessionDebugProgress = useCallback(
+        (patch) => {
+            const current = sessionRuntimeState?.participant?.debugProgress || {
+                phase: "START",
+                progress: 0,
+                weProgress: 0,
+                direction: "",
+                jokerSpent: 0,
+            };
+            const merged = patch === null ? null : { ...current, ...patch };
+
+            setSessionRuntimeState((prev) =>
+                prev ? { ...prev, participant: { ...prev.participant, debugProgress: merged } } : prev
+            );
+
+            if (runtimeSessionId && activeUserId) {
+                fetch("/api/mayak/session-runtime/debug-progress", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ sessionId: runtimeSessionId, userId: activeUserId, debugProgress: merged }),
+                }).catch(() => {});
+            }
+        },
+        [sessionRuntimeState, runtimeSessionId, activeUserId]
+    );
+
+    const handleBypassPhaseChange = useCallback((phase) => {
+        if (isSessionMode) {
+            pushSessionDebugProgress({ phase, progress: 0 });
+            return;
+        }
+        setBypassPhase(phase);
+        window.localStorage.setItem("mayak_bypass_phase", phase);
+        setBypassProgress(0);
+        window.localStorage.setItem("mayak_bypass_progress", "0");
+    }, [isSessionMode, pushSessionDebugProgress]);
+
+    const handleBypassProgressChange = useCallback((progress) => {
+        if (isSessionMode) {
+            pushSessionDebugProgress({ progress });
+            return;
+        }
+        setBypassProgress(progress);
+        window.localStorage.setItem("mayak_bypass_progress", progress.toString());
+    }, [isSessionMode, pushSessionDebugProgress]);
+
+    const handleBypassDirectionChange = useCallback((direction) => {
+        if (isSessionMode) {
+            pushSessionDebugProgress({ direction });
+            return;
+        }
+        setBypassDirection(direction);
+        window.localStorage.setItem("mayak_bypass_direction", direction);
+    }, [isSessionMode, pushSessionDebugProgress]);
+
+    const handleBypassWeProgressChange = useCallback((progress) => {
+        if (isSessionMode) {
+            pushSessionDebugProgress({ weProgress: progress });
+            return;
+        }
+        setBypassWeProgress(progress);
+        window.localStorage.setItem("mayak_bypass_we_progress", String(progress));
+    }, [isSessionMode, pushSessionDebugProgress]);
+
+    const handleBypassJokerSpentChange = useCallback((spent) => {
+        const normalized = spent ? 1 : 0;
+        if (isSessionMode) {
+            pushSessionDebugProgress({ jokerSpent: normalized });
+            return;
+        }
+        setBypassJokerSpent(normalized);
+        window.localStorage.setItem("mayak_bypass_joker_spent", String(normalized));
+    }, [isSessionMode, pushSessionDebugProgress]);
+
+    const prevProgressRef = useRef(null);
+
+    const handleResetBypassAchievements = useCallback(() => {
+        window.localStorage.removeItem(getStorageKey("mayak_achieved_start"));
+        window.localStorage.removeItem(getStorageKey("mayak_achieved_content_types"));
+        window.localStorage.removeItem(getStorageKey("mayak_achieved_specialization"));
+        prevProgressRef.current = null;
+        // В сессии дополнительно снимаем серверный override прогресса —
+        // возвращаемся к реальному прогрессу участника.
+        if (isSessionMode) {
+            pushSessionDebugProgress(null);
+        }
+        alert("Флаги достижений сброшены! Теперь можно протестировать их появление снова.");
+    }, [getStorageKey, isSessionMode, pushSessionDebugProgress]);
+
     const {
         isAdmin,
         isTokenValid,
@@ -350,6 +546,32 @@ export default function TrainerPage({ goTo }) {
                 taskElapsedTime: 0,
                 sectionId: tokenSectionId,
             });
+
+            if (isSessionMode && runtimeSessionId && activeUserId) {
+                const res = await fetch("/api/mayak/session-runtime/auto-approve", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        sessionId: runtimeSessionId,
+                        userId: activeUserId,
+                        taskNumber: taskNumber || String(currentTaskIndex + 1),
+                        taskIndex: currentTaskIndex,
+                        taskName,
+                    }),
+                });
+                const payload = await res.json().catch(() => ({}));
+                if (res.ok && payload.success) {
+                    const refreshResponse = await fetch(`/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`, {
+                        cache: "no-store",
+                    });
+                    const refreshPayload = await refreshResponse.json().catch(() => ({}));
+                    if (refreshResponse.ok && refreshPayload.success) {
+                        setSessionRuntimeState(refreshPayload.data || null);
+                    }
+                }
+            }
         } catch (err) {
             console.error("Error saving intro task:", err);
         }
@@ -358,7 +580,7 @@ export default function TrainerPage({ goTo }) {
         if (timerState.isRunning) {
             stopTimer();
         }
-    }, [currentTask, currentTaskIndex, tasksTexts, type, userType, who, timerState.isRunning, stopTimer]);
+    }, [currentTask, currentTaskIndex, tasksTexts, type, userType, who, timerState.isRunning, stopTimer, isSessionMode, runtimeSessionId, activeUserId, setSessionRuntimeState]);
 
 
     useEffect(() => {
@@ -381,6 +603,8 @@ export default function TrainerPage({ goTo }) {
     }, [currentTaskIndex, tasks, tokenTaskRange]);
 
     const [fields, setFields] = useState(createEmptyMayakFields);
+    const [showYaDirectionPopup, setShowYaDirectionPopup] = useState(false);
+    const [activeAchievement, setActiveAchievement] = useState(null);
     const [prompt, setPrompt] = useState("");
     const [isCopied, setIsCopied] = useState(false);
     const [buffer, setBuffer] = useState({});
@@ -499,8 +723,399 @@ export default function TrainerPage({ goTo }) {
         }
     }, [goTo]);
 
-    const { activeUserId, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
-    const isSessionMode = tokenType === "session" && !!runtimeSessionId;
+    const effectiveTableNumber = sessionRuntimeState?.participant?.tableNumber || tableNumber;
+
+    const yaProgress = useMemo(() => {
+        // Источник «ручного» прогресса части «Я»: bypass-режим (локальное
+        // состояние) ИЛИ админ-override в сессии (debugProgress с сервера). Если
+        // он есть — прогресс рисуем из него; иначе считаем из реальных задач.
+        const sessionDebug = isSessionMode ? sessionRuntimeState?.participant?.debugProgress : null;
+        const manualSource =
+            tokenType === "bypass"
+                ? { phase: bypassPhase, progress: bypassProgress, weProgress: bypassWeProgress, direction: bypassDirection }
+                : sessionDebug
+                ? {
+                      phase: sessionDebug.phase || "START",
+                      progress: Number(sessionDebug.progress) || 0,
+                      weProgress: Number(sessionDebug.weProgress) || 0,
+                      direction: sessionDebug.direction || "",
+                  }
+                : null;
+
+        if (manualSource) {
+            const WE_INDEX_TARGET = 36;
+            const targetMap = {
+                START: 4,
+                CONTENT_TYPES: YA_FORMAT_TARGET,
+                CHOOSING_DIRECTION: 4,
+                SPECIALIZATION: 4,
+                WE_INDEX: WE_INDEX_TARGET,
+            };
+            const currentPhase = manualSource.phase;
+
+            if (currentPhase === "WE_INDEX") {
+                // Часть «Я» уже завершена (звезда специализации зажжена), показываем
+                // «Индекс цифровой зрелости» части «Мы»: weDone из 36.
+                const weDone = Math.min(Math.max(0, manualSource.weProgress), WE_INDEX_TARGET);
+                return {
+                    phase: "WE_INDEX",
+                    count: weDone,
+                    target: WE_INDEX_TARGET,
+                    percentage: Math.min(100, Math.round((weDone / WE_INDEX_TARGET) * 100)),
+                    hasStar: true,
+                    yaStarEarned: true,
+                    direction: manualSource.direction || null,
+                    completedTypes: [],
+                };
+            }
+
+            const target = targetMap[currentPhase] || 4;
+            const count = Math.min(manualSource.progress, target);
+            const percentage = Math.min(100, Math.round((count / target) * 100));
+            const hasStar = currentPhase === "SPECIALIZATION" && count >= target;
+
+            return {
+                phase: currentPhase,
+                count,
+                target,
+                percentage,
+                hasStar,
+                direction: currentPhase === "SPECIALIZATION" ? manualSource.direction : null,
+                completedTypes: currentPhase !== "START" ? YA_FORMAT_TYPES.slice(0, count).map((t) => t.key) : [],
+            };
+        }
+
+        if (!sessionRuntimeState?.participant?.taskStates || !tasks.length) {
+            return { phase: "START", count: 0, target: 4, hasStar: false, percentage: 0 };
+        }
+
+        const activeSectionId = sessionRuntimeState.participant.sectionId || tokenSectionId || "";
+        const match = String(activeSectionId).match(/^(\d+)-/);
+        const rangeStart = match ? parseInt(match[1], 10) : 1;
+        const startPos = rangeStart - 1;
+
+        const completedTasks = sessionRuntimeState.participant.taskStates.filter(
+            (ts) => ts.status === "approved" || ts.status === "expired" || ts.status === "rework_expired"
+        );
+
+        // 1. Считаем выполненные задачи в диапазоне Старт (base 1..10)
+        let startApprovedCount = 0;
+        completedTasks.forEach((ts) => {
+            const taskIndex = Number(ts.taskIndex);
+            const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+            const baseNumber = indexInSection + 1;
+            if (baseNumber >= 1 && baseNumber <= 10) {
+                startApprovedCount += 1;
+            }
+        });
+
+        const isStartPhaseDone = startApprovedCount >= 4;
+
+        if (!isStartPhaseDone) {
+            return {
+                phase: "START",
+                count: startApprovedCount,
+                target: 4,
+                percentage: Math.min(100, Math.round((startApprovedCount / 4) * 100)),
+                hasStar: false,
+            };
+        }
+
+        // 2. Считаем освоенные форматы части «Я» (base 10..50) через общий
+        // словарь (Статика→изображение, Динамика→видео). Карта настроения
+        // засчитывается только если названа «<Формат> - Карта настроения».
+        const completedContentTypes = new Set();
+        completedTasks.forEach((ts) => {
+            const taskIndex = Number(ts.taskIndex);
+            const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+            const baseNumber = indexInSection + 1;
+
+            if (baseNumber >= 10 && baseNumber <= 50) {
+                // tasks — колода секции (0-based). indexInSection = baseNumber-1
+                // и есть правильный относительный индекс. Раньше тут брался
+                // globalTaskIndex (startPos+...), что для секций не с 1 давало
+                // выход за границы массива → формат не зачитывался и прогресс
+                // залипал в фазе «Типы контента».
+                const taskObj = tasks[indexInSection];
+                const rawType = taskObj?.contentType || "";
+                const mood = classifyMoodCard(rawType);
+                if (mood.isMood) {
+                    if (mood.standard && mood.section === "ya" && mood.key) {
+                        completedContentTypes.add(mood.key);
+                    }
+                    return;
+                }
+                const fmtKey = resolveFormatKey(rawType);
+                if (fmtKey) {
+                    completedContentTypes.add(fmtKey);
+                }
+            }
+        });
+
+        const isContentTypesPhaseDone = completedContentTypes.size >= YA_FORMAT_TARGET;
+
+        if (!isContentTypesPhaseDone) {
+            return {
+                phase: "CONTENT_TYPES",
+                count: completedContentTypes.size,
+                target: YA_FORMAT_TARGET,
+                percentage: Math.min(100, Math.round((completedContentTypes.size / YA_FORMAT_TARGET) * 100)),
+                hasStar: false,
+                completedTypes: Array.from(completedContentTypes),
+            };
+        }
+
+        // 3. Фаза специализации (yaDirection)
+        const yaDirection = sessionRuntimeState.participant.yaDirection;
+
+        if (!yaDirection) {
+            return {
+                phase: "CHOOSING_DIRECTION",
+                count: 0,
+                target: 4,
+                percentage: 0,
+                hasStar: false,
+            };
+        }
+
+        let specApprovedCount = 0;
+        const specTasks = [];
+        // yaDirection — canonical-ключ формата; сравниваем нормализованные ключи.
+        const targetFormatKey = resolveFormatKey(yaDirection);
+        completedTasks.forEach((ts) => {
+            const taskIndex = Number(ts.taskIndex);
+            const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+            const baseNumber = indexInSection + 1;
+
+            if (baseNumber >= 10 && baseNumber <= 50) {
+                // tasks — колода секции (0-based). indexInSection = baseNumber-1
+                // и есть правильный относительный индекс. Раньше тут брался
+                // globalTaskIndex (startPos+...), что для секций не с 1 давало
+                // выход за границы массива → формат не зачитывался и прогресс
+                // залипал в фазе «Типы контента».
+                const taskObj = tasks[indexInSection];
+                const rawType = taskObj?.contentType || "";
+                const mood = classifyMoodCard(rawType);
+                const fmtKey = mood.isMood
+                    ? (mood.standard && mood.section === "ya" ? mood.key : null)
+                    : resolveFormatKey(rawType);
+                if (fmtKey && targetFormatKey && fmtKey === targetFormatKey) {
+                    specTasks.push(ts);
+                }
+            }
+        });
+
+        specTasks.sort((a, b) => {
+            const timeA = a.updatedAt ? Date.parse(a.updatedAt) : 0;
+            const timeB = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+            if (timeA !== timeB) return timeA - timeB;
+            return Number(a.taskIndex) - Number(b.taskIndex);
+        });
+
+        // specTasks — ВСЕ выполненные задания выбранного формата в base 10..50,
+        // включая то одно «вводное», которое участник обязательно сделал на
+        // фазе «Типы контента» (там нужно по одному заданию каждого из 6
+        // форматов). Его вычитаем (-1), чтобы специализация засчитывала только
+        // 4 НОВЫХ задания после выбора направления. Звезда зажигается на 4.
+        // ВАЖНО: dashboard (mayakSessionDashboard.computeYaProgress) использует
+        // ровно ту же формулу — не «чинить» в ноль, иначе разъедется с UI.
+        if (specTasks.length > 1) {
+            specApprovedCount = specTasks.length - 1;
+        } else {
+            specApprovedCount = 0;
+        }
+
+        const YA_STAR_TARGET = 4;
+        const yaHasStar = specApprovedCount >= YA_STAR_TARGET;
+
+        if (!yaHasStar) {
+            return {
+                phase: "SPECIALIZATION",
+                direction: yaDirection,
+                count: specApprovedCount,
+                target: YA_STAR_TARGET,
+                percentage: Math.min(100, Math.round((specApprovedCount / YA_STAR_TARGET) * 100)),
+                hasStar: false,
+            };
+        }
+
+        // 4. Часть «Я» завершена (зажжена звезда специализации) → открывается
+        // следующий прогресс «Индекс цифровой зрелости» (часть «Мы»): сколько
+        // заданий распознанных направлений (base 51..99) выполнено из всех таких
+        // в колоде. Для эталонной колоды это 6 направлений × 6 = 36 заданий.
+        // Карта настроения засчитывается направлению только если названа по
+        // стандарту «<Направление> - Карта настроения».
+        const WE_FROM = 51;
+        const WE_TO = 99;
+        const recognizeDirection = (rawType) => {
+            const mood = classifyMoodCard(rawType);
+            return mood.isMood
+                ? (mood.standard && mood.section === "we" ? mood.key : null)
+                : resolveDirectionKey(rawType);
+        };
+
+        let weTotal = 0;
+        (tasks || []).forEach((taskObj, idx) => {
+            const base = idx + 1;
+            if (base >= WE_FROM && base <= WE_TO && recognizeDirection(taskObj?.contentType || "")) {
+                weTotal += 1;
+            }
+        });
+
+        let weDone = 0;
+        completedTasks.forEach((ts) => {
+            const taskIndex = Number(ts.taskIndex);
+            const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+            const baseNumber = indexInSection + 1;
+            if (baseNumber >= WE_FROM && baseNumber <= WE_TO) {
+                const taskObj = tasks[indexInSection];
+                if (recognizeDirection(taskObj?.contentType || "")) {
+                    weDone += 1;
+                }
+            }
+        });
+
+        return {
+            phase: "WE_INDEX",
+            direction: yaDirection,
+            count: weDone,
+            target: weTotal,
+            percentage: weTotal > 0 ? Math.min(100, Math.round((weDone / weTotal) * 100)) : 0,
+            // Звезда специализации части «Я» заработана и сохраняется (джокер
+            // продолжает начисляться от неё). Считаем фазу «с звездой».
+            hasStar: true,
+            yaStarEarned: true,
+        };
+    }, [sessionRuntimeState?.participant?.taskStates, sessionRuntimeState?.participant?.yaDirection, sessionRuntimeState?.participant?.debugProgress, isSessionMode, tasks, sessionRuntimeState?.participant?.sectionId, tokenSectionId, tokenType, bypassPhase, bypassProgress, bypassDirection, bypassWeProgress]);
+
+    // Баланс звёзд-джокеров: 1 начисляется за зажжённую звезду специализации
+    // части «Я» минус уже потраченные (jokerSpent из рантайма). earned берётся
+    // из того же yaProgress; на сервере при расходе пересчитывается заново.
+    const jokerBalance = useMemo(() => {
+        const earned = yaProgress?.hasStar ? 1 : 0;
+        if (isSessionMode) {
+            // При активном админ-override берём «потрачено» из него (чтобы в
+            // панели отладки вживую видеть смену 1↔0), иначе — реальный jokerSpent.
+            const override = sessionRuntimeState?.participant?.debugProgress;
+            const spent = override ? Number(override.jokerSpent) || 0 : Number(sessionRuntimeState?.participant?.jokerSpent) || 0;
+            return Math.max(0, earned - spent);
+        }
+        // Bypass: показываем заработанный джокер от звезды «Я» минус условно
+        // «потраченный» (переключатель в панели отладки), чтобы видеть смену 1↔0.
+        if (tokenType === "bypass") {
+            return Math.max(0, earned - bypassJokerSpent);
+        }
+        return 0;
+    }, [isSessionMode, tokenType, yaProgress?.hasStar, sessionRuntimeState?.participant?.jokerSpent, sessionRuntimeState?.participant?.debugProgress, bypassJokerSpent]);
+
+    // Состояние переключателя «Потратить джокер» в панели отладки: в сессии —
+    // из админ-override, иначе — из локального bypass-состояния.
+    const panelJokerSpent = isSessionMode
+        ? (sessionRuntimeState?.participant?.debugProgress?.jokerSpent ? 1 : 0)
+        : bypassJokerSpent;
+
+    // Панель отладки доступна в чистом bypass-режиме И администратору в сессии.
+    const canUseDebugPanel = tokenType === "bypass" || (isSessionMode && isAdmin);
+
+    // Фактические форматы части «Я» в текущей колоде — для попапа выбора
+    // специализации. Так попап показывает реальные направления колоды
+    // (напр. для СПО — с метками «Изображение»/«Видео», а не пустой список),
+    // а не захардкоженный набор.
+    const yaDirectionOptions = useMemo(() => {
+        const present = new Set();
+        (tasks || []).forEach((task) => {
+            const rawType = task?.contentType || "";
+            const mood = classifyMoodCard(rawType);
+            const fmtKey = mood.isMood
+                ? (mood.standard && mood.section === "ya" ? mood.key : null)
+                : resolveFormatKey(rawType);
+            if (fmtKey) present.add(fmtKey);
+        });
+        const list = YA_FORMAT_TYPES.filter((f) => present.has(f.key)).map((f) => ({ key: f.key, label: f.label }));
+        // Если в колоде ничего не распознано — отдаём канонический набор (fallback).
+        return list.length > 0 ? list : YA_FORMAT_TYPES.map((f) => ({ key: f.key, label: f.label }));
+    }, [tasks]);
+
+    const triggerAchievement = useCallback((achievement) => {
+        setAchievementsQueue((prev) => [...prev, achievement]);
+    }, []);
+
+    // Effect to process the achievements queue sequentially
+    useEffect(() => {
+        if (achievementsQueue.length > 0 && !activeAchievement) {
+            const next = achievementsQueue[0];
+            setActiveAchievement(next);
+            setAchievementsQueue((prev) => prev.slice(1));
+        }
+    }, [achievementsQueue, activeAchievement]);
+
+    // Effect to auto-dismiss active achievement after 5 seconds
+    useEffect(() => {
+        if (activeAchievement) {
+            const timer = setTimeout(() => {
+                setActiveAchievement(null);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [activeAchievement]);
+
+    // Main achievements check on progress change
+    useEffect(() => {
+        if (!(isSessionMode || tokenType === "bypass") || !yaProgress) {
+            prevProgressRef.current = null;
+            return;
+        }
+
+        // Initialize ref on first run, do not trigger achievements immediately
+        if (!prevProgressRef.current) {
+            prevProgressRef.current = yaProgress;
+            return;
+        }
+
+        // 1. Check Start phase done transition
+        const wasStart = prevProgressRef.current.phase === "START";
+        const isStartDone = yaProgress.phase !== "START";
+        const startFlagKey = getStorageKey("mayak_achieved_start");
+        if (wasStart && isStartDone && window.localStorage.getItem(startFlagKey) !== "true") {
+            window.localStorage.setItem(startFlagKey, "true");
+            triggerAchievement({
+                title: "Достижение: Первые шаги 🚀",
+                message: "Поздравляем! Вы успешно завершили стартовый этап МАЯК!",
+                icon: "🎯",
+            });
+        }
+
+        // 2. Check Content Types phase done transition
+        const wasContentTypes = prevProgressRef.current.phase === "START" || prevProgressRef.current.phase === "CONTENT_TYPES";
+        const isContentTypesDone = yaProgress.phase !== "START" && yaProgress.phase !== "CONTENT_TYPES";
+        const contentFlagKey = getStorageKey("mayak_achieved_content_types");
+        if (wasContentTypes && isContentTypesDone && window.localStorage.getItem(contentFlagKey) !== "true") {
+            window.localStorage.setItem(contentFlagKey, "true");
+            triggerAchievement({
+                title: "Достижение: Мультимедиа Эксперт 🎨",
+                message: "Потрясающе! Вы успешно освоили все 6 типов контента!",
+                icon: "🏆",
+            });
+        }
+
+        // 3. Check Specialization phase done transition (star lighted)
+        // Звезда специализации зажжена, когда фаза «Я» завершена: либо ещё в
+        // SPECIALIZATION с hasStar, либо уже перешли в WE_INDEX (Индекс
+        // цифровой зрелости открывается сразу после звезды).
+        const wasSpecNotDone = !prevProgressRef.current.hasStar;
+        const isSpecDone = (yaProgress.phase === "SPECIALIZATION" && yaProgress.hasStar) || yaProgress.phase === "WE_INDEX";
+        const specFlagKey = getStorageKey("mayak_achieved_specialization");
+        if (wasSpecNotDone && isSpecDone && window.localStorage.getItem(specFlagKey) !== "true") {
+            window.localStorage.setItem(specFlagKey, "true");
+            triggerAchievement({
+                title: "Достижение: Мастер Направления 🌟",
+                message: "Великолепно! Вы завершили специализацию и зажгли звезду части «Я»!",
+                icon: "👑",
+            });
+        }
+
+        prevProgressRef.current = yaProgress;
+    }, [yaProgress, isSessionMode, tokenType, triggerAchievement, getStorageKey]);
 
     const {
         activeTypeKey,
@@ -538,6 +1153,11 @@ export default function TrainerPage({ goTo }) {
         userType,
         who,
         sessionUploadRequired: isSessionMode,
+        isCurrentTaskApproved: ["approved", "expired", "rework_expired"].includes(
+            (Array.isArray(sessionRuntimeState?.participant?.taskStates)
+                ? sessionRuntimeState.participant.taskStates.find((task) => Number(task.taskIndex) === currentTaskIndex) || null
+                : null)?.status
+        ),
     });
 
     const {
@@ -634,6 +1254,55 @@ export default function TrainerPage({ goTo }) {
         setShowRolePopup,
     });
 
+    const handleYaDirectionConfirm = useCallback(
+        async (direction) => {
+            if (runtimeSessionId && activeUserId) {
+                // try/catch обязателен: при сетевом сбое fetch бросает исключение,
+                // без обработки оно уходит в unhandled rejection и попап выбора
+                // направления зависает без обратной связи. Тут показываем ошибку
+                // и НЕ закрываем попап — участник может повторить выбор.
+                try {
+                    const response = await fetch("/api/mayak/session-runtime/ya-direction", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            sessionId: runtimeSessionId,
+                            userId: activeUserId,
+                            direction,
+                        }),
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok || !payload.success) {
+                        alert(payload.error || "Не удалось сохранить направление в сессии");
+                        return;
+                    }
+                } catch (err) {
+                    alert("Не удалось сохранить направление: проблема с сетью. Попробуйте ещё раз.");
+                    return;
+                }
+            }
+
+            if (tokenType === "bypass") {
+                handleBypassDirectionChange(direction);
+            }
+
+            setSessionRuntimeState((prev) => {
+                if (!prev) return prev;
+                return {
+                    ...prev,
+                    participant: {
+                        ...prev.participant,
+                        yaDirection: direction,
+                    },
+                };
+            });
+            setShowYaDirectionPopup(false);
+        },
+        [activeUserId, runtimeSessionId, tokenType, handleBypassDirectionChange]
+    );
+
     const {
         handleCloseInstructionModal,
         handleCloseRankingTestPopup,
@@ -683,6 +1352,14 @@ export default function TrainerPage({ goTo }) {
                     localStorage.setItem(getStorageKey("userRole"), nextState.participant.role);
                 }
 
+                if (nextState?.participant?.tableNumber !== undefined && String(nextState.participant.tableNumber) !== String(tableNumber)) {
+                    const currentUser = getUserFromCookies() || {};
+                    await addUserToCookies(activeUserId, activeUserName, {
+                        ...currentUser,
+                        tableNumber: nextState.participant.tableNumber
+                    });
+                }
+
                 if (nextState && nextState.sessionActive === false) {
                     await removeKeyCookie();
                     await clearUserCookie();
@@ -702,7 +1379,7 @@ export default function TrainerPage({ goTo }) {
             cancelled = true;
             window.clearInterval(intervalId);
         };
-    }, [activeUserId, getStorageKey, isSessionMode, removeKeyCookie, runtimeSessionId, selectedRole, setSelectedRole]);
+    }, [activeUserId, activeUserName, tableNumber, getStorageKey, isSessionMode, removeKeyCookie, runtimeSessionId, selectedRole, setSelectedRole]);
 
     const handleChange = useCallback(
         (code, value) => {
@@ -913,6 +1590,49 @@ export default function TrainerPage({ goTo }) {
         },
         [activeUserId, currentTask, currentTaskData, currentTaskIndex, finalizeTaskExecution, runtimeSessionId, tasksTexts, timerState.elapsedTime, timerState.readyElapsedTime]
     );
+
+    // Использовать звезду-джокер: мгновенно засчитывает текущее задание «Мы»
+    // без инспектора. Сервер проверяет баланс/принадлежность к «Мы» и атомарно
+    // списывает джокер. По успеху — как при обычной сдаче: завершаем задание и
+    // обновляем состояние сессии.
+    const handleUseJokerStar = useCallback(async () => {
+        if (!runtimeSessionId || !activeUserId || !currentTaskData) return;
+        setSessionUploadError("");
+        setSessionUploadLoading(true);
+        try {
+            const response = await fetch("/api/mayak/session-runtime/joker-spend", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sessionId: runtimeSessionId,
+                    userId: activeUserId,
+                    taskNumber: String(currentTaskData.number || currentTask?.number || ""),
+                    taskIndex: currentTaskIndex,
+                    taskName: String(currentTask?.name || currentTaskData.title || `Задание ${currentTaskIndex + 1}`),
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || "Не удалось использовать звезду-джокер");
+            }
+
+            await finalizeTaskExecution({ timeWhenStopped: timerState.elapsedTime });
+
+            const refreshResponse = await fetch(`/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`, {
+                cache: "no-store",
+            });
+            const refreshPayload = await refreshResponse.json().catch(() => ({}));
+            if (refreshResponse.ok && refreshPayload.success) {
+                setSessionRuntimeState(refreshPayload.data || null);
+            }
+
+            setShowCompletionPopup(false);
+        } catch (error) {
+            setSessionUploadError(error.message || "Не удалось использовать звезду-джокер");
+        } finally {
+            setSessionUploadLoading(false);
+        }
+    }, [activeUserId, currentTask, currentTaskData, currentTaskIndex, finalizeTaskExecution, runtimeSessionId, timerState.elapsedTime]);
 
     const handleResolveInspectorReview = useCallback(
         async (action, comment = "") => {
@@ -1146,7 +1866,7 @@ export default function TrainerPage({ goTo }) {
         allowedMinIndex,
         allowedMaxIndex,
         selectedRole,
-        tableNumber,
+        tableNumber: effectiveTableNumber,
         rankingDelta5,
         onWhoChange: (value) => {
             // Сначала обновляем состояние, чтобы UI отреагировал
@@ -1198,7 +1918,6 @@ export default function TrainerPage({ goTo }) {
         onToggleTaskTimer: guardedToggleTaskTimer,
         onToggleMapPreview: handleToggleMapPreview,
         onToggleInstructionPreview: handleToggleInstructionPreview,
-        onCompleteSession: handleCompleteSession,
         onShowRolePopup: handleShowRolePopup,
         onToolLink1Click: handleToolLink1Click,
         mayakData,
@@ -1213,6 +1932,15 @@ export default function TrainerPage({ goTo }) {
         taskActionLabel: isCurrentTaskPendingReview ? "\u041d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435" : isCurrentTaskRejected ? "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c" : "\u041d\u0430\u0447\u0430\u0442\u044c \u0437\u0430\u0434\u0430\u043d\u0438\u0435",
         materialDownloadNotice,
         onTaskFileDownloaded: handleTaskFileDownloaded,
+        yaProgress,
+        isSessionMode,
+        onShowYaDirectionSelection: () => setShowYaDirectionPopup(true),
+        tokenType,
+        yaDirectionOptions,
+        onBypassPhaseChange: handleBypassPhaseChange,
+        onBypassProgressChange: handleBypassProgressChange,
+        onBypassDirectionChange: handleBypassDirectionChange,
+        onResetBypassAchievements: handleResetBypassAchievements,
     };
 
     const trainerFieldsBlock = (
@@ -1393,29 +2121,102 @@ export default function TrainerPage({ goTo }) {
         <>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
-                {tableNumber ? (
-                    <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
-                        Стол №{tableNumber}
+                {effectiveTableNumber ? (
+                    <div className="inline-flex items-center justify-center !rounded-full border border-slate-200 bg-white !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
+                        Стол №{effectiveTableNumber}
                     </div>
                 ) : null}
-                <Button
-                    icon
-                    disabled={timerState.isRunning}
-                    className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
-                    onClick={handleOpenHistory}
-                    title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
-                    <TimeIcon />
-                </Button>
-                {isAdmin && (
+                {selectedRole && (
+                    <div style={{ position: "relative" }} className="role-tooltip-wrap">
+                        <div className="inline-flex items-center justify-center !rounded-full border border-blue-200 bg-blue-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-blue-700 whitespace-nowrap cursor-default">
+                            {selectedRole}
+                        </div>
+                        <div
+                            className="role-tooltip"
+                            style={{
+                                position: "absolute",
+                                right: 0,
+                                top: "100%",
+                                marginTop: "8px",
+                                width: "380px",
+                                padding: "12px",
+                                borderRadius: "12px",
+                                border: "1px solid #e5e7eb",
+                                background: "#fff",
+                                color: "#111",
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                                opacity: 0,
+                                visibility: "hidden",
+                                transition: "opacity 0.2s, visibility 0.2s",
+                                zIndex: 50,
+                                pointerEvents: "none",
+                            }}>
+                            <p style={{ fontSize: "12px", color: "#666", lineHeight: "1.5" }}>{ROLE_DESCRIPTIONS[selectedRole] || ""}</p>
+                        </div>
+                        <style>{`.role-tooltip-wrap:hover .role-tooltip { opacity: 1 !important; visibility: visible !important; }`}</style>
+                    </div>
+                )}
+                {canUseDebugPanel && (
+                    <button
+                        type="button"
+                        onClick={() => setShowBypassMenu((prev) => !prev)}
+                        className="inline-flex items-center justify-center gap-1 !rounded-full border border-amber-200 !bg-amber-100 hover:!bg-amber-200 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold !text-amber-700 cursor-pointer transition-colors !shadow-none !w-auto !flex-initial flex-shrink-0 whitespace-nowrap"
+                    >
+                        <span className="leading-none">⚙️</span>
+                        <span className="leading-none">Отладка</span>
+                    </button>
+                )}
+                {sessionRuntimeState?.participant?.yaDirection && (
+                    <div className="inline-flex items-center justify-center !rounded-full border border-teal-200 bg-teal-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-teal-700 whitespace-nowrap capitalize cursor-default">
+                        Направление: {sessionRuntimeState.participant.yaDirection}
+                    </div>
+                )}
+                {jokerBalance > 0 && (
+                    <div
+                        className="inline-flex items-center justify-center gap-1 !rounded-full border border-rose-200 bg-rose-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-rose-700 whitespace-nowrap cursor-default"
+                        title="Звёзды-джокеры: мгновенно засчитывают задание части «Мы» без инспектора">
+                        <svg className="w-4 h-4 flex-shrink-0 text-red-500 fill-red-500 drop-shadow-[0_0_3px_rgba(239,68,68,0.6)]" viewBox="0 0 24 24">
+                            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                        </svg>
+                        <span className="leading-none">Джокеры: {jokerBalance}</span>
+                    </div>
+                )}
+                <div className="flex items-center gap-2 ml-auto">
                     <Button
                         icon
+                        roundeful
                         disabled={timerState.isRunning}
-                        className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
-                        onClick={handleAdminResetSession}
-                        title={timerState.isRunning ? "Недоступно во время выполнения задания" : "Сбросить сессию (админ)"}>
-                        <ResetIcon />
+                        className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                        onClick={handleOpenHistory}
+                        title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
+                        <TimeIcon className="w-[18px] h-[18px] text-slate-700 block" />
                     </Button>
-                )}
+                    {isAdmin && (
+                        <Button
+                            icon
+                            roundeful
+                            disabled={timerState.isRunning}
+                            className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                            onClick={handleAdminResetSession}
+                            title={timerState.isRunning ? "Недоступно во время выполнения задания" : "Сбросить сессию (админ)"}>
+                            <svg className="w-[18px] h-[18px] text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                                <path d="M21 3v6h-6" />
+                            </svg>
+                        </Button>
+                    )}
+                    {(isSessionMode || tokenType === "bypass") && (
+                        <Button
+                            inverted
+                            roundeful
+                            className="inline-flex items-center justify-center !rounded-full !bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                            onClick={handleCompleteSession}>
+                            Завершить&nbsp;сессию
+                        </Button>
+                    )}
+                </div>
             </Header>
 
             {showSecondQuestionnaire && (
@@ -1468,6 +2269,9 @@ export default function TrainerPage({ goTo }) {
                         rejectedComment={currentTaskReviewComment}
                         uploadLoading={sessionUploadLoading}
                         uploadError={sessionUploadError}
+                        canUseJoker={who === "we" && jokerBalance > 0}
+                        jokerBalance={jokerBalance}
+                        onUseJoker={handleUseJokerStar}
                         onClose={() => {
                             setShowCompletionPopup(false);
                             setSessionUploadError("");
@@ -1514,6 +2318,247 @@ export default function TrainerPage({ goTo }) {
                     }}
                 />
             ) : null}
+            {showYaDirectionPopup && (
+                <YaDirectionSelectionPopup
+                    onClose={() => setShowYaDirectionPopup(false)}
+                    onConfirm={handleYaDirectionConfirm}
+                    takenDirections={sessionRuntimeState?.tableDirections || []}
+                    options={yaDirectionOptions}
+                />
+            )}
+            {activeAchievement && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-white/95 backdrop-blur-md border border-emerald-100/80 shadow-[0_12px_40px_rgba(16,185,129,0.12)] p-3 rounded-xl w-max max-w-[360px] animate-slide-in pointer-events-auto transition-all duration-300">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gradient-to-br from-amber-100 to-orange-200 border border-amber-200/40 flex items-center justify-center text-xl shadow-[inset_0_1.5px_3px_rgba(255,255,255,0.6)]">
+                        {activeAchievement.icon}
+                    </div>
+                    <div className="flex-1 min-w-0 pr-1" style={{ textWrap: "normal" }}>
+                        <div className="text-[13px] font-extrabold text-slate-800 leading-tight">
+                            {activeAchievement.title.replace(/^Достижение:\s*/, "").replace(/[\u{1F300}-\u{1F9FF}]/gu, "").trim()}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                            {activeAchievement.message}
+                        </div>
+                    </div>
+                    <div 
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setActiveAchievement(null)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setActiveAchievement(null);
+                            }
+                        }}
+                        className="text-slate-400 hover:text-slate-600 p-1 rounded-full bg-transparent hover:bg-slate-100 transition-colors cursor-pointer flex items-center justify-center w-5 h-5 min-w-[20px] min-h-[20px] flex-shrink-0"
+                    >
+                        ✕
+                    </div>
+                </div>
+            )}
+            {canUseDebugPanel && showBypassMenu && (
+                <div
+                    style={{
+                        position: "fixed",
+                        left: `${bypassPosition.x}px`,
+                        top: `${bypassPosition.y}px`,
+                        zIndex: 9999
+                    }}
+                    className="w-80 bg-white border border-slate-200/80 rounded-2xl shadow-[0_20px_60px_-15px_rgba(15,23,42,0.4)] overflow-hidden flex flex-col select-none"
+                >
+                    {/* Шапка */}
+                    <div
+                        onPointerDown={handleDragStart}
+                        className="flex justify-between items-center px-3.5 py-2.5 bg-gradient-to-r from-slate-800 to-slate-700 cursor-move"
+                    >
+                        <span className="flex items-center gap-1.5 text-[11px] uppercase font-bold text-slate-200 tracking-wider">
+                            <span className="inline-flex w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+                            Панель отладки
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setShowBypassMenu(false)}
+                            className="text-slate-300 hover:text-white !bg-white/0 hover:!bg-white/15 p-0.5 rounded-md cursor-pointer !shadow-none !border-none flex items-center justify-center !w-6 !h-6 flex-shrink-0 transition-colors"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    <div className="p-3.5 flex flex-col gap-3">
+                        {/* Индикатор звёзд-джокеров */}
+                        <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-br from-rose-50 to-rose-100/60 border border-rose-200/70">
+                            <div className="flex items-center gap-2">
+                                <svg className={`w-5 h-5 transition-all duration-300 ${jokerBalance > 0 ? "text-red-500 fill-red-500 drop-shadow-[0_0_5px_rgba(239,68,68,0.6)]" : "text-slate-300 fill-slate-300"}`} viewBox="0 0 24 24">
+                                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                                </svg>
+                                <span className="text-[11px] font-bold text-rose-800">Звёзды-джокеры</span>
+                            </div>
+                            <span className={`text-base font-extrabold tabular-nums ${jokerBalance > 0 ? "text-red-600" : "text-slate-400"}`}>
+                                {jokerBalance}
+                            </span>
+                        </div>
+
+                        {/* Раздел: Этапы прогресса (Я → ИЦЗ единым рядом) */}
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Этап прогресса</span>
+                                <span className="flex-1 h-px bg-slate-150" />
+                            </div>
+                            <div className="grid grid-cols-4 gap-1.5">
+                                {[
+                                    { key: "START", label: "1. Старт" },
+                                    { key: "CONTENT_TYPES", label: "2. Контент" },
+                                    { key: "SPECIALIZATION", label: "3. Спец" },
+                                    { key: "WE_INDEX", label: "4. ИЦЗ" },
+                                ].map((step) => {
+                                    const active =
+                                        yaProgress.phase === step.key ||
+                                        (step.key === "SPECIALIZATION" && yaProgress.phase === "CHOOSING_DIRECTION");
+                                    return (
+                                        <button
+                                            key={step.key}
+                                            type="button"
+                                            onClick={() => handleBypassPhaseChange(step.key)}
+                                            title={step.key === "WE_INDEX" ? "Индекс цифровой зрелости" : undefined}
+                                            className={`text-[10px] py-1.5 px-1 rounded-lg font-semibold border transition-all cursor-pointer !shadow-none !w-auto ${
+                                                active
+                                                    ? "!bg-blue-600 !border-blue-600 !text-white shadow-sm"
+                                                    : "!bg-slate-50 !border-slate-200 !text-slate-500 hover:!bg-slate-100 hover:!text-slate-700"
+                                            }`}
+                                        >
+                                            {step.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Прогресс части «Я» (чипы 0..target) */}
+                            {yaProgress.phase !== "WE_INDEX" && (
+                                <div className="flex items-center justify-between text-[11px] text-slate-600 gap-2">
+                                    <span className="flex-shrink-0 font-medium">Прогресс:</span>
+                                    <div className="flex flex-wrap gap-1 justify-end">
+                                        {Array.from({ length: yaProgress.target + 1 }).map((_, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => handleBypassProgressChange(idx)}
+                                                className={`!w-[24px] !h-[24px] rounded-lg flex items-center justify-center font-bold text-[10px] border transition-all cursor-pointer !shadow-none ${
+                                                    yaProgress.count === idx
+                                                        ? "!bg-blue-600 !border-blue-600 !text-white"
+                                                        : "!bg-slate-50 !border-slate-200 !text-slate-500 hover:!bg-slate-100"
+                                                }`}
+                                            >
+                                                {idx}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Прогресс ИЦЗ (часть «Мы») — слайдер 0..36 + пресеты */}
+                            {yaProgress.phase === "WE_INDEX" && (
+                                <>
+                                    <div className="flex items-center justify-between text-[11px] text-slate-600">
+                                        <span className="font-medium">Индекс цифровой зрелости:</span>
+                                        <span className="font-extrabold text-slate-800 tabular-nums">{yaProgress.count} из {yaProgress.target}</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={36}
+                                        step={1}
+                                        value={Math.min(yaProgress.count, 36)}
+                                        onChange={(e) => handleBypassWeProgressChange(parseInt(e.target.value, 10) || 0)}
+                                        className="w-full accent-blue-600 cursor-pointer"
+                                    />
+                                    <div className="flex flex-wrap gap-1">
+                                        {[0, 6, 12, 18, 24, 30, 36].map((mark) => (
+                                            <button
+                                                key={mark}
+                                                type="button"
+                                                onClick={() => handleBypassWeProgressChange(mark)}
+                                                className={`flex-1 min-w-[28px] !h-[22px] rounded-md flex items-center justify-center font-bold text-[10px] border transition-all cursor-pointer !shadow-none ${
+                                                    yaProgress.count === mark
+                                                        ? "!bg-blue-600 !border-blue-600 !text-white"
+                                                        : "!bg-slate-50 !border-slate-200 !text-slate-500 hover:!bg-slate-100"
+                                                }`}
+                                            >
+                                                {mark}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Направление специализации */}
+                            {(yaProgress.phase === "SPECIALIZATION" || yaProgress.phase === "CHOOSING_DIRECTION" || yaProgress.phase === "WE_INDEX") && (
+                                <div className="flex items-center justify-between text-[11px] text-slate-600">
+                                    <span className="font-medium">Направление:</span>
+                                    <select
+                                        value={yaProgress.direction || ""}
+                                        onChange={(e) => handleBypassDirectionChange(e.target.value)}
+                                        className="text-[10px] py-1 px-1.5 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer"
+                                    >
+                                        <option value="">-- Выбрать --</option>
+                                        {yaDirectionOptions.map((opt) => (
+                                            <option key={opt.key} value={opt.key}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Раздел: Звезда-джокер (трата) */}
+                        {yaProgress.hasStar && (
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                                <span className="text-[11px] font-medium text-slate-600">Потратить джокер:</span>
+                                <div className="flex gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleBypassJokerSpentChange(0)}
+                                        className={`text-[10px] py-1 px-2.5 rounded-lg font-bold border transition-all cursor-pointer !shadow-none ${
+                                            panelJokerSpent === 0
+                                                ? "!bg-amber-500 !border-amber-500 !text-white"
+                                                : "!bg-slate-50 !border-slate-200 !text-slate-500 hover:!bg-slate-100"
+                                        }`}
+                                    >
+                                        Нет
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleBypassJokerSpentChange(1)}
+                                        className={`text-[10px] py-1 px-2.5 rounded-lg font-bold border transition-all cursor-pointer !shadow-none ${
+                                            panelJokerSpent === 1
+                                                ? "!bg-slate-700 !border-slate-700 !text-white"
+                                                : "!bg-slate-50 !border-slate-200 !text-slate-500 hover:!bg-slate-100"
+                                        }`}
+                                    >
+                                        Да
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="pt-2.5 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={handleResetBypassAchievements}
+                                className="!w-full text-[10.5px] !bg-red-50 hover:!bg-red-100 !text-red-600 !border-red-200 border py-1.5 rounded-lg font-bold text-center cursor-pointer transition-colors !shadow-none"
+                            >
+                                Сбросить достижения
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <style>{`
+                @keyframes slideInUp {
+                    from { transform: translateY(100px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
+                .animate-slide-in {
+                    animation: slideInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                }
+            `}</style>
         </>
     );
 }

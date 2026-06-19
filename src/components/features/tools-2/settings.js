@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 
 import Header from "@/components/layout/Header";
@@ -110,6 +110,7 @@ async function validateTokenAPI(tokenValue) {
             usedCount: data.usedCount || 0,
             error: data.error || null,
             isBypass: data.isBypass || false,
+            adminBypass: data.adminBypass || false,
             tokenType: data.tokenType || "legacy",
             sessionId: data.sessionId || null,
             sessionName: data.sessionName || null,
@@ -362,6 +363,67 @@ export default function SettingsPage({ goTo }) {
         setIsValidating(true);
         try {
             const result = await validateTokenAPI(validatedTokenValue);
+
+            // Admin-bypass via fffff suffix / env secret: the server already
+            // authorized this. Enter the trainer right away (admin + debug),
+            // skipping the admin-password screen. Store the full token (with the
+            // suffix) so the runtime access gate re-detects the bypass.
+            if (result.adminBypass) {
+                await addKeyToCookies(nextTokenValue);
+                setStoredToken(nextTokenValue);
+
+                // Если под суффиксом админ-байпаса лежит активная сессия —
+                // заходим сразу в сессионный режим (с правами администратора),
+                // без ручного выбора стола и регистрации. Это даёт тот же
+                // функционал, что и обычный вход по токену, включая роль и
+                // очередь инспектора. Стол назначаем автоматически (стол 1).
+                if ((result.tokenType || "") === "session" && result.sessionId) {
+                    const adminUserId = "dev-bypass";
+                    const adminName = "Администратор (отладка)";
+                    const resolvedTable = "1";
+
+                    try {
+                        const participantResponse = await fetch("/api/mayak/session-runtime/participant", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                sessionId: result.sessionId,
+                                userId: adminUserId,
+                                name: adminName,
+                                organization: "",
+                                tableNumber: resolvedTable,
+                            }),
+                        });
+                        const participantPayload = await participantResponse.json().catch(() => ({}));
+                        if (!participantResponse.ok || !participantPayload.success) {
+                            throw new Error(participantPayload.error || "Не удалось зарегистрировать администратора в сессии");
+                        }
+                    } catch (error) {
+                        console.error("Ошибка авто-входа администратора в сессию:", error);
+                        setTokenError(error.message || "Не удалось войти в сессию администратором");
+                        return;
+                    }
+
+                    await addUserToCookies(adminUserId, adminName, {
+                        tokenType: "session",
+                        sessionId: result.sessionId,
+                        sessionName: result.sessionName || "",
+                        tableNumber: resolvedTable,
+                        guestMode: true,
+                    });
+                    setIsDevBypass(true);
+                    setHasRegisteredUser(true);
+                    goTo("trainer");
+                    return;
+                }
+
+                await addUserToCookies("dev-bypass", "Admin bypass", { tokenType: "bypass" });
+                setIsDevBypass(true);
+                setHasRegisteredUser(true);
+                goTo("trainer");
+                return;
+            }
+
             const isAccessible = result.valid || (result.isExhausted && result.isActive);
             const nextSessionInfo = {
                 tokenType: result.tokenType || "legacy",
@@ -401,7 +463,7 @@ export default function SettingsPage({ goTo }) {
         } finally {
             setIsValidating(false);
         }
-    }, [syncRegisteredUserState]);
+    }, [syncRegisteredUserState, goTo]);
 
     useEffect(() => {
         if (!router.isReady) return;
@@ -714,8 +776,8 @@ export default function SettingsPage({ goTo }) {
             goTo("trainer");
         } catch (error) {
 
-            console.error("РћС€РёР±РєР° Р°РєС‚РёРІР°С†РёРё РіРѕСЃС‚РµРІРѕРіРѕ РњРђРЇРљ:", error);
-            setGuestFormError(error.message || "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ РіРѕСЃС‚РµРІРѕР№ РІС…РѕРґ.");
+            console.error("Ошибка активации гостевого МАЯК:", error);
+            setGuestFormError(error.message || "Не удалось активировать гостевой вход.");
         } finally {
             setIsLoading(false);
         }
@@ -791,7 +853,7 @@ export default function SettingsPage({ goTo }) {
         }
 
         if (sessionInfo.tokenType === "session" && !String(tableNumber || "").trim()) {
-            alert("Р’С‹Р±РµСЂРёС‚Рµ СЃС‚РѕР» РґР»СЏ РІС…РѕРґР° РІ СЃРµСЃСЃРёСЋ.");
+            alert("Выберите стол для входа в сессию.");
             return;
         }
 
@@ -800,7 +862,7 @@ export default function SettingsPage({ goTo }) {
             if (!isStoredTokenActive) {
                 const consumeResult = await consumeTokenAPI(token);
                 if (!consumeResult.success) {
-                    alert(consumeResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ С‚РѕРєРµРЅ.");
+                    alert(consumeResult.error || "Не удалось активировать токен.");
                     return;
                 }
                 setTokenRemainingAttempts(consumeResult.remainingAttempts || 0);
@@ -889,8 +951,8 @@ export default function SettingsPage({ goTo }) {
                 return;
             }
 
-            console.error("РћС€РёР±РєР° Р°РєС‚РёРІР°С†РёРё РњРђРЇРљ:", error);
-            alert(error.message || "РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР° РїСЂРё Р°РєС‚РёРІР°С†РёРё С‚СЂРµРЅР°Р¶РµСЂР°.");
+            console.error("Ошибка активации МАЯК:", error);
+            alert(error.message || "Произошла ошибка при активации тренажера.");
         } finally {
             setIsLoading(false);
         }
