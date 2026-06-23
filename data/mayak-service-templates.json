@@ -1,0 +1,34 @@
+{
+  "services": [
+    {
+      "serviceKey": "suno",
+      "serviceName": "Suno",
+      "serviceUrl": "",
+      "order": 0,
+      "formats": [
+        {
+          "formatKey": "база",
+          "formatName": "База",
+          "templateFile": "suno-база-1782123437847.pptx",
+          "order": 0,
+          "uploadedAt": "2026-06-22T10:17:17.867Z"
+        }
+      ]
+    },
+    {
+      "serviceKey": "qwen",
+      "serviceName": "Qwen",
+      "serviceUrl": "1",
+      "order": 1,
+      "formats": [
+        {
+          "formatKey": "текст",
+          "formatName": "текст",
+          "templateFile": "qwen-текст-1782150713109.pptx",
+          "order": 0,
+          "uploadedAt": "2026-06-22T17:51:53.115Z"
+        }
+      ]
+    }
+  ]
+}

@@ -142,6 +142,8 @@ export default async function handler(req, res) {
                 toolLink2: t.toolLink2 || "",
                 toolName2: t.toolName2 || "",
                 services: t.services || "",
+                instructionFormat: t.instructionFormat || "",
+                instructionService: t.instructionService || "",
             }));
 
             await writeSectionJson(sectionId, "index.json", cleanTasks);

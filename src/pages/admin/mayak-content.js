@@ -87,6 +87,7 @@ const COLUMNS = [
     { key: "instruction", label: "Загр.инстр.", width: 160, source: "task", fileCol: "instructions" },
     { key: "file", label: "Загр.доп.мат.", width: 160, source: "task", fileCol: "files" },
     { key: "map", label: "Загр.карту", width: 160, source: "task", fileCol: "maps" },
+    { key: "generate", label: "⚙ Авто-инстр.", width: 150, source: "action" },
 ];
 
 // ============ Авторазмер textarea ============
@@ -420,6 +421,10 @@ function RangeEditor({ range, onBack }) {
     const textsRef = useRef(texts);
     const [boundTokens, setBoundTokens] = useState([]);
     const [fileSizes, setFileSizes] = useState({});
+    const [serviceTemplates, setServiceTemplates] = useState([]);
+    const [genBusyRow, setGenBusyRow] = useState(null);
+    const [genAllBusy, setGenAllBusy] = useState(false);
+    const [genProgress, setGenProgress] = useState(null); // { done, total }
 
     // Undo-стек для Ctrl+Z (снимки {tasks, texts})
     const undoStack = useRef([]);
@@ -620,10 +625,18 @@ function RangeEditor({ range, onBack }) {
                 return;
             }
 
-            // Ctrl+C — копировать выделенные ячейки как TSV
+            // Ctrl+C — копировать выделенные ячейки как TSV.
+            // Если фокус внутри одиночной ячейки и есть текстовое выделение —
+            // отдаём копирование браузеру (копируется выделенный текст). Иначе
+            // (есть выделение диапазона ИЛИ ячейка без текстового выделения)
+            // копируем ячейки сами.
             if ((e.ctrlKey || e.metaKey) && e.key === "c") {
                 if (!sel) return;
-                if (!isMulti && inInput) return;
+                if (!isMulti && inInput) {
+                    const el = document.activeElement;
+                    const hasTextSel = el && typeof el.selectionStart === "number" && el.selectionStart !== el.selectionEnd;
+                    if (hasTextSel) return; // пусть браузер скопирует выделенный текст внутри ячейки
+                }
                 e.preventDefault();
                 const lines = [];
                 for (let r = sel.r1; r <= sel.r2; r++) {
@@ -719,6 +732,154 @@ function RangeEditor({ range, onBack }) {
         setLoading(false);
     }, [range]);
 
+    // Реестр шаблонов инструкций (сервис → форматы) для автогенерации
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/admin/mayak-service-templates");
+                const json = await res.json();
+                if (!cancelled && Array.isArray(json?.data?.services)) setServiceTemplates(json.data.services);
+            } catch { /* нет шаблонов — кнопка будет неактивна */ }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Сервис задания и его форматы из реестра шаблонов.
+    // Сервис ищем в колонке «Сервисы», затем в «Инструмент 1/2» (toolName1/2),
+    // где в текущих колодах обычно и указан сервис (например, Suno).
+    // Возвращает:
+    //   candidates    — все названия сервисов, упомянутые в задании;
+    //   matchedServices — сервисы из реестра, у которых ЕСТЬ шаблон (форматы), без дублей;
+    //   service/formats — выбранный сервис (по instructionService) или первый с шаблоном;
+    //   svcName        — отображаемое имя выбранного/первого кандидата.
+    const getTaskTemplate = useCallback((task) => {
+        const candidates = [];
+        String(task?.services || "")
+            .split(/[,;\n]/)
+            .forEach((s) => { const v = s.trim(); if (v) candidates.push(v); });
+        [task?.toolName1, task?.toolName2].forEach((s) => { const v = String(s || "").trim(); if (v) candidates.push(v); });
+
+        const matchedServices = [];
+        let serviceNoFmt = null;
+        for (const name of candidates) {
+            const needle = name.toLowerCase();
+            const service = serviceTemplates.find((s) => s.serviceName.toLowerCase() === needle || s.serviceKey === needle);
+            if (!service) continue;
+            if (service.formats.length) {
+                if (!matchedServices.some((s) => s.serviceKey === service.serviceKey)) matchedServices.push(service);
+            } else if (!serviceNoFmt) {
+                serviceNoFmt = service;
+            }
+        }
+
+        // Ручной выбор сервиса (если в задании несколько с шаблонами).
+        const chosenKey = String(task?.instructionService || "").trim();
+        let service = null;
+        if (matchedServices.length) {
+            service = (chosenKey && matchedServices.find((s) => s.serviceKey === chosenKey)) || matchedServices[0];
+        }
+
+        if (service) return { svcName: service.serviceName, service, formats: service.formats, matchedServices };
+        if (serviceNoFmt) return { svcName: serviceNoFmt.serviceName, service: serviceNoFmt, formats: [], matchedServices };
+        return { svcName: candidates[0] || "", service: null, formats: [], matchedServices };
+    }, [serviceTemplates]);
+
+    const handleServiceChange = useCallback((rowIdx, serviceKey) => {
+        // Смена сервиса сбрасывает выбранный формат (форматы у сервисов разные).
+        setTasks((prev) => prev.map((t, i) => (i === rowIdx ? { ...t, instructionService: serviceKey, instructionFormat: "" } : t)));
+        isDirty.current = true;
+    }, []);
+
+    // Автогенерация инструкций возможна только для 6 контентных форматов «Я»
+    // (Текст, Аудио, Изображение/Статика, Интерактив, Видео/Динамика, Данные).
+    // Старт, карты настроения и направления «Мы» (Знания и навыки и т.п.) — исключаются.
+    const isGeneratableContent = useCallback((contentType) => classifyTask(contentType).kind === "ya-format", []);
+
+    const taskHasMap = useCallback((task) => {
+        const explicit = String(task?.map || "").trim();
+        if (explicit && existingMaps.includes(explicit)) return true;
+        const num = String(task?.number || "").trim();
+        return !!num && existingMaps.some((f) => f.replace(/\.[^.]+$/, "") === num);
+    }, [existingMaps]);
+
+    const handleFormatChange = useCallback((rowIdx, formatKey) => {
+        setTasks((prev) => prev.map((t, i) => (i === rowIdx ? { ...t, instructionFormat: formatKey } : t)));
+        isDirty.current = true;
+    }, []);
+
+    const generateInstructionFor = useCallback(async (task) => {
+        const res = await fetch("/api/admin/mayak-content/generate-instruction", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ range, number: task.number, formatKey: task.instructionFormat || "", serviceKey: task.instructionService || "" }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json?.success === false) {
+            throw new Error(json?.error || "Не удалось сгенерировать инструкцию");
+        }
+        return json.data;
+    }, [range]);
+
+    const applyGeneratedInstruction = useCallback((data) => {
+        setTasks((prev) => prev.map((t) => (String(t.number) === String(data.number)
+            ? { ...t, instruction: data.instruction, instructionText: data.instructionText || t.instructionText, hasInstruction: true, instructionFormat: data.formatKey || t.instructionFormat || "", instructionService: data.serviceKey || t.instructionService || "" }
+            : t)));
+        setExistingInstructions((prev) => (prev.includes(data.instruction) ? prev : [...prev, data.instruction]));
+    }, []);
+
+    const handleGenerateInstruction = useCallback(async (rowIdx) => {
+        const task = tasksRef.current[rowIdx];
+        if (!task) return;
+        setGenBusyRow(rowIdx);
+        setSaveMsg(null);
+        try {
+            const data = await generateInstructionFor(task);
+            applyGeneratedInstruction(data);
+            setSaveMsg({ type: "success", text: `Инструкция для задания ${data.number} обновлена (${data.serviceName} · ${data.formatName})` });
+        } catch (err) {
+            setSaveMsg({ type: "error", text: `Задание ${task.number}: ${err.message}` });
+        } finally {
+            setGenBusyRow(null);
+        }
+    }, [generateInstructionFor, applyGeneratedInstruction]);
+
+    const handleGenerateAll = useCallback(async () => {
+        // Только контентные форматы «Я», у которых есть шаблон сервиса и загруженная карта.
+        const targets = tasksRef.current.filter((t) => {
+            if (!isGeneratableContent(t.contentType)) return false;
+            const { formats } = getTaskTemplate(t);
+            return formats.length > 0 && taskHasMap(t);
+        });
+        if (targets.length === 0) {
+            setSaveMsg({ type: "error", text: "Нет подходящих заданий: нужен контентный тип (Текст/Аудио/Изображение/Интерактив/Видео/Данные) + шаблон сервиса + карта" });
+            return;
+        }
+        setGenAllBusy(true);
+        setGenProgress({ done: 0, total: targets.length });
+        setSaveMsg({ type: "success", text: `Генерация 0/${targets.length}...` });
+        let ok = 0;
+        const errors = [];
+        for (let i = 0; i < targets.length; i++) {
+            const task = targets[i];
+            try {
+                const data = await generateInstructionFor(task);
+                applyGeneratedInstruction(data);
+                ok += 1;
+            } catch (err) {
+                errors.push(`№${task.number}: ${err.message}`);
+            }
+            setGenProgress({ done: i + 1, total: targets.length });
+            setSaveMsg({ type: "success", text: `Генерация ${i + 1}/${targets.length}... (готово ${ok}, ошибок ${errors.length})` });
+        }
+        setGenAllBusy(false);
+        setGenProgress(null);
+        setSaveMsg({
+            type: errors.length ? "error" : "success",
+            text: `Готово: ${ok}/${targets.length} инструкций обновлено${errors.length ? `. Ошибки: ${errors.slice(0, 5).join("; ")}` : ""}`,
+        });
+    }, [getTaskTemplate, isGeneratableContent, taskHasMap, generateInstructionFor, applyGeneratedInstruction]);
+
     // Загрузка привязанных токенов
     const loadBoundTokens = useCallback(async () => {
         try {
@@ -763,6 +924,35 @@ function RangeEditor({ range, onBack }) {
 
     // Валидация колоды по стандарту (для баннера «что исправить»).
     const deckStandard = useMemo(() => validateDeckStandard(tasks), [tasks]);
+
+    // Проверка сервисов: для контентных заданий сервис (из «Сервисы»/«Инструмент»)
+    // должен присутствовать в каталоге «Шаблоны инструкций». Иначе — проблема с подсказкой.
+    const serviceIssues = useMemo(() => {
+        if (!serviceTemplates.length) return [];
+        const known = new Set();
+        serviceTemplates.forEach((s) => { known.add(s.serviceName.toLowerCase()); known.add(s.serviceKey); });
+        const issues = [];
+        for (const t of tasks) {
+            if (classifyTask(t.contentType).kind !== "ya-format") continue;
+            const candidates = [];
+            String(t.services || "").split(/[,;\n]/).forEach((s) => { const v = s.trim(); if (v) candidates.push(v); });
+            [t.toolName1, t.toolName2].forEach((s) => { const v = String(s || "").trim(); if (v) candidates.push(v); });
+            if (candidates.length === 0) {
+                issues.push({ number: t.number, kind: "no-service" });
+                continue;
+            }
+            if (candidates.some((c) => known.has(c.toLowerCase()))) continue;
+            // Подсказка: сервис из каталога, чьё имя похоже (вхождение подстроки).
+            const first = candidates[0];
+            const low = first.toLowerCase();
+            const near = serviceTemplates.find((s) => {
+                const n = s.serviceName.toLowerCase();
+                return n.includes(low) || low.includes(n);
+            });
+            issues.push({ number: t.number, kind: "unknown", name: first, suggestion: near?.serviceName || "" });
+        }
+        return issues;
+    }, [tasks, serviceTemplates]);
 
     // Мемоизированные счётчики для тулбара
     const toolbarCounts = useMemo(() => ({
@@ -1215,6 +1405,9 @@ function RangeEditor({ range, onBack }) {
                     })()}
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <button onClick={handleGenerateAll} disabled={genAllBusy} title="Сгенерировать PDF-инструкции для контентных заданий (Текст/Аудио/Изображение/Интерактив/Видео/Данные) с шаблоном и картой" style={{ ...btnStyle, background: "#7c3aed", opacity: genAllBusy ? 0.7 : 1 }}>
+                        {genAllBusy ? `Генерация ${genProgress?.done ?? 0}/${genProgress?.total ?? "?"}...` : "⚙ Сгенерировать все"}
+                    </button>
                     <button onClick={handleValidate} style={{ ...btnStyle, background: "#6366f1" }}>Проверка</button>
                     <button onClick={handleSave} disabled={saving} style={{ ...btnStyle, background: validationErrors.length > 0 ? "#f59e0b" : "#22c55e", opacity: saving ? 0.7 : 1 }}>
                         {saving ? "Сохранение..." : "Сохранить"}
@@ -1287,6 +1480,29 @@ function RangeEditor({ range, onBack }) {
                 </div>
             )}
 
+            {/* Проверка сервисов: сервис задания не найден в каталоге «Шаблоны инструкций» */}
+            {!loading && serviceIssues.length > 0 && (
+                <div style={{
+                    padding: "8px 14px", borderRadius: 6, marginBottom: 8, fontSize: 12,
+                    background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412",
+                }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        Сервисы вне каталога ({serviceIssues.length}). Автогенерация по ним невозможна.
+                    </div>
+                    {serviceIssues.slice(0, 12).map((iss, i) => (
+                        <div key={`svc-${i}`}>
+                            {iss.kind === "no-service"
+                                ? `• Задание ${iss.number}: контентный тип, но не указан сервис (колонка «Сервисы» или «Инструмент»).`
+                                : `• Задание ${iss.number}: сервис «${iss.name}» не найден в каталоге.${iss.suggestion ? ` Возможно, имелся в виду «${iss.suggestion}».` : ""}`}
+                        </div>
+                    ))}
+                    {serviceIssues.length > 12 && <div style={{ opacity: 0.8 }}>…и ещё {serviceIssues.length - 12}.</div>}
+                    <div style={{ marginTop: 4, opacity: 0.85 }}>
+                        Решение: добавьте сервис на вкладке <Link href="/admin/mayak-service-templates" style={{ color: "#2563eb" }}>«Шаблоны инструкций»</Link> (имя + ссылка, можно без шаблона), либо исправьте название сервиса в колонке так, чтобы оно совпадало с каталогом.
+                    </div>
+                </div>
+            )}
+
             {/* Таблица-гугл */}
             <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 160px)", border: "1px solid #c0c0c0", borderRadius: 0 }}>
                 <table style={{ borderCollapse: "collapse", fontSize: 12, fontFamily: "'Arial', sans-serif", tableLayout: "fixed", width: COLUMNS.reduce((s, c) => s + c.width, 0) }}>
@@ -1318,6 +1534,72 @@ function RangeEditor({ range, onBack }) {
                                         const val = getCellValue(ri, col);
                                         const sel = isCellSelected(ri, ci);
                                         const active = activeCell?.row === ri && activeCell?.col === ci;
+
+                                        if (col.source === "action") {
+                                            const { svcName, service, formats, matchedServices } = getTaskTemplate(task);
+                                            const hasTemplate = formats.length > 0;
+                                            const generatable = isGeneratableContent(task.contentType);
+                                            const multiService = matchedServices.length > 1;
+                                            const selectedSvc = service?.serviceKey || "";
+                                            const selectedFmt = task.instructionFormat || formats[0]?.formatKey || "";
+                                            const busy = genBusyRow === ri || genAllBusy;
+                                            const disabled = !generatable || !svcName || !hasTemplate || busy;
+                                            const title = !generatable
+                                                ? "Автогенерация только для типов: Текст, Аудио, Изображение, Интерактив, Видео, Данные"
+                                                : !svcName
+                                                ? "Укажите сервис в колонке «Сервисы» или «Инструмент»"
+                                                : !hasTemplate
+                                                ? `Для сервиса «${svcName}» не загружен шаблон`
+                                                : multiService
+                                                ? `Несколько сервисов — выбран «${svcName}». Сгенерировать инструкцию.`
+                                                : "Сгенерировать PDF-инструкцию из шаблона и карты задания";
+                                            return (
+                                                <td key={ci} style={{ ...cellStyle, borderLeft: "1px solid #e2e8f0", padding: "2px 4px" }}>
+                                                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                                                        {multiService && (
+                                                            <select
+                                                                value={selectedSvc}
+                                                                onChange={(e) => handleServiceChange(ri, e.target.value)}
+                                                                title="К какому сервису привязать инструкцию"
+                                                                style={{ fontSize: 11, maxWidth: 80, border: "1px solid #f59e0b", borderRadius: 4, padding: "2px" }}>
+                                                                {matchedServices.map((s) => (
+                                                                    <option key={s.serviceKey} value={s.serviceKey}>{s.serviceName}</option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                        {formats.length > 1 && (
+                                                            <select
+                                                                value={selectedFmt}
+                                                                onChange={(e) => handleFormatChange(ri, e.target.value)}
+                                                                title="Формат инструкции"
+                                                                style={{ fontSize: 11, maxWidth: 72, border: "1px solid #cbd5e1", borderRadius: 4, padding: "2px" }}>
+                                                                {formats.map((f) => (
+                                                                    <option key={f.formatKey} value={f.formatKey}>{f.formatName}</option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            disabled={disabled}
+                                                            title={title}
+                                                            onClick={() => handleGenerateInstruction(ri)}
+                                                            style={{
+                                                                fontSize: 11,
+                                                                fontWeight: 600,
+                                                                padding: "4px 8px",
+                                                                borderRadius: 4,
+                                                                border: "none",
+                                                                cursor: disabled ? "default" : "pointer",
+                                                                color: "#fff",
+                                                                background: disabled ? "#cbd5e1" : "#7c3aed",
+                                                                whiteSpace: "nowrap",
+                                                            }}>
+                                                            {busy ? "..." : "Обновить"}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            );
+                                        }
 
                                         if (col.autoCheckbox) {
                                             // Вычисляем состояние авто-галочки по текстовому полю
