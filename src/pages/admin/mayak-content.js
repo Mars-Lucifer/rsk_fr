@@ -537,6 +537,40 @@ function RangeEditor({ range, onBack }) {
     const saveSnapshotRef = useRef(null);
     const handlePasteMultiRef = useRef(null);
     const setCellValueRef = useRef(null);
+    const copyTextRef = useRef(null);
+
+    // Надёжное копирование в буфер: сначала Clipboard API (нужен secure context
+    // и фокус документа), при отказе — фоллбэк через скрытую textarea + execCommand.
+    // Раньше тут был navigator.clipboard.writeText(...).catch(()=>{}) — при тихом
+    // отказе пользователь не понимал, скопировалось или нет («не копирует»).
+    copyTextRef.current = (text, cellCount) => {
+        const notifyOk = () => setSaveMsg({ type: "success", text: `Скопировано ячеек: ${cellCount}` });
+        const notifyFail = () => setSaveMsg({ type: "error", text: "Не удалось скопировать в буфер обмена" });
+
+        const fallback = () => {
+            try {
+                const ta = document.createElement("textarea");
+                ta.value = text;
+                ta.style.position = "fixed";
+                ta.style.top = "-9999px";
+                ta.setAttribute("readonly", "");
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand("copy");
+                document.body.removeChild(ta);
+                if (ok) notifyOk(); else notifyFail();
+            } catch {
+                notifyFail();
+            }
+        };
+
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(text).then(notifyOk).catch(fallback);
+        } else {
+            fallback();
+        }
+    };
+
     useEffect(() => {
         keydownHandlerRef.current = (e) => {
             const tag = document.activeElement?.tagName?.toLowerCase();
@@ -601,7 +635,9 @@ function RangeEditor({ range, onBack }) {
                     }
                     lines.push(cells.join("\t"));
                 }
-                navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
+                const tsv = lines.join("\n");
+                const cellCount = (sel.r2 - sel.r1 + 1) * (sel.c2 - sel.c1 + 1);
+                copyTextRef.current?.(tsv, cellCount);
                 return;
             }
 
