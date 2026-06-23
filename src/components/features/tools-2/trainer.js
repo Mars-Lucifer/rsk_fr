@@ -2207,15 +2207,13 @@ export default function TrainerPage({ goTo }) {
                             </svg>
                         </Button>
                     )}
-                    {(isSessionMode || tokenType === "bypass") && (
-                        <Button
-                            inverted
-                            roundeful
-                            className="inline-flex items-center justify-center !rounded-full !bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
-                            onClick={handleCompleteSession}>
-                            Завершить&nbsp;сессию
-                        </Button>
-                    )}
+                    <Button
+                        inverted
+                        roundeful
+                        className="inline-flex items-center justify-center !rounded-full !bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                        onClick={handleCompleteSession}>
+                        Завершить&nbsp;сессию
+                    </Button>
                 </div>
             </Header>
 
