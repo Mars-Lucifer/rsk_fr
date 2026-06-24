@@ -43,6 +43,12 @@ export const MAYAK_ADMIN_SECTIONS = [
         description: "Ссылки, прогресс, конструктор и анонимная анкета подготовки.",
         href: "/admin/mayak-onboarding",
     },
+    {
+        id: "service-templates",
+        title: "Шаблоны инструкций",
+        description: "PPTX-шаблоны инструкций по сервисам и форматам для автогенерации инструкций заданий.",
+        href: "/admin/mayak-service-templates",
+    },
 ];
 
 const MAYAK_ADMIN_AUTH_URL = "/api/admin/mayak-auth";

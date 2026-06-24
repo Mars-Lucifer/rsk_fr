@@ -1,18 +1,13 @@
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
-import { execFile } from "child_process";
-import { promisify } from "util";
 
 import { completeMayakSession, getMayakSessionById } from "@/lib/mayakSessions";
 import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
-
-const execFileAsync = promisify(execFile);
+import { convertToPdf, logLibreOffice } from "@/lib/libreofficeConverter";
 
 const SESSION_RUNTIME_FILE = path.join(process.cwd(), "data", "mayak-session-runtime.json");
 const SESSION_FILES_ROOT = path.join(process.cwd(), "data", "mayak-session-files");
-const LIBREOFFICE_WORK_ROOT = path.join(process.cwd(), "tmp_pdf_tools", "mayak-libreoffice");
-const LIBREOFFICE_LOG_FILE = path.join(process.cwd(), "data", "mayak-libreoffice.log");
 const DEFAULT_REVIEW_TIMEOUT_SECONDS = 130;
 const DEFAULT_REWORK_TIMEOUT_SECONDS = 180;
 const PREVIEW_PROCESSING_TIMEOUT_MS = 90 * 1000;
@@ -81,74 +76,12 @@ function isReviewReadyForInspector(review) {
     return review?.file?.previewStatus === "ready" || review?.file?.previewStatus === "failed";
 }
 
-function logLibreOffice(step, payload = {}) {
-    const entry = {
-        timestamp: new Date().toISOString(),
-        step,
-        ...payload,
-    };
-    console.log(`[MAYAK][LibreOffice][${step}]`, entry);
-    fs.mkdir(path.dirname(LIBREOFFICE_LOG_FILE), { recursive: true })
-        .then(() => fs.appendFile(LIBREOFFICE_LOG_FILE, `${JSON.stringify(entry)}\n`, "utf8"))
-        .catch(() => {});
-}
-
 function isStalePreviewProcessing(file) {
     if (!file || file.previewStatus !== "processing") return false;
     if (!file.previewProcessingStartedAt) return true;
     const startedAt = Date.parse(file.previewProcessingStartedAt);
     if (!Number.isFinite(startedAt)) return true;
     return Date.now() - startedAt > PREVIEW_PROCESSING_TIMEOUT_MS;
-}
-
-async function canAccessExecutable(candidate) {
-    if (!candidate) return false;
-
-    const isPathCandidate = candidate.includes("\\") || candidate.includes("/") || candidate.endsWith(".exe");
-    if (isPathCandidate) {
-        try {
-            await fs.access(candidate);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    try {
-        if (process.platform === "win32") {
-            await execFileAsync("where.exe", [candidate], { windowsHide: true, timeout: 5000 });
-        } else {
-            await execFileAsync("which", [candidate], { timeout: 5000 });
-        }
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-async function resolveLibreOfficeCommand() {
-    const envCandidate = normalizeString(process.env.MAYAK_LIBREOFFICE_PATH);
-    if (envCandidate && (await canAccessExecutable(envCandidate))) {
-        logLibreOffice("resolve-command", { source: "env", command: envCandidate });
-        return envCandidate;
-    }
-
-    const candidates = [
-        "soffice",
-        "libreoffice",
-        "C:/Program Files/LibreOffice/program/soffice.exe",
-        "C:/Program Files (x86)/LibreOffice/program/soffice.exe",
-    ];
-
-    for (const candidate of candidates) {
-        if (await canAccessExecutable(candidate)) {
-            logLibreOffice("resolve-command", { source: "fallback", command: candidate });
-            return candidate;
-        }
-    }
-
-    logLibreOffice("resolve-command-missed", {});
-    return null;
 }
 
 async function ensureStoreFile() {
@@ -348,98 +281,7 @@ function serializeReviewSummary(sessionId, review) {
 }
 
 async function convertWordToPdf(sourcePath, targetDir) {
-    const command = await resolveLibreOfficeCommand();
-    if (!command) {
-        throw new Error("\u041d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d LibreOffice/soffice. \u0423\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 LibreOffice \u0438\u043b\u0438 \u0437\u0430\u0434\u0430\u0439\u0442\u0435 \u043f\u0443\u0442\u044c \u0447\u0435\u0440\u0435\u0437 MAYAK_LIBREOFFICE_PATH.");
-    }
-
-    const conversionId = crypto.randomUUID();
-    const sourceExt = path.extname(sourcePath).toLowerCase();
-    const workDir = path.join(LIBREOFFICE_WORK_ROOT, conversionId);
-    const tempDir = path.join(workDir, "temp");
-    const profileDir = path.join(workDir, "profile");
-    const inputDir = path.join(workDir, "input");
-    const outputDir = path.join(workDir, "output");
-    const stagedInputPath = path.join(inputDir, "input" + sourceExt);
-    const stagedOutputPath = path.join(outputDir, "input.pdf");
-    const profileUri = "file:///" + profileDir.replace(/\\/g, "/");
-
-    try {
-        await fs.mkdir(tempDir, { recursive: true });
-        await fs.mkdir(profileDir, { recursive: true });
-        await fs.mkdir(inputDir, { recursive: true });
-        await fs.mkdir(outputDir, { recursive: true });
-        await fs.copyFile(sourcePath, stagedInputPath);
-
-        const args = [
-            "--headless",
-            "--nologo",
-            "--nodefault",
-            "--norestore",
-            "--nolockcheck",
-            "-env:UserInstallation=" + profileUri,
-            "--convert-to",
-            "pdf",
-            "--outdir",
-            outputDir,
-            stagedInputPath,
-        ];
-
-        logLibreOffice("convert-start", {
-            conversionId,
-            command,
-            sourcePath,
-            stagedInputPath,
-            targetDir,
-        });
-
-        const result = await execFileAsync(command, args, {
-            windowsHide: true,
-            timeout: 45000,
-            maxBuffer: 10 * 1024 * 1024,
-            env: {
-                ...process.env,
-                TEMP: tempDir,
-                TMP: tempDir,
-            },
-        });
-
-        await fs.access(stagedOutputPath);
-        const expectedPdf = path.join(targetDir, path.parse(sourcePath).name + ".pdf");
-        await fs.copyFile(stagedOutputPath, expectedPdf);
-
-        logLibreOffice("convert-success", {
-            conversionId,
-            sourcePath,
-            expectedPdf,
-            stdout: String(result?.stdout || "").trim(),
-            stderr: String(result?.stderr || "").trim(),
-        });
-
-        return expectedPdf;
-    } catch (lastError) {
-        logLibreOffice("convert-failed", {
-            conversionId,
-            command,
-            sourcePath,
-            targetDir,
-            code: lastError?.code || null,
-            signal: lastError?.signal || null,
-            killed: Boolean(lastError?.killed),
-            stdout: String(lastError?.stdout || "").trim(),
-            stderr: String(lastError?.stderr || "").trim(),
-            message: lastError?.message || "Unknown LibreOffice error",
-        });
-        if (lastError?.code === "ENOENT") {
-            throw new Error("\u041d\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435 \u043d\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d LibreOffice. \u0414\u043b\u044f Word \u0438 PowerPoint \u0444\u0430\u0439\u043b\u043e\u0432 \u043f\u043e\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u0435 PDF \u0438\u043b\u0438 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 LibreOffice.");
-        }
-        if (lastError?.killed || lastError?.signal === "SIGTERM") {
-            throw new Error("\u041a\u043e\u043d\u0432\u0435\u0440\u0442\u0430\u0446\u0438\u044f \u0444\u0430\u0439\u043b\u0430 \u0437\u0430\u043d\u044f\u043b\u0430 \u0441\u043b\u0438\u0448\u043a\u043e\u043c \u043c\u043d\u043e\u0433\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 PDF \u0438\u043b\u0438 \u0444\u0430\u0439\u043b \u043c\u0435\u043d\u044c\u0448\u0435\u0433\u043e \u0440\u0430\u0437\u043c\u0435\u0440\u0430.");
-        }
-        throw new Error("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043a\u043e\u043d\u0432\u0435\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c Word \u0438\u043b\u0438 PowerPoint \u0444\u0430\u0439\u043b \u0432 PDF.");
-    } finally {
-        await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
-    }
+    return convertToPdf(sourcePath, targetDir);
 }
 
 export async function registerMayakSessionParticipant({ sessionId, userId, name, organization, tableNumber }) {
