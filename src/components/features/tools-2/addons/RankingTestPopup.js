@@ -3,6 +3,7 @@ import Button from "@/components/ui/Button";
 import CloseIcon from "@/assets/general/close.svg";
 import { RANKING_TEST_DATA } from "../../../../../data/rankingTestData";
 import { useRankingDragAndDrop } from "./useRankingDragAndDrop";
+import { useLevelTimer } from "./useLevelTimer";
 
 const STORAGE_KEY = "trainer_v2_rankingTestResults";
 const PREVIOUS_STORAGE_KEY = "trainer_v2_rankingTestResults_previous";
@@ -211,15 +212,6 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
     // ID перетаскиваемого элемента (не индекс — индекс меняется при reorder)
     const [showHint, setShowHint] = useState(true);
 
-    const [levelTimers, setLevelTimers] = useState(() => {
-        const timers = {};
-        for (let i = 0; i < levels.length; i++) {
-            timers[i] = savedData?.[`level${i + 1}`]?.time || 0;
-        }
-        return timers;
-    });
-    const timerRef = useRef(null);
-
     const currentLevelRef = useRef(currentLevel);
 
     useEffect(() => {
@@ -240,16 +232,14 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
         handleTouchStart,
     } = useRankingDragAndDrop({ userOrder, isLevelDone, currentLevelRef, setUserOrders });
 
-    useEffect(() => {
-        if (isLevelDone || isFullyCompleted) {
-            if (timerRef.current) clearInterval(timerRef.current);
-            return;
-        }
-        timerRef.current = setInterval(() => {
-            setLevelTimers((prev) => ({ ...prev, [currentLevel]: (prev[currentLevel] || 0) + 1 }));
-        }, 1000);
-        return () => { if (timerRef.current) clearInterval(timerRef.current); };
-    }, [currentLevel, isLevelDone, isFullyCompleted]);
+    // Таймер активного уровня вынесен в хук; семантика 1:1.
+    const { levelTimers, setLevelTimers } = useLevelTimer({
+        levelsCount: levels.length,
+        currentLevel,
+        isLevelDone,
+        isFullyCompleted,
+        savedData,
+    });
 
     const getPrompt = useCallback(
         (id) => level.prompts.find((p) => p.id === id),
