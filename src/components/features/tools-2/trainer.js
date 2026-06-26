@@ -390,6 +390,26 @@ export default function TrainerPage({ goTo }) {
     const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
     const isSessionMode = tokenType === "session" && !!runtimeSessionId;
 
+    // Единый refresh состояния сессии. Раньше один и тот же блок «запросить
+    // /session-runtime/state и записать в стейт» был скопирован в 4 местах
+    // (авто-аппрув intro, upload, joker-spend, решение инспектора) и в polling-
+    // эффекте. Теперь — одна стабильная функция; возвращает новый state (или null),
+    // чтобы вызывающий при желании читал его сразу.
+    const refreshSessionRuntimeState = useCallback(async () => {
+        if (!runtimeSessionId || !activeUserId) return null;
+        const refreshResponse = await fetch(
+            `/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`,
+            { cache: "no-store" }
+        );
+        const refreshPayload = await refreshResponse.json().catch(() => ({}));
+        if (refreshResponse.ok && refreshPayload.success) {
+            const nextState = refreshPayload.data || null;
+            setSessionRuntimeState(nextState);
+            return nextState;
+        }
+        return null;
+    }, [runtimeSessionId, activeUserId]);
+
     // Отладка в сессии: панель меняет ТОЛЬКО клиентский override (localStorage),
     // на сервер ничего не пишется. Это гарантирует, что отладка администратора
     // не влияет ни на других участников, ни на дашборд, ни на реальные задачи.
@@ -564,13 +584,7 @@ export default function TrainerPage({ goTo }) {
                 });
                 const payload = await res.json().catch(() => ({}));
                 if (res.ok && payload.success) {
-                    const refreshResponse = await fetch(`/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`, {
-                        cache: "no-store",
-                    });
-                    const refreshPayload = await refreshResponse.json().catch(() => ({}));
-                    if (refreshResponse.ok && refreshPayload.success) {
-                        setSessionRuntimeState(refreshPayload.data || null);
-                    }
+                    await refreshSessionRuntimeState();
                 }
             }
         } catch (err) {
@@ -581,7 +595,7 @@ export default function TrainerPage({ goTo }) {
         if (timerState.isRunning) {
             stopTimer();
         }
-    }, [currentTask, currentTaskIndex, tasksTexts, type, userType, who, timerState.isRunning, stopTimer, isSessionMode, runtimeSessionId, activeUserId, setSessionRuntimeState]);
+    }, [currentTask, currentTaskIndex, tasksTexts, type, userType, who, timerState.isRunning, stopTimer, isSessionMode, runtimeSessionId, activeUserId, refreshSessionRuntimeState]);
 
 
     useEffect(() => {
@@ -1338,13 +1352,7 @@ export default function TrainerPage({ goTo }) {
                     timeWhenStopped: timerState.elapsedTime,
                 });
 
-                const refreshResponse = await fetch(`/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`, {
-                    cache: "no-store",
-                });
-                const refreshPayload = await refreshResponse.json().catch(() => ({}));
-                if (refreshResponse.ok && refreshPayload.success) {
-                    setSessionRuntimeState(refreshPayload.data || null);
-                }
+                await refreshSessionRuntimeState();
 
                 setShowCompletionPopup(false);
             } catch (error) {
@@ -1353,7 +1361,7 @@ export default function TrainerPage({ goTo }) {
                 setSessionUploadLoading(false);
             }
         },
-        [activeUserId, currentTask, currentTaskData, currentTaskIndex, finalizeTaskExecution, runtimeSessionId, tasksTexts, timerState.elapsedTime, timerState.readyElapsedTime]
+        [activeUserId, currentTask, currentTaskData, currentTaskIndex, finalizeTaskExecution, runtimeSessionId, tasksTexts, timerState.elapsedTime, timerState.readyElapsedTime, refreshSessionRuntimeState]
     );
 
     // Использовать звезду-джокер: мгновенно засчитывает текущее задание «Мы»
@@ -1383,13 +1391,7 @@ export default function TrainerPage({ goTo }) {
 
             await finalizeTaskExecution({ timeWhenStopped: timerState.elapsedTime });
 
-            const refreshResponse = await fetch(`/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`, {
-                cache: "no-store",
-            });
-            const refreshPayload = await refreshResponse.json().catch(() => ({}));
-            if (refreshResponse.ok && refreshPayload.success) {
-                setSessionRuntimeState(refreshPayload.data || null);
-            }
+            await refreshSessionRuntimeState();
 
             setShowCompletionPopup(false);
         } catch (error) {
@@ -1397,7 +1399,7 @@ export default function TrainerPage({ goTo }) {
         } finally {
             setSessionUploadLoading(false);
         }
-    }, [activeUserId, currentTask, currentTaskData, currentTaskIndex, finalizeTaskExecution, runtimeSessionId, timerState.elapsedTime]);
+    }, [activeUserId, currentTask, currentTaskData, currentTaskIndex, finalizeTaskExecution, runtimeSessionId, timerState.elapsedTime, refreshSessionRuntimeState]);
 
     const handleResolveInspectorReview = useCallback(
         async (action, comment = "") => {
@@ -1425,20 +1427,14 @@ export default function TrainerPage({ goTo }) {
                 }
 
                 setOpenedInspectorReviewId("");
-                const refreshResponse = await fetch(`/api/mayak/session-runtime/state?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`, {
-                    cache: "no-store",
-                });
-                const refreshPayload = await refreshResponse.json().catch(() => ({}));
-                if (refreshResponse.ok && refreshPayload.success) {
-                    setSessionRuntimeState(refreshPayload.data || null);
-                }
+                await refreshSessionRuntimeState();
             } catch (error) {
                 setInspectorResolveError(error.message || "Не удалось сохранить решение инспектора");
             } finally {
                 setInspectorResolveLoading(false);
             }
         },
-        [activeInspectorReview, activeUserId, runtimeSessionId]
+        [activeInspectorReview, activeUserId, runtimeSessionId, refreshSessionRuntimeState]
     );
 
     const handleClosePreview = useCallback(() => {

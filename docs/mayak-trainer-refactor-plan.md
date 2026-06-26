@@ -66,9 +66,14 @@
 «залипания прогресса»).
 
 ### Этап 2 — Единый слой session-runtime
-`useMayakSessionRuntime`: polling + мутации (`upload`, `joker-spend`, `review`,
-`ya-direction`, `role`) + единый `refreshState()`. Убирает 4-кратный повтор и
-~250 строк из монолита.
+Цель: убрать 4-кратный повтор блока «запросить `/session-runtime/state` →
+записать в стейт». Сделано через одну стабильную `refreshSessionRuntimeState`
+в `trainer.js` (см. журнал). Полный вынос обработчиков (`upload`, `joker-spend`,
+`review`, `ya-direction`) и polling-эффекта в отдельный хук СОЗНАТЕЛЬНО отложен:
+они сильно связаны с контекстом задачи (`currentTaskData`, `finalizeTaskExecution`,
+`timerState`, `activeInspectorReview`) и побочными эффектами polling (синк роли,
+куки, редирект). Вынос потребовал бы прокинуть ~10 параметров в хук — это лишь
+переместит связанность и повысит риск. Решается вместе с Этапом 4 (сужение хуков).
 
 ### Этап 3 — Разбить JSX
 `<TrainerDebugPanel>` (~190 стр.), `<TrainerFieldsPanel>`, `<TrainerOutputPanel>`,
@@ -100,6 +105,10 @@
   зелёная, smoke-тест функции на эталонной колоде пройден. Полное слияние с
   серверной `mayakSessionDashboard.computeYaProgress` НЕ делалось (риск для
   joker-логики) — отмечено как отдельная задача.
+- [x] Этап 2 — добавлена стабильная `refreshSessionRuntimeState`; устранён
+  4-кратный повтор inline-refresh (intro auto-approve, upload, joker-spend,
+  решение инспектора). Polling-эффект и обработчики оставлены в компоненте
+  (их вынос в хук отложен — см. описание Этапа 2). Сборка зелёная.
 - [ ] Этап 1
 - [ ] Этап 2
 - [ ] Этап 3
