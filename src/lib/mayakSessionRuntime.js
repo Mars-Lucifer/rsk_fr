@@ -122,6 +122,29 @@ async function writeStore(store, touchedSessionIds = null) {
     });
 }
 
+// Атомарная мутация рантайма: весь read-modify-write выполняется под одним
+// файловым локом (как в spendJokerStarAndApproveTask). Это устраняет гонку
+// «прочитали снимок вне лока → потеряли чужие параллельные изменения».
+// Колбэк получает (store, bucket), мутирует store на месте и возвращает
+// результат; запись на диск делается один раз после колбэка. Если колбэк
+// бросает исключение — файл не перезаписывается.
+// ВНИМАНИЕ: лок НЕ реентерабельный — внутри mutator нельзя вызывать функции,
+// которые сами берут лок (writeStore/expirePendingReviews). Для истечения
+// ревью под локом используйте applyPendingReviewExpirations(bucket).
+async function mutateSessionRuntime(sessionId, mutator) {
+    await ensureStoreFile();
+    return withJsonFileLock(SESSION_RUNTIME_FILE, async () => {
+        const store = await readJsonFile(SESSION_RUNTIME_FILE, createEmptyStore());
+        if (!store.sessions || typeof store.sessions !== "object") {
+            store.sessions = {};
+        }
+        const bucket = ensureSessionBucket(store, sessionId);
+        const result = await mutator(store, bucket);
+        await writeJsonFileAtomic(SESSION_RUNTIME_FILE, store);
+        return result;
+    });
+}
+
 function ensureSessionBucket(store, sessionId) {
     if (!store.sessions[sessionId]) {
         store.sessions[sessionId] = {
@@ -220,8 +243,9 @@ function expireReworkIfNeeded(taskState) {
     return true;
 }
 
-async function expirePendingReviews(store, sessionId) {
-    const bucket = ensureSessionBucket(store, sessionId);
+// Истечение ревью/доработок на месте, БЕЗ записи на диск. Безопасно вызывать
+// под локом (внутри mutateSessionRuntime). Возвращает признак изменений.
+function applyPendingReviewExpirations(bucket) {
     let changed = false;
 
     Object.values(bucket.reviews || {}).forEach((review) => {
@@ -239,6 +263,12 @@ async function expirePendingReviews(store, sessionId) {
         });
     });
 
+    return changed;
+}
+
+async function expirePendingReviews(store, sessionId) {
+    const bucket = ensureSessionBucket(store, sessionId);
+    const changed = applyPendingReviewExpirations(bucket);
     if (changed) {
         await writeStore(store, [sessionId]);
     }
@@ -295,64 +325,29 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
         throw new Error("Р’С‹Р±СЂР°РЅРЅС‹Р№ СЃС‚РѕР» РЅРµ РІС…РѕРґРёС‚ РІ РґРёР°РїР°Р·РѕРЅ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё");
     }
 
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    const existing = bucket.participants[userId] || {};
     const participantLimit = normalizeTableNumber(session.participantLimit);
-    if (!existing.userId && participantLimit > 0 && Object.keys(bucket.participants || {}).length >= participantLimit) {
-        throw new Error("Лимит участников для этого токена исчерпан");
-    }
-    bucket.participants[userId] = {
-        userId,
-        name: normalizeString(name) || existing.name || "РЈС‡Р°СЃС‚РЅРёРє",
-        organization: normalizeString(organization) || existing.organization || "",
-        tableNumber: normalizedTableNumber,
-        role: existing.role || "",
-        inspectorTargetTable: existing.inspectorTargetTable || null,
-        registeredAt: existing.registeredAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        tasks: existing.tasks || {},
-        // Сохраняем при повторной регистрации, иначе обнулятся прогресс
-        // направления и счётчик потраченных звёзд-джокеров.
-        yaDirection: existing.yaDirection || "",
-        jokerSpent: Number(existing.jokerSpent) || 0,
-    };
-    await writeStore(store, [sessionId]);
-    return bucket.participants[userId];
-}
-
-export async function assignMayakSessionRole({ sessionId, userId, role }) {
-    const session = await getMayakSessionById(sessionId);
-    if (!session || session.status !== "active") {
-        throw new Error("РЎРµСЃСЃРёСЏ РЅРµРґРѕСЃС‚СѓРїРЅР° РёР»Рё СѓР¶Рµ Р·Р°РІРµСЂС€РµРЅР°");
-    }
-
-    const normalizedRole = normalizeString(role);
-    if (!normalizedRole) {
-        throw new Error("РќРµ РІС‹Р±СЂР°РЅР° СЂРѕР»СЊ");
-    }
-
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    const participant = bucket.participants[userId];
-    if (!participant) {
-        throw new Error("РЈС‡Р°СЃС‚РЅРёРє РЅРµ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅ РІ СЌС‚РѕР№ СЃРµСЃСЃРёРё");
-    }
-
-    if (isReviewerRole(normalizedRole)) {
-        const takenByAnother = Object.values(bucket.participants).find((candidate) => candidate.userId !== userId && candidate.tableNumber === participant.tableNumber && candidate.role === normalizedRole);
-        if (takenByAnother) {
-            throw new Error(`Р”Р»СЏ СЃС‚РѕР»Р° ${participant.tableNumber} РёРЅСЃРїРµРєС‚РѕСЂ СѓР¶Рµ РІС‹Р±СЂР°РЅ`);
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const existing = bucket.participants[userId] || {};
+        if (!existing.userId && participantLimit > 0 && Object.keys(bucket.participants || {}).length >= participantLimit) {
+            throw new Error("Лимит участников для этого токена исчерпан");
         }
-        participant.inspectorTargetTable = getInspectorTargetTable(participant.tableNumber, normalizeTableNumber(session.tableCount));
-    } else {
-        participant.inspectorTargetTable = null;
-    }
-
-    participant.role = normalizedRole;
-    participant.updatedAt = new Date().toISOString();
-    await writeStore(store, [sessionId]);
-    return participant;
+        bucket.participants[userId] = {
+            userId,
+            name: normalizeString(name) || existing.name || "РЈС‡Р°СЃС‚РЅРёРє",
+            organization: normalizeString(organization) || existing.organization || "",
+            tableNumber: normalizedTableNumber,
+            role: existing.role || "",
+            inspectorTargetTable: existing.inspectorTargetTable || null,
+            registeredAt: existing.registeredAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            tasks: existing.tasks || {},
+            // Сохраняем при повторной регистрации, иначе обнулятся прогресс
+            // направления и счётчик потраченных звёзд-джокеров.
+            yaDirection: existing.yaDirection || "",
+            jokerSpent: Number(existing.jokerSpent) || 0,
+        };
+        return bucket.participants[userId];
+    });
 }
 
 export async function setMayakSessionParticipantRole({ sessionId, userId, role }) {
@@ -366,33 +361,32 @@ export async function setMayakSessionParticipantRole({ sessionId, userId, role }
         throw new Error("\u041d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d\u0430 \u0440\u043e\u043b\u044c");
     }
 
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    const participant = bucket.participants?.[userId];
-    if (!participant) {
-        throw new Error("\u0423\u0447\u0430\u0441\u0442\u043d\u0438\u043a \u043d\u0435 \u0437\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u043d \u0432 \u044d\u0442\u043e\u0439 \u0441\u0435\u0441\u0441\u0438\u0438");
-    }
-
-    if (isReviewerRole(normalizedRole)) {
-        const takenByAnother = Object.values(bucket.participants || {}).find(
-            (candidate) => candidate.userId !== userId && candidate.tableNumber === participant.tableNumber && candidate.role === normalizedRole
-        );
-        if (takenByAnother) {
-            throw new Error(
-                normalizedRole === ADMINISTRATOR_ROLE
-                    ? `\u0414\u043b\u044f \u0441\u0442\u043e\u043b\u0430 ${participant.tableNumber} \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440 \u0443\u0436\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d`
-                    : `\u0414\u043b\u044f \u0441\u0442\u043e\u043b\u0430 ${participant.tableNumber} \u0438\u043d\u0441\u043f\u0435\u043a\u0442\u043e\u0440 \u0443\u0436\u0435 \u0432\u044b\u0431\u0440\u0430\u043d`
-            );
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("\u0423\u0447\u0430\u0441\u0442\u043d\u0438\u043a \u043d\u0435 \u0437\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u043d \u0432 \u044d\u0442\u043e\u0439 \u0441\u0435\u0441\u0441\u0438\u0438");
         }
-        participant.inspectorTargetTable = getInspectorTargetTable(participant.tableNumber, normalizeTableNumber(session.tableCount));
-    } else {
-        participant.inspectorTargetTable = null;
-    }
 
-    participant.role = normalizedRole;
-    participant.updatedAt = new Date().toISOString();
-    await writeStore(store, [sessionId]);
-    return participant;
+        if (isReviewerRole(normalizedRole)) {
+            const takenByAnother = Object.values(bucket.participants || {}).find(
+                (candidate) => candidate.userId !== userId && candidate.tableNumber === participant.tableNumber && candidate.role === normalizedRole
+            );
+            if (takenByAnother) {
+                throw new Error(
+                    normalizedRole === ADMINISTRATOR_ROLE
+                        ? `\u0414\u043b\u044f \u0441\u0442\u043e\u043b\u0430 ${participant.tableNumber} \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440 \u0443\u0436\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d`
+                        : `\u0414\u043b\u044f \u0441\u0442\u043e\u043b\u0430 ${participant.tableNumber} \u0438\u043d\u0441\u043f\u0435\u043a\u0442\u043e\u0440 \u0443\u0436\u0435 \u0432\u044b\u0431\u0440\u0430\u043d`
+                );
+            }
+            participant.inspectorTargetTable = getInspectorTargetTable(participant.tableNumber, normalizeTableNumber(session.tableCount));
+        } else {
+            participant.inspectorTargetTable = null;
+        }
+
+        participant.role = normalizedRole;
+        participant.updatedAt = new Date().toISOString();
+        return participant;
+    });
 }
 
 // Возвращает сырые объекты участников рантайма (включая карту tasks) для аналитики дашборда.
@@ -421,34 +415,33 @@ export async function moveMayakSessionParticipantTable({ sessionId, userId, tabl
         throw new Error("Недопустимый номер стола");
     }
 
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    const participant = bucket.participants?.[userId];
-    if (!participant) {
-        throw new Error("Участник не зарегистрирован в этой сессии");
-    }
-
-    if (participant.tableNumber === targetTable) {
-        return participant;
-    }
-
-    // Проверяем уникальность роли-ревьюера на новом столе.
-    if (isReviewerRole(participant.role)) {
-        const conflict = Object.values(bucket.participants || {}).find(
-            (candidate) => candidate.userId !== userId && candidate.tableNumber === targetTable && candidate.role === participant.role
-        );
-        if (conflict) {
-            throw new Error(`Для стола ${targetTable} такая роль уже занята`);
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
         }
-    }
 
-    participant.tableNumber = targetTable;
-    participant.inspectorTargetTable = isReviewerRole(participant.role)
-        ? getInspectorTargetTable(targetTable, totalTables)
-        : null;
-    participant.updatedAt = new Date().toISOString();
-    await writeStore(store, [sessionId]);
-    return participant;
+        if (participant.tableNumber === targetTable) {
+            return participant;
+        }
+
+        // Проверяем уникальность роли-ревьюера на новом столе.
+        if (isReviewerRole(participant.role)) {
+            const conflict = Object.values(bucket.participants || {}).find(
+                (candidate) => candidate.userId !== userId && candidate.tableNumber === targetTable && candidate.role === participant.role
+            );
+            if (conflict) {
+                throw new Error(`Для стола ${targetTable} такая роль уже занята`);
+            }
+        }
+
+        participant.tableNumber = targetTable;
+        participant.inspectorTargetTable = isReviewerRole(participant.role)
+            ? getInspectorTargetTable(targetTable, totalTables)
+            : null;
+        participant.updatedAt = new Date().toISOString();
+        return participant;
+    });
 }
 
 export async function readSessionReviews(sessionId) {
@@ -517,133 +510,132 @@ export async function createMayakSessionReview({
         throw new Error("РЎРµСЃСЃРёСЏ РЅРµРґРѕСЃС‚СѓРїРЅР° РёР»Рё СѓР¶Рµ Р·Р°РІРµСЂС€РµРЅР°");
     }
 
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    await expirePendingReviews(store, sessionId);
-
-    const participant = bucket.participants[userId];
-    if (!participant) {
-        throw new Error("РЈС‡Р°СЃС‚РЅРёРє РЅРµ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅ РІ СЌС‚РѕР№ СЃРµСЃСЃРёРё");
-    }
-
     const taskKey = buildTaskKey(taskNumber);
     if (!taskKey) {
         throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ РЅРѕРјРµСЂ Р·Р°РґР°РЅРёСЏ РґР»СЏ РїСЂРѕРІРµСЂРєРё");
     }
 
-    const existingTaskState = participant.tasks?.[taskKey];
-    if (existingTaskState?.status === "pending_review" && existingTaskState?.isBlocking) {
-        throw new Error("Р­С‚Рѕ Р·Р°РґР°РЅРёРµ СѓР¶Рµ РѕС‚РїСЂР°РІР»РµРЅРѕ РёРЅСЃРїРµРєС‚РѕСЂСѓ Рё Р¶РґС‘С‚ РїСЂРѕРІРµСЂРєРё");
-    }
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        applyPendingReviewExpirations(bucket);
 
-    const createdAt = new Date().toISOString();
-    const nextReviewId = normalizeString(reviewId) || crypto.randomUUID();
-    const reviewerTableNumber = getReviewerTableForParticipant(participant.tableNumber, normalizeTableNumber(session.tableCount));
-    const reviewDurationSeconds = getReviewTimeoutSeconds(session);
-    const review = {
-        id: nextReviewId,
-        sessionId,
-        participantUserId: participant.userId,
-        participantName: participant.name,
-        participantTableNumber: participant.tableNumber,
-        reviewerTableNumber,
-        taskKey,
-        taskNumber: normalizeString(taskNumber),
-        taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
-        taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
-        taskTitle: normalizeString(taskTitle),
-        contentType: normalizeString(contentType),
-        description: normalizeString(description),
-        taskText: normalizeString(taskText),
-        secondsSpent: Number.isFinite(secondsSpent) ? secondsSpent : 0,
-        submissionText: normalizeString(submissionText).slice(0, 10000),
-        file: storedFile,
-        createdAt,
-        durationSeconds: reviewDurationSeconds,
-        expiresAt: new Date(Date.now() + reviewDurationSeconds * 1000).toISOString(),
-        status: "pending",
-        resolutionComment: "",
-        resolvedAt: null,
-    };
+        const participant = bucket.participants[userId];
+        if (!participant) {
+            throw new Error("РЈС‡Р°СЃС‚РЅРёРє РЅРµ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅ РІ СЌС‚РѕР№ СЃРµСЃСЃРёРё");
+        }
 
-    bucket.reviews[nextReviewId] = review;
-    participant.tasks[taskKey] = {
-        taskKey,
-        taskNumber: normalizeString(taskNumber),
-        taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
-        taskName: review.taskName,
-        status: "pending_review",
-        reviewId: nextReviewId,
-        isBlocking: true,
-        expiresAt: review.expiresAt,
-        reworkExpiresAt: null,
-        durationSeconds: reviewDurationSeconds,
-        comment: "",
-        updatedAt: createdAt,
-    };
-    participant.updatedAt = createdAt;
-    await writeStore(store, [sessionId]);
-    return serializeReviewSummary(sessionId, review);
+        const existingTaskState = participant.tasks?.[taskKey];
+        if (existingTaskState?.status === "pending_review" && existingTaskState?.isBlocking) {
+            throw new Error("Р­С‚Рѕ Р·Р°РґР°РЅРёРµ СѓР¶Рµ РѕС‚РїСЂР°РІР»РµРЅРѕ РёРЅСЃРїРµРєС‚РѕСЂСѓ Рё Р¶РґС‘С‚ РїСЂРѕРІРµСЂРєРё");
+        }
+
+        const createdAt = new Date().toISOString();
+        const nextReviewId = normalizeString(reviewId) || crypto.randomUUID();
+        const reviewerTableNumber = getReviewerTableForParticipant(participant.tableNumber, normalizeTableNumber(session.tableCount));
+        const reviewDurationSeconds = getReviewTimeoutSeconds(session);
+        const review = {
+            id: nextReviewId,
+            sessionId,
+            participantUserId: participant.userId,
+            participantName: participant.name,
+            participantTableNumber: participant.tableNumber,
+            reviewerTableNumber,
+            taskKey,
+            taskNumber: normalizeString(taskNumber),
+            taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
+            taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
+            taskTitle: normalizeString(taskTitle),
+            contentType: normalizeString(contentType),
+            description: normalizeString(description),
+            taskText: normalizeString(taskText),
+            secondsSpent: Number.isFinite(secondsSpent) ? secondsSpent : 0,
+            submissionText: normalizeString(submissionText).slice(0, 10000),
+            file: storedFile,
+            createdAt,
+            durationSeconds: reviewDurationSeconds,
+            expiresAt: new Date(Date.now() + reviewDurationSeconds * 1000).toISOString(),
+            status: "pending",
+            resolutionComment: "",
+            resolvedAt: null,
+        };
+
+        bucket.reviews[nextReviewId] = review;
+        participant.tasks[taskKey] = {
+            taskKey,
+            taskNumber: normalizeString(taskNumber),
+            taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
+            taskName: review.taskName,
+            status: "pending_review",
+            reviewId: nextReviewId,
+            isBlocking: true,
+            expiresAt: review.expiresAt,
+            reworkExpiresAt: null,
+            durationSeconds: reviewDurationSeconds,
+            comment: "",
+            updatedAt: createdAt,
+        };
+        participant.updatedAt = createdAt;
+        return serializeReviewSummary(sessionId, review);
+    });
 }
 
 export async function resolveMayakSessionReview({ sessionId, reviewId, inspectorUserId, action, comment }) {
     const session = await getMayakSessionById(sessionId);
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    await expirePendingReviews(store, sessionId);
 
-    const review = bucket.reviews?.[reviewId];
-    if (!review) {
-        throw new Error("Р—Р°СЏРІРєР° РЅР° РїСЂРѕРІРµСЂРєСѓ РЅРµ РЅР°Р№РґРµРЅР°");
-    }
-    if (review.status !== "pending") {
-        throw new Error("Р­С‚Р° Р·Р°СЏРІРєР° СѓР¶Рµ РѕР±СЂР°Р±РѕС‚Р°РЅР°");
-    }
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        applyPendingReviewExpirations(bucket);
 
-    const inspector = bucket.participants?.[inspectorUserId];
-    if (!inspector || !isReviewerRole(inspector.role)) {
-        throw new Error("РџСЂРѕРІРµСЂРєСѓ РјРѕР¶РµС‚ РІС‹РїРѕР»РЅРёС‚СЊ С‚РѕР»СЊРєРѕ РёРЅСЃРїРµРєС‚РѕСЂ");
-    }
-    if (inspector.inspectorTargetTable !== review.participantTableNumber) {
-        throw new Error("Р­С‚РѕС‚ РёРЅСЃРїРµРєС‚РѕСЂ РЅРµ Р·Р°РєСЂРµРїР»С‘РЅ Р·Р° РІС‹Р±СЂР°РЅРЅС‹Рј СЃС‚РѕР»РѕРј");
-    }
+        const review = bucket.reviews?.[reviewId];
+        if (!review) {
+            throw new Error("Р—Р°СЏРІРєР° РЅР° РїСЂРѕРІРµСЂРєСѓ РЅРµ РЅР°Р№РґРµРЅР°");
+        }
+        if (review.status !== "pending") {
+            throw new Error("Р­С‚Р° Р·Р°СЏРІРєР° СѓР¶Рµ РѕР±СЂР°Р±РѕС‚Р°РЅР°");
+        }
 
-    const participant = bucket.participants?.[review.participantUserId];
-    if (!participant) {
-        throw new Error("РЈС‡Р°СЃС‚РЅРёРє РїСЂРѕРІРµСЂРєРё РЅРµ РЅР°Р№РґРµРЅ");
-    }
+        const inspector = bucket.participants?.[inspectorUserId];
+        if (!inspector || !isReviewerRole(inspector.role)) {
+            throw new Error("РџСЂРѕРІРµСЂРєСѓ РјРѕР¶РµС‚ РІС‹РїРѕР»РЅРёС‚СЊ С‚РѕР»СЊРєРѕ РёРЅСЃРїРµРєС‚РѕСЂ");
+        }
+        if (inspector.inspectorTargetTable !== review.participantTableNumber) {
+            throw new Error("Р­С‚РѕС‚ РёРЅСЃРїРµРєС‚РѕСЂ РЅРµ Р·Р°РєСЂРµРїР»С‘РЅ Р·Р° РІС‹Р±СЂР°РЅРЅС‹Рј СЃС‚РѕР»РѕРј");
+        }
 
-    const normalizedAction = normalizeString(action);
-    const normalizedComment = normalizeString(comment);
-    if (normalizedAction === "reject" && !normalizedComment) {
-        throw new Error("РџСЂРё РѕС‚РєР»РѕРЅРµРЅРёРё РЅСѓР¶РЅРѕ СѓРєР°Р·Р°С‚СЊ РїСЂРёС‡РёРЅСѓ");
-    }
+        const participant = bucket.participants?.[review.participantUserId];
+        if (!participant) {
+            throw new Error("РЈС‡Р°СЃС‚РЅРёРє РїСЂРѕРІРµСЂРєРё РЅРµ РЅР°Р№РґРµРЅ");
+        }
 
-    const resolvedAt = new Date().toISOString();
-    const isApproved = normalizedAction === "approve";
-    const reworkDurationSeconds = getReworkTimeoutSeconds(session);
-    const reworkExpiresAt = isApproved ? null : new Date(Date.now() + reworkDurationSeconds * 1000).toISOString();
-    review.status = isApproved ? "approved" : "rejected";
-    review.resolutionComment = normalizedComment;
-    review.resolvedAt = resolvedAt;
-    participant.tasks[review.taskKey] = {
-        ...(participant.tasks[review.taskKey] || {}),
-        taskKey: review.taskKey,
-        taskNumber: review.taskNumber,
-        taskIndex: review.taskIndex,
-        taskName: review.taskName,
-        reviewId,
-        updatedAt: resolvedAt,
-        comment: normalizedComment,
-        status: isApproved ? "approved" : "rejected",
-        isBlocking: !isApproved,
-        expiresAt: null,
-        reworkExpiresAt,
-        durationSeconds: isApproved ? null : reworkDurationSeconds,
-    };
-    participant.updatedAt = resolvedAt;
-    await writeStore(store, [sessionId]);
-    return serializeReviewSummary(sessionId, review);
+        const normalizedAction = normalizeString(action);
+        const normalizedComment = normalizeString(comment);
+        if (normalizedAction === "reject" && !normalizedComment) {
+            throw new Error("РџСЂРё РѕС‚РєР»РѕРЅРµРЅРёРё РЅСѓР¶РЅРѕ СѓРєР°Р·Р°С‚СЊ РїСЂРёС‡РёРЅСѓ");
+        }
+
+        const resolvedAt = new Date().toISOString();
+        const isApproved = normalizedAction === "approve";
+        const reworkDurationSeconds = getReworkTimeoutSeconds(session);
+        const reworkExpiresAt = isApproved ? null : new Date(Date.now() + reworkDurationSeconds * 1000).toISOString();
+        review.status = isApproved ? "approved" : "rejected";
+        review.resolutionComment = normalizedComment;
+        review.resolvedAt = resolvedAt;
+        participant.tasks[review.taskKey] = {
+            ...(participant.tasks[review.taskKey] || {}),
+            taskKey: review.taskKey,
+            taskNumber: review.taskNumber,
+            taskIndex: review.taskIndex,
+            taskName: review.taskName,
+            reviewId,
+            updatedAt: resolvedAt,
+            comment: normalizedComment,
+            status: isApproved ? "approved" : "rejected",
+            isBlocking: !isApproved,
+            expiresAt: null,
+            reworkExpiresAt,
+            durationSeconds: isApproved ? null : reworkDurationSeconds,
+        };
+        participant.updatedAt = resolvedAt;
+        return serializeReviewSummary(sessionId, review);
+    });
 }
 
 export async function getMayakSessionRuntimeState({ sessionId, userId }) {
@@ -879,30 +871,29 @@ export async function setMayakSessionParticipantYaDirection({ sessionId, userId,
         throw new Error("Сессия недоступна или уже завершена");
     }
 
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    const participant = bucket.participants?.[userId];
-    if (!participant) {
-        throw new Error("Участник не зарегистрирован в этой сессии");
-    }
-
     const normalizedDirection = String(direction || "").trim().toLowerCase();
-    if (normalizedDirection) {
-        const takenByAnother = Object.values(bucket.participants || {}).find(
-            (candidate) =>
-                candidate.userId !== userId &&
-                candidate.tableNumber === participant.tableNumber &&
-                String(candidate.yaDirection || "").trim().toLowerCase() === normalizedDirection
-        );
-        if (takenByAnother) {
-            throw new Error(`Направление "${direction}" уже выбрано другим участником за вашим столом (${takenByAnother.name}).`);
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
         }
-    }
 
-    participant.yaDirection = direction;
-    participant.updatedAt = new Date().toISOString();
-    await writeStore(store, [sessionId]);
-    return participant;
+        if (normalizedDirection) {
+            const takenByAnother = Object.values(bucket.participants || {}).find(
+                (candidate) =>
+                    candidate.userId !== userId &&
+                    candidate.tableNumber === participant.tableNumber &&
+                    String(candidate.yaDirection || "").trim().toLowerCase() === normalizedDirection
+            );
+            if (takenByAnother) {
+                throw new Error(`Направление "${direction}" уже выбрано другим участником за вашим столом (${takenByAnother.name}).`);
+            }
+        }
+
+        participant.yaDirection = direction;
+        participant.updatedAt = new Date().toISOString();
+        return participant;
+    });
 }
 
 export async function autoApproveMayakSessionTask({ sessionId, userId, taskNumber, taskIndex, taskName }) {
@@ -911,36 +902,35 @@ export async function autoApproveMayakSessionTask({ sessionId, userId, taskNumbe
         throw new Error("Сессия недоступна или уже завершена");
     }
 
-    const store = await readStore();
-    const bucket = ensureSessionBucket(store, sessionId);
-    const participant = bucket.participants?.[userId];
-    if (!participant) {
-        throw new Error("Участник не зарегистрирован в этой сессии");
-    }
-
     const taskKey = buildTaskKey(taskNumber);
     if (!taskKey) {
         throw new Error("Не удалось определить номер задания");
     }
 
-    const createdAt = new Date().toISOString();
-    participant.tasks[taskKey] = {
-        taskKey,
-        taskNumber: normalizeString(taskNumber),
-        taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
-        taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
-        status: "approved",
-        reviewId: null,
-        isBlocking: false,
-        expiresAt: null,
-        reworkExpiresAt: null,
-        durationSeconds: 0,
-        comment: "",
-        updatedAt: createdAt,
-    };
-    participant.updatedAt = createdAt;
-    await writeStore(store, [sessionId]);
-    return participant.tasks[taskKey];
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
+        }
+
+        const createdAt = new Date().toISOString();
+        participant.tasks[taskKey] = {
+            taskKey,
+            taskNumber: normalizeString(taskNumber),
+            taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
+            taskName: normalizeString(taskName) || `Задание ${taskNumber}`,
+            status: "approved",
+            reviewId: null,
+            isBlocking: false,
+            expiresAt: null,
+            reworkExpiresAt: null,
+            durationSeconds: 0,
+            comment: "",
+            updatedAt: createdAt,
+        };
+        participant.updatedAt = createdAt;
+        return participant.tasks[taskKey];
+    });
 }
 
 // Атомарный расход звезды-джокера: уменьшает баланс и мгновенно одобряет
