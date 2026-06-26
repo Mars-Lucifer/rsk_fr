@@ -2020,12 +2020,6 @@ export default function TrainerPage({ goTo }) {
             {!isMobile && <TrainerControls {...trainerControlsProps} />}
 
             {sessionRuntimeError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{sessionRuntimeError}</div> : null}
-            {false && currentTaskReviewComment ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    <div className="mb-1 font-semibold">Задание требует исправлений</div>
-                    <div>{currentTaskReviewComment}</div>
-                </div>
-            ) : null}
             {(isCurrentTaskPendingReview || isCurrentTaskRejected) ? (
                 <SessionReviewStatusBanner
                     taskNumber={currentTask?.number || currentTaskIndex + 1}
