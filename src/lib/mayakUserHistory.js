@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 
+import { withJsonFileLock, readJsonFile, writeJsonFileAtomic } from "@/lib/jsonFileLock";
+
 const HISTORY_FILE = path.join(process.cwd(), "data", "mayak-user-history.json");
 const ARTIFACTS_ROOT = path.join(process.cwd(), "data", "mayak-user-artifacts");
 const ARTIFACT_TYPE_META = {
@@ -57,11 +59,20 @@ async function readStore() {
     }
 }
 
-async function writeStore(store) {
-    await fs.mkdir(path.dirname(HISTORY_FILE), { recursive: true });
-    const tempFile = `${HISTORY_FILE}.tmp`;
-    await fs.writeFile(tempFile, JSON.stringify(store, null, 2), "utf-8");
-    await fs.rename(tempFile, HISTORY_FILE);
+// Атомарная мутация истории: read-modify-write под одним файловым локом.
+// Без этого одновременное завершение нескольких участников приводило к
+// гонке (оба читают снимок, второй затирает запись первого) и потере
+// результатов в mayak-user-history.json. Колбэк мутирует store на месте и
+// возвращает результат; запись делается один раз после колбэка.
+async function mutateHistoryStore(mutator) {
+    await ensureStoreFile();
+    return withJsonFileLock(HISTORY_FILE, async () => {
+        const parsed = await readJsonFile(HISTORY_FILE, createEmptyStore());
+        const store = { entries: Array.isArray(parsed?.entries) ? parsed.entries : [] };
+        const result = await mutator(store);
+        await writeJsonFileAtomic(HISTORY_FILE, store);
+        return result;
+    });
 }
 
 function buildArtifactUrls(runId) {
@@ -132,9 +143,9 @@ export async function createMayakHistoryEntry({
         artifactDir,
     };
 
-    const store = await readStore();
-    store.entries.push(entry);
-    await writeStore(store);
+    await mutateHistoryStore((store) => {
+        store.entries.push(entry);
+    });
     return entry;
 }
 
@@ -151,42 +162,42 @@ export async function getMayakHistoryEntryForUser(portalUserId, runId) {
 }
 
 export async function attachAnalyticsToMayakHistoryEntry(runId, analyticsBuffer) {
-    const store = await readStore();
-    const entryIndex = store.entries.findIndex((entry) => String(entry.runId) === String(runId || ""));
-    if (entryIndex === -1) {
-        return null;
-    }
+    return mutateHistoryStore(async (store) => {
+        const entryIndex = store.entries.findIndex((entry) => String(entry.runId) === String(runId || ""));
+        if (entryIndex === -1) {
+            return null;
+        }
 
-    const entry = store.entries[entryIndex];
-    await fs.mkdir(entry.artifactDir, { recursive: true });
-    await fs.writeFile(
-        path.join(entry.artifactDir, ARTIFACT_TYPE_META.analytics.filename),
-        Buffer.from(analyticsBuffer)
-    );
+        const entry = store.entries[entryIndex];
+        await fs.mkdir(entry.artifactDir, { recursive: true });
+        await fs.writeFile(
+            path.join(entry.artifactDir, ARTIFACT_TYPE_META.analytics.filename),
+            Buffer.from(analyticsBuffer)
+        );
 
-    store.entries[entryIndex] = {
-        ...entry,
-        analyticsStatus: ANALYTICS_STATUS.ready,
-        analyticsError: "",
-    };
-    await writeStore(store);
-    return store.entries[entryIndex];
+        store.entries[entryIndex] = {
+            ...entry,
+            analyticsStatus: ANALYTICS_STATUS.ready,
+            analyticsError: "",
+        };
+        return store.entries[entryIndex];
+    });
 }
 
 export async function markMayakHistoryAnalyticsFailed(runId, errorMessage) {
-    const store = await readStore();
-    const entryIndex = store.entries.findIndex((entry) => String(entry.runId) === String(runId || ""));
-    if (entryIndex === -1) {
-        return null;
-    }
+    return mutateHistoryStore((store) => {
+        const entryIndex = store.entries.findIndex((entry) => String(entry.runId) === String(runId || ""));
+        if (entryIndex === -1) {
+            return null;
+        }
 
-    store.entries[entryIndex] = {
-        ...store.entries[entryIndex],
-        analyticsStatus: ANALYTICS_STATUS.failed,
-        analyticsError: String(errorMessage || "").trim(),
-    };
-    await writeStore(store);
-    return store.entries[entryIndex];
+        store.entries[entryIndex] = {
+            ...store.entries[entryIndex],
+            analyticsStatus: ANALYTICS_STATUS.failed,
+            analyticsError: String(errorMessage || "").trim(),
+        };
+        return store.entries[entryIndex];
+    });
 }
 
 export async function readMayakHistoryArtifact({ portalUserId, runId, type }) {
