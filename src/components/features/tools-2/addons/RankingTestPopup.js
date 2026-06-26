@@ -4,9 +4,14 @@ import CloseIcon from "@/assets/general/close.svg";
 import { RANKING_TEST_DATA } from "../../../../../data/rankingTestData";
 import { useRankingDragAndDrop } from "./useRankingDragAndDrop";
 import { useLevelTimer } from "./useLevelTimer";
+import {
+    loadSavedResults,
+    loadPreviousResults,
+    saveResults,
+    savePreviousResults,
+    clearCurrentResults,
+} from "./rankingResultsStorage";
 
-const STORAGE_KEY = "trainer_v2_rankingTestResults";
-const PREVIOUS_STORAGE_KEY = "trainer_v2_rankingTestResults_previous";
 const RANKING_ZONE_LIMITS = [
     { greenMax: 4, yellowMax: 8 },
     { greenMax: 8, yellowMax: 16 },
@@ -57,34 +62,6 @@ function calcPositionDiffs(userOrder, correctOrder) {
     });
 }
 
-function loadSavedResults() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
-}
-
-function loadPreviousResults() {
-    try {
-        const raw = localStorage.getItem(PREVIOUS_STORAGE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
-}
-
-function saveResults(data) {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-        console.error("Ошибка сохранения результатов тестирования:", e);
-    }
-}
-
 function formatTime(seconds) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -125,12 +102,8 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
             // При forceRetake сразу сохраняем старые результаты как предыдущие и очищаем текущие
             const current = loadSavedResults();
             if (current) {
-                try {
-                    localStorage.setItem(PREVIOUS_STORAGE_KEY, JSON.stringify(current));
-                } catch (e) {
-                    console.error("Ошибка сохранения предыдущих результатов:", e);
-                }
-                localStorage.removeItem(STORAGE_KEY);
+                savePreviousResults(current);
+                clearCurrentResults();
             }
             return null;
         }
@@ -189,15 +162,11 @@ export default function RankingTestPopup({ onClose, onSave, forceRetake = false 
     const handleRetake = () => {
         // Сохраняем текущие результаты как предыдущие
         if (savedData) {
-            try {
-                localStorage.setItem(PREVIOUS_STORAGE_KEY, JSON.stringify(savedData));
-            } catch (e) {
-                console.error("Ошибка сохранения предыдущих результатов:", e);
-            }
+            savePreviousResults(savedData);
             setPreviousData(savedData);
         }
         // Очищаем текущие результаты
-        localStorage.removeItem(STORAGE_KEY);
+        clearCurrentResults();
         setSavedData(null);
         setIsRetakeMode(true);
         setCompletedLevels({});
