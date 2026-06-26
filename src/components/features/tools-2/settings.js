@@ -24,6 +24,11 @@ import {
     hasResolvedPortalProfileCache,
     primePortalProfileCache,
 } from "@/lib/portalProfileClient";
+import {
+    hasPortalIdentityFields,
+    parseMayakGuestToken,
+    buildMayakGuestUserId,
+} from "./mayakGuestToken";
 
 const EMPTY_SESSION_INFO = {
     tokenType: "legacy",
@@ -32,8 +37,6 @@ const EMPTY_SESSION_INFO = {
     tableCount: 0,
 };
 
-const MAYAK_GUEST_SUFFIX = "aaaaa";
-const MAYAK_TEMP_GUEST_TOKEN = "aaaaa";
 const TEMP_GUEST_PROFILE = {
     firstName: "МАЯК",
     lastName: "Участник",
@@ -44,55 +47,6 @@ const EMPTY_GUEST_FORM = {
     lastName: "",
     patronymic: "",
 };
-
-function hasPortalIdentityFields(payload) {
-    const profile = normalizePortalProfile(payload);
-    return Boolean(String(profile.surname || "").trim() && String(profile.name || "").trim());
-}
-
-function parseMayakGuestToken(tokenValue) {
-    const normalized = String(tokenValue || "").trim();
-    if (!normalized) {
-        return { rawToken: "", baseToken: "", isGuestMode: false };
-    }
-
-    if (normalized.toLowerCase() === MAYAK_TEMP_GUEST_TOKEN) {
-        return {
-            rawToken: normalized,
-            baseToken: MAYAK_TEMP_GUEST_TOKEN,
-            isGuestMode: true,
-            isTemporaryGuestToken: true,
-        };
-    }
-
-    if (normalized.toLowerCase().endsWith(MAYAK_GUEST_SUFFIX)) {
-        return {
-            rawToken: normalized,
-            baseToken: normalized.slice(0, -MAYAK_GUEST_SUFFIX.length).trim(),
-            isGuestMode: true,
-            isTemporaryGuestToken: false,
-        };
-    }
-
-    return {
-        rawToken: normalized,
-        baseToken: normalized,
-        isGuestMode: false,
-        isTemporaryGuestToken: false,
-    };
-}
-
-function buildMayakGuestUserId(sessionInfo = {}) {
-    const sessionPart = String(sessionInfo?.sessionId || sessionInfo?.tokenType || "guest")
-        .trim()
-        .replace(/[^a-zA-Z0-9_-]+/g, "-");
-    const randomPart =
-        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    return `guest-${sessionPart || "guest"}-${randomPart}`;
-}
 
 async function validateTokenAPI(tokenValue) {
     try {

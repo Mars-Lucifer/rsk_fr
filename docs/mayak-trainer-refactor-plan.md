@@ -89,10 +89,15 @@
 - `useMayakTaskManager` → `useMayakTaskLoader` + `useMayakTaskTimer`.
 
 ### Этап 5 — `settings.js` и `RankingTestPopup.js` (отдельный трек)
-- `settings.js` → хуки `useTokenValidation`, `useGuestActivation`, `usePortalAuth`,
-  `useAdminBypass`.
-- `RankingTestPopup.js` → `useDragAndDrop` + `useLevelTimer` + презентационные
-  `RankingLevel`/`RankingResults`.
+- `RankingTestPopup.js` → `useRankingDragAndDrop` + `useLevelTimer` +
+  `rankingResultsStorage` (СДЕЛАНО, см. журнал).
+- `settings.js`: чистые хелперы вынесены в `mayakGuestToken.js` (СДЕЛАНО).
+  Разделение 4 потоков авторизации (admin/guest/token/portal) на отдельные
+  хуки — НЕ рекомендуется: потоки делят общее состояние (`sessionInfo`,
+  `tableNumber`, `token`, `portalProfilePayload`, регистрация участника), вынос
+  добавит хукам по 10+ параметров и лишь переместит связанность, при этом
+  требует ручного QA логина во всех режимах в encoding-чувствительном файле.
+  Решение по разбиению оставлено за владельцем.
 
 ## Вне области
 - Контракты `/api/mayak/*`, формат `data/mayak-*`, легаси-токены, session как домен.
