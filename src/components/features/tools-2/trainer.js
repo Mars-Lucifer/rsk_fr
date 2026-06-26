@@ -163,6 +163,8 @@ export default function TrainerPage({ goTo }) {
 
     const [taskInputValue, setTaskInputValue] = useState("");
     const debounceTimeoutRef = useRef(null);
+    // Защита от повторного клика «Завершить», пока идёт асинхронная финализация.
+    const isTogglingTimerRef = useRef(false);
     const [isPreviewResizing, setIsPreviewResizing] = useState(false);
     const [previewWidth, setPreviewWidth] = useState(() => {
         if (typeof window === "undefined") return PREVIEW_WIDTH_DEFAULT;
@@ -513,6 +515,7 @@ export default function TrainerPage({ goTo }) {
         timerState,
         startTimer,
         stopTimer,
+        resetTimer,
         goToTask,
         nextTask,
         prevTask,
@@ -552,9 +555,14 @@ export default function TrainerPage({ goTo }) {
             mayak: { m: "", a: "", y: "", k: "", o1: "", k2: "", o2: "" },
             finalPrompt: "(вводное задание)",
         };
-        const currentLog = JSON.parse(localStorage.getItem(getStorageKey("session_tasks_log")) || "[]");
-        const filteredLog = currentLog.filter((item) => item.number && String(item.number) !== String(logEntry.number));
-        localStorage.setItem(getStorageKey("session_tasks_log"), JSON.stringify([...filteredLog, logEntry]));
+        // Локальный лог не должен блокировать сохранение на сервер.
+        try {
+            const currentLog = JSON.parse(localStorage.getItem(getStorageKey("session_tasks_log")) || "[]");
+            const filteredLog = currentLog.filter((item) => item.number && String(item.number) !== String(logEntry.number));
+            localStorage.setItem(getStorageKey("session_tasks_log"), JSON.stringify([...filteredLog, logEntry]));
+        } catch (logErr) {
+            console.error("Не удалось записать локальный лог вводного задания (продолжаем сохранение на сервер):", logErr);
+        }
 
         // Сохраняем на сервер
         try {
@@ -1591,8 +1599,17 @@ export default function TrainerPage({ goTo }) {
             return;
         }
 
+        // Не даём запустить вторую финализацию, пока не завершилась первая.
+        if (isTogglingTimerRef.current) {
+            return;
+        }
+        isTogglingTimerRef.current = true;
         setSessionUploadError("");
-        await toggleTaskTimer();
+        try {
+            await toggleTaskTimer();
+        } finally {
+            isTogglingTimerRef.current = false;
+        }
     };
 
     const guardedGoToTask = (nextIndex) => {
@@ -1605,6 +1622,13 @@ export default function TrainerPage({ goTo }) {
                     : "Сначала дождитесь проверки текущего задания инспектором.";
             alert(message);
             return;
+        }
+        // Реальный переход к другому заданию: сбрасываем таймер и черновик
+        // полей/промта/оценки, чтобы накопленное время и текст предыдущей
+        // задачи не перенеслись на новую (иначе время спишется не на ту задачу).
+        if (nextIndex !== currentTaskIndex) {
+            resetTimer();
+            handleResetFields();
         }
         goToTask(nextIndex);
     };

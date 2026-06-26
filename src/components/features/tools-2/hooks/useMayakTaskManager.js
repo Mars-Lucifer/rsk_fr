@@ -346,6 +346,17 @@ export const useMayakTaskManager = ({ userType, who, taskVersion, isTokenValid, 
         });
     }, []);
 
+    // Полный сброс таймера к нулю. Нужен при переходе к другому заданию,
+    // чтобы накопленное время предыдущей задачи не списалось на новую.
+    const resetTimer = useCallback(() => {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        try {
+            sessionStorage.removeItem("trainer_v2_taskTimer");
+        } catch {}
+        setTimerState({ isRunning: false, startTime: null, elapsedTime: 0, readyElapsedTime: null });
+    }, []);
+
     useEffect(() => {
         if (timerState.isRunning && timerState.startTime && !timerRef.current) {
             timerRef.current = setInterval(() => {
@@ -382,6 +393,7 @@ export const useMayakTaskManager = ({ userType, who, taskVersion, isTokenValid, 
         timerState,
         startTimer,
         stopTimer,
+        resetTimer,
         goToTask,
         nextTask,
         prevTask,

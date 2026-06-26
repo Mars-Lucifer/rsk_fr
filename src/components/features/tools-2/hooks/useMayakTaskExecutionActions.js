@@ -81,9 +81,15 @@ export const useMayakTaskExecutionActions = ({
                 finalPrompt: prompt,
             };
 
-            const currentLog = JSON.parse(localStorage.getItem(getStorageKey("session_tasks_log")) || "[]");
-            const filteredLog = currentLog.filter((item) => item.number && String(item.number) !== String(logEntry.number));
-            localStorage.setItem(getStorageKey("session_tasks_log"), JSON.stringify([...filteredLog, logEntry]));
+            // Локальный лог не должен блокировать сохранение на сервер: при
+            // переполненной квоте/приватном режиме localStorage может бросить.
+            try {
+                const currentLog = JSON.parse(localStorage.getItem(getStorageKey("session_tasks_log")) || "[]");
+                const filteredLog = currentLog.filter((item) => item.number && String(item.number) !== String(logEntry.number));
+                localStorage.setItem(getStorageKey("session_tasks_log"), JSON.stringify([...filteredLog, logEntry]));
+            } catch (logErr) {
+                console.error("Не удалось записать локальный лог задания (продолжаем сохранение на сервер):", logErr);
+            }
 
             try {
                 const result = await saveMayakTaskAttempt({
