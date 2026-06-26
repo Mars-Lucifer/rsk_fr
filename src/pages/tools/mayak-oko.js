@@ -8,13 +8,22 @@ import IndexPage from "@/components/features/tools-2";
 import TrainerPage from "@/components/features/tools-2/trainer";
 import HistoryPage from "@/components/features/tools-2/history";
 import SettingsPage from "@/components/features/tools-2/settings";
-import AdminPage from "@/components/features/tools-2/admin";
 
 export default function Home() {
     const [pageKey, setPageKey] = useState("mayakOko");
     const router = useRouter();
 
     const goTo = (pageName) => {
+        // Единая точка навигации: сохраняем активный экран, чтобы при
+        // перезагрузке (F5) восстановиться именно на нём, а не на главной.
+        if (typeof window !== "undefined") {
+            try {
+                sessionStorage.setItem("currentPage", pageName);
+            } catch {
+                // sessionStorage может быть недоступен (приватный режим) —
+                // навигацию это не должно блокировать.
+            }
+        }
         setPageKey(pageName);
     };
 
@@ -62,7 +71,6 @@ export default function Home() {
                 {effectivePageKey === "trainer" && <TrainerPage goTo={goTo} />}
                 {effectivePageKey === "settings" && <SettingsPage goTo={goTo} />}
                 {effectivePageKey === "history" && <HistoryPage goTo={goTo} />}
-                {effectivePageKey === "admin" && <AdminPage goTo={goTo} />}
             </TransitionWrapper>
         </Layout>
     );

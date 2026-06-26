@@ -34,6 +34,14 @@ export function clearMayakSessionCompletionState({ getStorageKey, removeKeyCooki
     sessionStorage.removeItem(getStorageKey("currentTaskIndex"));
     setSelectedRole(null);
     removeKeyCookie();
+    // Данные входа удалены (removeKeyCookie). Сбрасываем и сохранённый экран,
+    // чтобы восстановление после F5/возврата не отправило пользователя в
+    // тренажёр уже без токена — корректный экран после завершения это «главная».
+    try {
+        sessionStorage.setItem("currentPage", "mayakOko");
+    } catch {
+        // sessionStorage может быть недоступен — не критично.
+    }
     localStorage.setItem("trainer_v2_sessionCompletionPending", "true");
 }
 

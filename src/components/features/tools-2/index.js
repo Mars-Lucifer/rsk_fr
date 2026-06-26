@@ -213,10 +213,6 @@ export default function IndexPage({ goTo }) {
         setCookie(getStorageKey("buffer"), JSON.stringify(newBuffer));
     }
 
-    {
-        showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />;
-    }
-
     function handleChange(code, value) {
         setFields((prev) => ({ ...prev, [code]: value }));
     }

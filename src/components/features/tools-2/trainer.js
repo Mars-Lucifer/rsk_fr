@@ -735,7 +735,7 @@ export default function TrainerPage({ goTo }) {
             // 1. Сразу удаляем флаг, чтобы это не повторилось при перезагрузке
             localStorage.removeItem(getStorageKey("sessionCompletionPending"));
             // 2. Перенаправляем на главную страницу
-            goTo("index");
+            goTo("mayakOko");
         }
     }, [goTo]);
 
