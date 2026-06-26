@@ -256,3 +256,266 @@ export function validateDeckStandard(tasks) {
         hasStart,
     };
 }
+
+// --- Прогресс части «Я»/«Мы» для тренажёра (клиент) -----------------------
+//
+// Чистый расчёт прогресса для UI тренажёра (`trainer.js`). Вынесен из
+// гигантского useMemo, чтобы:
+//   - снять ~260 строк доменной логики с god-компонента;
+//   - покрыть формулу тестами (в истории были баги «залипания прогресса» на
+//     секциях, начинающихся не с 1);
+//   - держать её рядом с хелперами (classifyMoodCard/resolveFormatKey/…).
+//
+// ВНИМАНИЕ: серверный mayakSessionDashboard.computeYaProgress использует ту же
+// формулу фаз START/CONTENT_TYPES/SPECIALIZATION. Эта функция дополнительно
+// считает фазу WE_INDEX и ручной источник (bypass/админ-debug). Любая правка
+// формулы должна синхронно отражаться в обоих местах, пока они не объединены.
+//
+// Параметры:
+//   manualSource    — { phase, progress, weProgress, direction } | null.
+//        Если задан (bypass-токен или клиентский админ-override сессии),
+//        прогресс рисуется из него, минуя расчёт по задачам.
+//   participant     — sessionRuntimeState.participant | null
+//        (taskStates[], sectionId, yaDirection).
+//   tasks           — колода секции (массив объектов с contentType), 0-based.
+//   fallbackSectionId — sectionId токена, если у участника не задан.
+export function computeTrainerYaProgress({
+    manualSource = null,
+    participant = null,
+    tasks = [],
+    fallbackSectionId = "",
+} = {}) {
+    if (manualSource) {
+        const WE_INDEX_TARGET = 36;
+        const targetMap = {
+            START: 4,
+            CONTENT_TYPES: YA_FORMAT_TARGET,
+            CHOOSING_DIRECTION: 4,
+            SPECIALIZATION: 4,
+            WE_INDEX: WE_INDEX_TARGET,
+        };
+        const currentPhase = manualSource.phase;
+
+        if (currentPhase === "WE_INDEX") {
+            // Часть «Я» уже завершена (звезда специализации зажжена), показываем
+            // «Индекс цифровой зрелости» части «Мы»: weDone из 36.
+            const weDone = Math.min(Math.max(0, manualSource.weProgress), WE_INDEX_TARGET);
+            return {
+                phase: "WE_INDEX",
+                count: weDone,
+                target: WE_INDEX_TARGET,
+                percentage: Math.min(100, Math.round((weDone / WE_INDEX_TARGET) * 100)),
+                hasStar: true,
+                yaStarEarned: true,
+                direction: manualSource.direction || null,
+                completedTypes: [],
+            };
+        }
+
+        const target = targetMap[currentPhase] || 4;
+        const count = Math.min(manualSource.progress, target);
+        const percentage = Math.min(100, Math.round((count / target) * 100));
+        const hasStar = currentPhase === "SPECIALIZATION" && count >= target;
+
+        return {
+            phase: currentPhase,
+            count,
+            target,
+            percentage,
+            hasStar,
+            direction: currentPhase === "SPECIALIZATION" ? manualSource.direction : null,
+            completedTypes: currentPhase !== "START" ? YA_FORMAT_TYPES.slice(0, count).map((t) => t.key) : [],
+        };
+    }
+
+    if (!participant?.taskStates || !tasks.length) {
+        return { phase: "START", count: 0, target: 4, hasStar: false, percentage: 0 };
+    }
+
+    const activeSectionId = participant.sectionId || fallbackSectionId || "";
+    const match = String(activeSectionId).match(/^(\d+)-/);
+    const rangeStart = match ? parseInt(match[1], 10) : 1;
+    const startPos = rangeStart - 1;
+
+    const completedTasks = participant.taskStates.filter(
+        (ts) => ts.status === "approved" || ts.status === "expired" || ts.status === "rework_expired"
+    );
+
+    // 1. Считаем выполненные задачи в диапазоне Старт (base 1..10)
+    let startApprovedCount = 0;
+    completedTasks.forEach((ts) => {
+        const taskIndex = Number(ts.taskIndex);
+        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+        const baseNumber = indexInSection + 1;
+        if (baseNumber >= 1 && baseNumber <= 10) {
+            startApprovedCount += 1;
+        }
+    });
+
+    const isStartPhaseDone = startApprovedCount >= 4;
+
+    if (!isStartPhaseDone) {
+        return {
+            phase: "START",
+            count: startApprovedCount,
+            target: 4,
+            percentage: Math.min(100, Math.round((startApprovedCount / 4) * 100)),
+            hasStar: false,
+        };
+    }
+
+    // 2. Считаем освоенные форматы части «Я» (base 10..50) через общий
+    // словарь (Статика→изображение, Динамика→видео). Карта настроения
+    // засчитывается только если названа «<Формат> - Карта настроения».
+    const completedContentTypes = new Set();
+    completedTasks.forEach((ts) => {
+        const taskIndex = Number(ts.taskIndex);
+        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+        const baseNumber = indexInSection + 1;
+
+        if (baseNumber >= 10 && baseNumber <= 50) {
+            // tasks — колода секции (0-based). indexInSection = baseNumber-1
+            // и есть правильный относительный индекс. Раньше тут брался
+            // globalTaskIndex (startPos+...), что для секций не с 1 давало
+            // выход за границы массива → формат не зачитывался и прогресс
+            // залипал в фазе «Типы контента».
+            const taskObj = tasks[indexInSection];
+            const rawType = taskObj?.contentType || "";
+            const mood = classifyMoodCard(rawType);
+            if (mood.isMood) {
+                if (mood.standard && mood.section === "ya" && mood.key) {
+                    completedContentTypes.add(mood.key);
+                }
+                return;
+            }
+            const fmtKey = resolveFormatKey(rawType);
+            if (fmtKey) {
+                completedContentTypes.add(fmtKey);
+            }
+        }
+    });
+
+    const isContentTypesPhaseDone = completedContentTypes.size >= YA_FORMAT_TARGET;
+
+    if (!isContentTypesPhaseDone) {
+        return {
+            phase: "CONTENT_TYPES",
+            count: completedContentTypes.size,
+            target: YA_FORMAT_TARGET,
+            percentage: Math.min(100, Math.round((completedContentTypes.size / YA_FORMAT_TARGET) * 100)),
+            hasStar: false,
+            completedTypes: Array.from(completedContentTypes),
+        };
+    }
+
+    // 3. Фаза специализации (yaDirection)
+    const yaDirection = participant.yaDirection;
+
+    if (!yaDirection) {
+        return {
+            phase: "CHOOSING_DIRECTION",
+            count: 0,
+            target: 4,
+            percentage: 0,
+            hasStar: false,
+        };
+    }
+
+    let specApprovedCount = 0;
+    const specTasks = [];
+    // yaDirection — canonical-ключ формата; сравниваем нормализованные ключи.
+    const targetFormatKey = resolveFormatKey(yaDirection);
+    completedTasks.forEach((ts) => {
+        const taskIndex = Number(ts.taskIndex);
+        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+        const baseNumber = indexInSection + 1;
+
+        if (baseNumber >= 10 && baseNumber <= 50) {
+            const taskObj = tasks[indexInSection];
+            const rawType = taskObj?.contentType || "";
+            const mood = classifyMoodCard(rawType);
+            const fmtKey = mood.isMood
+                ? (mood.standard && mood.section === "ya" ? mood.key : null)
+                : resolveFormatKey(rawType);
+            if (fmtKey && targetFormatKey && fmtKey === targetFormatKey) {
+                specTasks.push(ts);
+            }
+        }
+    });
+
+    specTasks.sort((a, b) => {
+        const timeA = a.updatedAt ? Date.parse(a.updatedAt) : 0;
+        const timeB = b.updatedAt ? Date.parse(b.updatedAt) : 0;
+        if (timeA !== timeB) return timeA - timeB;
+        return Number(a.taskIndex) - Number(b.taskIndex);
+    });
+
+    // specTasks — ВСЕ выполненные задания выбранного формата в base 10..50,
+    // включая то одно «вводное», которое участник обязательно сделал на
+    // фазе «Типы контента». Его вычитаем (-1), чтобы специализация засчитывала
+    // только 4 НОВЫХ задания после выбора направления. Звезда зажигается на 4.
+    if (specTasks.length > 1) {
+        specApprovedCount = specTasks.length - 1;
+    } else {
+        specApprovedCount = 0;
+    }
+
+    const YA_STAR_TARGET = 4;
+    const yaHasStar = specApprovedCount >= YA_STAR_TARGET;
+
+    if (!yaHasStar) {
+        return {
+            phase: "SPECIALIZATION",
+            direction: yaDirection,
+            count: specApprovedCount,
+            target: YA_STAR_TARGET,
+            percentage: Math.min(100, Math.round((specApprovedCount / YA_STAR_TARGET) * 100)),
+            hasStar: false,
+        };
+    }
+
+    // 4. Часть «Я» завершена → «Индекс цифровой зрелости» части «Мы»: сколько
+    // заданий распознанных направлений (base 51..99) выполнено из всех таких
+    // в колоде. Карта настроения засчитывается направлению только по стандарту.
+    const WE_FROM = 51;
+    const WE_TO = 99;
+    const recognizeDirection = (rawType) => {
+        const mood = classifyMoodCard(rawType);
+        return mood.isMood
+            ? (mood.standard && mood.section === "we" ? mood.key : null)
+            : resolveDirectionKey(rawType);
+    };
+
+    let weTotal = 0;
+    (tasks || []).forEach((taskObj, idx) => {
+        const base = idx + 1;
+        if (base >= WE_FROM && base <= WE_TO && recognizeDirection(taskObj?.contentType || "")) {
+            weTotal += 1;
+        }
+    });
+
+    let weDone = 0;
+    completedTasks.forEach((ts) => {
+        const taskIndex = Number(ts.taskIndex);
+        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
+        const baseNumber = indexInSection + 1;
+        if (baseNumber >= WE_FROM && baseNumber <= WE_TO) {
+            const taskObj = tasks[indexInSection];
+            if (recognizeDirection(taskObj?.contentType || "")) {
+                weDone += 1;
+            }
+        }
+    });
+
+    return {
+        phase: "WE_INDEX",
+        direction: yaDirection,
+        count: weDone,
+        target: weTotal,
+        percentage: weTotal > 0 ? Math.min(100, Math.round((weDone / weTotal) * 100)) : 0,
+        // Звезда специализации части «Я» заработана и сохраняется (джокер
+        // продолжает начисляться от неё). Считаем фазу «с звездой».
+        hasStar: true,
+        yaStarEarned: true,
+    };
+}

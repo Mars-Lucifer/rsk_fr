@@ -94,6 +94,12 @@
 - [x] Этап 0 — удалён мёртвый хук `useMayakGroqEvaluation.js` и мёртвая JSX-ветка
   `trainer.js:2023`; сборка `npm run build` зелёная. Обёртку флагов в `useMemo`
   отложил из Этапа 0 как поведенчески-смежную (перенесена в Этап 3).
+- [x] Этап 1 — `yaProgress` (~260 стр.) вынесен в чистую
+  `mayakProgressModel.computeTrainerYaProgress`. `trainer.js`: 2564 → 2323 стр.
+  useMemo стал тонкой обёрткой (сборка manualSource + вызов функции). Сборка
+  зелёная, smoke-тест функции на эталонной колоде пройден. Полное слияние с
+  серверной `mayakSessionDashboard.computeYaProgress` НЕ делалось (риск для
+  joker-логики) — отмечено как отдельная задача.
 - [ ] Этап 1
 - [ ] Этап 2
 - [ ] Этап 3
