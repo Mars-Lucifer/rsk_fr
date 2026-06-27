@@ -4,6 +4,7 @@ import {
     listSectionFiles,
     writeSectionFile,
 } from "../../../../lib/mayakContentStorage.js";
+import { invalidateRangesCache } from "../../../../lib/mayakContentCache.js";
 
 export const config = {
     api: {
@@ -41,6 +42,7 @@ export default async function handler(req, res) {
             }
             const buffer = Buffer.from(data, "base64");
             const result = await writeSectionFile(sectionId, type, filename, buffer);
+            invalidateRangesCache();
             return res.status(200).json({ success: true, filename: result.filename });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
@@ -54,6 +56,7 @@ export default async function handler(req, res) {
                 return res.status(400).json({ success: false, error: "filename обязателен" });
             }
             await deleteSectionFile(sectionId, type, filename);
+            invalidateRangesCache();
             return res.status(200).json({ success: true });
         } catch (error) {
             if (error.code === "ENOENT") {

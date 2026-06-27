@@ -8,11 +8,13 @@ export default async function handler(req, res) {
     try {
         const { sectionId, includeTexts } = req.query;
         if (sectionId) {
-            const bundle = await getSectionBundle(sectionId, { includeTexts: includeTexts !== "0" });
+            // validateFiles: рантайм тренажёра получает ссылки, выверенные по
+            // диску — битая ссылка в index.json не доходит до клиента и не даёт 404.
+            const bundle = await getSectionBundle(sectionId, { includeTexts: includeTexts !== "0", validateFiles: true });
             return res.status(200).json({ success: true, data: bundle });
         }
 
-        const data = await getAllSectionsIndexBundles();
+        const data = await getAllSectionsIndexBundles({ validateFiles: true });
         return res.status(200).json({
             success: true,
             data: {

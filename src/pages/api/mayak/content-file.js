@@ -3,6 +3,15 @@ import { promises as fs } from "fs";
 import path from "path";
 import { getSectionFilePath, getSourceFilePath, sanitizeSectionId } from "../../../lib/mayakContentStorage.js";
 
+// Роут стримит файлы контента (PDF/изображения/аудио/видео), которые штатно
+// превышают дефолтный 4MB-лимит ответа API-роутов Next.js. Без этого Next
+// сыпет предупреждениями "API response exceeds 4MB" на каждый крупный файл.
+export const config = {
+    api: {
+        responseLimit: false,
+    },
+};
+
 function getContentType(filePath) {
     const ext = path.extname(filePath).toLowerCase();
     if (ext === ".pdf") return "application/pdf";

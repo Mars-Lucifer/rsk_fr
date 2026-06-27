@@ -3,10 +3,13 @@ import path from "path";
 import { requireMayakAdmin } from "../../../../lib/mayakAdminAuth.js";
 import {
     getSectionDir,
+    getSectionJsonPath,
     listSectionFiles,
     readSectionJson,
     writeSectionJson,
 } from "../../../../lib/mayakContentStorage.js";
+import { withJsonFileLock } from "../../../../lib/jsonFileLock.js";
+import { invalidateRangesCache } from "../../../../lib/mayakContentCache.js";
 
 export default async function handler(req, res) {
     if (!requireMayakAdmin(req, res)) {
@@ -146,28 +149,35 @@ export default async function handler(req, res) {
                 instructionService: t.instructionService || "",
             }));
 
-            await writeSectionJson(sectionId, "index.json", cleanTasks);
+            // Запись колоды под per-section локом на index.json — тем же, что
+            // берёт генерация инструкций. Так PUT /tasks и generate-instruction
+            // не пересекаются на read-modify-write одного и того же index.json.
+            const indexPath = await getSectionJsonPath(sectionId, "index.json");
+            await withJsonFileLock(indexPath, async () => {
+                await writeSectionJson(sectionId, "index.json", cleanTasks);
 
-            if (Array.isArray(texts)) {
-                const cleanTexts = texts
-                    .filter((t) => t.number && (t.description || t.task))
-                    .map((t) => ({
-                        number: String(t.number),
-                        description: t.description || "",
-                        task: t.task || "",
-                    }));
-                await writeSectionJson(sectionId, "TaskText.json", cleanTexts);
-            }
+                if (Array.isArray(texts)) {
+                    const cleanTexts = texts
+                        .filter((t) => t.number && (t.description || t.task))
+                        .map((t) => ({
+                            number: String(t.number),
+                            description: t.description || "",
+                            task: t.task || "",
+                        }));
+                    await writeSectionJson(sectionId, "TaskText.json", cleanTexts);
+                }
 
-            if (rangeName !== undefined) {
-                const existingMeta = await readSectionJson(sectionId, "meta.json", {});
-                const nextMeta = {
-                    ...(existingMeta && typeof existingMeta === "object" ? existingMeta : {}),
-                    rangeName: rangeName || "",
-                };
-                await writeSectionJson(sectionId, "meta.json", nextMeta);
-            }
+                if (rangeName !== undefined) {
+                    const existingMeta = await readSectionJson(sectionId, "meta.json", {});
+                    const nextMeta = {
+                        ...(existingMeta && typeof existingMeta === "object" ? existingMeta : {}),
+                        rangeName: rangeName || "",
+                    };
+                    await writeSectionJson(sectionId, "meta.json", nextMeta);
+                }
+            });
 
+            invalidateRangesCache();
             return res.status(200).json({ success: true, warnings: warnings.length > 0 ? warnings : undefined });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });

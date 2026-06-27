@@ -155,6 +155,18 @@ export async function ensureSectionDir(sectionId) {
     return sectionDir;
 }
 
+// Абсолютный путь к JSON-файлу раздела. Нужен для per-section блокировки
+// (withJsonFileLock) при read-modify-write, чтобы генерация инструкций и
+// сохранение колоды не затирали index.json друг друга.
+export async function getSectionJsonPath(sectionId, filename) {
+    const sectionDir = await getSectionDir(sectionId);
+    const safeName = sanitizeFilename(filename);
+    if (!safeName) {
+        throw new Error("Invalid filename");
+    }
+    return path.join(sectionDir, safeName);
+}
+
 export async function readSectionJson(sectionId, filename, fallbackValue) {
     try {
         const sectionDir = await getSectionDir(sectionId);
@@ -222,23 +234,57 @@ export async function getSourceFilePath(filename) {
     return path.join(root, "source", safeFilename);
 }
 
-export async function getSectionBundle(sectionId, { includeTexts = true } = {}) {
-    const tasks = await readSectionJson(sectionId, "index.json", []);
+// Приводит ссылки задания на файлы к фактическому состоянию диска: ссылку на
+// отсутствующий файл обнуляет, а пустое поле — привязывает к файлу с именем по
+// номеру задания (та же логика, что в admin GET /tasks). Файловая система —
+// единственный источник правды о наличии файла; index.json лишь подсказка.
+// Так испорченный/устаревший index.json не заставит рантайм запрашивать
+// несуществующий файл (битая ссылка → 404). Не мутирует вход.
+export async function reconcileTasksToDisk(sectionId, tasks) {
+    if (!Array.isArray(tasks) || tasks.length === 0) return Array.isArray(tasks) ? tasks : [];
+    const [files, instructions, maps] = await Promise.all([
+        listSectionFiles(sectionId, "files"),
+        listSectionFiles(sectionId, "instructions"),
+        listSectionFiles(sectionId, "maps"),
+    ]);
+    const resolve = (current, list, num) => {
+        const value = String(current || "").trim();
+        if (value && list.includes(value)) return value;
+        const byNumber = num && list.find((f) => f.replace(/\.[^.]+$/, "") === num);
+        return byNumber || "";
+    };
+    return tasks.map((task) => {
+        const num = String(task.number || "").trim();
+        return {
+            ...task,
+            instruction: resolve(task.instruction, instructions, num),
+            file: resolve(task.file, files, num),
+            map: resolve(task.map, maps, num),
+        };
+    });
+}
+
+export async function getSectionBundle(sectionId, { includeTexts = true, validateFiles = false } = {}) {
+    const rawTasks = await readSectionJson(sectionId, "index.json", []);
     const meta = await readSectionJson(sectionId, "meta.json", {});
     const texts = includeTexts ? await readSectionJson(sectionId, "TaskText.json", []) : [];
+    let tasks = Array.isArray(rawTasks) ? rawTasks : [];
+    if (validateFiles) {
+        tasks = await reconcileTasksToDisk(sectionId, tasks);
+    }
     return {
         sectionId,
-        tasks: Array.isArray(tasks) ? tasks : [],
+        tasks,
         texts: Array.isArray(texts) ? texts : [],
         meta: meta && typeof meta === "object" ? meta : {},
     };
 }
 
-export async function getAllSectionsIndexBundles() {
+export async function getAllSectionsIndexBundles({ validateFiles = false } = {}) {
     const sectionIds = await readManifest();
     const bundles = await Promise.all(
         sectionIds.map(async (sectionId) => {
-            const bundle = await getSectionBundle(sectionId, { includeTexts: false });
+            const bundle = await getSectionBundle(sectionId, { includeTexts: false, validateFiles });
             return {
                 sectionId,
                 tasks: bundle.tasks,

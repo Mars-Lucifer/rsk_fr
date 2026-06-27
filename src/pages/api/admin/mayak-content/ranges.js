@@ -1,6 +1,7 @@
 ﻿import { requireMayakAdmin } from "../../../../lib/mayakAdminAuth.js";
 import { readSectionJson, readManifest, writeManifest, writeSectionJson, listSectionFiles, getSectionBundle, ensureSectionDir } from "../../../../lib/mayakContentStorage.js";
 import { validateDeckStandard } from "../../../../lib/mayakProgressModel.js";
+import { getRangesCache, setRangesCache, invalidateRangesCache } from "../../../../lib/mayakContentCache.js";
 
 async function saveSortedManifest(slugs) {
     const sorted = [...slugs].sort((a, b) => {
@@ -33,6 +34,10 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
         try {
+            const cached = getRangesCache();
+            if (cached) {
+                return res.status(200).json({ success: true, data: cached, cached: true });
+            }
             const sectionIds = await readManifest();
             const rangesInfo = await Promise.all(
                 sectionIds.map(async (sectionId) => {
@@ -63,6 +68,7 @@ export default async function handler(req, res) {
                     };
                 })
             );
+            setRangesCache(rangesInfo);
             return res.status(200).json({ success: true, data: rangesInfo });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });
@@ -114,6 +120,7 @@ export default async function handler(req, res) {
 
             slugs.push(slug);
             const sorted = await saveSortedManifest(slugs);
+            invalidateRangesCache();
             return res.status(201).json({ success: true, data: sorted, sectionId: slug });
         } catch (error) {
             return res.status(500).json({ success: false, error: error.message });

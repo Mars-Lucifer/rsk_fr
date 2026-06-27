@@ -6,11 +6,14 @@ import { requireMayakAdmin } from "@/lib/mayakAdminAuth";
 import {
     getSectionDir,
     getSectionFilePath,
+    getSectionJsonPath,
     listSectionFiles,
     readSectionJson,
     writeSectionFile,
     writeSectionJson,
 } from "@/lib/mayakContentStorage";
+import { withJsonFileLock } from "@/lib/jsonFileLock";
+import { invalidateRangesCache } from "@/lib/mayakContentCache";
 import { convertToPdf } from "@/lib/libreofficeConverter";
 import { rasterizePdfFirstPageToPng } from "@/lib/pdfRasterize";
 import { findService, getTemplatePath, readServiceTemplates, replaceMapInPptx, resolveFormat } from "@/lib/mayakServiceTemplates";
@@ -147,19 +150,38 @@ export default async function handler(req, res) {
         const pdfPath = await convertToPdf(tempPptxPath, workDir);
         const pdfBuffer = await fs.readFile(pdfPath);
 
-        // 5. Сохраняем как инструкцию задания и обновляем index.json
+        // 5. Сохраняем PDF-инструкцию на диск (вне лока — тяжёлая операция).
         const instructionFilename = `${number}.pdf`;
         await writeSectionFile(sectionId, "instructions", instructionFilename, pdfBuffer);
 
-        tasks[taskIndex] = {
-            ...task,
-            instruction: instructionFilename,
-            instructionText: String(task.instructionText || "").trim() || "Инструкция",
-            hasInstruction: true,
-            instructionFormat: format.formatKey,
-            instructionService: service.serviceKey,
-        };
-        await writeSectionJson(sectionId, "index.json", tasks);
+        // 6. Финальный read-modify-write index.json под per-section локом со
+        // СВЕЖИМ перечитыванием: тяжёлая генерация PDF могла идти секунды, за
+        // это время оператор мог сохранить колоду. Перечитываем актуальный файл
+        // и правим только это задание, чтобы не затереть чужие изменения и не
+        // словить гонку с PUT /tasks (он берёт тот же лок).
+        const indexPath = await getSectionJsonPath(sectionId, "index.json");
+        let savedInstructionText = "";
+        await withJsonFileLock(indexPath, async () => {
+            const freshTasks = await readSectionJson(sectionId, "index.json", []);
+            const idx = freshTasks.findIndex((t) => String(t.number || "").trim() === number);
+            if (idx === -1) {
+                // Задание исчезло из колоды за время генерации — нечего обновлять.
+                savedInstructionText = String(task.instructionText || "").trim() || "Инструкция";
+                return;
+            }
+            savedInstructionText = String(freshTasks[idx].instructionText || "").trim() || "Инструкция";
+            freshTasks[idx] = {
+                ...freshTasks[idx],
+                instruction: instructionFilename,
+                instructionText: savedInstructionText,
+                hasInstruction: true,
+                instructionFormat: format.formatKey,
+                instructionService: service.serviceKey,
+            };
+            await writeSectionJson(sectionId, "index.json", freshTasks);
+        });
+
+        invalidateRangesCache();
 
         return res.status(200).json({
             success: true,
@@ -170,7 +192,7 @@ export default async function handler(req, res) {
                 serviceKey: service.serviceKey,
                 formatName: format.formatName,
                 formatKey: format.formatKey,
-                instructionText: tasks[taskIndex].instructionText,
+                instructionText: savedInstructionText,
             },
         });
     } catch (error) {
