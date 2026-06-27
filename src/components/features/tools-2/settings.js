@@ -1141,7 +1141,7 @@ export default function SettingsPage({ goTo }) {
                         goTo("mayakOko");
                     }}
                 >
-                    <CloseIcon />
+                    <CloseIcon className="!text-black" />
                 </Button>
             </Header>
 

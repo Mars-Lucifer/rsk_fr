@@ -55,7 +55,7 @@ export const MayakField = memo(function MayakField({ field, value, isMobile, dis
                     <>
                         <div className="flex-1 min-w-0 flex flex-col">
                             <div className="input-wrapper w-full">
-                                <TextareaAutosize minRows={1} className="w-full resize-none bg-transparent outline-none text-black" placeholder={placeholder} value={value} onChange={handleChange} disabled={disabled} />
+                                <TextareaAutosize minRows={1} style={{ lineHeight: "1.5rem" }} className="w-full resize-none bg-transparent outline-none text-black overflow-hidden" placeholder={placeholder} value={value} onChange={handleChange} disabled={disabled} />
                                 {value && <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">{label}</p>}
                             </div>
                         </div>
@@ -80,7 +80,7 @@ export const MayakField = memo(function MayakField({ field, value, isMobile, dis
                     <>
                         <div className="flex-1 min-w-0 flex flex-col">
                             <div className="input-wrapper w-full">
-                                <TextareaAutosize minRows={1} className="w-full resize-none bg-transparent outline-none text-black" placeholder={placeholder} value={value} onChange={handleChange} disabled={disabled} />
+                                <TextareaAutosize minRows={1} style={{ lineHeight: "1.5rem" }} className="w-full resize-none bg-transparent outline-none text-black overflow-hidden" placeholder={placeholder} value={value} onChange={handleChange} disabled={disabled} />
                                 {value && <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">{label}</p>}
                             </div>
                         </div>

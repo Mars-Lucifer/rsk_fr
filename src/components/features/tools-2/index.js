@@ -6,18 +6,13 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 import LinkIcon from "@/assets/general/link.svg";
-import CopyIcon from "@/assets/general/copy.svg";
 import TimeIcon from "@/assets/general/time.svg";
-import Plusicon from "@/assets/general/plus.svg";
-import SettsIcon from "@/assets/general/setts.svg";
-import RandomIcon from "@/assets/general/random.svg";
 import ResetIcon from "@/assets/general/ResetIcon.svg";
 import TelegramIcon from "@/assets/general/TelegramIcon.svg";
 import TopIcon from "@/assets/general/TopIcon.svg";
 import HotIcon from "@/assets/general/HotIcon.svg";
 
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import TextareaAutosize from "react-textarea-autosize";
 import CourseIcon from "@/assets/nav/course.svg";
 
 import Input from "@/components/ui/Input/Input";
@@ -26,6 +21,9 @@ import Switcher from "@/components/ui/Switcher";
 import Block from "@/components/features/public/Block";
 
 import { STATIC_MAYAK_DATA } from "../../../../data/mayakDataConst";
+
+import { MayakField } from "./TrainerUiSections";
+import { buildMayakPromptDraft } from "./utils/buildMayakPromptDraft";
 
 const STORAGE_PREFIX = "trainer_v2_"; // Префикс для новой версии
 const getStorageKey = (key) => `${STORAGE_PREFIX}${key}`;
@@ -331,34 +329,18 @@ export default function IndexPage({ goTo }) {
         }
     }
 
-    function pickOne(arr) {
-        return arr[Math.floor(Math.random() * arr.length)];
-    }
-    function cleanupPrompt(str) {
-        return str
-            .replace(/\s{2,}/g, " ")
-            .replace(/,\s*,/g, ", ")
-            .replace(/\.\s*\./g, ".")
-            .trim();
-    }
-
     function createPrompt() {
-        const values = fields;
-        if (!Object.values(values).every((v) => v)) {
+        // Единый источник генерации промта (тот же, что и в тренажёре).
+        const draft = buildMayakPromptDraft(fields);
+        if (!draft) {
             setPrompt('Пожалуйста, заполните все поля (или используйте "кубики").');
             return;
         }
 
-        // Статическая генерация промпта
-        let draftPrompt = `Представь, что ты ${
-            values.y
-        }. Твоя миссия — ${values.m.toLowerCase()}. Ты создаешь контент для следующей аудитории: ${values.a.toLowerCase()}. При работе ты должен учитывать такие ограничения: ${values.o1.toLowerCase()}. Готовый результат должен соответствовать следующим критериям: ${values.k.toLowerCase()}. Этот материал будет использоваться в следующем контексте: ${values.k2.toLowerCase()}. Финальное оформление должно быть таким: ${values.o2.toLowerCase()}.`;
-
-        // Чистим итог от лишних пробелов и обновляем состояние
-        let finalPrompt = cleanupPrompt(draftPrompt);
+        const finalPrompt = draft.finalPrompt;
         setPrompt(finalPrompt);
 
-        // Запись в историю (логика из вашего целевого файла сохранена)
+        // Запись в историю
         const entry = { date: new Date().toISOString(), type, prompt: finalPrompt };
         const newHist = [entry, ...history].slice(0, 50);
         setHistory(newHist);
@@ -461,170 +443,34 @@ export default function IndexPage({ goTo }) {
                                         </Button>
                                     </div>
                                     {(fieldsList || []).slice(0, 4).map((f) => (
-                                        // ИЗМЕНЕНИЕ 3: Новый дизайн поля ввода
-                                        <div key={f.code} className="flex w-full items-center gap-4">
-                                            <span className="w-6 text-center font-bold text-lg text-gray-400">{f.label.charAt(0)}</span>
-                                            <div className="group flex-1 flex w-full items-start gap-2">
-                                                {isMobile ? (
-                                                    <>
-                                                        <div className="flex-1 min-w-0 flex flex-col">
-                                                            <div className="input-wrapper w-full">
-                                                                <TextareaAutosize
-                                                                    minRows={1}
-                                                                    className="w-full resize-none bg-transparent outline-none text-black overflow-hidden"
-                                                                    placeholder={f.label.split(" - ")[1]}
-                                                                    value={fields[f.code]}
-                                                                    onChange={(e) => handleChange(f.code, e.target.value)}
-                                                                />
-                                                                {fields[f.code] && (
-                                                                    <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">
-                                                                        {f.label}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-shrink-0 items-center gap-2">
-                                                            <Button icon onClick={() => handleShowBufferForField(f.code)} title="Сохраненные варианты">
-                                                                <CopyIcon />
-                                                            </Button>
-                                                            <div className="relative">
-                                                                <Button icon onClick={() => handleAddToBuffer(f.code)} title="Сохранить">
-                                                                    <Plusicon />
-                                                                </Button>
-                                                                {savedField === f.code && (
-                                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-10 transition-opacity duration-300">
-                                                                        Сохранено
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <Button icon onClick={() => handleRandom(f.code)} title="Случайный вариант">
-                                                                <RandomIcon />
-                                                            </Button>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div className="flex-1 min-w-0 flex flex-col">
-                                                            <div className="input-wrapper w-full">
-                                                                <TextareaAutosize
-                                                                    minRows={1}
-                                                                    className="w-full resize-none bg-transparent outline-none text-black overflow-hidden"
-                                                                    placeholder={f.label.split(" - ")[1]}
-                                                                    value={fields[f.code]}
-                                                                    onChange={(e) => handleChange(f.code, e.target.value)}
-                                                                />
-                                                                {fields[f.code] && (
-                                                                    <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">
-                                                                        {f.label}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={() => handleShowBufferForField(f.code)} title="Сохраненные варианты">
-                                                            <CopyIcon />
-                                                        </Button>
-                                                        <div className="relative !flex lg:!hidden lg:group-hover:!flex">
-                                                            <Button icon onClick={() => handleAddToBuffer(f.code)} title="Сохранить">
-                                                                <Plusicon />
-                                                            </Button>
-                                                            {savedField === f.code && (
-                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-10 transition-opacity duration-300">
-                                                                    Сохранено
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={() => handleRandom(f.code)} title="Случайный вариант">
-                                                            <RandomIcon />
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
+                                        <MayakField
+                                            key={f.code}
+                                            field={f}
+                                            value={fields[f.code]}
+                                            isMobile={isMobile}
+                                            onChange={handleChange}
+                                            onShowBuffer={handleShowBufferForField}
+                                            onAddToBuffer={handleAddToBuffer}
+                                            onRandom={handleRandom}
+                                            savedField={savedField}
+                                        />
                                     ))}
                                 </div>
 
                                 <div className="flex flex-col gap-[0.5rem]">
                                     <span className="big">Условия реализации и параметры оформления</span>
                                     {(fieldsList || []).slice(4).map((f) => (
-                                        // ИЗМЕНЕНИЕ 3: Новый дизайн поля ввода
-                                        <div key={f.code} className="flex w-full items-center gap-4">
-                                            <span className="w-6 text-center font-bold text-lg text-gray-400">{f.label.charAt(0)}</span>
-                                            <div className="group flex-1 flex w-full items-start gap-2">
-                                                {isMobile ? (
-                                                    <>
-                                                        <div className="flex-1 min-w-0 flex flex-col">
-                                                            <div className="input-wrapper w-full">
-                                                                <TextareaAutosize
-                                                                    minRows={1}
-                                                                    className="w-full resize-none bg-transparent outline-none text-black overflow-hidden"
-                                                                    placeholder={f.label.split(" - ")[1]}
-                                                                    value={fields[f.code]}
-                                                                    onChange={(e) => handleChange(f.code, e.target.value)}
-                                                                />
-                                                                {fields[f.code] && (
-                                                                    <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">
-                                                                        {f.label}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex flex-shrink-0 items-center gap-2">
-                                                            <Button icon onClick={() => handleShowBufferForField(f.code)} title="Сохраненные варианты">
-                                                                <CopyIcon />
-                                                            </Button>
-                                                            <div className="relative">
-                                                                <Button icon onClick={() => handleAddToBuffer(f.code)} title="Сохранить">
-                                                                    <Plusicon />
-                                                                </Button>
-                                                                {savedField === f.code && (
-                                                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-10 transition-opacity duration-300">
-                                                                        Сохранено
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <Button icon onClick={() => handleRandom(f.code)} title="Случайный вариант">
-                                                                <RandomIcon />
-                                                            </Button>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div className="flex-1 min-w-0 flex flex-col">
-                                                            <div className="input-wrapper w-full">
-                                                                <TextareaAutosize
-                                                                    minRows={1}
-                                                                    className="w-full resize-none bg-transparent outline-none text-black overflow-hidden"
-                                                                    placeholder={f.label.split(" - ")[1]}
-                                                                    value={fields[f.code]}
-                                                                    onChange={(e) => handleChange(f.code, e.target.value)}
-                                                                />
-                                                                {fields[f.code] && (
-                                                                    <p className="text-xs text-gray-400 pb-2 pl-[0.875rem] opacity-70">
-                                                                        {f.label}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={() => handleShowBufferForField(f.code)} title="Сохраненные варианты">
-                                                            <CopyIcon />
-                                                        </Button>
-                                                        <div className="relative !flex lg:!hidden lg:group-hover:!flex">
-                                                            <Button icon onClick={() => handleAddToBuffer(f.code)} title="Сохранить">
-                                                                <Plusicon />
-                                                            </Button>
-                                                            {savedField === f.code && (
-                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-10 transition-opacity duration-300">
-                                                                    Сохранено
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <Button icon className="!flex lg:!hidden lg:group-hover:!flex" onClick={() => handleRandom(f.code)} title="Случайный вариант">
-                                                            <RandomIcon />
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
+                                        <MayakField
+                                            key={f.code}
+                                            field={f}
+                                            value={fields[f.code]}
+                                            isMobile={isMobile}
+                                            onChange={handleChange}
+                                            onShowBuffer={handleShowBufferForField}
+                                            onAddToBuffer={handleAddToBuffer}
+                                            onRandom={handleRandom}
+                                            savedField={savedField}
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -642,7 +488,7 @@ export default function IndexPage({ goTo }) {
                 <div className="col-span-12 lg:col-span-6 h-full flex flex-col gap-4">
                     <Block className="flex-grow !bg-slate-50 flex flex-col">
                         <h6 className="text-black mb-2">Ваш промт</h6>
-                        <div className="flex-grow overflow-y-auto">
+                        <div className="flex-grow">
                             <p className="text-gray-600">{prompt || 'Заполните поля и нажмите "Создать запрос"'}</p>
                         </div>
                     </Block>

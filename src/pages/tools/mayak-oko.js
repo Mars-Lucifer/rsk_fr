@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 
 import TransitionWrapper from "@/components/layout/TransitionWrapper";
@@ -13,9 +13,13 @@ export default function Home() {
     const [pageKey, setPageKey] = useState("mayakOko");
     const router = useRouter();
 
-    const goTo = (pageName) => {
-        // Единая точка навигации: сохраняем активный экран, чтобы при
-        // перезагрузке (F5) восстановиться именно на нём, а не на главной.
+    // Единая точка навигации. Обязательно стабильная ссылка (useCallback):
+    // её держат в зависимостях useEffect хуки тренажёра (useMayakAccessGate и др.).
+    // Без мемоизации goTo пересоздаётся на каждый рендер, из-за чего access-gate
+    // перезапускался бесконечно (спам /validate-token и дёрганье перехода в настройки).
+    const goTo = useCallback((pageName) => {
+        // Сохраняем активный экран, чтобы при перезагрузке (F5) восстановиться
+        // именно на нём, а не на главной.
         if (typeof window !== "undefined") {
             try {
                 sessionStorage.setItem("currentPage", pageName);
@@ -25,7 +29,7 @@ export default function Home() {
             }
         }
         setPageKey(pageName);
-    };
+    }, []);
 
     const hasTokenQuery = router.isReady && (router.query.token || router.query.password);
     const effectivePageKey = hasTokenQuery && pageKey === "mayakOko" ? "settings" : pageKey;

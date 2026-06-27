@@ -1819,7 +1819,7 @@ export default function TrainerPage({ goTo }) {
 
             <Block className="flex min-h-0 flex-grow flex-col !bg-slate-50">
                 <h6 className="text-black mb-2">Ваш промт</h6>
-                <div className="flex-grow overflow-y-auto">
+                <div className="flex-grow">
                     <p className="text-gray-600">{prompt || 'Заполните поля и нажмите "Создать промт"'}</p>
                 </div>
             </Block>
