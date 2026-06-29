@@ -2,6 +2,16 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { COLUMNS } from "../columns";
 import { copyMayakText } from "@/components/features/tools-2/utils/copyMayakText";
 
+// Экранирование ячейки для TSV (правила Excel/Google Sheets): если значение
+// содержит таб/перевод строки/кавычку — оборачиваем в кавычки, внутренние
+// кавычки удваиваем. Без этого многострочные ячейки (Описание/Задание и др.)
+// ломали границы строк/колонок при копировании диапазона. Симметрично парсеру
+// вставки parseClipboardTable.
+function escapeTsvCell(value) {
+    const s = String(value ?? "");
+    return /[\t\n\r"]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 // Выделение ячеек (как в Google Sheets): активная ячейка, диапазон выделения,
 // навигация стрелками/Tab/Enter, и глобальные горячие клавиши (Ctrl+C/V/Z, Delete).
 //
@@ -175,7 +185,7 @@ export const useSpreadsheetSelection = ({
                     for (let c = sel.c1; c <= sel.c2; c++) {
                         const col = COLUMNS[c];
                         if (!col) { cells.push(""); continue; }
-                        cells.push(String(getCellValue(r, col) || ""));
+                        cells.push(escapeTsvCell(getCellValue(r, col)));
                     }
                     lines.push(cells.join("\t"));
                 }
