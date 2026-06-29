@@ -7,7 +7,7 @@ import { copyMayakText } from "./utils/copyMayakText";
 const copyToClipboard = copyMayakText;
 
 export const RoleSelectionPopup = ({ onClose, onConfirm }) => {
-    const roles = ["ИНЖЕНЕР", "МЕДИАТОР", "ХРАНИТЕЛЬ МАЯКА", "ИНСПЕКТОР", "КАПИТАН", "ЛЕТОПИСЕЦ"];
+    const roles = ["ИНЖЕНЕР", "МЕДИАТОР", "ХРАНИТЕЛЬ МАЯКА", "Инспектор", "КАПИТАН", "ЛЕТОПИСЕЦ"];
     const [currentSelection, setCurrentSelection] = useState(null);
 
     const handleConfirm = () => {
@@ -365,7 +365,7 @@ export const SessionCompletionPopup = memo(function SessionCompletionPopup({ onC
     );
 });
 
-export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData, onClose, elapsedTime }) {
+export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData, onClose, elapsedTime, canUseJoker = false, jokerBalance = 0, onUseJoker }) {
     // --- НАЧАЛО ДОБАВЛЕННОЙ ЛОГИКИ ---
     const [levels, setLevels] = useState({
         level1: "",
@@ -455,7 +455,15 @@ export const TaskCompletionPopup = memo(function TaskCompletionPopup({ taskData,
                     </div>
                 </div>
 
-                <div className="mt-4 flex justify-end relative">
+                <div className="mt-4 flex items-center justify-end gap-2 relative">
+                    {canUseJoker && typeof onUseJoker === "function" ? (
+                        <Button
+                            onClick={onUseJoker}
+                            className="mr-auto !border !border-rose-300 !text-rose-700 !bg-rose-50 hover:!bg-rose-100"
+                            title="Мгновенно засчитать задание части «Мы» без инспектора, потратив звезду-джокер">
+                            ⭐ Использовать звезду-джокер ({jokerBalance})
+                        </Button>
+                    ) : null}
                     <Button onClick={handleCopyClick} className="!bg-gray-100 !text-gray-800 hover:!bg-gray-200">
                         Скопировать задание
                     </Button>

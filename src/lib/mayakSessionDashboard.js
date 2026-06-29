@@ -43,8 +43,7 @@ function normalizeName(name) {
 function normalizeAndMapRole(roleStr) {
     if (!roleStr) return "";
     const norm = String(roleStr).trim().toUpperCase().replace(/Ё/g, "Е");
-    if (norm === "ИНСПЕКТОР" || norm === "INSPECTOR" || norm === "КОНТРОЛЕР") return "ИНСПЕКТОР";
-    if (norm === "АДМИНИСТРАТОР" || norm === "ADMINISTRATOR") return "АДМИНИСТРАТОР";
+    if (norm === "ИНСПЕКТОР" || norm === "INSPECTOR" || norm === "КОНТРОЛЕР") return "Инспектор";
     if (norm === "КАПИТАН" || norm === "CAPTAIN") return "Капитан";
     if (norm === "ИНЖЕНЕР" || norm === "ENGINEER") return "Инженер";
     if (norm === "МЕДИАТОР" || norm === "MEDIATOR" || norm === "КОММУНИКАТОР") return "Медиатор";
@@ -73,7 +72,7 @@ function mapTypeToRole(type) {
             return "Хранитель Маяка";
         case "text":
         case "текст":
-            return "ИНСПЕКТОР";
+            return "Инспектор";
         default:
             return "Участник";
     }

@@ -21,6 +21,7 @@ export function useMayakSessionActions({
     setShowRolePopup,
     stopTimer,
     timerIsRunning,
+    onAfterRoleConfirm,
 }) {
     const handleRoleConfirm = useCallback(
         async (role) => {
@@ -46,11 +47,15 @@ export function useMayakSessionActions({
             setSelectedRole(role);
             localStorage.setItem(getStorageKey("userRole"), role);
             setShowRolePopup(false);
+            // Сразу выдаём тайную миссию под выбранную роль и показываем её попап.
+            if (typeof onAfterRoleConfirm === "function") {
+                await onAfterRoleConfirm(role);
+            }
             if (isIntroTask(currentTaskIndex)) {
                 autoCompleteIntroTask();
             }
         },
-        [activeUserId, autoCompleteIntroTask, currentTaskIndex, getStorageKey, isIntroTask, sessionId, setSelectedRole, setShowRolePopup]
+        [activeUserId, autoCompleteIntroTask, currentTaskIndex, getStorageKey, isIntroTask, onAfterRoleConfirm, sessionId, setSelectedRole, setShowRolePopup]
     );
 
     const handleAdminResetSession = useCallback(() => {

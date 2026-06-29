@@ -1,12 +1,10 @@
 // Клиентские константы дашборда (без серверных импортов с fs).
 
-export const INSPECTOR_ROLE = "ИНСПЕКТОР";
-export const ADMINISTRATOR_ROLE = "АДМИНИСТРАТОР";
+export const INSPECTOR_ROLE = "Инспектор";
 
 export const ROLE_OPTIONS = [
     { value: "Участник", label: "Участник" },
     { value: INSPECTOR_ROLE, label: "Инспектор" },
-    { value: ADMINISTRATOR_ROLE, label: "Администратор" },
     { value: "Капитан", label: "Капитан" },
     { value: "Инженер", label: "Инженер" },
     { value: "Медиатор", label: "Медиатор" },
@@ -20,5 +18,5 @@ export function roleLabel(role) {
 }
 
 export function isReviewerRole(role) {
-    return role === INSPECTOR_ROLE || role === ADMINISTRATOR_ROLE;
+    return role === INSPECTOR_ROLE;
 }

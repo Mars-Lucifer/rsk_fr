@@ -273,6 +273,42 @@ export async function createMayakSession(payload) {
     return session;
 }
 
+// Debug-сессия для входа по `fffff`: персистентная активная сессия на конкретном
+// разделе, чтобы вход без заранее созданного токена открывал НАСТОЯЩИЙ сессионный
+// режим (роли, инспектор, джокер, ревью), а не офлайн-симуляцию bypass.
+// Идемпотентно: переиспользуем существующую активную debug-сессию этого раздела
+// (опознаём по детерминированному имени-сентинелу), иначе создаём новую через
+// общий createMayakSession (он сам делает авто-токен и пишет под локом).
+const DEBUG_SESSION_NAME_PREFIX = "__mayak_debug__ ";
+
+export async function getOrCreateMayakDebugSession({ sectionId, taskRange } = {}) {
+    const targetSectionId = normalizeString(sectionId);
+    if (!targetSectionId) {
+        throw new Error("Для debug-сессии нужен sectionId");
+    }
+    const sessionName = `${DEBUG_SESSION_NAME_PREFIX}${targetSectionId}`;
+
+    const store = await readMayakSessionsStore();
+    const existing = (Array.isArray(store?.sessions) ? store.sessions : []).find(
+        (session) =>
+            session.status === "active" &&
+            session.name === sessionName &&
+            session.sectionId === targetSectionId
+    );
+    if (existing) {
+        return existing;
+    }
+
+    return createMayakSession({
+        name: sessionName,
+        sectionId: targetSectionId,
+        taskRange: normalizeString(taskRange) || targetSectionId,
+        tableCount: 1,
+        tokenUsageLimit: 100000,
+        source: "debug",
+    });
+}
+
 export async function updateMayakSession(sessionId, payload) {
     const store = await readMayakSessionsStore();
     const tokens = await listMayakSessionTokens();

@@ -7,6 +7,7 @@ import InstructionImageModal from "./InstructionImageModal";
 import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
 import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
+import { SecretMissionPopup } from "./SecretMission";
 import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup, YaDirectionSelectionPopup } from "./TrainerPopups";
 
 import InfoIcon from "@/assets/general/info.svg";
@@ -22,7 +23,7 @@ import CloseIcon from "@/assets/general/close.svg";
 import { clearUserCookie, removeKeyCookie, addUserToCookies, getUserFromCookies } from "./actions";
 // Добавляем эти две строки для работы сертификата
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { resolveFormatKey, classifyMoodCard, YA_FORMAT_TYPES, computeTrainerYaProgress } from "@/lib/mayakProgressModel";
+import { resolveFormatKey, resolveDirectionKey, classifyMoodCard, YA_FORMAT_TYPES, computeTrainerYaProgress } from "@/lib/mayakProgressModel";
 import { AchievementToast, TrainerDebugPanel } from "./TrainerOverlays";
 import CourseIcon from "@/assets/nav/course.svg";
 import Button from "@/components/ui/Button";
@@ -175,6 +176,15 @@ export default function TrainerPage({ goTo }) {
 
     const [hasCompletedSecondQuestionnaire, setHasCompletedSecondQuestionnaire] = useState(localStorage.getItem(getStorageKey("hasCompletedSecondQuestionnaire")) === "true");
     const [selectedRole, setSelectedRole] = useState(localStorage.getItem(getStorageKey("userRole")) || null);
+    // Локально сохранённая тайная миссия для НЕ сессионного режима (в сессии миссия
+    // хранится на сервере в participant.secretMission). Объект: { role, id, title, text }.
+    const [localSecretMission, setLocalSecretMission] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem(getStorageKey("secretMission")) || "null");
+        } catch {
+            return null;
+        }
+    });
     const [taskVersion, setTaskVersion] = useState(localStorage.getItem(getStorageKey("taskVersion")) || "v2");
     const [questionnaireSettings, setQuestionnaireSettings] = useState({ introQuestionnaireUrl: "", completionSurveyUrl: "" });
 
@@ -393,6 +403,28 @@ export default function TrainerPage({ goTo }) {
     const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
     const isSessionMode = tokenType === "session" && !!runtimeSessionId;
 
+    // Вне сессии: если роль сменилась, прежняя локальная миссия больше не актуальна —
+    // сбрасываем, чтобы участник мог получить миссию под новую роль.
+    useEffect(() => {
+        if (isSessionMode) return;
+        if (localSecretMission && localSecretMission.role && localSecretMission.role !== selectedRole) {
+            setLocalSecretMission(null);
+            try {
+                localStorage.removeItem(getStorageKey("secretMission"));
+            } catch {}
+        }
+    }, [selectedRole, isSessionMode, localSecretMission]);
+
+    // Сохранение локально выданной миссии (вне сессии).
+    const handleLocalSecretMissionAssigned = useCallback((mission) => {
+        setLocalSecretMission(mission);
+        try {
+            localStorage.setItem(getStorageKey("secretMission"), JSON.stringify(mission));
+        } catch {}
+    }, []);
+
+    // Актуальная тайная миссия: в сессии — из рантайма участника, вне сессии — локальная.
+    const effectiveSecretMission = isSessionMode ? sessionRuntimeState?.participant?.secretMission || null : localSecretMission;
     // Единый refresh состояния сессии. Раньше один и тот же блок «запросить
     // /session-runtime/state и записать в стейт» был скопирован в 4 местах
     // (авто-аппрув intro, upload, joker-spend, решение инспектора) и в polling-
@@ -412,6 +444,36 @@ export default function TrainerPage({ goTo }) {
         }
         return null;
     }, [runtimeSessionId, activeUserId]);
+
+    // Попап с тайной миссией, который открывается сразу после подтверждения роли.
+    const [secretMissionPopup, setSecretMissionPopup] = useState(null);
+
+    // Выдаёт тайную миссию под роль и открывает попап с описанием.
+    // Режимы: сессия (закрепление на сервере) / standalone (localStorage).
+    // Сбой выдачи НЕ должен ломать подтверждение роли — ошибки гасим тихо.
+    const assignAndShowSecretMission = useCallback(async (role) => {
+        if (!role) return;
+        try {
+            const sessionAssign = isSessionMode && runtimeSessionId && activeUserId;
+            const endpoint = sessionAssign ? "/api/mayak/session-runtime/secret-mission" : "/api/mayak/secret-mission";
+            const body = sessionAssign ? { sessionId: runtimeSessionId, userId: activeUserId } : { role };
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success || !payload.data) return;
+            if (sessionAssign) {
+                await refreshSessionRuntimeState();
+            } else {
+                handleLocalSecretMissionAssigned(payload.data);
+            }
+            setSecretMissionPopup(payload.data);
+        } catch {
+            /* выдача миссии не критична для подтверждения роли */
+        }
+    }, [isSessionMode, runtimeSessionId, activeUserId, refreshSessionRuntimeState, handleLocalSecretMissionAssigned]);
 
     // Отладка в сессии: панель меняет ТОЛЬКО клиентский override (localStorage),
     // на сервер ничего не пишется. Это гарантирует, что отладка администратора
@@ -802,6 +864,16 @@ export default function TrainerPage({ goTo }) {
         ? (sessionDebugOverride?.jokerSpent ? 1 : 0)
         : bypassJokerSpent;
 
+    // Текущее задание — направление части «Мы» (как на сервере getJokerSpendContext):
+    // base = индекс+1 в диапазоне 51..99 и распознанное направление по типу контента.
+    // Кнопку джокера привязываем к самому заданию, а не к переключателю «Я/Мы»,
+    // чтобы она была доступна на любом «Мы»-задании при наличии звезды-джокера.
+    const currentTaskIsWeDirection = useMemo(() => {
+        const base = currentTaskIndex + 1;
+        if (base < 51 || base > 99) return false;
+        return Boolean(resolveDirectionKey(currentTaskData?.contentType || ""));
+    }, [currentTaskIndex, currentTaskData?.contentType]);
+
     // Панель отладки доступна в чистом bypass-режиме И администратору в сессии.
     const canUseDebugPanel = tokenType === "bypass" || (isSessionMode && isAdmin);
 
@@ -1022,6 +1094,7 @@ export default function TrainerPage({ goTo }) {
         setShowRolePopup,
         stopTimer,
         timerIsRunning: timerState.isRunning,
+        onAfterRoleConfirm: assignAndShowSecretMission,
     });
 
     const { handleCompleteSession, handleShowRolePopup, handleToolLink1Click } = useMayakTrainerControlActions({
@@ -1409,6 +1482,23 @@ export default function TrainerPage({ goTo }) {
             setSessionUploadLoading(false);
         }
     }, [activeUserId, currentTask, currentTaskData, currentTaskIndex, finalizeTaskExecution, runtimeSessionId, timerState.elapsedTime, refreshSessionRuntimeState]);
+
+    // Bypass-симуляция расхода джокера в попапе завершения. В режиме fffff нет
+    // сервера и инспектора, поэтому повторяем боевую семантику клиентски:
+    // списываем звезду (баланс 1→0) и мгновенно засчитываем задание части «Мы»
+    // (+1 к прогрессу ИЦЗ, максимум 36). Так в fffff можно вживую спроектировать
+    // и увидеть, как тратится джокер при завершении задания.
+    const handleUseBypassJokerStar = useCallback(() => {
+        handleBypassJokerSpentChange(1);
+        setBypassWeProgress((prev) => {
+            const next = Math.min(36, (Number(prev) || 0) + 1);
+            if (typeof window !== "undefined") {
+                window.localStorage.setItem("mayak_bypass_we_progress", String(next));
+            }
+            return next;
+        });
+        setShowCompletionPopup(false);
+    }, [handleBypassJokerSpentChange]);
 
     const handleResolveInspectorReview = useCallback(
         async (action, comment = "") => {
@@ -1932,6 +2022,17 @@ export default function TrainerPage({ goTo }) {
                                 pointerEvents: "none",
                             }}>
                             <p style={{ fontSize: "12px", color: "#666", lineHeight: "1.5" }}>{ROLE_DESCRIPTIONS[selectedRole] || ""}</p>
+                            {effectiveSecretMission?.text ? (
+                                <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: "1px solid #eee" }}>
+                                    <div style={{ fontSize: "11px", fontWeight: 600, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>
+                                        🎯 Тайная миссия
+                                    </div>
+                                    {effectiveSecretMission.title ? (
+                                        <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "4px", color: "#111" }}>«{effectiveSecretMission.title}»</div>
+                                    ) : null}
+                                    <p style={{ fontSize: "12px", color: "#666", lineHeight: "1.5" }}>{effectiveSecretMission.text}</p>
+                                </div>
+                            ) : null}
                         </div>
                         <style>{`.role-tooltip-wrap:hover .role-tooltip { opacity: 1 !important; visibility: visible !important; }`}</style>
                     </div>
@@ -2047,7 +2148,7 @@ export default function TrainerPage({ goTo }) {
                         rejectedComment={currentTaskReviewComment}
                         uploadLoading={sessionUploadLoading}
                         uploadError={sessionUploadError}
-                        canUseJoker={who === "we" && jokerBalance > 0}
+                        canUseJoker={currentTaskIsWeDirection && jokerBalance > 0}
                         jokerBalance={jokerBalance}
                         onUseJoker={handleUseJokerStar}
                         onClose={() => {
@@ -2060,6 +2161,9 @@ export default function TrainerPage({ goTo }) {
                     <TaskCompletionPopup
                         taskData={currentTaskData}
                         elapsedTime={timerState.readyElapsedTime}
+                        canUseJoker={tokenType === "bypass" && who === "we" && jokerBalance > 0}
+                        jokerBalance={jokerBalance}
+                        onUseJoker={handleUseBypassJokerStar}
                         onClose={() => {
                             setShowCompletionPopup(false);
                         }}
@@ -2067,6 +2171,7 @@ export default function TrainerPage({ goTo }) {
                 ))}
             {showSessionCompletionPopup && <SessionCompletionPopup onClose={handleCloseSessionCompletionPopup} onSave={handleSaveSessionCompletion} />}
             {showRolePopup && <RoleSelectionPopup onClose={handleCloseRolePopup} onConfirm={handleRoleConfirm} />}
+            {secretMissionPopup && <SecretMissionPopup mission={secretMissionPopup} onClose={() => setSecretMissionPopup(null)} />}
             {showRankingTestPopup && (
                 <RankingTestPopup
                     onClose={handleCloseRankingTestPopup}

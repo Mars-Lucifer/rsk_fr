@@ -44,6 +44,12 @@ export const MAYAK_ADMIN_SECTIONS = [
         href: "/admin/mayak-onboarding",
     },
     {
+        id: "secret-missions",
+        title: "Тайные миссии",
+        description: "Пул секретных заданий по ролям для сессионного режима тренажёра.",
+        href: "/admin/mayak-secret-missions",
+    },
+    {
         id: "service-templates",
         title: "Шаблоны инструкций",
         description: "PPTX-шаблоны инструкций по сервисам и форматам для автогенерации инструкций заданий.",

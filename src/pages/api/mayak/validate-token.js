@@ -1,6 +1,7 @@
 import { validateToken, useToken as consumeLegacyToken } from "@/utils/mayakTokens";
 import { useMayakSessionToken as consumeMayakSessionToken, validateMayakSessionToken } from "@/lib/mayakSessionTokens";
-import { findActiveMayakSessionByTokenId } from "@/lib/mayakSessions";
+import { findActiveMayakSessionByTokenId, getOrCreateMayakDebugSession } from "@/lib/mayakSessions";
+import { readManifest } from "@/lib/mayakContentStorage";
 
 const DEV_BYPASS_TOKEN = "fffff";
 const MAYAK_GUEST_SUFFIX = "aaaaa";
@@ -46,6 +47,12 @@ function detectAdminBypass(req, token) {
     if (isLocalMayakBypassEnabled(req)) {
         if (t === DEV_BYPASS_TOKEN) return true;
         if (t.length > DEV_BYPASS_TOKEN.length && t.toLowerCase().endsWith(DEV_BYPASS_TOKEN)) {
+            return true;
+        }
+        // Префиксная форма `fffff<подсказка_раздела>` (напр. fffff8001) — вход в
+        // debug-сессию на конкретном разделе. Работает только под локальным
+        // гейтом, поэтому прод-безопасность не меняется.
+        if (t.length > DEV_BYPASS_TOKEN.length && t.toLowerCase().startsWith(DEV_BYPASS_TOKEN)) {
             return true;
         }
     }
@@ -136,6 +143,61 @@ async function resolveAdminBypassSession(req, token) {
     }
 }
 
+// Выбор раздела по подсказке из `fffff<hint>`: точное совпадение → префикс →
+// вхождение → первый раздел как fallback. Пустой hint (голый fffff) → первый.
+function resolveDebugSectionId(sectionIds, hint) {
+    if (!Array.isArray(sectionIds) || sectionIds.length === 0) {
+        return null;
+    }
+    const normalizedHint = String(hint || "").trim().toLowerCase();
+    if (!normalizedHint) {
+        return sectionIds[0];
+    }
+    return (
+        sectionIds.find((id) => String(id).toLowerCase() === normalizedHint) ||
+        sectionIds.find((id) => String(id).toLowerCase().startsWith(normalizedHint)) ||
+        sectionIds.find((id) => String(id).toLowerCase().includes(normalizedHint)) ||
+        sectionIds[0]
+    );
+}
+
+// Голый `fffff` или `fffff<hint>` без реального токена под суффиксом → поднимаем
+// (или переиспользуем) персистентную debug-сессию на нужном разделе, чтобы вход
+// открывал НАСТОЯЩИЙ сессионный режим. Возвращает данные сессии для
+// buildBypassValidationResponse, либо null (нет контента → остаётся чистый bypass).
+async function resolveDebugSession(req, token) {
+    if (!isLocalMayakBypassEnabled(req)) {
+        return null;
+    }
+    const t = String(token || "");
+    const lower = t.toLowerCase();
+    const hint = lower !== DEV_BYPASS_TOKEN && lower.startsWith(DEV_BYPASS_TOKEN)
+        ? t.slice(DEV_BYPASS_TOKEN.length)
+        : "";
+
+    try {
+        const sectionIds = await readManifest();
+        const sectionId = resolveDebugSectionId(sectionIds, hint);
+        if (!sectionId) {
+            return null;
+        }
+        const session = await getOrCreateMayakDebugSession({ sectionId, taskRange: sectionId });
+        if (!session?.id) {
+            return null;
+        }
+        return {
+            sessionId: session.id,
+            sessionName: session.name || "",
+            tableCount: session.tableCount || 0,
+            sectionId: session.sectionId || sectionId,
+            taskRange: session.taskRange || sectionId,
+        };
+    } catch (error) {
+        console.error("Error resolving debug session:", error);
+        return null;
+    }
+}
+
 function buildGuestValidationResponse() {
     return {
         success: true,
@@ -215,8 +277,18 @@ export default async function handler(req, res) {
             }
 
             if (detectAdminBypass(req, token)) {
+                // 1. `<реальный_токен>fffff` — админ в уже созданной сессии.
                 const sessionData = await resolveAdminBypassSession(req, token);
-                return res.status(200).json(buildBypassValidationResponse(sessionData));
+                if (sessionData) {
+                    return res.status(200).json(buildBypassValidationResponse(sessionData));
+                }
+                // 2. Голый `fffff` или `fffff<hint>` — персистентная debug-сессия.
+                const debugSession = await resolveDebugSession(req, token);
+                if (debugSession) {
+                    return res.status(200).json(buildBypassValidationResponse(debugSession));
+                }
+                // 3. Контента нет — остаётся чистый bypass (офлайн-симуляция).
+                return res.status(200).json(buildBypassValidationResponse(null));
             }
 
             if (token === MAYAK_TEMP_GUEST_TOKEN) {

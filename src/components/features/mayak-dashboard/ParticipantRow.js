@@ -43,8 +43,7 @@ function ParticipantRow({
 
     const getRoleClass = (role) => {
         switch (role) {
-            case "ИНСПЕКТОР": return styles.roleInspector;
-            case "АДМИНИСТРАТОР": return styles.roleAdmin;
+            case "Инспектор": return styles.roleInspector;
             case "Капитан": return styles.roleCaptain;
             case "Инженер": return styles.roleEngineer;
             case "Медиатор": return styles.roleMediator;

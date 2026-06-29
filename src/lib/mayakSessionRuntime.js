@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { completeMayakSession, getMayakSessionById } from "@/lib/mayakSessions";
 import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 import { convertToPdf, logLibreOffice } from "@/lib/libreofficeConverter";
+import { pickRandomMissionForRole } from "@/lib/mayakSecretMissions";
 
 const SESSION_RUNTIME_FILE = path.join(process.cwd(), "data", "mayak-session-runtime.json");
 const SESSION_FILES_ROOT = path.join(process.cwd(), "data", "mayak-session-files");
@@ -12,9 +13,8 @@ const DEFAULT_REVIEW_TIMEOUT_SECONDS = 130;
 const DEFAULT_REWORK_TIMEOUT_SECONDS = 180;
 const PREVIEW_PROCESSING_TIMEOUT_MS = 90 * 1000;
 const MAX_SESSION_UPLOAD_FILE_SIZE = 30 * 1024 * 1024;
-export const INSPECTOR_ROLE = "\u0418\u041d\u0421\u041f\u0415\u041a\u0422\u041e\u0420";
-export const ADMINISTRATOR_ROLE = "\u0410\u0414\u041c\u0418\u041d\u0418\u0421\u0422\u0420\u0410\u0422\u041e\u0420";
-const REVIEWER_ROLES = new Set([INSPECTOR_ROLE, ADMINISTRATOR_ROLE]);
+export const INSPECTOR_ROLE = "\u0418\u043d\u0441\u043f\u0435\u043a\u0442\u043e\u0440";
+const REVIEWER_ROLES = new Set([INSPECTOR_ROLE]);
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif"]);
 const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".m4a", ".ogg"]);
@@ -163,6 +163,13 @@ function getInspectorTargetTable(tableNumber, tableCount) {
 function getReviewerTableForParticipant(tableNumber, tableCount) {
     if (tableCount <= 1) return tableNumber;
     return tableNumber === 1 ? tableCount : tableNumber - 1;
+}
+
+// Debug-сессия (вход по `fffff`): один стол, один участник-админ. Для неё
+// послабляем правила ревью, чтобы полный цикл (сдача → проверка) проходился
+// соло при ЛЮБОЙ роли — участник сам разбирает ревью своего стола.
+function isDebugSession(session) {
+    return String(session?.source || "") === "debug";
 }
 
 function getReviewTimeoutSeconds(session) {
@@ -345,6 +352,9 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
             // направления и счётчик потраченных звёзд-джокеров.
             yaDirection: existing.yaDirection || "",
             jokerSpent: Number(existing.jokerSpent) || 0,
+            // Сохраняем выданную тайную миссию: «получить можно один раз»,
+            // повторная регистрация не должна обнулять её.
+            secretMission: existing.secretMission || null,
         };
         return bucket.participants[userId];
     });
@@ -372,21 +382,69 @@ export async function setMayakSessionParticipantRole({ sessionId, userId, role }
                 (candidate) => candidate.userId !== userId && candidate.tableNumber === participant.tableNumber && candidate.role === normalizedRole
             );
             if (takenByAnother) {
-                throw new Error(
-                    normalizedRole === ADMINISTRATOR_ROLE
-                        ? `\u0414\u043b\u044f \u0441\u0442\u043e\u043b\u0430 ${participant.tableNumber} \u0430\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440 \u0443\u0436\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d`
-                        : `\u0414\u043b\u044f \u0441\u0442\u043e\u043b\u0430 ${participant.tableNumber} \u0438\u043d\u0441\u043f\u0435\u043a\u0442\u043e\u0440 \u0443\u0436\u0435 \u0432\u044b\u0431\u0440\u0430\u043d`
-                );
+                throw new Error(`\u0414\u043b\u044f \u0441\u0442\u043e\u043b\u0430 ${participant.tableNumber} \u0438\u043d\u0441\u043f\u0435\u043a\u0442\u043e\u0440 \u0443\u0436\u0435 \u0432\u044b\u0431\u0440\u0430\u043d`);
             }
             participant.inspectorTargetTable = getInspectorTargetTable(participant.tableNumber, normalizeTableNumber(session.tableCount));
         } else {
             participant.inspectorTargetTable = null;
         }
 
+        // Защита от дурака: при смене роли старая тайная миссия (под прежнюю роль)
+        // больше не актуальна — сбрасываем, чтобы под новую роль выдалась свежая.
+        if (participant.role !== normalizedRole) {
+            participant.secretMission = null;
+        }
+
         participant.role = normalizedRole;
         participant.updatedAt = new Date().toISOString();
         return participant;
     });
+}
+
+// Выдаёт участнику тайную миссию из пула его роли (по явному запросу — кнопкой).
+// «Получить можно только один раз»: если миссия уже выдана — возвращаем её без перевыбора.
+export async function assignSecretMission({ sessionId, userId }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    return mutateSessionRuntime(sessionId, async (store, bucket) => {
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
+        }
+        if (!normalizeString(participant.role)) {
+            throw new Error("Сначала выберите роль");
+        }
+        if (participant.secretMission && participant.secretMission.text) {
+            return participant.secretMission;
+        }
+
+        const mission = await pickRandomMissionForRole(participant.role);
+        if (!mission) {
+            throw new Error("Для вашей роли тайные миссии пока не заданы");
+        }
+
+        participant.secretMission = {
+            id: mission.id,
+            title: mission.title,
+            text: mission.text,
+            assignedAt: new Date().toISOString(),
+        };
+        participant.updatedAt = new Date().toISOString();
+        return participant.secretMission;
+    });
+}
+
+// Удаляет полный текст тайной миссии из объекта участника для дашборда/аналитики:
+// оператор видит факт и название выданной миссии, но не её секретный текст.
+function redactSecretMission(participant) {
+    if (!participant?.secretMission) {
+        return participant;
+    }
+    const { id, title, assignedAt } = participant.secretMission;
+    return { ...participant, secretMission: { id, title: title || "", assignedAt: assignedAt || null } };
 }
 
 // Возвращает сырые объекты участников рантайма (включая карту tasks) для аналитики дашборда.
@@ -399,7 +457,7 @@ export async function readSessionRuntimeParticipants(sessionId) {
     await expirePendingReviews(store, sessionId);
     const freshStore = await readStore();
     const bucket = ensureSessionBucket(freshStore, sessionId);
-    return Object.values(bucket.participants || {}).map((participant) => ({ ...participant }));
+    return Object.values(bucket.participants || {}).map((participant) => redactSecretMission({ ...participant }));
 }
 
 // Перемещает участника за другой стол (режим редактора дашборда).
@@ -593,10 +651,11 @@ export async function resolveMayakSessionReview({ sessionId, reviewId, inspector
         }
 
         const inspector = bucket.participants?.[inspectorUserId];
-        if (!inspector || !isReviewerRole(inspector.role)) {
+        const debugSession = isDebugSession(session);
+        if (!inspector || (!debugSession && !isReviewerRole(inspector.role))) {
             throw new Error("РџСЂРѕРІРµСЂРєСѓ РјРѕР¶РµС‚ РІС‹РїРѕР»РЅРёС‚СЊ С‚РѕР»СЊРєРѕ РёРЅСЃРїРµРєС‚РѕСЂ");
         }
-        if (inspector.inspectorTargetTable !== review.participantTableNumber) {
+        if (!debugSession && inspector.inspectorTargetTable !== review.participantTableNumber) {
             throw new Error("Р­С‚РѕС‚ РёРЅСЃРїРµРєС‚РѕСЂ РЅРµ Р·Р°РєСЂРµРїР»С‘РЅ Р·Р° РІС‹Р±СЂР°РЅРЅС‹Рј СЃС‚РѕР»РѕРј");
         }
 
@@ -673,10 +732,14 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
     }
 
     const blockingTask = getBlockingTaskState(participant);
+    // В debug-сессии (соло, 1 стол) очередь видна при любой роли: целевой стол
+    // проверки = собственный стол участника, иначе — закреплённый стол инспектора.
+    const debugSession = isDebugSession(session);
+    const queueTargetTable = participant.inspectorTargetTable || (debugSession ? participant.tableNumber : null);
     const inspectorQueue =
-        isReviewerRole(participant.role) && participant.inspectorTargetTable
+        queueTargetTable && (debugSession || isReviewerRole(participant.role))
             ? Object.values(bucket.reviews || {})
-                  .filter((review) => review.status === "pending" && review.participantTableNumber === participant.inspectorTargetTable)
+                  .filter((review) => review.status === "pending" && review.participantTableNumber === queueTargetTable)
                   .filter((review) => isReviewReadyForInspector(review))
                   .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
                   .map((review) => serializeReviewSummary(sessionId, review))
