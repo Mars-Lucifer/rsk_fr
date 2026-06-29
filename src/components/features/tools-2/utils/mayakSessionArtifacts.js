@@ -31,13 +31,25 @@ export function buildMayakRankingData(currentRanking, previousRanking) {
     });
 }
 
+// Защитный разбор JSON из localStorage: повреждённое значение не должно ронять
+// сборку артефактов (а с ней и всё завершение сессии). Возвращаем fallback.
+function safeParse(raw, fallback) {
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed == null ? fallback : parsed;
+    } catch {
+        return fallback;
+    }
+}
+
 export async function buildMayakSessionArtifacts({ getStorageKey, tokenSectionId }) {
-    const currentRanking = JSON.parse(localStorage.getItem("trainer_v2_rankingTestResults") || "{}");
-    const previousRanking = JSON.parse(localStorage.getItem("trainer_v2_rankingTestResults_previous") || "{}");
+    const currentRanking = safeParse(localStorage.getItem("trainer_v2_rankingTestResults"), {});
+    const previousRanking = safeParse(localStorage.getItem("trainer_v2_rankingTestResults_previous"), {});
     const rankingData = buildMayakRankingData(currentRanking, previousRanking);
 
-    const rawLog = JSON.parse(localStorage.getItem(getStorageKey("session_tasks_log")) || "[]");
-    const completedTasksData = rawLog.filter((task) => task.finalPrompt && task.finalPrompt !== "");
+    const parsedLog = safeParse(localStorage.getItem(getStorageKey("session_tasks_log")), []);
+    const rawLog = Array.isArray(parsedLog) ? parsedLog : [];
+    const completedTasksData = rawLog.filter((task) => task && task.finalPrompt && task.finalPrompt !== "");
 
     let avgTimes = {};
     if (tokenSectionId) {

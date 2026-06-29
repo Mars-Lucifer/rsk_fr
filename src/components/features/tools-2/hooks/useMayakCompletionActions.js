@@ -165,43 +165,56 @@ export const useMayakCompletionActions = ({
         return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
     }, []);
 
+    // Строгая генерация лога: бросает ошибку наверх (для завершения сессии гостя,
+    // где провал не должен приводить к молчаливой потере артефакта).
+    const downloadLogsStrict = useCallback(async () => {
+        const userData = getUserFromCookies();
+        const userName = buildFullMayakName(userData);
+        const dateStr = new Date().toLocaleDateString("ru-RU");
+        const { rankingData, enrichedTasks, totalSessionSeconds } = await buildMayakSessionArtifacts({
+            getStorageKey,
+            tokenSectionId,
+        });
+        const blobLogs = await buildMayakSessionLogBlob({
+            userName,
+            userRole: selectedRole,
+            dateStr,
+            totalTime: formatTaskTime(totalSessionSeconds),
+            rankingData,
+            tasks: enrichedTasks,
+        });
+        downloadMayakBlob(blobLogs, `Log_Mayak_${userName.replace(/\s+/g, "_")}_${dateStr}.pdf`);
+    }, [formatTaskTime, getStorageKey, selectedRole, tokenSectionId]);
+
+    // Толерантная обёртка для отдельной кнопки скачивания (ошибки не критичны).
     const handleDownloadLogs = useCallback(async () => {
         try {
-            const userData = getUserFromCookies();
-            const userName = buildFullMayakName(userData);
-            const dateStr = new Date().toLocaleDateString("ru-RU");
-            const { rankingData, enrichedTasks, totalSessionSeconds } = await buildMayakSessionArtifacts({
-                getStorageKey,
-                tokenSectionId,
-            });
-            const blobLogs = await buildMayakSessionLogBlob({
-                userName,
-                userRole: selectedRole,
-                dateStr,
-                totalTime: formatTaskTime(totalSessionSeconds),
-                rankingData,
-                tasks: enrichedTasks,
-            });
-            downloadMayakBlob(blobLogs, `Log_Mayak_${userName.replace(/\s+/g, "_")}_${dateStr}.pdf`);
+            await downloadLogsStrict();
         } catch (error) {
             console.error("Ошибка при генерации логов:", error);
         }
-    }, [formatTaskTime, getStorageKey, selectedRole, tokenSectionId]);
+    }, [downloadLogsStrict]);
 
+    // Строгая генерация сертификата: бросает ошибку наверх.
+    const downloadCertificateStrict = useCallback(async () => {
+        const userData = getUserFromCookies();
+        const userName = buildCertificateMayakName(userData);
+        const dateStr = new Date().toLocaleDateString("ru-RU");
+        const userId = await resolveMayakCertificateUserId(userData);
+        const qrDataUrl = await buildMayakQrDataUrl(userId);
+        const certificateNumber = await resolveMayakCertificateNumber({ ...userData, portalUserId: userId });
+        const blobCert = await buildMayakCertificateBlob({ userName, dateStr, qrDataUrl, certificateNumber });
+        downloadMayakBlob(blobCert, `Certificate_Mayak_${userName.replace(/\s+/g, "_")}.pdf`);
+    }, []);
+
+    // Толерантная обёртка для отдельной кнопки скачивания.
     const handleDownloadCertificate = useCallback(async () => {
         try {
-            const userData = getUserFromCookies();
-            const userName = buildCertificateMayakName(userData);
-            const dateStr = new Date().toLocaleDateString("ru-RU");
-            const userId = await resolveMayakCertificateUserId(userData);
-            const qrDataUrl = await buildMayakQrDataUrl(userId);
-            const certificateNumber = await resolveMayakCertificateNumber({ ...userData, portalUserId: userId });
-            const blobCert = await buildMayakCertificateBlob({ userName, dateStr, qrDataUrl, certificateNumber });
-            downloadMayakBlob(blobCert, `Certificate_Mayak_${userName.replace(/\s+/g, "_")}.pdf`);
+            await downloadCertificateStrict();
         } catch (error) {
             console.error("Ошибка при генерации сертификата:", error);
         }
-    }, []);
+    }, [downloadCertificateStrict]);
 
     const handleDownloadAnalytics = useCallback(async () => {
         if (!ENABLE_MAYAK_FINAL_ANALYTICS) {
@@ -365,13 +378,17 @@ export const useMayakCompletionActions = ({
     }, [formatTaskTime, getStorageKey, selectedRole, tokenSectionId]);
 
     const handleDownloadGuestArtifacts = useCallback(async () => {
-        await handleDownloadCertificate();
+        // Сертификат и лог — критичные артефакты: если генерация упала, бросаем
+        // ошибку наверх, чтобы завершение прервалось и сессия НЕ сбросилась
+        // (иначе гость уходит без файлов и без предупреждения).
+        await downloadCertificateStrict();
         await new Promise((resolve) => setTimeout(resolve, 200));
-        await handleDownloadLogs();
+        await downloadLogsStrict();
         await new Promise((resolve) => setTimeout(resolve, 200));
+        // Аналитика необязательна — best-effort, ошибки не критичны.
         await handleDownloadAnalytics();
         return { success: true };
-    }, [handleDownloadAnalytics, handleDownloadCertificate, handleDownloadLogs]);
+    }, [downloadCertificateStrict, downloadLogsStrict, handleDownloadAnalytics]);
 
     const handleSaveSessionCompletion = useCallback(async () => {
         setTelegramLoading(true);

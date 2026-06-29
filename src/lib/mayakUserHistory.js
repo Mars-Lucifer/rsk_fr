@@ -27,6 +27,11 @@ const ANALYTICS_STATUS = {
     failed: "failed",
 };
 
+// Окно идемпотентности завершения: повтор (ретрай при потере ответа, двойной
+// клик) с той же сигнатурой в пределах окна возвращает уже созданную запись, а
+// не плодит дубликат истории/сертификата.
+const COMPLETION_DEDUP_WINDOW_MS = 2 * 60 * 1000;
+
 function createEmptyStore() {
     return { entries: [] };
 }
@@ -85,7 +90,7 @@ function buildArtifactUrls(runId) {
 }
 
 export function serializeMayakHistoryEntry(entry) {
-    const { artifactDir, ...safeEntry } = entry;
+    const { artifactDir, dedupSignature, ...safeEntry } = entry;
     const analyticsStatus = String(entry?.analyticsStatus || "").trim() || ANALYTICS_STATUS.ready;
     const files = buildArtifactUrls(entry.runId);
     return {
@@ -110,43 +115,64 @@ export async function createMayakHistoryEntry({
     logBuffer,
     analyticsBuffer = null,
 }) {
-    const runId = crypto.randomUUID();
     const completedIso = new Date(completedAt || new Date()).toISOString();
+    const completedMs = Date.parse(completedIso);
     const userSegment = sanitizeIdSegment(portalProfile.id, "anonymous");
-    const artifactDir = path.join(ARTIFACTS_ROOT, userSegment, runId);
 
-    await fs.mkdir(artifactDir, { recursive: true });
-    await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.certificate.filename), Buffer.from(certificateBuffer));
-    await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.log.filename), Buffer.from(logBuffer));
-    if (analyticsBuffer) {
-        await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.analytics.filename), Buffer.from(analyticsBuffer));
-    }
+    // Сигнатура завершения для дедупа: один и тот же пользователь, тот же токен
+    // (раздел/сессия) и стол. Повтор в окне = тот же логический результат.
+    const dedupSignature = [
+        String(portalProfile.id || ""),
+        String(tokenContext.sectionId || ""),
+        String(tokenContext.sessionId || ""),
+        activeUser?.tableNumber ? String(activeUser.tableNumber) : "",
+    ].join("|");
 
-    const entry = {
-        runId,
-        portalUserId: portalProfile.id,
-        fullName: portalProfile.fullName,
-        organization: portalProfile.organizationLabel,
-        organizationId: portalProfile.organizationId,
-        completedAt: completedIso,
-        tokenType: tokenContext.tokenType || "legacy",
-        sectionId: tokenContext.sectionId || null,
-        sessionId: tokenContext.sessionId || null,
-        sessionName: tokenContext.sessionName || "",
-        tableNumber: activeUser?.tableNumber ? String(activeUser.tableNumber) : "",
-        selectedRole: String(selectedRole || logData.userRole || "").trim(),
-        trainerName: "МАЯК ОКО",
-        completedTaskCount: Array.isArray(logData.tasks) ? logData.tasks.length : 0,
-        totalTime: String(logData.totalTime || "").trim(),
-        analyticsStatus: analyticsBuffer ? ANALYTICS_STATUS.ready : ANALYTICS_STATUS.pending,
-        analyticsError: "",
-        artifactDir,
-    };
+    return mutateHistoryStore(async (store) => {
+        const duplicate = store.entries.find((existing) => {
+            if (existing.dedupSignature !== dedupSignature) return false;
+            const existingMs = Date.parse(existing.completedAt || "");
+            return Number.isFinite(existingMs) && Math.abs(completedMs - existingMs) <= COMPLETION_DEDUP_WINDOW_MS;
+        });
+        if (duplicate) {
+            // Идемпотентный возврат: артефакты и запись не создаём повторно.
+            return duplicate;
+        }
 
-    await mutateHistoryStore((store) => {
+        const runId = crypto.randomUUID();
+        const artifactDir = path.join(ARTIFACTS_ROOT, userSegment, runId);
+        await fs.mkdir(artifactDir, { recursive: true });
+        await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.certificate.filename), Buffer.from(certificateBuffer));
+        await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.log.filename), Buffer.from(logBuffer));
+        if (analyticsBuffer) {
+            await fs.writeFile(path.join(artifactDir, ARTIFACT_TYPE_META.analytics.filename), Buffer.from(analyticsBuffer));
+        }
+
+        const entry = {
+            runId,
+            portalUserId: portalProfile.id,
+            fullName: portalProfile.fullName,
+            organization: portalProfile.organizationLabel,
+            organizationId: portalProfile.organizationId,
+            completedAt: completedIso,
+            tokenType: tokenContext.tokenType || "legacy",
+            sectionId: tokenContext.sectionId || null,
+            sessionId: tokenContext.sessionId || null,
+            sessionName: tokenContext.sessionName || "",
+            tableNumber: activeUser?.tableNumber ? String(activeUser.tableNumber) : "",
+            selectedRole: String(selectedRole || logData.userRole || "").trim(),
+            trainerName: "МАЯК ОКО",
+            completedTaskCount: Array.isArray(logData.tasks) ? logData.tasks.length : 0,
+            totalTime: String(logData.totalTime || "").trim(),
+            analyticsStatus: analyticsBuffer ? ANALYTICS_STATUS.ready : ANALYTICS_STATUS.pending,
+            analyticsError: "",
+            dedupSignature,
+            artifactDir,
+        };
+
         store.entries.push(entry);
+        return entry;
     });
-    return entry;
 }
 
 export async function listMayakHistoryByPortalUserId(portalUserId) {
