@@ -17,6 +17,7 @@ import { invalidateRangesCache } from "@/lib/mayakContentCache";
 import { convertToPdf } from "@/lib/libreofficeConverter";
 import { rasterizePdfFirstPageToPng } from "@/lib/pdfRasterize";
 import { findService, getTemplatePath, readServiceTemplates, replaceMapInPptx, resolveFormat } from "@/lib/mayakServiceTemplates";
+import { resolveFormatKey } from "@/lib/mayakProgressModel";
 
 const GEN_WORK_ROOT = path.join(process.cwd(), "tmp_pdf_tools", "mayak-instruction-gen");
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"]);
@@ -38,14 +39,16 @@ function serviceCandidates(task) {
 
 // Находит сервис-кандидат с шаблоном. Если задан serviceKey (ручной выбор при
 // нескольких сервисах) — приоритет ему, но только если он среди кандидатов задания.
-function matchServiceWithTemplate(registry, task, formatKey, serviceKey) {
+// contentTypeKey — канонический тип контента задания (текст/изображение/...), по
+// которому автоматически выбирается нужный формат сервиса.
+function matchServiceWithTemplate(registry, task, formatKey, serviceKey, contentTypeKey) {
     const candidates = serviceCandidates(task);
 
     if (serviceKey) {
         for (const name of candidates) {
             const service = findService(registry, name);
             if (service && service.serviceKey === serviceKey) {
-                const format = resolveFormat(service, formatKey);
+                const format = resolveFormat(service, formatKey, contentTypeKey);
                 return { service, format: format || null, candidateName: service.serviceName };
             }
         }
@@ -55,7 +58,7 @@ function matchServiceWithTemplate(registry, task, formatKey, serviceKey) {
     for (const name of candidates) {
         const service = findService(registry, name);
         if (service) {
-            const format = resolveFormat(service, formatKey);
+            const format = resolveFormat(service, formatKey, contentTypeKey);
             if (format) return { service, format, candidateName: name };
             if (!fallback) fallback = { service, format: null, candidateName: name };
         }
@@ -110,7 +113,9 @@ export default async function handler(req, res) {
             return res.status(422).json({ success: false, error: "У задания не указан сервис (колонки «Сервисы» или «Инструмент»)" });
         }
         const registry = await readServiceTemplates();
-        const { service, format, candidateName } = matchServiceWithTemplate(registry, task, formatKey, serviceKey);
+        // Канонический тип контента задания → авто-выбор формата шаблона.
+        const contentTypeKey = resolveFormatKey(task.contentType) || "";
+        const { service, format, candidateName } = matchServiceWithTemplate(registry, task, formatKey, serviceKey, contentTypeKey);
         if (!service) {
             return res.status(422).json({ success: false, error: `Для сервиса «${candidateName}» не загружен шаблон` });
         }

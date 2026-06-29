@@ -98,13 +98,22 @@ export function findService(registry, serviceKeyOrName) {
 }
 
 /**
- * Возвращает формат сервиса: по formatKey, либо первый по порядку (дефолт).
+ * Возвращает формат сервиса. Приоритет:
+ *   1) явный formatKey (ручной выбор оператором);
+ *   2) совпадение по типу контента задания (contentTypeKey, напр. «изображение»);
+ *   3) первый формат по порядку (легаси-фоллбэк).
+ * Благодаря (2) пара «Qwen изображение / Qwen текст» разрешается автоматически
+ * по типу задания, без ручного выбора формата.
  */
-export function resolveFormat(service, formatKey) {
+export function resolveFormat(service, formatKey, contentTypeKey) {
     if (!service || !Array.isArray(service.formats) || service.formats.length === 0) return null;
     if (formatKey) {
         const found = service.formats.find((f) => f.formatKey === formatKey);
         if (found) return found;
+    }
+    if (contentTypeKey) {
+        const byType = service.formats.find((f) => f.formatKey === contentTypeKey);
+        if (byType) return byType;
     }
     return service.formats[0];
 }

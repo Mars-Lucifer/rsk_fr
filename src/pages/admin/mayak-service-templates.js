@@ -6,6 +6,7 @@ import { useRouter } from "next/router";
 import Header from "@/components/layout/Header";
 import MayakAdminBackLink from "@/components/mayak-admin/MayakAdminBackLink";
 import { buildMayakAdminLoginUrl, getMayakAdminAuthStatus } from "@/lib/mayakAdminClient";
+import { YA_FORMAT_TYPES } from "@/lib/mayakProgressModel";
 
 const API_URL = "/api/admin/mayak-service-templates";
 const SELF_PATH = "/admin/mayak-service-templates";
@@ -177,8 +178,10 @@ export default function AdminMayakServiceTemplatesPage() {
                     <div>
                         <h1 style={pageTitleStyle}>Шаблоны инструкций</h1>
                         <div style={pageLeadStyle}>
-                            Загрузите .pptx-шаблон для пары «сервис + формат». На первом слайде шаблона должна быть картинка-плейсхолдер —
-                            при генерации она заменяется картой задания, и шаблон превращается в PDF-инструкцию.
+                            Загрузите .pptx-шаблон для пары «сервис + тип контента» (Текст/Изображение/Видео/…). На первом слайде шаблона
+                            должна быть картинка-плейсхолдер — при генерации она заменяется картой задания, и шаблон превращается в PDF-инструкцию.
+                            При генерации формат выбирается <b>автоматически по типу задания</b>: например, у Qwen задание-«Изображение» возьмёт
+                            шаблон «Изображение», а задание-«Текст» — шаблон «Текст».
                         </div>
                     </div>
                     <MayakAdminBackLink />
@@ -197,8 +200,13 @@ export default function AdminMayakServiceTemplatesPage() {
                         <input value={serviceUrl} onChange={(e) => setServiceUrl(e.target.value)} placeholder="https://suno.com/" style={inputStyle} />
                     </label>
                     <label style={fieldStyle}>
-                        <span style={labelStyle}>Формат</span>
-                        <input value={formatName} onChange={(e) => setFormatName(e.target.value)} placeholder="Например, База песни" style={inputStyle} />
+                        <span style={labelStyle}>Формат (тип контента)</span>
+                        <select value={formatName} onChange={(e) => setFormatName(e.target.value)} style={inputStyle}>
+                            <option value="">— выберите тип —</option>
+                            {YA_FORMAT_TYPES.map((fmt) => (
+                                <option key={fmt.key} value={fmt.label}>{fmt.label}</option>
+                            ))}
+                        </select>
                     </label>
                     <label style={fieldStyle}>
                         <span style={labelStyle}>Файл .pptx</span>
