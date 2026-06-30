@@ -20,14 +20,14 @@ export function buildMayakSessionCompletionPayload({ activeUserId, elapsedTime, 
     };
 }
 
-export function clearMayakSessionCompletionState({ getStorageKey, removeKeyCookie, resetQwenSessionState, setSelectedRole, setShowSessionCompletionPopup, setShowThirdQuestionnaire }) {
+export function clearMayakSessionCompletionState({ getStorageKey, removeKeyCookie, resetSovaSessionState, setSelectedRole, setShowSessionCompletionPopup, setShowThirdQuestionnaire }) {
     setShowSessionCompletionPopup(false);
     setShowThirdQuestionnaire(false);
     localStorage.removeItem(getStorageKey("userRole"));
     localStorage.removeItem(getStorageKey("sessionStartTime"));
     localStorage.removeItem(getStorageKey("session_tasks_log"));
     localStorage.removeItem(getStorageKey("completedTasks"));
-    resetQwenSessionState();
+    resetSovaSessionState();
     localStorage.removeItem("trainer_v2_rankingTestResults");
     localStorage.removeItem("trainer_v2_rankingTestResults_previous");
     sessionStorage.removeItem("trainer_v2_taskTimer");
@@ -49,7 +49,6 @@ export async function executeMayakSessionCompletion({
     elapsedTime,
     levels,
     onPersistArtifacts,
-    onSendToTelegram,
     onClearState,
     redirectTo = "/profile",
 }) {
@@ -69,12 +68,6 @@ export async function executeMayakSessionCompletion({
     }).catch((error) => console.error("Ошибка сохранения измерений MAYAK (не критично):", error));
 
     await onPersistArtifacts();
-
-    try {
-        await onSendToTelegram();
-    } catch (error) {
-        console.error("Telegram-отправка не удалась (не критично):", error);
-    }
 
     await new Promise((resolve) => setTimeout(resolve, 1200));
     onClearState();

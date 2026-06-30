@@ -1,19 +1,17 @@
 import {
-    QWEN_EVALUATION_SYSTEM_PROMPT,
-    buildQwenEvaluationUserMessage,
-    classifyQwenFailure,
-    isValidQwenEvaluationShape,
+    SOVA_EVALUATION_SYSTEM_PROMPT,
+    buildSovaEvaluationUserMessage,
+    classifySovaFailure,
+    isValidSovaEvaluationShape,
     maskSecret,
-    normalizeQwenEvaluation,
-    parseQwenEvaluation,
-} from "../../../lib/mayakQwen.js";
+    normalizeSovaEvaluation,
+    parseSovaEvaluation,
+} from "../../../lib/mayakSova.js";
 import { readMayakSettings } from "../../../lib/mayakSettings.js";
 
-// Активная проверка полей МАЯК-ОКО идёт через OpenRouter (OpenAI-совместимый).
+// Активная проверка полей МАЯК-ОКО (СОВА) идёт через OpenRouter (OpenAI-совместимый).
 // Модель по умолчанию — google/gemini-3-flash-preview: стабильно отдаёт строгий
-// JSON и стоит дёшево. Логика разбора/нормализации общая с Qwen и переиспользуется
-// как есть. Codex Sale из этого пути убран (токен провайдера был отозван); его
-// конфигурация остаётся в админке для других сценариев, но в оценке не участвует.
+// JSON и стоит дёшево. Логика разбора/нормализации общая и живёт в mayakSova.js.
 // При невалидной структуре ответа делаем один повтор тем же провайдером —
 // это компенсирует отсутствие второго провайдера и редкие сбои формата у модели.
 
@@ -46,7 +44,7 @@ async function requestStructuredEvaluation({ apiUrl, token, model, systemPrompt,
             messages: [
                 {
                     role: "system",
-                    content: systemPrompt || QWEN_EVALUATION_SYSTEM_PROMPT,
+                    content: systemPrompt || SOVA_EVALUATION_SYSTEM_PROMPT,
                 },
                 {
                     role: "user",
@@ -69,9 +67,9 @@ async function requestStructuredEvaluation({ apiUrl, token, model, systemPrompt,
 
     const data = await response.json();
     const rawMessage = data.choices?.[0]?.message?.content || "";
-    const parsedEvaluation = parseQwenEvaluation(rawMessage);
+    const parsedEvaluation = parseSovaEvaluation(rawMessage);
 
-    if (!parsedEvaluation || !isValidQwenEvaluationShape(parsedEvaluation)) {
+    if (!parsedEvaluation || !isValidSovaEvaluationShape(parsedEvaluation)) {
         return {
             ok: false,
             status: 502,
@@ -87,7 +85,7 @@ async function requestStructuredEvaluation({ apiUrl, token, model, systemPrompt,
 }
 
 function buildNormalizedEvaluation(parsedEvaluation, { fields, taskContext }) {
-    return normalizeQwenEvaluation(parsedEvaluation, {
+    return normalizeSovaEvaluation(parsedEvaluation, {
         fields,
         taskContext,
     });
@@ -147,7 +145,7 @@ async function handlePromptEvaluation({ res, userMessageContent, fields, taskCon
                 continue;
             }
 
-            const failure = classifyQwenFailure(result.status, result.errorText);
+            const failure = classifySovaFailure(result.status, result.errorText);
             failures.push({ provider: "openrouter", attempt, status: result.status, reason: failure.reason, token: maskSecret(token) });
             console.error("[PromptEvaluation] OpenRouter API error:", result.status, failure.reason, maskSecret(token), result.errorText);
             break;
@@ -175,13 +173,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "fields are required" });
     }
 
-    const userMessageContent = buildQwenEvaluationUserMessage({
+    const userMessageContent = buildSovaEvaluationUserMessage({
         taskContext,
         fields,
     });
 
     const settings = await readMayakSettings();
-    const systemPrompt = typeof settings.sovaPrompt === "string" && settings.sovaPrompt.trim() ? settings.sovaPrompt.trim() : QWEN_EVALUATION_SYSTEM_PROMPT;
+    const systemPrompt = typeof settings.sovaPrompt === "string" && settings.sovaPrompt.trim() ? settings.sovaPrompt.trim() : SOVA_EVALUATION_SYSTEM_PROMPT;
 
     return handlePromptEvaluation({
         res,

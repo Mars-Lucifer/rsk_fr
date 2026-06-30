@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 
 const SETTINGS_FILE = path.join(process.cwd(), "data", "mayak-settings.json");
-export const DEFAULT_PROMPT_EVALUATION_PROVIDER = "qwen";
+export const DEFAULT_PROMPT_EVALUATION_PROVIDER = "openrouter";
 export const DEFAULT_PROMPT_EVALUATION_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
 export const DEFAULT_PROMPT_EVALUATION_OLLAMA_MODEL = "gemma4:e2b";
 
@@ -13,6 +13,7 @@ export function normalizeMayakQuestionnaireUrl(value) {
 export function normalizePromptEvaluationProvider(value) {
     const normalizedValue = typeof value === "string" ? value.trim().toLowerCase() : "";
     return normalizedValue === "ollama" ? "ollama" : DEFAULT_PROMPT_EVALUATION_PROVIDER;
+    // Поддерживаемые значения: "openrouter" (по умолчанию) или "ollama".
 }
 
 export function normalizePromptEvaluationOllamaBaseUrl(value) {

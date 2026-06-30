@@ -8,18 +8,10 @@ export async function register() {
     try {
       if (fs.existsSync(settingsPath)) {
         const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        if (settings.telegramBotToken) process.env['TELEGRAM_BOT_TOKEN'] = settings.telegramBotToken;
         if (settings.openrouterApiKey) process.env['OPENROUTER_API_KEY'] = settings.openrouterApiKey;
-        if (settings.telegramBotUsername) process.env['TELEGRAM_BOT_USERNAME'] = settings.telegramBotUsername;
-        if (settings.telegramWebhookUrl) process.env['TELEGRAM_WEBHOOK_URL'] = settings.telegramWebhookUrl;
         const baseUrlKey = 'NEXT_PUBLIC' + '_BASE_URL';
         if (settings.baseUrl) process.env[baseUrlKey] = settings.baseUrl;
       }
     } catch {}
-
-    if (process.env.TELEGRAM_BOT_TOKEN) {
-      const { startBot } = await import('./lib/telegramBot.js');
-      startBot();
-    }
   }
 }

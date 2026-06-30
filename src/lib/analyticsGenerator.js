@@ -4,8 +4,7 @@ import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { readMayakSettings } from './mayakSettings.js';
-import { maskSecret } from './mayakQwen.js';
-import { CODEX_API_URL, getStoredCodexConfig } from './mayakCodex.js';
+import { maskSecret } from './mayakSova.js';
 
 const DEFAULT_FINAL_FILE_MODEL = 'google/gemini-3-flash-preview';
 
@@ -411,7 +410,6 @@ async function fetchWithTimeout(url, options, timeoutMs = LLM_REQUEST_TIMEOUT_MS
 
 async function getFinalFileLLMConfig() {
   const settings = await readMayakSettings();
-  const codex = await getStoredCodexConfig();
   const openRouterApiKey =
     settings.finalFileOpenrouterApiKey ||
     settings.openrouterApiKey ||
@@ -421,8 +419,6 @@ async function getFinalFileLLMConfig() {
   const model = settings.finalFileModel || process.env.MAYAK_FINAL_FILE_MODEL || DEFAULT_FINAL_FILE_MODEL;
 
   return {
-    codexToken: codex.token,
-    codexModel: codex.model,
     openRouterApiKey: String(openRouterApiKey || '').trim(),
     model: String(model || '').trim() || DEFAULT_FINAL_FILE_MODEL,
     analyticsPrompt: typeof settings.analyticsPrompt === 'string' ? settings.analyticsPrompt.trim() : '',
@@ -430,37 +426,11 @@ async function getFinalFileLLMConfig() {
 }
 
 async function callLLM(prompt) {
-  const { codexToken, codexModel, openRouterApiKey, model } = await getFinalFileLLMConfig();
-
-  // Основной провайдер итоговой аналитики — Codex Sale (как и оценка в тренажёре).
-  if (codexToken) {
-    try {
-      const res = await fetchWithTimeout(`${CODEX_API_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${codexToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: codexModel,
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 8000,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return data.choices?.[0]?.message?.content || 'Не удалось получить анализ';
-      }
-
-      console.error('[Analytics] Codex Sale API error:', res.status, maskSecret(codexToken), await res.text());
-    } catch (error) {
-      console.error('[Analytics] Codex Sale request error:', maskSecret(codexToken), error.message);
-    }
-  }
+  // Провайдер итоговой аналитики — OpenRouter (тот же, что и оценка СОВА в sova-check.js).
+  const { openRouterApiKey, model } = await getFinalFileLLMConfig();
 
   if (!openRouterApiKey) {
-    throw new Error('Не задан Codex Sale токен или резервный OpenRouter API Key для итоговой аналитики. Укажите его в /admin/mayak-ai-tokens.');
+    throw new Error('Не задан OpenRouter API Key для итоговой аналитики. Укажите его в /admin/mayak-ai-tokens.');
   }
 
   const res = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {

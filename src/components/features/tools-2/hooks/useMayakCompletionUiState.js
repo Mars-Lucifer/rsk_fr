@@ -5,8 +5,7 @@ export function useMayakCompletionUiState() {
     const [showSecondQuestionnaire, setShowSecondQuestionnaire] = useState(false);
     const [showThirdQuestionnaire, setShowThirdQuestionnaire] = useState(false);
     const [hasCompletedQuestionnaire, setHasCompletedQuestionnaire] = useState(false);
-    const [telegramLink, setTelegramLink] = useState(null);
-    const [telegramLoading, setTelegramLoading] = useState(false);
+    const [completionLoading, setCompletionLoading] = useState(false);
     const [completionTestingDone, setCompletionTestingDone] = useState(false);
     const [completionSurveyDone, setCompletionSurveyDone] = useState(false);
     const [showSessionCompletionPopup, setShowSessionCompletionPopup] = useState(false);
@@ -33,10 +32,8 @@ export function useMayakCompletionUiState() {
         setShowThirdQuestionnaire,
         hasCompletedQuestionnaire,
         setHasCompletedQuestionnaire,
-        telegramLink,
-        setTelegramLink,
-        telegramLoading,
-        setTelegramLoading,
+        completionLoading,
+        setCompletionLoading,
         completionTestingDone,
         setCompletionTestingDone,
         completionSurveyDone,

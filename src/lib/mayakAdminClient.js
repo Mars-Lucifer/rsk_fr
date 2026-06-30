@@ -28,7 +28,7 @@ export const MAYAK_ADMIN_SECTIONS = [
     {
         id: "ai-tokens",
         title: "AI токены",
-        description: "Единый пул Qwen, резерв OpenRouter и промпты для СОВА и итоговой аналитики.",
+        description: "Ключ OpenRouter и промпты для СОВА и итоговой аналитики.",
         href: "/admin/mayak-ai-tokens",
     },
     {

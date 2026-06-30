@@ -1,9 +1,8 @@
-import { promises as fs } from "fs";
-import path from "path";
+// СОВА — фича оценки полей МАЯК-ОКО. Провайдеро-независимая часть:
+// системный промпт, сборка запроса, парсинг/нормализация JSON-ответа и зон.
+// Сам провайдер нейросети (сейчас OpenRouter) живёт в эндпоинте sova-check.js.
 
-export const QWEN_API_URL = "https://qwen.aikit.club";
-export const QWEN_MODEL = "qwen3.5-plus";
-export const MAYAK_OKO_QWEN_FIELDS = [
+export const MAYAK_OKO_FIELDS = [
     {
         code: "m",
         label: "Миссия",
@@ -40,7 +39,7 @@ export const MAYAK_OKO_QWEN_FIELDS = [
         description: "Как оформить результат.",
     },
 ];
-export const QWEN_EVALUATION_SYSTEM_PROMPT = `Ты — строгий, но конструктивный эксперт по методологии МАЯК-ОКО.
+export const SOVA_EVALUATION_SYSTEM_PROMPT = `Ты — строгий, но конструктивный эксперт по методологии МАЯК-ОКО.
 
 Твоя задача — оценить каждое поле структуры МАЯК-ОКО отдельно, но всегда в связи с исходным заданием.
 
@@ -120,13 +119,6 @@ export const QWEN_EVALUATION_SYSTEM_PROMPT = `Ты — строгий, но ко
     }
   ]
 }`;
-const SETTINGS_FILE = path.join(process.cwd(), "data", "mayak-settings.json");
-
-const qwenTokenLoadState = globalThis.__mayakQwenTokenLoadState || {
-    activeCounts: new Map(),
-    rrCursor: 0,
-};
-globalThis.__mayakQwenTokenLoadState = qwenTokenLoadState;
 
 export function maskSecret(value) {
     if (!value) return null;
@@ -134,178 +126,7 @@ export function maskSecret(value) {
     return `${value.slice(0, 4)}...${value.slice(-3)}`;
 }
 
-function decodeJwtPayload(token) {
-    const parts = String(token || "").split(".");
-    if (parts.length < 2) return null;
-
-    try {
-        return JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8"));
-    } catch {
-        return null;
-    }
-}
-
-export function getQwenTokenExpiryInfo(token, now = Date.now()) {
-    const payload = decodeJwtPayload(token);
-    const exp = Number(payload?.exp);
-    if (!Number.isFinite(exp)) {
-        return {
-            expiresAt: null,
-            expiresTs: null,
-            remainingMs: null,
-            status: "unknown",
-        };
-    }
-
-    const expiresTs = exp * 1000;
-    const remainingMs = expiresTs - now;
-    return {
-        expiresAt: new Date(expiresTs).toISOString(),
-        expiresTs,
-        remainingMs,
-        status: remainingMs <= 0 ? "expired" : remainingMs <= 5 * 24 * 60 * 60 * 1000 ? "expiring" : "active",
-    };
-}
-
-export function normalizeQwenTokenEntries(tokens) {
-    const source = Array.isArray(tokens) ? tokens : typeof tokens === "string" ? tokens.split(/\r?\n/) : tokens && typeof tokens === "object" ? [tokens] : [];
-    const seen = new Set();
-
-    return source
-        .map((entry) => {
-            if (typeof entry === "string") {
-                return {
-                    name: "",
-                    token: entry.trim(),
-                    email: "",
-                    account: "",
-                    sessionAccount: "",
-                };
-            }
-
-            if (!entry || typeof entry !== "object") {
-                return {
-                    name: "",
-                    token: "",
-                };
-            }
-
-            return {
-                name: typeof entry.name === "string" ? entry.name.trim() : "",
-                token: typeof entry.token === "string" ? entry.token.trim() : "",
-                email: typeof entry.email === "string" ? entry.email.trim() : "",
-                account: typeof entry.account === "string" ? entry.account.trim() : "",
-                sessionAccount: typeof entry.sessionAccount === "string" ? entry.sessionAccount.trim() : "",
-            };
-        })
-        .filter((entry) => entry.token)
-        .filter((entry) => {
-            if (seen.has(entry.token)) return false;
-            seen.add(entry.token);
-            return true;
-        });
-}
-
-export function normalizeQwenTokens(tokens) {
-    return normalizeQwenTokenEntries(tokens).map((entry) => entry.token);
-}
-
-export async function readMayakSettings() {
-    try {
-        return JSON.parse(await fs.readFile(SETTINGS_FILE, "utf-8"));
-    } catch {
-        return {};
-    }
-}
-
-export async function getStoredQwenTokens() {
-    const settings = await readMayakSettings();
-    return normalizeQwenTokens(settings.qwenTokens);
-}
-
-export async function getStoredQwenTokenEntries() {
-    const settings = await readMayakSettings();
-    return normalizeQwenTokenEntries(settings.qwenTokens);
-}
-
-export async function getStoredQwenBackupToken() {
-    const settings = await readMayakSettings();
-    return normalizeQwenTokens([settings.qwenBackupToken])[0] || "";
-}
-
-export async function getQwenTokenPool() {
-    return getStoredQwenTokens();
-}
-
-function syncQwenTokenLoadState(tokenPool) {
-    const validTokens = new Set(tokenPool);
-
-    for (const token of qwenTokenLoadState.activeCounts.keys()) {
-        if (!validTokens.has(token)) {
-            qwenTokenLoadState.activeCounts.delete(token);
-        }
-    }
-
-    for (const token of tokenPool) {
-        if (!qwenTokenLoadState.activeCounts.has(token)) {
-            qwenTokenLoadState.activeCounts.set(token, 0);
-        }
-    }
-}
-
-export function acquireLeastLoadedQwenToken(tokenPool, excludedTokens = []) {
-    const normalizedPool = normalizeQwenTokens(tokenPool);
-    if (normalizedPool.length === 0) {
-        return null;
-    }
-
-    syncQwenTokenLoadState(normalizedPool);
-    const excluded = new Set(normalizeQwenTokens(excludedTokens));
-    const availableTokens = normalizedPool.filter((token) => !excluded.has(token));
-    if (availableTokens.length === 0) {
-        return null;
-    }
-
-    const rankedTokens = availableTokens.map((token, index) => ({
-        token,
-        load: qwenTokenLoadState.activeCounts.get(token) || 0,
-        orderOffset: (index - (qwenTokenLoadState.rrCursor % availableTokens.length) + availableTokens.length) % availableTokens.length,
-    }));
-
-    rankedTokens.sort((left, right) => {
-        if (left.load !== right.load) {
-            return left.load - right.load;
-        }
-
-        return left.orderOffset - right.orderOffset;
-    });
-
-    const selected = rankedTokens[0];
-    qwenTokenLoadState.activeCounts.set(selected.token, selected.load + 1);
-    qwenTokenLoadState.rrCursor = (qwenTokenLoadState.rrCursor + 1) % Math.max(availableTokens.length, 1);
-
-    return selected.token;
-}
-
-export function releaseQwenToken(token) {
-    if (!token || !qwenTokenLoadState.activeCounts.has(token)) {
-        return;
-    }
-
-    const currentLoad = qwenTokenLoadState.activeCounts.get(token) || 0;
-    if (currentLoad <= 1) {
-        qwenTokenLoadState.activeCounts.set(token, 0);
-        return;
-    }
-
-    qwenTokenLoadState.activeCounts.set(token, currentLoad - 1);
-}
-
-export function getQwenTokenActiveLoad(token) {
-    return qwenTokenLoadState.activeCounts.get(token) || 0;
-}
-
-export function classifyQwenFailure(status, errorText = "") {
+export function classifySovaFailure(status, errorText = "") {
     const haystack = `${status} ${errorText}`.toLowerCase();
 
     const authIssue =
@@ -325,7 +146,7 @@ export function classifyQwenFailure(status, errorText = "") {
         return {
             shouldTryNextToken: true,
             reason: "token_expired_or_invalid",
-            userMessage: "Qwen отклонил текущий токен как истекший или невалидный.",
+            userMessage: "Провайдер отклонил текущий токен как истекший или невалидный.",
         };
     }
 
@@ -333,21 +154,21 @@ export function classifyQwenFailure(status, errorText = "") {
         return {
             shouldTryNextToken: true,
             reason: "token_limit_reached",
-            userMessage: "Qwen отклонил текущий токен из-за лимита или rate limit.",
+            userMessage: "Провайдер отклонил текущий токен из-за лимита или rate limit.",
         };
     }
 
     return {
         shouldTryNextToken: false,
         reason: "upstream_error",
-        userMessage: "Сервис проверки Qwen временно недоступен.",
+        userMessage: "Сервис проверки СОВА временно недоступен.",
     };
 }
 
-export function buildQwenEvaluationUserMessage({ taskContext, fields }) {
+export function buildSovaEvaluationUserMessage({ taskContext, fields }) {
     const responseTemplate = {
         summary: "",
-        field_assessments: MAYAK_OKO_QWEN_FIELDS.map((field) => ({
+        field_assessments: MAYAK_OKO_FIELDS.map((field) => ({
             code: field.code,
             zone: "<green|red>",
         })),
@@ -358,7 +179,7 @@ export function buildQwenEvaluationUserMessage({ taskContext, fields }) {
             description: "",
             task: "Задание не указано",
         },
-        mayak_oko_fields: MAYAK_OKO_QWEN_FIELDS.map((field) => ({
+        mayak_oko_fields: MAYAK_OKO_FIELDS.map((field) => ({
             code: field.code,
             label: field.label,
             description: field.description,
@@ -378,7 +199,7 @@ ${JSON.stringify(responseTemplate, null, 2)}
 ${JSON.stringify(payload, null, 2)}`;
 }
 
-export function cleanQwenText(rawText = "") {
+export function cleanSovaText(rawText = "") {
     return String(rawText)
         .replace(/<details>.*?<\/details>/gis, "")
         .replace(/Response ID:.*?Request ID:[^\n]+/gis, "")
@@ -402,8 +223,8 @@ function tryJsonParse(candidate) {
     return null;
 }
 
-export function parseQwenEvaluation(rawText = "") {
-    const cleaned = cleanQwenText(rawText);
+export function parseSovaEvaluation(rawText = "") {
+    const cleaned = cleanSovaText(rawText);
     if (!cleaned) return null;
 
     const direct = tryJsonParse(cleaned);
@@ -418,22 +239,22 @@ export function parseQwenEvaluation(rawText = "") {
     return null;
 }
 
-export function isValidQwenEvaluationShape(parsed) {
+export function isValidSovaEvaluationShape(parsed) {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         return false;
     }
 
-    if (!Array.isArray(parsed.field_assessments) || parsed.field_assessments.length !== MAYAK_OKO_QWEN_FIELDS.length) {
+    if (!Array.isArray(parsed.field_assessments) || parsed.field_assessments.length !== MAYAK_OKO_FIELDS.length) {
         return false;
     }
 
-    const expectedCodes = MAYAK_OKO_QWEN_FIELDS.map((field) => field.code);
+    const expectedCodes = MAYAK_OKO_FIELDS.map((field) => field.code);
     const actualCodes = parsed.field_assessments.map((field) => (typeof field?.code === "string" ? field.code.trim() : ""));
 
     return expectedCodes.every((code, index) => actualCodes[index] === code);
 }
 
-export function normalizeQwenZone(zone) {
+export function normalizeSovaZone(zone) {
     const value = String(zone || "")
         .trim()
         .toLowerCase();
@@ -451,7 +272,7 @@ function normalizeShortText(value, fallback) {
     return normalized || fallback;
 }
 
-function sanitizeQwenSummaryText(value = "") {
+function sanitizeSovaSummaryText(value = "") {
     return String(value)
         .replace(/\btask_context\b/gi, "задания")
         .replace(/\bmayak_oko_fields\b/gi, "полей")
@@ -515,7 +336,7 @@ function applyFieldSpecificityGuards(fieldAssessments, { fields = {} } = {}) {
     });
 }
 
-export function deriveQwenOverallZone(fieldAssessments) {
+export function deriveSovaOverallZone(fieldAssessments) {
     const counts = fieldAssessments.reduce(
         (acc, field) => {
             acc[field.zone] += 1;
@@ -585,7 +406,7 @@ function buildWeakFieldsSummaryAddon(weakFields) {
 
     return `Уточни ${formatFieldLabels(weakFields).toLowerCase()}: сейчас эти поля не дотягивают до задачи.`;
 }
-export function normalizeQwenEvaluation(parsed, context = {}) {
+export function normalizeSovaEvaluation(parsed, context = {}) {
     const sourceAssessments = Array.isArray(parsed?.field_assessments) ? parsed.field_assessments : [];
     const byCode = new Map();
 
@@ -595,9 +416,9 @@ export function normalizeQwenEvaluation(parsed, context = {}) {
         byCode.set(code, entry);
     }
 
-    const fieldAssessments = MAYAK_OKO_QWEN_FIELDS.map((field) => {
+    const fieldAssessments = MAYAK_OKO_FIELDS.map((field) => {
         const source = byCode.get(field.code) || {};
-        const zone = normalizeQwenZone(source.zone);
+        const zone = normalizeSovaZone(source.zone);
 
         return {
             code: field.code,
@@ -607,7 +428,7 @@ export function normalizeQwenEvaluation(parsed, context = {}) {
     });
 
     const adjustedFieldAssessments = applyFieldSpecificityGuards(fieldAssessments, context);
-    const { overallZone, counts } = deriveQwenOverallZone(adjustedFieldAssessments);
+    const { overallZone, counts } = deriveSovaOverallZone(adjustedFieldAssessments);
     const strongFields = adjustedFieldAssessments.filter((field) => field.zone === "green").map((field) => field.label);
     const weakFields = adjustedFieldAssessments.filter((field) => field.zone !== "green").map((field) => field.label);
     const fallbackSummary = buildFallbackSummary({ overallZone, strongFields, weakFields });
@@ -617,7 +438,7 @@ export function normalizeQwenEvaluation(parsed, context = {}) {
     const finalSummary = [baseSummary, summaryAddon].filter(Boolean).join(" ");
 
     return {
-        summary: sanitizeQwenSummaryText(finalSummary),
+        summary: sanitizeSovaSummaryText(finalSummary),
         overallZone,
         counts,
         fieldAssessments: adjustedFieldAssessments,

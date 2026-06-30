@@ -6,7 +6,7 @@ import { createEmptyMayakFields } from "../utils/mayakPromptState";
 
 export const useMayakPromptActions = ({
     buildPromptDraft,
-    clearQwenState,
+    clearSovaState,
     mayakData,
     setFields,
     setIsCopied,
@@ -17,8 +17,8 @@ export const useMayakPromptActions = ({
     const handleResetFields = useCallback(() => {
         setFields(createEmptyMayakFields());
         setPrompt("");
-        clearQwenState();
-    }, [clearQwenState, setFields, setPrompt]);
+        clearSovaState();
+    }, [clearSovaState, setFields, setPrompt]);
 
     const handleCopy = useCallback(
         (value) => {
@@ -55,8 +55,8 @@ export const useMayakPromptActions = ({
         const promptDraft = buildPromptDraft();
         if (!promptDraft) return;
 
-        clearQwenState();
-    }, [buildPromptDraft, clearQwenState]);
+        clearSovaState();
+    }, [buildPromptDraft, clearSovaState]);
 
     return {
         createPrompt,

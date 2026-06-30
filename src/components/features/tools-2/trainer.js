@@ -40,7 +40,7 @@ import { createEmptyMayakFields } from "./utils/mayakPromptState";
 import { clearMayakSessionCompletionState } from "./utils/mayakSessionCompletion";
 import { useMayakConfirmationActions } from "./hooks/useMayakConfirmationActions";
 import { useMayakCompletionUiState } from "./hooks/useMayakCompletionUiState";
-import { useMayakQwenEvaluation } from "./hooks/useMayakQwenEvaluation";
+import { useMayakSovaEvaluation } from "./hooks/useMayakSovaEvaluation";
 import { useMayakQuestionnaireActions } from "./hooks/useMayakQuestionnaireActions";
 import { useMayakPopupActions } from "./hooks/useMayakPopupActions";
 import { useMayakSessionActions } from "./hooks/useMayakSessionActions";
@@ -64,7 +64,7 @@ const PREVIEW_WIDTH_MAX = 560;
 const PREVIEW_WIDTH_DEFAULT = 520;
 const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 10000;
 
-const QWEN_EVALUATION_LIMIT = 20;
+const SOVA_EVALUATION_LIMIT = 20;
 const getStorageKey = (key) => `${TRAINER_PREFIX}_${key}`;
 const isIntroTask = (index) => index % 100 < 3;
 const isRoleSelectionTask = (task) => {
@@ -77,7 +77,7 @@ const formatTaskTime = (seconds) => {
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 };
-const QWEN_ZONE_META = {
+const SOVA_ZONE_META = {
     green: {
         blockClass: "!bg-green-50 border border-green-200",
     },
@@ -92,14 +92,14 @@ const QWEN_ZONE_META = {
     },
 };
 
-const getQwenZoneMeta = (zone) => QWEN_ZONE_META[zone] || QWEN_ZONE_META.default;
-const QWEN_MASCOT_POOLS = {
+const getSovaZoneMeta = (zone) => SOVA_ZONE_META[zone] || SOVA_ZONE_META.default;
+const SOVA_MASCOT_POOLS = {
     green: [{ animatedSrc: "/mascot-good-transparent-anim-smooth.webp" }, { animatedSrc: "/mascot-good-2-transparent-anim.webp" }, { animatedSrc: "/mascot-good-3-transparent-anim.webp" }],
     yellow: [{ animatedSrc: "/mascot-neutral-1-transparent-anim.webp" }, { animatedSrc: "/mascot-neutral-2-transparent-anim.webp" }, { animatedSrc: "/mascot-neutral-3-transparent-anim.webp" }],
     red: [{ animatedSrc: "/mascot-bad-transparent-anim.webp" }, { animatedSrc: "/mascot-bad-2-transparent-anim.webp" }, { animatedSrc: "/mascot-bad-3-transparent-anim.webp", hideAfterMs: 5980 }],
 };
-const getRandomQwenMascotAsset = (zone) => {
-    const pool = QWEN_MASCOT_POOLS[zone];
+const getRandomSovaMascotAsset = (zone) => {
+    const pool = SOVA_MASCOT_POOLS[zone];
     if (!Array.isArray(pool) || pool.length === 0) {
         return null;
     }
@@ -107,18 +107,18 @@ const getRandomQwenMascotAsset = (zone) => {
     const selectedAsset = pool[Math.floor(Math.random() * pool.length)];
     return selectedAsset ? { ...selectedAsset } : null;
 };
-const QWEN_UNAVAILABLE_MASCOT_ASSET = { animatedSrc: "/mascot-bad-3-transparent-anim.webp", hideAfterMs: 5980 };
-const QWEN_MASCOT_ASSET_PRELOAD_LIST = Array.from(
+const SOVA_UNAVAILABLE_MASCOT_ASSET = { animatedSrc: "/mascot-bad-3-transparent-anim.webp", hideAfterMs: 5980 };
+const SOVA_MASCOT_ASSET_PRELOAD_LIST = Array.from(
     new Set([
-        QWEN_UNAVAILABLE_MASCOT_ASSET.animatedSrc,
-        ...Object.values(QWEN_MASCOT_POOLS)
+        SOVA_UNAVAILABLE_MASCOT_ASSET.animatedSrc,
+        ...Object.values(SOVA_MASCOT_POOLS)
             .flat()
             .map((asset) => asset.animatedSrc)
             .filter(Boolean),
     ])
 );
 const formatFieldList = (labels) => (Array.isArray(labels) ? labels.filter(Boolean).join(", ") : "");
-const getQwenScoreMeta = (greenCount, totalFields = 7) => {
+const getSovaScoreMeta = (greenCount, totalFields = 7) => {
     const safeGreenCount = Number.isFinite(greenCount) ? greenCount : 0;
     const safeTotalFields = Number.isFinite(totalFields) && totalFields > 0 ? totalFields : 7;
 
@@ -141,7 +141,7 @@ const getQwenScoreMeta = (greenCount, totalFields = 7) => {
         textClass: "text-[var(--color-red)]",
     };
 };
-const buildQwenTaskContext = ({ taskTextData }) => ({
+const buildSovaTaskContext = ({ taskTextData }) => ({
     description: taskTextData?.description || "",
     task: taskTextData?.task || "",
 });
@@ -244,10 +244,8 @@ export default function TrainerPage({ goTo }) {
         setShowThirdQuestionnaire,
         hasCompletedQuestionnaire,
         setHasCompletedQuestionnaire,
-        telegramLink,
-        setTelegramLink,
-        telegramLoading,
-        setTelegramLoading,
+        completionLoading,
+        setCompletionLoading,
         completionTestingDone,
         setCompletionTestingDone,
         completionSurveyDone,
@@ -697,24 +695,24 @@ export default function TrainerPage({ goTo }) {
     const [showBuffer, setShowBuffer] = useState(false);
     const [currentField, setCurrentField] = useState(null);
     const {
-        qwenResponse,
-        qwenLoading,
-        qwenZone,
-        qwenStrongFields,
-        qwenWeakFields,
-        qwenGreenCount,
-        qwenTotalFields,
-        qwenChecksRemaining,
+        sovaResponse,
+        sovaLoading,
+        sovaZone,
+        sovaStrongFields,
+        sovaWeakFields,
+        sovaGreenCount,
+        sovaTotalFields,
+        sovaChecksRemaining,
         showMascotVideo,
-        activeQwenMascotAsset,
+        activeSovaMascotAsset,
         isPromptCopyAwaitingEvaluation,
         mascotPlaybackKey,
         evaluationLimit,
-        syncQwenEvaluationQuota,
-        clearQwenState,
-        resetQwenSessionState,
+        syncSovaEvaluationQuota,
+        clearSovaState,
+        resetSovaSessionState,
         createPromptWithEvaluation,
-    } = useMayakQwenEvaluation({
+    } = useMayakSovaEvaluation({
         getStorageKey,
         buildPromptDraft: () => buildPromptDraftRef.current?.(),
         currentTaskIndex,
@@ -761,7 +759,7 @@ export default function TrainerPage({ goTo }) {
     const buildPromptDraft = useCallback(() => {
         const builtDraft = buildMayakPromptDraft(fields);
         if (!builtDraft) {
-            clearQwenState();
+            clearSovaState();
             setPrompt('Пожалуйста, заполните все поля (или используйте "кубики").');
             return null;
         }
@@ -769,7 +767,7 @@ export default function TrainerPage({ goTo }) {
         const { values, finalPrompt } = builtDraft;
         const taskNumber = currentTask?.number?.toString();
         const taskTextData = taskNumber ? tasksTexts.find((t) => t.number === taskNumber) : null;
-        const taskContext = buildQwenTaskContext({
+        const taskContext = buildSovaTaskContext({
             taskTextData,
         });
 
@@ -781,15 +779,15 @@ export default function TrainerPage({ goTo }) {
             finalPrompt,
             taskContext,
         };
-    }, [clearQwenState, currentTask?.number, fields, savePromptToHistory, tasksTexts]);
+    }, [clearSovaState, currentTask?.number, fields, savePromptToHistory, tasksTexts]);
 
     buildPromptDraftRef.current = buildPromptDraft;
 
     useEffect(() => {
         if (sessionStartTime) {
-            syncQwenEvaluationQuota(sessionStartTime);
+            syncSovaEvaluationQuota(sessionStartTime);
         }
-    }, [sessionStartTime, syncQwenEvaluationQuota]);
+    }, [sessionStartTime, syncSovaEvaluationQuota]);
 
     useEffect(() => {
         const loadedBuffer = loadMayakBuffer(getStorageKey("buffer"));
@@ -844,16 +842,19 @@ export default function TrainerPage({ goTo }) {
     // из того же yaProgress; на сервере при расходе пересчитывается заново.
     const jokerBalance = useMemo(() => {
         const earned = yaProgress?.hasStar ? 1 : 0;
+        // Bypass (fffff) — чистая клиентская песочница: и заработок звезды, и её
+        // расход живут только локально (bypassJokerSpent). Эту ветку проверяем
+        // ДО isSessionMode, потому что fffff может зайти в сессию (dev-bypass), и
+        // там серверного джокера у него нет — баланс обязан считаться по bypass,
+        // иначе кнопка покажет «1», а серверный расход откажет («Нет джокеров»).
+        if (tokenType === "bypass") {
+            return Math.max(0, earned - bypassJokerSpent);
+        }
         if (isSessionMode) {
             // При активном клиентском админ-override берём «потрачено» из него
             // (чтобы в панели отладки вживую видеть смену 1↔0), иначе — реальный.
             const spent = sessionDebugOverride ? Number(sessionDebugOverride.jokerSpent) || 0 : Number(sessionRuntimeState?.participant?.jokerSpent) || 0;
             return Math.max(0, earned - spent);
-        }
-        // Bypass: показываем заработанный джокер от звезды «Я» минус условно
-        // «потраченный» (переключатель в панели отладки), чтобы видеть смену 1↔0.
-        if (tokenType === "bypass") {
-            return Math.max(0, earned - bypassJokerSpent);
         }
         return 0;
     }, [isSessionMode, tokenType, yaProgress?.hasStar, sessionRuntimeState?.participant?.jokerSpent, sessionDebugOverride, bypassJokerSpent]);
@@ -1024,19 +1025,17 @@ export default function TrainerPage({ goTo }) {
         handleDownloadCertificate,
         handleDownloadLogs,
         handleSaveSessionCompletion,
-        handleSendToTelegram,
     } = useMayakCompletionActions({
         elapsedTime: timerState.elapsedTime,
         getStorageKey,
         levels,
         removeKeyCookie,
-        resetQwenSessionState,
+        resetSovaSessionState,
         selectedRole,
         setSelectedRole,
         setShowSessionCompletionPopup,
         setShowThirdQuestionnaire,
-        setTelegramLink,
-        setTelegramLoading,
+        setCompletionLoading,
         tokenSectionId,
     });
 
@@ -1083,7 +1082,7 @@ export default function TrainerPage({ goTo }) {
         isIntroTask,
         sessionId: runtimeSessionId,
         removeKeyCookie,
-        resetQwenSessionState,
+        resetSovaSessionState,
         setCompletionSurveyDone,
         setCompletionTestingDone,
         setFields,
@@ -1630,7 +1629,7 @@ export default function TrainerPage({ goTo }) {
     );
     const { createPrompt, handleCopy, handleRandom, handleResetFields } = useMayakPromptActions({
         buildPromptDraft,
-        clearQwenState,
+        clearSovaState,
         mayakData,
         setFields,
         setIsCopied,
@@ -1669,13 +1668,13 @@ export default function TrainerPage({ goTo }) {
         ? "Оценка недоступна на первых трех заданиях каждой колоды"
         : isCreateDisabled
           ? "Сначала заполните все поля"
-          : qwenChecksRemaining <= 0
+          : sovaChecksRemaining <= 0
             ? "Лимит оценок для этой сессии исчерпан"
             : "";
-    const isCreateWithEvaluationDisabled = isCreateDisabled || isEvaluationBlockedForIntroTask || qwenLoading || qwenChecksRemaining <= 0;
-    const qwenZoneMeta = getQwenZoneMeta(qwenZone);
-    const qwenScoreMeta = qwenGreenCount === null ? null : getQwenScoreMeta(qwenGreenCount, qwenTotalFields);
-    const shouldShowQwenMascot = !qwenLoading && activeQwenMascotAsset && showMascotVideo;
+    const isCreateWithEvaluationDisabled = isCreateDisabled || isEvaluationBlockedForIntroTask || sovaLoading || sovaChecksRemaining <= 0;
+    const sovaZoneMeta = getSovaZoneMeta(sovaZone);
+    const sovaScoreMeta = sovaGreenCount === null ? null : getSovaScoreMeta(sovaGreenCount, sovaTotalFields);
+    const shouldShowSovaMascot = !sovaLoading && activeSovaMascotAsset && showMascotVideo;
 
     const guardedToggleTaskTimer = async () => {
         if (!timerState.isRunning && isCurrentTaskPendingReview) {
@@ -1876,13 +1875,13 @@ export default function TrainerPage({ goTo }) {
                 <div className="mt-4 flex w-full flex-col gap-2">
                     <div className="flex w-full flex-col gap-2 sm:flex-row">
                         <span className="block w-full" title={isCreateDisabled ? "Сначала заполните все поля" : ""}>
-                            <Button className="blue w-full" type="button" onClick={createPrompt} disabled={isCreateDisabled || qwenLoading}>
+                            <Button className="blue w-full" type="button" onClick={createPrompt} disabled={isCreateDisabled || sovaLoading}>
                                 Создать&nbsp;промт
                             </Button>
                         </span>
                         <span className="block w-full" title={createWithEvaluationDisabledReason}>
                             <Button className="w-full" type="button" onClick={createPromptWithEvaluation} disabled={isCreateWithEvaluationDisabled}>
-                                Создать&nbsp;промт&nbsp;с&nbsp;оценкой&nbsp;({qwenChecksRemaining}/{evaluationLimit})
+                                Создать&nbsp;промт&nbsp;с&nbsp;оценкой&nbsp;({sovaChecksRemaining}/{evaluationLimit})
                             </Button>
                         </span>
                     </div>
@@ -1914,38 +1913,38 @@ export default function TrainerPage({ goTo }) {
                 </div>
             </Block>
 
-            {(qwenLoading || qwenResponse) && (
-                <Block className={`${qwenLoading ? QWEN_ZONE_META.default.blockClass : qwenZoneMeta.blockClass} relative flex flex-col`}>
-                    {!qwenLoading && qwenScoreMeta && (
-                        <div className={`absolute right-4 top-4 text-lg font-bold sm:text-xl ${qwenScoreMeta.textClass}`}>
-                            {qwenScoreMeta.text}
+            {(sovaLoading || sovaResponse) && (
+                <Block className={`${sovaLoading ? SOVA_ZONE_META.default.blockClass : sovaZoneMeta.blockClass} relative flex flex-col`}>
+                    {!sovaLoading && sovaScoreMeta && (
+                        <div className={`absolute right-4 top-4 text-lg font-bold sm:text-xl ${sovaScoreMeta.textClass}`}>
+                            {sovaScoreMeta.text}
                         </div>
                     )}
                     <h6 className="mb-2 text-black">Оценка от нейросети</h6>
-                    <div className={`flex ${shouldShowQwenMascot ? "flex-col gap-3 sm:flex-row sm:items-start sm:justify-between" : "flex-col"}`}>
+                    <div className={`flex ${shouldShowSovaMascot ? "flex-col gap-3 sm:flex-row sm:items-start sm:justify-between" : "flex-col"}`}>
                         <div className="flex-1">
-                            {qwenLoading ? (
+                            {sovaLoading ? (
                                 <p className="text-gray-500 animate-pulse">Анализирую промпт...</p>
                             ) : (
                                 <div className="flex flex-col gap-3">
-                                    <p className="text-gray-700">{qwenResponse}</p>
-                                    {qwenStrongFields.length > 0 && (
+                                    <p className="text-gray-700">{sovaResponse}</p>
+                                    {sovaStrongFields.length > 0 && (
                                         <p className="text-sm text-gray-700">
-                                            <span className="font-semibold text-black">Сильные поля:</span> {formatFieldList(qwenStrongFields)}
+                                            <span className="font-semibold text-black">Сильные поля:</span> {formatFieldList(sovaStrongFields)}
                                         </p>
                                     )}
-                                    {qwenWeakFields.length > 0 && (
+                                    {sovaWeakFields.length > 0 && (
                                         <p className="text-sm text-gray-700">
-                                            <span className="font-semibold text-black">Слабые поля:</span> {formatFieldList(qwenWeakFields)}
+                                            <span className="font-semibold text-black">Слабые поля:</span> {formatFieldList(sovaWeakFields)}
                                         </p>
                                     )}
                                 </div>
                             )}
                         </div>
-                        {shouldShowQwenMascot && (
+                        {shouldShowSovaMascot && (
                             <div className="flex shrink-0 flex-col items-center self-center">
                                 <div className="h-[96px] w-[96px] sm:h-[112px] sm:w-[112px]">
-                                    <img key={mascotPlaybackKey} src={activeQwenMascotAsset.animatedSrc} alt="" aria-hidden="true" decoding="sync" fetchPriority="high" className="h-full w-full object-contain" />
+                                    <img key={mascotPlaybackKey} src={activeSovaMascotAsset.animatedSrc} alt="" aria-hidden="true" decoding="sync" fetchPriority="high" className="h-full w-full object-contain" />
                                 </div>
                             </div>
                         )}
@@ -2110,7 +2109,7 @@ export default function TrainerPage({ goTo }) {
                     onClose={handleCloseThirdQuestionnaire}
                     testingDone={completionTestingDone}
                     surveyDone={completionSurveyDone}
-                    certificateLoading={telegramLoading}
+                    certificateLoading={completionLoading}
                     onOpenTesting={handleOpenCompletionTesting}
                     onOpenSurvey={handleOpenCompletionSurvey}
                     onGetCertificate={handleGetCompletionCertificate}
@@ -2150,7 +2149,7 @@ export default function TrainerPage({ goTo }) {
                         uploadError={sessionUploadError}
                         canUseJoker={currentTaskIsWeDirection && jokerBalance > 0}
                         jokerBalance={jokerBalance}
-                        onUseJoker={handleUseJokerStar}
+                        onUseJoker={tokenType === "bypass" ? handleUseBypassJokerStar : handleUseJokerStar}
                         onClose={() => {
                             setShowCompletionPopup(false);
                             setSessionUploadError("");

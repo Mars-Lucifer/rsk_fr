@@ -1,11 +1,10 @@
 import { useCallback } from "react";
 
-import { blobToBase64, buildMayakSessionArtifacts } from "../utils/mayakSessionArtifacts";
+import { buildMayakSessionArtifacts } from "../utils/mayakSessionArtifacts";
 import { clearMayakSessionCompletionState, executeMayakSessionCompletion, saveMayakCompletionDelta } from "../utils/mayakSessionCompletion";
 import { buildMayakCertificateBlob, buildMayakQrDataUrl, buildMayakSessionLogBlob, downloadMayakBlob } from "../utils/mayakSessionDocuments";
 import { getKeyFromCookies, getUserFromCookies } from "../actions";
 
-const ENABLE_MAYAK_TELEGRAM_COMPLETION_DELIVERY = false;
 // Временно отключено: при завершении сессии скачиваются только сертификат и лог,
 // итоговая аналитика пропускается. Вернуть в true, чтобы снова генерировать аналитику.
 const ENABLE_MAYAK_FINAL_ANALYTICS = false;
@@ -150,13 +149,12 @@ export const useMayakCompletionActions = ({
     getStorageKey,
     levels,
     removeKeyCookie,
-    resetQwenSessionState,
+    resetSovaSessionState,
     selectedRole,
     setSelectedRole,
     setShowSessionCompletionPopup,
     setShowThirdQuestionnaire,
-    setTelegramLink,
-    setTelegramLoading,
+    setCompletionLoading,
     tokenSectionId,
 }) => {
     const formatTaskTime = useCallback((seconds) => {
@@ -268,76 +266,6 @@ export const useMayakCompletionActions = ({
         }
     }, [formatTaskTime, getStorageKey, selectedRole, tokenSectionId]);
 
-    const handleSendToTelegram = useCallback(async () => {
-        if (!ENABLE_MAYAK_TELEGRAM_COMPLETION_DELIVERY) {
-            return;
-        }
-
-        setTelegramLoading(true);
-
-        try {
-            const userData = getUserFromCookies();
-            const userName = buildFullMayakName(userData);
-            const dateStr = new Date().toLocaleDateString("ru-RU");
-            const userId = await resolveMayakCertificateUserId(userData);
-            const qrDataUrl = await buildMayakQrDataUrl(userId);
-            const certificateNumber = await resolveMayakCertificateNumber({ ...userData, portalUserId: userId });
-            const certBlob = await buildMayakCertificateBlob({
-                userName: buildCertificateMayakName(userData),
-                dateStr,
-                qrDataUrl,
-                certificateNumber,
-            });
-            const { rankingData, enrichedTasks, totalSessionSeconds } = await buildMayakSessionArtifacts({
-                getStorageKey,
-                tokenSectionId,
-            });
-            const totalTime = formatTaskTime(totalSessionSeconds);
-            const logBlob = await buildMayakSessionLogBlob({
-                userName,
-                userRole: selectedRole,
-                dateStr,
-                totalTime,
-                rankingData,
-                tasks: enrichedTasks,
-            });
-
-            const certBase64 = await blobToBase64(certBlob);
-            const logBase64 = await blobToBase64(logBlob);
-
-            const res = await fetch("/api/mayak/telegram-prepare", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    userName,
-                    certificate: certBase64,
-                    log: logBase64,
-                    logData: {
-                        userName,
-                        userRole: selectedRole,
-                        date: dateStr,
-                        totalTime,
-                        rankingData,
-                        tasks: enrichedTasks,
-                    },
-                }),
-            });
-
-            if (!res.ok) {
-                throw new Error("Ошибка подготовки сессии");
-            }
-
-            const { deepLink } = await res.json();
-            setTelegramLink(deepLink);
-            window.open(deepLink, "_blank");
-        } catch (error) {
-            console.error("Ошибка отправки в Telegram:", error);
-            alert("Не удалось подготовить файлы для Telegram. Попробуйте ещё раз.");
-        } finally {
-            setTelegramLoading(false);
-        }
-    }, [formatTaskTime, getStorageKey, selectedRole, setTelegramLink, setTelegramLoading, tokenSectionId]);
-
     const handleSaveArtifactsToProfile = useCallback(async () => {
         const activeKey = await getKeyFromCookies();
         if (!activeKey?.text) {
@@ -391,7 +319,7 @@ export const useMayakCompletionActions = ({
     }, [downloadCertificateStrict, downloadLogsStrict, handleDownloadAnalytics]);
 
     const handleSaveSessionCompletion = useCallback(async () => {
-        setTelegramLoading(true);
+        setCompletionLoading(true);
 
         try {
             const activeUser = getUserFromCookies();
@@ -400,12 +328,11 @@ export const useMayakCompletionActions = ({
                 elapsedTime,
                 levels,
                 onPersistArtifacts: isGuestUser ? handleDownloadGuestArtifacts : handleSaveArtifactsToProfile,
-                onSendToTelegram: handleSendToTelegram,
                 onClearState: () =>
                     clearMayakSessionCompletionState({
                         getStorageKey,
                         removeKeyCookie,
-                        resetQwenSessionState,
+                        resetSovaSessionState,
                         setSelectedRole,
                         setShowSessionCompletionPopup,
                         setShowThirdQuestionnaire,
@@ -416,15 +343,14 @@ export const useMayakCompletionActions = ({
             console.error("Ошибка в процессе завершения:", error);
             alert(error.message || "Не удалось сохранить материалы MAYAK в личном кабинете.");
         } finally {
-            setTelegramLoading(false);
+            setCompletionLoading(false);
         }
-    }, [elapsedTime, getStorageKey, handleDownloadGuestArtifacts, handleSaveArtifactsToProfile, handleSendToTelegram, levels, removeKeyCookie, resetQwenSessionState, setSelectedRole, setShowSessionCompletionPopup, setShowThirdQuestionnaire, setTelegramLoading]);
+    }, [elapsedTime, getStorageKey, handleDownloadGuestArtifacts, handleSaveArtifactsToProfile, levels, removeKeyCookie, resetSovaSessionState, setSelectedRole, setShowSessionCompletionPopup, setShowThirdQuestionnaire, setCompletionLoading]);
 
     return {
         handleDownloadAnalytics,
         handleDownloadCertificate,
         handleDownloadLogs,
         handleSaveSessionCompletion,
-        handleSendToTelegram,
     };
 };

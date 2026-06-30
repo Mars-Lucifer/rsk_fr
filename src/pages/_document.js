@@ -7,7 +7,7 @@ export default function Document(props) {
                 <style>{`
           /* Можно оставить стили, если нужны адаптивные правки для desktop */
           @media (max-width: 900px) {
-            body:not([data-pathname^="/tools"]):not([data-pathname^="/prep-session"]):not([data-pathname^="/results"]) .desktop {
+            body:not([data-pathname^="/tools"]):not([data-pathname^="/results"]) .desktop {
               display: block;
             }
           }

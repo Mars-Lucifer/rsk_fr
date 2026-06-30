@@ -9,7 +9,7 @@ export function useMayakSessionActions({
     isAdmin,
     isIntroTask,
     sessionId,
-    resetQwenSessionState,
+    resetSovaSessionState,
     removeKeyCookie,
     setCompletionSurveyDone,
     setCompletionTestingDone,
@@ -68,7 +68,7 @@ export function useMayakSessionActions({
         localStorage.removeItem(getStorageKey("sessionStartTime"));
         localStorage.removeItem(getStorageKey("session_tasks_log"));
         localStorage.removeItem(getStorageKey("completedTasks"));
-        localStorage.removeItem(getStorageKey("qwenEvaluationQuota"));
+        localStorage.removeItem(getStorageKey("sovaEvaluationQuota"));
         localStorage.removeItem(getStorageKey("hasCompletedSecondQuestionnaire"));
         localStorage.removeItem(getStorageKey("mayak_achieved_start"));
         localStorage.removeItem(getStorageKey("mayak_achieved_content_types"));
@@ -84,7 +84,7 @@ export function useMayakSessionActions({
         setHasCompletedSecondQuestionnaire(false);
         setFields(createEmptyMayakFields());
         setPrompt("");
-        resetQwenSessionState();
+        resetSovaSessionState();
         setCompletionTestingDone(false);
         setCompletionSurveyDone(false);
         removeKeyCookie();
@@ -93,7 +93,7 @@ export function useMayakSessionActions({
         getStorageKey,
         isAdmin,
         removeKeyCookie,
-        resetQwenSessionState,
+        resetSovaSessionState,
         setCompletionSurveyDone,
         setCompletionTestingDone,
         setFields,

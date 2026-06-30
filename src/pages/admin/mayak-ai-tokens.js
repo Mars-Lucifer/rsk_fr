@@ -6,19 +6,10 @@ import Header from "@/components/layout/Header";
 import MayakAdminBackLink from "@/components/mayak-admin/MayakAdminBackLink";
 import { buildMayakAdminLoginUrl, getMayakAdminAuthStatus } from "@/lib/mayakAdminClient";
 
-const CODEX_DEFAULT_MODEL = "gpt-5.4-mini";
-const CODEX_MODELS = ["gpt-5.3-codex", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5"];
-
 const initialSettings = {
     finalFileOpenrouterApiKey: "",
     finalFileOpenrouterApiKeyIsSet: false,
     finalFileModel: "google/gemini-3-flash-preview",
-    codexToken: "",
-    codexTokenIsSet: false,
-    codexModel: CODEX_DEFAULT_MODEL,
-    qwenTokens: [],
-    qwenTokensCount: 0,
-    qwenTokensIsSet: false,
     sovaPrompt: "",
     analyticsPrompt: "",
 };
@@ -29,50 +20,6 @@ async function parseJsonResponse(response, fallbackMessage) {
         throw new Error(payload.error || fallbackMessage);
     }
     return payload;
-}
-
-function formatExpiry(expiry) {
-    if (!expiry?.expiresAt) return "срок не найден";
-    const date = new Date(expiry.expiresAt);
-    if (Number.isNaN(date.getTime())) return "срок не найден";
-
-    const formattedDate = date.toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-    });
-
-    if (expiry.status === "expired" || expiry.remainingMs <= 0) return `истек ${formattedDate}`;
-    if (typeof expiry.remainingMs !== "number") return `до ${formattedDate}`;
-
-    const totalHours = Math.max(0, Math.ceil(expiry.remainingMs / (60 * 60 * 1000)));
-    const days = Math.floor(totalHours / 24);
-    const hours = totalHours % 24;
-    const remaining = days > 0 ? `${days} д. ${hours} ч.` : `${hours} ч.`;
-    return `до ${formattedDate}, осталось ${remaining}`;
-}
-
-function expiryTone(expiry) {
-    if (!expiry?.expiresAt) return "unknown";
-    if (expiry.status === "expired" || expiry.remainingMs <= 0) return "expired";
-    if (typeof expiry.remainingMs !== "number") return "unknown";
-    return expiry.remainingMs > 7 * 24 * 60 * 60 * 1000 ? "active" : "expiring";
-}
-
-function formatSessionAccount(index) {
-    const accountNumber = Number(index) + 1;
-    if (!Number.isFinite(accountNumber) || accountNumber < 1) return "acc??";
-    return `acc${String(accountNumber).padStart(2, "0")}`;
-}
-
-function getTokenDisplayName(token) {
-    return token?.email || token?.name || formatSessionAccount(token?.index);
-}
-
-function getTokenAccountLabel(token) {
-    return token?.account || formatSessionAccount(token?.index);
 }
 
 function StatusMark({ active, value }) {
@@ -106,19 +53,9 @@ export default function AdminMayakAiTokens() {
     const [drafts, setDrafts] = useState({
         finalFileOpenrouterApiKey: "",
         finalFileModel: "",
-        codexToken: "",
-        codexModel: CODEX_DEFAULT_MODEL,
         sovaPrompt: "",
         analyticsPrompt: "",
-        qwenTokenName: "",
-        qwenTokenValue: "",
     });
-    const [tokensExpanded, setTokensExpanded] = useState(false);
-    const [editingTokenIndex, setEditingTokenIndex] = useState(null);
-    const [tokenEdits, setTokenEdits] = useState({ name: "", token: "" });
-    const [refreshingTokens, setRefreshingTokens] = useState(false);
-    const [refreshingTokenIndex, setRefreshingTokenIndex] = useState(null);
-    const [importingTokens, setImportingTokens] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -154,7 +91,6 @@ export default function AdminMayakAiTokens() {
         setDrafts((current) => ({
             ...current,
             finalFileModel: nextSettings.finalFileModel || "",
-            codexModel: nextSettings.codexModel || CODEX_DEFAULT_MODEL,
             sovaPrompt: nextSettings.sovaPrompt || "",
             analyticsPrompt: nextSettings.analyticsPrompt || "",
         }));
@@ -231,140 +167,6 @@ export default function AdminMayakAiTokens() {
         saveSettings({ [field]: value }, successMessage, field.includes("Key") ? [field] : []);
     };
 
-    const saveCodexToken = () => {
-        const value = String(drafts.codexToken || "").trim();
-        if (!value) {
-            setError("Укажите Codex Sale API Key");
-            return;
-        }
-        saveSettings({ codexToken: value }, "Codex Sale API Key сохранен", ["codexToken"]);
-    };
-
-    const saveCodexModel = () => {
-        const value = String(drafts.codexModel || "").trim() || CODEX_DEFAULT_MODEL;
-        saveSettings({ codexModel: value }, "Модель Codex Sale сохранена");
-    };
-
-    const addQwenToken = () => {
-        const name = drafts.qwenTokenName.trim();
-        const token = drafts.qwenTokenValue.trim();
-        if (!name || !token) {
-            setError("Укажите название и Qwen-токен");
-            return;
-        }
-        saveSettings({ qwenTokenAdd: { name, token } }, "Qwen-токен добавлен, срок действия определен автоматически", [
-            "qwenTokenName",
-            "qwenTokenValue",
-        ]);
-    };
-
-    const removeQwenToken = (index) => {
-        if (!window.confirm("Удалить этот Qwen-токен из общего пула?")) return;
-        saveSettings({ qwenTokenRemoveIndex: index }, "Qwen-токен удален");
-    };
-
-    const startEditQwenToken = (token) => {
-        setEditingTokenIndex(token.index);
-        setTokenEdits({
-            name: token.name || "",
-            token: token.token || "",
-        });
-    };
-
-    const updateTokenEdit = (key, value) => {
-        setTokenEdits((current) => ({ ...current, [key]: value }));
-    };
-
-    const saveQwenTokenEdit = async (index) => {
-        const name = tokenEdits.name.trim();
-        const token = tokenEdits.token.trim();
-        if (!name || !token) {
-            setError("Укажите название и Qwen-токен");
-            return;
-        }
-
-        const nextTokens = settings.qwenTokens.map((entry) => ({
-            name: entry.index === index ? name : entry.name,
-            email: entry.email || "",
-            account: entry.account || "",
-            token: entry.index === index ? token : entry.token,
-        }));
-
-        await saveSettings({ qwenTokens: nextTokens }, "Qwen-токен обновлен, срок действия пересчитан");
-        setEditingTokenIndex(null);
-        setTokenEdits({ name: "", token: "" });
-    };
-
-    const refreshQwenTokens = async (index = null) => {
-        const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 130000);
-
-        try {
-            if (index === null) {
-                setRefreshingTokens(true);
-            } else {
-                setRefreshingTokenIndex(index);
-            }
-            setError("");
-            const payload = await parseJsonResponse(
-                await fetch("/api/admin/qwen-tokens/refresh", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(index === null ? {} : { index }),
-                    signal: controller.signal,
-                }),
-                "Не удалось обновить Qwen-токены"
-            );
-            const count = Array.isArray(payload.updated) ? payload.updated.length : 0;
-            setMessage(index === null ? `Qwen-токены обновлены: ${count}` : "Qwen-токен обновлен");
-            await loadSettings();
-        } catch (refreshError) {
-            setError(refreshError.name === "AbortError" ? "Qwen-обновление заняло слишком много времени" : refreshError.message || "Не удалось обновить Qwen-токены");
-        } finally {
-            window.clearTimeout(timeoutId);
-            setRefreshingTokens(false);
-            setRefreshingTokenIndex(null);
-        }
-    };
-
-    const importQwenTokenFile = async (event) => {
-        const file = event.target.files?.[0];
-        event.target.value = "";
-        if (!file) return;
-
-        try {
-            setImportingTokens(true);
-            setError("");
-            const parsed = JSON.parse(await file.text());
-            const payload = await parseJsonResponse(
-                await fetch("/api/admin/qwen-tokens/import", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(parsed),
-                }),
-                "Не удалось импортировать Qwen-токены"
-            );
-            setMessage(`Qwen-токены импортированы: ${payload.count || 0}`);
-            await loadSettings();
-            setTokensExpanded(true);
-        } catch (importError) {
-            setError(importError.message || "Не удалось импортировать Qwen-токены");
-        } finally {
-            setImportingTokens(false);
-        }
-    };
-
-    const copyText = async (value, successMessage) => {
-        if (!value) return;
-        try {
-            await navigator.clipboard.writeText(value);
-            setError("");
-            setMessage(successMessage);
-        } catch {
-            setError("Не удалось скопировать значение");
-        }
-    };
-
     if (!isAuthenticated || loading) {
         return (
             <>
@@ -394,203 +196,22 @@ export default function AdminMayakAiTokens() {
 
                 <section className="grid">
                     <article className="panel">
-                        <h2>Codex Sale (основная проверка)</h2>
+                        <h2>OpenRouter</h2>
                         <p className="panel-note">
-                            Активный провайдер оценки полей МАЯК-ОКО. Запросы идут через codex.sale (OpenAI-совместимый). Укажите API-ключ и выберите модель — изменения применяются без передеплоя.
+                            Единственный провайдер нейросети: оценка промптов СОВА (проверка полей МАЯК-ОКО) и итоговая PDF-аналитика. Один и тот же API-ключ используется для обеих задач. Модель ниже относится к генерации аналитики.
                         </p>
                         <SecretRow
-                            label="Codex Sale API Key"
-                            statusActive={settings.codexTokenIsSet}
-                            statusValue={settings.codexToken}
-                            value={drafts.codexToken}
-                            placeholder="sk-clb-..."
-                            onChange={(value) => updateDraft("codexToken", value)}
-                            onSave={saveCodexToken}
-                            disabled={saving}
-                        />
-                        <div className="field-row">
-                            <label>
-                                <span>
-                                    Модель Codex Sale
-                                    <StatusMark active={Boolean(settings.codexModel)} value={settings.codexModel} />
-                                </span>
-                                <select value={drafts.codexModel || CODEX_DEFAULT_MODEL} onChange={(event) => updateDraft("codexModel", event.target.value)}>
-                                    {CODEX_MODELS.map((modelId) => (
-                                        <option key={modelId} value={modelId}>
-                                            {modelId}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            <button type="button" onClick={saveCodexModel} disabled={saving}>
-                                Сохранить
-                            </button>
-                        </div>
-                    </article>
-                </section>
-
-                <section className="grid">
-                    <article className="panel">
-                        <div className="panel-head">
-                            <h2>Qwen - токены</h2>
-                            <div className="panel-actions">
-                                <label className={importingTokens || saving ? "import-button disabled" : "import-button"}>
-                                    {importingTokens ? "Импортируем..." : "Импорт JSON"}
-                                    <input type="file" accept="application/json,.json" onChange={importQwenTokenFile} disabled={importingTokens || saving} />
-                                </label>
-                                <button
-                                    type="button"
-                                    className="refresh"
-                                    onClick={() => refreshQwenTokens()}
-                                    disabled={saving || refreshingTokens || refreshingTokenIndex !== null || settings.qwenTokens.length === 0}
-                                >
-                                    {refreshingTokens ? "Обновляем..." : "Обновить все"}
-                                </button>
-                                <button type="button" className="ghost" onClick={() => setTokensExpanded((current) => !current)}>
-                                    {tokensExpanded ? "Свернуть" : `Развернуть (${settings.qwenTokens.length})`}
-                                </button>
-                            </div>
-                        </div>
-
-                        {tokensExpanded ? (
-                            <div className="token-list">
-                                {settings.qwenTokens.length === 0 ? <div className="empty">Qwen-токены не добавлены</div> : null}
-                                {settings.qwenTokens.map((token) => {
-                                    const isEditing = editingTokenIndex === token.index;
-                                    return (
-                                        <div key={`${token.index}:${token.email || token.name}`} className="token-row">
-                                            <div className={isEditing ? "token-info token-info-edit" : "token-info"}>
-                                                {isEditing ? (
-                                                    <>
-                                                        <span className="account-badge">{getTokenAccountLabel(token)}</span>
-                                                        <input value={tokenEdits.name} onChange={(event) => updateTokenEdit("name", event.target.value)} placeholder="Название токена" />
-                                                        <input
-                                                            type="password"
-                                                            value={tokenEdits.token}
-                                                            onChange={(event) => updateTokenEdit("token", event.target.value)}
-                                                            placeholder="JWT/Qwen token"
-                                                        />
-                                                        <span className={`expiry ${expiryTone(token.expiry)}`}>{formatExpiry(token.expiry)}</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span className="account-badge">{getTokenAccountLabel(token)}</span>
-                                                        <strong title={getTokenDisplayName(token)}>{getTokenDisplayName(token)}</strong>
-                                                        <code>{token.mask || token.token}</code>
-                                                        <span className={`expiry ${expiryTone(token.expiry)}`}>{formatExpiry(token.expiry)}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                            <div className="token-actions">
-                                                {isEditing ? (
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            className="icon ok"
-                                                            onClick={() => saveQwenTokenEdit(token.index)}
-                                                            disabled={saving}
-                                                            title="Сохранить"
-                                                            aria-label="Сохранить"
-                                                        >
-                                                            ✓
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="icon"
-                                                            onClick={() => {
-                                                                setEditingTokenIndex(null);
-                                                                setTokenEdits({ name: "", token: "" });
-                                                            }}
-                                                            disabled={saving}
-                                                            title="Отмена"
-                                                            aria-label="Отмена"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            className="icon refresh-icon"
-                                                            onClick={() => refreshQwenTokens(token.index)}
-                                                            disabled={saving || refreshingTokens || refreshingTokenIndex !== null}
-                                                            title="Обновить токен"
-                                                            aria-label="Обновить токен"
-                                                        >
-                                                            {refreshingTokenIndex === token.index ? "..." : "↻"}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="icon"
-                                                            onClick={() => copyText(token.token, "Qwen-токен скопирован")}
-                                                            disabled={saving}
-                                                            title="Скопировать токен"
-                                                            aria-label="Скопировать токен"
-                                                        >
-                                                            ⧉
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="icon edit"
-                                                            onClick={() => startEditQwenToken(token)}
-                                                            disabled={saving}
-                                                            title="Редактировать"
-                                                            aria-label="Редактировать"
-                                                        >
-                                                            ✎
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="icon danger"
-                                                            onClick={() => removeQwenToken(token.index)}
-                                                            disabled={saving}
-                                                            title="Удалить"
-                                                            aria-label="Удалить"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : null}
-
-                        <div className="field-row split">
-                            <label>
-                                <span>Название токена</span>
-                                <input value={drafts.qwenTokenName} onChange={(event) => updateDraft("qwenTokenName", event.target.value)} placeholder="Основной Qwen" />
-                            </label>
-                            <label>
-                                <span>Qwen-токен</span>
-                                <input type="password" value={drafts.qwenTokenValue} onChange={(event) => updateDraft("qwenTokenValue", event.target.value)} placeholder="JWT/Qwen token" />
-                            </label>
-                            <button type="button" onClick={addQwenToken} disabled={saving}>
-                                Добавить
-                            </button>
-                        </div>
-                    </article>
-                </section>
-
-                <section className="grid">
-                    <article className="panel">
-                        <h2>Резерв OpenRouter</h2>
-                        <p className="panel-note">OpenRouter используется только как резерв, если Codex Sale временно недоступен. Укажите API key и модель.</p>
-                        <SecretRow
-                            label="Резервный OpenRouter API Key"
+                            label="OpenRouter API Key"
                             statusActive={settings.finalFileOpenrouterApiKeyIsSet}
                             statusValue={settings.finalFileOpenrouterApiKey}
                             value={drafts.finalFileOpenrouterApiKey}
                             placeholder="sk-or-v1..."
                             onChange={(value) => updateDraft("finalFileOpenrouterApiKey", value)}
-                            onSave={() => saveTextField("finalFileOpenrouterApiKey", "Резервный OpenRouter API Key сохранен", true)}
+                            onSave={() => saveTextField("finalFileOpenrouterApiKey", "OpenRouter API Key сохранен", true)}
                             disabled={saving}
                         />
                         <SecretRow
-                            label="Модель OpenRouter"
+                            label="Модель OpenRouter (итоговая аналитика)"
                             statusActive={Boolean(settings.finalFileModel)}
                             statusValue={settings.finalFileModel}
                             value={drafts.finalFileModel}
