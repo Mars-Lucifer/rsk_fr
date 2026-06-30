@@ -502,6 +502,38 @@ export async function moveMayakSessionParticipantTable({ sessionId, userId, tabl
     });
 }
 
+// Удаляет участника из активной сессии (режим редактора дашборда): убирает его
+// из рантайма вместе с его заявками на проверку. Слот токена освобождается
+// автоматически (лимит считается по числу участников). На устройстве участника
+// тренажёр при следующем поллинге увидит participant=null и завершит сессию.
+export async function removeMayakSessionParticipant({ sessionId, userId }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const normalizedUserId = String(userId || "");
+    if (!normalizedUserId) {
+        throw new Error("Не указан участник");
+    }
+
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        if (!bucket.participants?.[normalizedUserId]) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
+        }
+        delete bucket.participants[normalizedUserId];
+        // Чистим его заявки на проверку, чтобы они не висели в очереди инспектора.
+        if (bucket.reviews) {
+            for (const reviewId of Object.keys(bucket.reviews)) {
+                if (bucket.reviews[reviewId]?.participantUserId === normalizedUserId) {
+                    delete bucket.reviews[reviewId];
+                }
+            }
+        }
+        return { userId: normalizedUserId, removed: true };
+    });
+}
+
 export async function readSessionReviews(sessionId) {
     const store = await readStore();
     const bucket = store.sessions?.[sessionId] || { reviews: {} };

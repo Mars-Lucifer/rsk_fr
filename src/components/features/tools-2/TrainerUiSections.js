@@ -146,6 +146,8 @@ export const TrainerControls = memo(function TrainerControls({
     onPrevTask,
     onNextTask,
     onTaskInputChange,
+    onContentTypeClick,
+    contentTypeAnchors = [],
     onToggleTaskTimer,
     onToggleMapPreview,
     onToggleInstructionPreview,
@@ -231,18 +233,25 @@ export const TrainerControls = memo(function TrainerControls({
                                 {contentTypesOrder.map((type) => {
                                     const isCompleted = Array.isArray(yaProgress.completedTypes) && yaProgress.completedTypes.includes(type.key);
                                     const colorStyles = contentTypeColors[type.key] || { bg: "bg-blue-500", border: "border-blue-500", text: "text-white" };
+                                    // Кликабельна только если для типа задан якорь и доступна навигация.
+                                    const hasAnchor = Array.isArray(contentTypeAnchors) && contentTypeAnchors.includes(type.key);
+                                    const clickable = hasAnchor && !isTaskRunning && !isTaskNavigationLocked && typeof onContentTypeClick === "function";
                                     return (
-                                        <div 
+                                        <button
+                                            type="button"
                                             key={type.key}
+                                            onClick={clickable ? () => onContentTypeClick(type.key) : undefined}
+                                            disabled={!clickable}
+                                            title={hasAnchor ? "Перейти к заданию этого типа" : undefined}
                                             className={`flex-1 flex items-center justify-center py-1.5 px-0.5 sm:px-1 text-[9px] sm:text-[10.5px] font-bold rounded-lg border transition-all duration-300 ${
-                                                isCompleted 
-                                                    ? `${colorStyles.bg} ${colorStyles.border} ${colorStyles.text} shadow-sm` 
+                                                isCompleted
+                                                    ? `${colorStyles.bg} ${colorStyles.border} ${colorStyles.text} shadow-sm`
                                                     : "bg-white border-slate-200 text-slate-400"
-                                            }`}
+                                            } ${clickable ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
                                         >
                                             <span className="hidden sm:inline">{type.label}</span>
                                             <span className="inline sm:hidden">{type.shortLabel || type.label}</span>
-                                        </div>
+                                        </button>
                                     );
                                 })}
                             </div>

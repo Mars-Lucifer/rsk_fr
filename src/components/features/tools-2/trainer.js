@@ -1183,10 +1183,16 @@ export default function TrainerPage({ goTo }) {
         setShowThirdQuestionnaire,
     });
 
+    // Флаг «участник уже был в сессии». Нужен, чтобы отличить удаление участника
+    // из дашборда (participant=null после регистрации) от кратковременной гонки
+    // на входе и не выкинуть участника ошибочно до завершения регистрации.
+    const sessionParticipantSeenRef = useRef(false);
+
     useEffect(() => {
         if (!isSessionMode || !runtimeSessionId || !activeUserId) {
             setSessionRuntimeState(null);
             setSessionRuntimeError("");
+            sessionParticipantSeenRef.current = false;
             return undefined;
         }
 
@@ -1207,6 +1213,10 @@ export default function TrainerPage({ goTo }) {
                 setSessionRuntimeState(nextState);
                 setSessionRuntimeError("");
 
+                if (nextState?.participant) {
+                    sessionParticipantSeenRef.current = true;
+                }
+
                 if (nextState?.participant?.role && nextState.participant.role !== selectedRole) {
                     setSelectedRole(nextState.participant.role);
                     localStorage.setItem(getStorageKey("userRole"), nextState.participant.role);
@@ -1220,7 +1230,12 @@ export default function TrainerPage({ goTo }) {
                     });
                 }
 
-                if (nextState && nextState.sessionActive === false) {
+                // Завершение сессии у участника: либо сессия закрыта админом
+                // (sessionActive=false), либо участника удалили из дашборда —
+                // тогда participant=null при активной сессии после того, как он
+                // уже был зарегистрирован.
+                const wasRemoved = !!nextState?.sessionActive && !nextState?.participant && sessionParticipantSeenRef.current;
+                if (nextState && (nextState.sessionActive === false || wasRemoved)) {
                     await removeKeyCookie();
                     await clearUserCookie();
                     localStorage.removeItem(getStorageKey("userRole"));
@@ -1789,6 +1804,23 @@ export default function TrainerPage({ goTo }) {
                 }
                 // Если не найдено — просто не переключаем, даём пользователю исправить
             }, 600);
+        },
+        // Список типов, у которых есть задание-якорь (для подсветки кликабельных
+        // плашек в тренажёре). На каждый тип — максимум одно задание.
+        contentTypeAnchors: tasks.filter((t) => t && t.typeAnchor).map((t) => String(t.typeAnchor)),
+        // Клик по плашке типа контента: подставляем номер задания-якоря в поле
+        // и переключаемся штатной навигацией. Если якоря для типа нет или идёт
+        // выполнение/блокировка — ничего не делаем.
+        onContentTypeClick: (typeKey) => {
+            if (timerState.isRunning || isCurrentTaskPendingReview || isCurrentTaskRejected) return;
+            const idx = tasks.findIndex((t) => t && String(t.typeAnchor || "") === typeKey);
+            if (idx < 0) return;
+            if (idx < allowedMinIndex || idx > allowedMaxIndex) return;
+            const displayValue = tokenTaskRange
+                ? (tasks[idx].number?.toString() || String(idx + 1))
+                : String(idx + 1);
+            setTaskInputValue(displayValue);
+            guardedGoToTask(idx);
         },
         onToggleTaskTimer: guardedToggleTaskTimer,
         onToggleMapPreview: handleToggleMapPreview,

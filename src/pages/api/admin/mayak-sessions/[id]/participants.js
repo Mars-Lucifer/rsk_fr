@@ -3,6 +3,7 @@ import {
     listMayakSessionParticipants,
     setMayakSessionParticipantRole,
     moveMayakSessionParticipantTable,
+    removeMayakSessionParticipant,
 } from "../../../../../lib/mayakSessionRuntime.js";
 
 export default async function handler(req, res) {
@@ -44,6 +45,19 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true, data: participant });
         } catch (error) {
             return res.status(400).json({ success: false, error: error.message || "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0430" });
+        }
+    }
+
+    if (req.method === "DELETE") {
+        try {
+            const { userId } = req.body || {};
+            const result = await removeMayakSessionParticipant({
+                sessionId,
+                userId: String(userId || ""),
+            });
+            return res.status(200).json({ success: true, data: result });
+        } catch (error) {
+            return res.status(400).json({ success: false, error: error.message || "Не удалось удалить участника" });
         }
     }
 

@@ -1,4 +1,4 @@
-import { classifyTask } from "@/lib/mayakProgressModel";
+import { classifyTask, YA_FORMAT_TYPES } from "@/lib/mayakProgressModel";
 
 // Распознан ли contentType по стандарту (старт / формат «Я» / направление «Мы»
 // / карта настроения с префиксом). Используется для подсветки ячеек «Тип».
@@ -7,6 +7,11 @@ export function isStandardContentType(value) {
     if (info.kind === "mood") return info.standard === true;
     return info.kind === "start" || info.kind === "ya-format" || info.kind === "we-direction";
 }
+
+// Опции колонки «Тип-якорь»: 6 канонических типов контента «Я» (текст/аудио/…).
+// Якорь — это задание, на которое прыгает клик по плашке типа в тренажёре.
+// На каждый тип допустимо не более одного якоря (правило в RangeEditor).
+export const ANCHOR_OPTIONS = YA_FORMAT_TYPES.map((t) => ({ key: t.key, label: t.label }));
 
 // Колонки таблицы (порядок как в Google Sheets)
 export const COLUMNS = [
@@ -32,4 +37,5 @@ export const COLUMNS = [
     { key: "file", label: "Загр.доп.мат.", width: 160, source: "task", fileCol: "files" },
     { key: "map", label: "Загр.карту", width: 160, source: "task", fileCol: "maps" },
     { key: "generate", label: "⚙ Авто-инстр.", width: 150, source: "action" },
+    { key: "typeAnchor", label: "⚓ Тип-якорь", width: 120, source: "task", selectAnchor: true },
 ];

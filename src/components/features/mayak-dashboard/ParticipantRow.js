@@ -2,7 +2,7 @@ import { memo } from "react";
 
 import styles from "./dashboard.module.css";
 import { ROLE_OPTIONS, roleLabel } from "./dashboardConstants";
-import { StarIcon } from "./icons";
+import { StarIcon, CloseIcon } from "./icons";
 
 function ParticipantRow({
     participant,
@@ -13,6 +13,7 @@ function ParticipantRow({
     rowIndex = 0,
     directionsMeta = [],
     onChangeRole,
+    onRemove,
     onDragStart,
     onDragEnd,
 }) {
@@ -61,7 +62,24 @@ function ParticipantRow({
             onDragEnd={editorMode ? onDragEnd : undefined}
         >
             <td className={styles.tdName}>
-                <span className={styles.personName}>{participant.name || "Без имени"}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {editorMode && onRemove && (
+                        <button
+                            type="button"
+                            title="Удалить участника и завершить его сессию"
+                            onClick={(event) => { event.stopPropagation(); onRemove(participant); }}
+                            style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                width: 20, height: 20, flexShrink: 0, padding: 0,
+                                border: "none", borderRadius: 6, cursor: "pointer",
+                                color: "#dc2626", background: "rgba(220,38,38,0.12)",
+                            }}
+                        >
+                            <CloseIcon className={styles.removeIcon} />
+                        </button>
+                    )}
+                    <span className={styles.personName}>{participant.name || "Без имени"}</span>
+                </span>
             </td>
             <td className={styles.tdRole}>
                 {editorMode ? (

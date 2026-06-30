@@ -147,6 +147,9 @@ export default async function handler(req, res) {
                 services: t.services || "",
                 instructionFormat: t.instructionFormat || "",
                 instructionService: t.instructionService || "",
+                // Тип-якорь: к какому типу контента привязано это задание для
+                // быстрого перехода по клику на плашку типа в тренажёре.
+                typeAnchor: t.typeAnchor || "",
             }));
 
             // Запись колоды под per-section локом на index.json — тем же, что

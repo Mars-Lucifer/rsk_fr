@@ -184,7 +184,7 @@ export const useContentData = ({ range }) => {
                 const colIdx = startCol + c;
                 if (colIdx >= COLUMNS.length) break;
                 const col = COLUMNS[colIdx];
-                if (!col || col.readOnly || col.fileCol || col.checkbox || col.autoCheckbox) continue;
+                if (!col || col.readOnly || col.fileCol || col.checkbox || col.autoCheckbox || col.selectAnchor) continue;
                 writeCell(targetRow, col, cells[c]);
             }
         }

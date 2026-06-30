@@ -22,6 +22,7 @@ function TablePanel({
     draggingUserId = null,
     dropActive = false,
     onChangeRole,
+    onRemove,
     onPersonDragStart,
     onPersonDragEnd,
     onTableDragOver,
@@ -72,6 +73,7 @@ function TablePanel({
                                                     big={expanded}
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={onChangeRole}
+                                                    onRemove={onRemove}
                                                     onDragStart={onPersonDragStart}
                                                     onDragEnd={onPersonDragEnd}
                                                 />
@@ -100,6 +102,7 @@ function TablePanel({
                                                     big={expanded}
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={onChangeRole}
+                                                    onRemove={onRemove}
                                                     onDragStart={onPersonDragStart}
                                                     onDragEnd={onPersonDragEnd}
                                                 />

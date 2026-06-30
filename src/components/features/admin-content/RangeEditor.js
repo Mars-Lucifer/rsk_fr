@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { Cell } from "./Cell";
 import { BulkUploadDropZone } from "./BulkUploadDropZone";
 import { RangeEditorToolbar } from "./RangeEditorToolbar";
-import { COLUMNS, isStandardContentType } from "./columns";
+import { COLUMNS, isStandardContentType, ANCHOR_OPTIONS } from "./columns";
 import { headerStyle, cellStyle } from "./styles";
 import { useContentData } from "./hooks/useContentData";
 import { useContentFiles } from "./hooks/useContentFiles";
@@ -50,6 +50,19 @@ export function RangeEditor({ range, onBack }) {
     });
 
     const noop = useCallback(() => {}, []);
+
+    // Колонка «Тип-якорь»: один якорь на тип. При выборе типа на строке тот же
+    // тип снимается со всех остальных строк, чтобы клик по плашке в тренажёре
+    // вёл строго к одному заданию.
+    const handleTypeAnchorChange = useCallback((rowIdx, value) => {
+        saveSnapshot();
+        isDirtyRef.current = true;
+        setTasks((prev) => prev.map((t, i) => {
+            if (i === rowIdx) return { ...t, typeAnchor: value };
+            if (value && (t.typeAnchor || "") === value) return { ...t, typeAnchor: "" };
+            return t;
+        }));
+    }, [saveSnapshot, setTasks, isDirtyRef]);
 
     if (loading) {
         return <div style={{ padding: 32, textAlign: "center" }}>Загрузка раздела {range}...</div>;
@@ -261,6 +274,23 @@ export function RangeEditor({ range, onBack }) {
                                                     selected={sel}
                                                     isActive={active}
                                                 />
+                                            );
+                                        }
+
+                                        if (col.selectAnchor) {
+                                            return (
+                                                <td key={ci} style={{ ...cellStyle, borderLeft: "1px solid #e2e8f0", padding: "2px 4px" }}>
+                                                    <select
+                                                        value={val || ""}
+                                                        onChange={(e) => handleTypeAnchorChange(ri, e.target.value)}
+                                                        title="Тип-якорь: по клику на эту плашку в тренажёре откроется данное задание. Один якорь на тип."
+                                                        style={{ fontSize: 11, width: "100%", border: "1px solid #cbd5e1", borderRadius: 4, padding: "2px" }}>
+                                                        <option value="">—</option>
+                                                        {ANCHOR_OPTIONS.map((o) => (
+                                                            <option key={o.key} value={o.key}>{o.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
                                             );
                                         }
 

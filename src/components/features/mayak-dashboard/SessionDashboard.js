@@ -213,6 +213,33 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
         [patchParticipant]
     );
 
+    // Удаление участника из запущенной сессии (режим редактора): подтверждение →
+    // DELETE → принудительное обновление дашборда. Сессия у участника завершится
+    // сама при следующем поллинге его тренажёра (participant=null).
+    const handleRemoveParticipant = useCallback(
+        async (participant) => {
+            if (!participant?.userId) return;
+            const name = participant.name || "участника";
+            if (!window.confirm(`Удалить «${name}» из сессии? Его сессия будет завершена.`)) return;
+            try {
+                const response = await fetch(`/api/admin/mayak-sessions/${encodeURIComponent(sessionId)}/participants`, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId: participant.userId }),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || "Не удалось удалить участника");
+                }
+                await fetchData(false, { force: true });
+                showToast(`«${name}» удалён из сессии`);
+            } catch (err) {
+                showToast(err.message || "Не удалось удалить участника");
+            }
+        },
+        [sessionId, fetchData, showToast]
+    );
+
     const handlePersonDragStart = useCallback((event, participant) => {
         setDraggingUserId(participant.userId);
         event.dataTransfer.effectAllowed = "move";
@@ -293,6 +320,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
         editorMode,
         draggingUserId,
         onChangeRole: handleChangeRole,
+        onRemove: handleRemoveParticipant,
         onPersonDragStart: handlePersonDragStart,
         onPersonDragEnd: handlePersonDragEnd,
         onTableDragOver: handleTableDragOver,
@@ -402,6 +430,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                                                     editorMode={editorMode}
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={handleChangeRole}
+                                                    onRemove={handleRemoveParticipant}
                                                     onDragStart={handlePersonDragStart}
                                                     onDragEnd={handlePersonDragEnd}
                                                 />
@@ -417,6 +446,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                                                     editorMode={editorMode}
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={handleChangeRole}
+                                                    onRemove={handleRemoveParticipant}
                                                     onDragStart={handlePersonDragStart}
                                                     onDragEnd={handlePersonDragEnd}
                                                 />
