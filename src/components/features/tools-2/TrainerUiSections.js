@@ -237,11 +237,22 @@ export const TrainerControls = memo(function TrainerControls({
                                     const hasAnchor = Array.isArray(contentTypeAnchors) && contentTypeAnchors.includes(type.key);
                                     const clickable = hasAnchor && !isTaskRunning && !isTaskNavigationLocked && typeof onContentTypeClick === "function";
                                     return (
-                                        <button
-                                            type="button"
+                                        // Плашка — это div (не button), чтобы глобальный стиль `button {}`
+                                        // из colour.css не перекрашивал блок в чёрный/серый. Заливка типа
+                                        // задаётся только классами Tailwind по isCompleted. Клик по якорю
+                                        // остаётся доступным через role/tabIndex/onKeyDown.
+                                        <div
                                             key={type.key}
+                                            role={clickable ? "button" : undefined}
+                                            tabIndex={clickable ? 0 : undefined}
                                             onClick={clickable ? () => onContentTypeClick(type.key) : undefined}
-                                            disabled={!clickable}
+                                            onKeyDown={clickable ? (e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    onContentTypeClick(type.key);
+                                                }
+                                            } : undefined}
+                                            aria-disabled={!clickable}
                                             title={hasAnchor ? "Перейти к заданию этого типа" : undefined}
                                             className={`flex-1 flex items-center justify-center py-1.5 px-0.5 sm:px-1 text-[9px] sm:text-[10.5px] font-bold rounded-lg border transition-all duration-300 ${
                                                 isCompleted
@@ -251,7 +262,7 @@ export const TrainerControls = memo(function TrainerControls({
                                         >
                                             <span className="hidden sm:inline">{type.label}</span>
                                             <span className="inline sm:hidden">{type.shortLabel || type.label}</span>
-                                        </button>
+                                        </div>
                                     );
                                 })}
                             </div>
