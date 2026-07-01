@@ -238,55 +238,73 @@ export async function validateMayakSessionToken(tokenValue) {
 
 export async function useMayakSessionToken(tokenValue) {
     const normalizedValue = normalizeString(tokenValue);
+    // Побочная чистка вне лока: сама может трогать файлы, не должна быть под
+    // локом токенов (иначе риск дедлока/удержания лока дольше нужного).
     await sweepExpiredDelegatedMayakSessions();
-    const store = await readStore();
-    const index = store.tokens.findIndex((item) => item.token === normalizedValue);
 
-    if (index === -1) {
-        return { success: false, error: "Токен не найден" };
-    }
+    // ВЕСЬ read-modify-write счётчика — под одним локом. Иначе при одновременном
+    // входе группы по общему токену все читают одинаковый usedCount и затирают
+    // инкременты друг друга (lost update): счётчик недосчитывается, лимит входов
+    // фактически не соблюдается. Регистрация участников уже так защищена
+    // (mutateSessionRuntime) — приводим расход токена к тому же инварианту.
+    // Внутри лока НЕЛЬЗЯ звать writeStore() (он берёт тот же лок → дедлок) —
+    // читаем/пишем напрямую. getDelegatedOwnerUsageState читает другой файл.
+    return withJsonFileLock(SESSION_TOKENS_FILE, async () => {
+        await ensureStoreFile();
+        const store = await readJsonFile(SESSION_TOKENS_FILE, createEmptyStore());
+        store.tokens = Array.isArray(store?.tokens) ? store.tokens : [];
+        const index = store.tokens.findIndex((item) => item.token === normalizedValue);
 
-    const current = store.tokens[index];
-    if (!current.isActive) {
-        return { success: false, error: "Токен деактивирован" };
-    }
+        if (index === -1) {
+            return { success: false, error: "Токен не найден" };
+        }
 
-    if (isExpiredToken(current)) {
-        return { success: false, error: "Срок действия токена истёк", remainingAttempts: 0 };
-    }
+        const current = store.tokens[index];
+        if (!current.isActive) {
+            return { success: false, error: "Токен деактивирован" };
+        }
 
-    const delegatedUsageState =
-        String(current.source || "") === "delegated-admin" ? await getDelegatedOwnerUsageState(current.ownerUserId, store.tokens) : null;
-    if (delegatedUsageState && delegatedUsageState.remainingAttempts < 1) {
-        return { success: false, error: "Лимит входов по доступу исчерпан", remainingAttempts: 0 };
-    }
+        if (isExpiredToken(current)) {
+            return { success: false, error: "Срок действия токена истёк", remainingAttempts: 0 };
+        }
 
-    if (!delegatedUsageState && current.usedCount >= current.usageLimit) {
-        return { success: false, error: "Лимит использований исчерпан", remainingAttempts: 0 };
-    }
+        const delegatedUsageState =
+            String(current.source || "") === "delegated-admin" ? await getDelegatedOwnerUsageState(current.ownerUserId, store.tokens) : null;
+        if (delegatedUsageState && delegatedUsageState.remainingAttempts < 1) {
+            return { success: false, error: "Лимит входов по доступу исчерпан", remainingAttempts: 0 };
+        }
 
-    store.tokens[index] = {
-        ...current,
-        usedCount: current.usedCount + 1,
-        updatedAt: new Date().toISOString(),
-    };
-    await writeStore(store, [current.id]);
+        if (!delegatedUsageState && current.usedCount >= current.usageLimit) {
+            return { success: false, error: "Лимит использований исчерпан", remainingAttempts: 0 };
+        }
 
-    const responseToken = delegatedUsageState
-        ? {
-              ...store.tokens[index],
-              usageLimit: delegatedUsageState.totalLimit,
-              usedCount: delegatedUsageState.usedCount + 1,
-          }
-        : store.tokens[index];
+        const updatedToken = {
+            ...current,
+            usedCount: current.usedCount + 1,
+            updatedAt: new Date().toISOString(),
+        };
+        store.tokens[index] = updatedToken;
+        // Пишем весь стор, прочитанный ВНУТРИ этого же лока, — чужие токены не
+        // затираются (актуальная копия), а инкремент атомарен относительно
+        // других расходов.
+        await writeJsonFileAtomic(SESSION_TOKENS_FILE, store);
 
-    return {
-        success: true,
-        token: toTokenWithStats(responseToken),
-        remainingAttempts: delegatedUsageState
-            ? Math.max(0, delegatedUsageState.remainingAttempts - 1)
-            : Math.max(0, store.tokens[index].usageLimit - store.tokens[index].usedCount),
-    };
+        const responseToken = delegatedUsageState
+            ? {
+                  ...updatedToken,
+                  usageLimit: delegatedUsageState.totalLimit,
+                  usedCount: delegatedUsageState.usedCount + 1,
+              }
+            : updatedToken;
+
+        return {
+            success: true,
+            token: toTokenWithStats(responseToken),
+            remainingAttempts: delegatedUsageState
+                ? Math.max(0, delegatedUsageState.remainingAttempts - 1)
+                : Math.max(0, updatedToken.usageLimit - updatedToken.usedCount),
+        };
+    });
 }
 
 export async function createMayakSessionToken(payload) {
