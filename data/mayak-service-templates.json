@@ -12,21 +12,139 @@
           "templateFile": "suno-база-1782123437847.pptx",
           "order": 0,
           "uploadedAt": "2026-06-22T10:17:17.867Z"
+        },
+        {
+          "formatKey": "расширенная",
+          "formatName": "Расширенная",
+          "templateFile": "suno-rasshirennaya.pptx",
+          "order": 1,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
         }
       ]
     },
     {
       "serviceKey": "qwen",
       "serviceName": "Qwen",
-      "serviceUrl": "1",
+      "serviceUrl": "",
       "order": 1,
       "formats": [
         {
           "formatKey": "текст",
-          "formatName": "текст",
+          "formatName": "Текст",
           "templateFile": "qwen-текст-1782150713109.pptx",
           "order": 0,
           "uploadedAt": "2026-06-22T17:51:53.115Z"
+        },
+        {
+          "formatKey": "изображение",
+          "formatName": "Фото",
+          "templateFile": "qwen-foto.pptx",
+          "order": 1,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
+        },
+        {
+          "formatKey": "видео",
+          "formatName": "Видео",
+          "templateFile": "qwen-video.pptx",
+          "order": 2,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
+        }
+      ]
+    },
+    {
+      "serviceKey": "any2text",
+      "serviceName": "Any2text",
+      "serviceUrl": "",
+      "order": 2,
+      "formats": [
+        {
+          "formatKey": "аудио",
+          "formatName": "Аудио",
+          "templateFile": "any2text.pptx",
+          "order": 0,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
+        }
+      ]
+    },
+    {
+      "serviceKey": "audiocleaner",
+      "serviceName": "AudioCleaner",
+      "serviceUrl": "",
+      "order": 3,
+      "formats": [
+        {
+          "formatKey": "аудио",
+          "formatName": "Аудио",
+          "templateFile": "audiocleaner.pptx",
+          "order": 0,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
+        }
+      ]
+    },
+    {
+      "serviceKey": "pixverse",
+      "serviceName": "PixVerse",
+      "serviceUrl": "",
+      "order": 4,
+      "formats": [
+        {
+          "formatKey": "видео",
+          "formatName": "Видео",
+          "templateFile": "pixverse.pptx",
+          "order": 0,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
+        }
+      ]
+    },
+    {
+      "serviceKey": "renderforest",
+      "serviceName": "Renderforest",
+      "serviceUrl": "",
+      "order": 5,
+      "formats": [
+        {
+          "formatKey": "видео",
+          "formatName": "Видео",
+          "templateFile": "renderforest.pptx",
+          "order": 0,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
+        }
+      ]
+    },
+    {
+      "serviceKey": "zai",
+      "serviceName": "Z.ai",
+      "serviceUrl": "",
+      "order": 6,
+      "formats": [
+        {
+          "formatKey": "интерактив",
+          "formatName": "Интерактив",
+          "templateFile": "zai.pptx",
+          "order": 0,
+          "uploadedAt": "2026-07-09T00:42:41.000Z"
+        }
+      ]
+    },
+    {
+      "serviceKey": "gamma",
+      "serviceName": "Gamma",
+      "serviceUrl": "",
+      "order": 7,
+      "formats": [
+        {
+          "formatKey": "интерактив",
+          "formatName": "Интерактив",
+          "templateFile": "gamma.pptx",
+          "order": 0,
+          "uploadedAt": "2026-07-09T01:08:07.000Z"
+        },
+        {
+          "formatKey": "замена-фона",
+          "formatName": "Замена фона",
+          "templateFile": "gamma-zamena-fona.pptx",
+          "order": 1,
+          "uploadedAt": "2026-07-09T01:08:07.000Z"
         }
       ]
     }

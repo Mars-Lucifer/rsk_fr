@@ -8,6 +8,7 @@ import { useContentData } from "./hooks/useContentData";
 import { useContentFiles } from "./hooks/useContentFiles";
 import { useInstructionGenerator } from "./hooks/useInstructionGenerator";
 import { useSpreadsheetSelection } from "./hooks/useSpreadsheetSelection";
+import { resolveFormatKey } from "@/lib/mayakProgressModel";
 
 // ============ Редактор раздела (Google Sheets стиль) ============
 export function RangeEditor({ range, onBack }) {
@@ -138,7 +139,9 @@ export function RangeEditor({ range, onBack }) {
                                             const generatable = isGeneratableContent(task.contentType);
                                             const multiService = matchedServices.length > 1;
                                             const selectedSvc = service?.serviceKey || "";
-                                            const selectedFmt = task.instructionFormat || formats[0]?.formatKey || "";
+                                            const autoFmtKey = resolveFormatKey(task.contentType);
+                                            const autoFmt = formats.find((f) => f.formatKey === autoFmtKey);
+                                            const selectedFmt = task.instructionFormat || autoFmt?.formatKey || formats[0]?.formatKey || "";
                                             const busy = genBusyRow === ri || genAllBusy;
                                             const disabled = !generatable || !svcName || !hasTemplate || busy;
                                             const title = !generatable
