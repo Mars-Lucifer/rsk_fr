@@ -1,7 +1,27 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import styles from "./dashboard.module.css";
 import ParticipantRow from "./ParticipantRow";
-import { FolderIcon } from "./icons";
+import { FolderIcon, StarIcon } from "./icons";
+
+// Агрегат стола по 6 направлениям части «Мы»: в каждом направлении до 6 звёзд —
+// по одной за КАЖДОГО участника стола, закрывшего это направление (лично).
+// Максимум стола: 6 направлений × 6 звёзд = 36. Логика зажигания личного
+// направления — та же, что в participant.we.directions (сервер).
+function computeTableDirections(directionsMeta, participants) {
+    if (!Array.isArray(directionsMeta) || !Array.isArray(participants)) return [];
+    return directionsMeta.map((dirMeta) => {
+        let litCount = 0;
+        let jokerCount = 0;
+        participants.forEach((p) => {
+            const found = p.we?.directions?.find((d) => d.key === dirMeta.key);
+            if (found?.lit) {
+                litCount += 1;
+                if (found.viaJoker) jokerCount += 1;
+            }
+        });
+        return { key: dirMeta.key, label: dirMeta.label, litCount, jokerCount };
+    });
+}
 
 function formatDuration(totalSeconds) {
     if (!totalSeconds || totalSeconds <= 0) return "—";
@@ -23,12 +43,19 @@ function TablePanel({
     dropActive = false,
     onChangeRole,
     onRemove,
+    onHide,
     onPersonDragStart,
     onPersonDragEnd,
     onTableDragOver,
     onTableDragLeave,
     onTableDrop,
 }) {
+    // Командный агрегат направлений «Мы» считаем один раз на стол и раздаём в строки.
+    const tableDirections = useMemo(
+        () => (mode === "we" ? computeTableDirections(directionsMeta, table.participants) : []),
+        [mode, directionsMeta, table.participants]
+    );
+
     return (
         <section
             className={`${styles.panel} ${styles.tablePanel} ${dropActive ? styles.panelDropActive : ""} ${expanded ? styles.tablePanelExpanded : ""}`}
@@ -50,7 +77,8 @@ function TablePanel({
                     </div>
                 ) : (
                     <>
-                        <div className={styles.tableResponsive}>
+                        <div className={mode === "we" ? styles.weLayout : styles.tableResponsive}>
+                            <div className={mode === "we" ? styles.weTableScroll : undefined}>
                             <table className={styles.participantTable}>
                                 {mode === "ya" ? (
                                     <>
@@ -74,6 +102,7 @@ function TablePanel({
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={onChangeRole}
                                                     onRemove={onRemove}
+                                                    onHide={onHide}
                                                     onDragStart={onPersonDragStart}
                                                     onDragEnd={onPersonDragEnd}
                                                 />
@@ -86,8 +115,6 @@ function TablePanel({
                                             <tr>
                                                 <th>УЧАСТНИК</th>
                                                 <th>РОЛЬ</th>
-                                                <th>Направление</th>
-                                                <th>Индекс цифровой зрелости</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -98,11 +125,13 @@ function TablePanel({
                                                     mode={mode}
                                                     rowIndex={index}
                                                     directionsMeta={directionsMeta}
+                                                    tableDirections={tableDirections}
                                                     editorMode={editorMode}
                                                     big={expanded}
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={onChangeRole}
                                                     onRemove={onRemove}
+                                                    onHide={onHide}
                                                     onDragStart={onPersonDragStart}
                                                     onDragEnd={onPersonDragEnd}
                                                 />
@@ -111,6 +140,45 @@ function TablePanel({
                                     </>
                                 )}
                             </table>
+                            </div>
+                            {/* Блок направлений «Мы» — независим от строк участников:
+                                растягивается на высоту панели, строки распределяются
+                                равномерно. В каждом направлении 6 слотов звёзд — по
+                                одной за каждого участника стола, лично закрывшего
+                                направление (максимум стола 6×6=36). Джокерные —
+                                красные, показываются последними из зажжённых. */}
+                            {mode === "we" && (
+                                <div className={styles.weDirectionsBlock}>
+                                    <div className={styles.weDirectionsHead}>ИНДЕКС ЦИФРОВОЙ ЗРЕЛОСТИ</div>
+                                    {tableDirections.map((dir) => {
+                                        const SLOTS = 6;
+                                        const litCount = Math.min(dir.litCount || 0, SLOTS);
+                                        const jokerCount = Math.min(dir.jokerCount || 0, litCount);
+                                        return (
+                                            <div
+                                                key={dir.key}
+                                                className={styles.weDirectionRow}
+                                                title={`${dir.label}: ${litCount} из ${SLOTS}${jokerCount ? ` (джокеров: ${jokerCount})` : ""}`}
+                                            >
+                                                <span className={styles.weDirectionLabel}>{dir.label}</span>
+                                                <span className={styles.dirStarsRow}>
+                                                    {Array.from({ length: SLOTS }, (_, slot) => {
+                                                        const lit = slot < litCount;
+                                                        const viaJoker = lit && slot >= litCount - jokerCount;
+                                                        return (
+                                                            <StarIcon
+                                                                key={slot}
+                                                                className={`${styles.dirStar} ${viaJoker ? styles.dirStarJoker : lit ? styles.dirStarLit : ""}`}
+                                                                filled={lit}
+                                                            />
+                                                        );
+                                                    })}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
                         {/* Table specific metrics under table */}
@@ -148,7 +216,7 @@ function TablePanel({
                                     <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
                                     <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
                                         {mode === "we"
-                                            ? `${table.totals.weApproved !== undefined ? table.totals.weApproved : "0"} из ${(table.totals.participantCount || 0) * 6}`
+                                            ? `${Math.min(table.totals.weApproved || 0, 36)} из 36`
                                             : (table.totals.approvedTotal !== undefined ? table.totals.approvedTotal : "0")}
                                     </span>
                                 </div>

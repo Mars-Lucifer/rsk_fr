@@ -549,6 +549,114 @@
     white-space: nowrap;
 }
 
+/* --- Режим «Мы»: таблица участников + независимый блок направлений --- */
+/* Контейнер: участники и блок направлений — два столбца, переносятся вниз,
+   если по ширине не влезают (полные ФИО + 6 звёзд). Блок направлений сам
+   растягивается на высоту и распределяет 6 строк равномерно — НЕ привязан
+   к строкам таблицы участников. */
+/* Панель стола фиксированной высоты (grid-auto-rows:1fr) — контент не должен
+   стекать вниз (переполнит). Поэтому участники и направления идут В РЯД без
+   переноса: слева таблица (имена с многоточием), справа блок направлений
+   фиксированной ширины. */
+.weLayout {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 12px;
+    flex-grow: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Область участников: занимает свободную ширину; имена длиннее — обрезаются
+   многоточием (полное имя в title). */
+.weTableScroll {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.weTableScroll .participantTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.weTableScroll .participantTable th:last-child,
+.weTableScroll .participantTable td:last-child {
+    width: 92px;
+}
+
+.weTableScroll .tdName {
+    overflow: hidden;
+}
+
+/* Обёртка имени (+ кнопки редактора): flex с min-width:0, чтобы имя внутри
+   могло сжаться и включить многоточие вместо наезда на колонку роли. */
+.tdNameInner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.weTableScroll .personName {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Блок направлений: независим от строк участников, тянется на высоту панели и
+   равномерно распределяет 6 строк. Фиксированная ширина — чтобы влезали 6 звёзд
+   рядом с полными ФИО в узкой (½ экрана) панели. */
+.weDirectionsBlock {
+    flex: 0 0 208px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 4px 0 8px;
+    border-left: 1px solid var(--border-color);
+    padding-left: 12px;
+}
+
+.weDirectionsHead {
+    font-size: 9px;
+    color: #94a3b8;
+    font-weight: 600;
+    padding: 6px 0 6px;
+    white-space: nowrap;
+}
+
+/* Строка направления: подпись слева (с многоточием), звёзды справа фикс-колонкой
+   — во всех строках одна ширина, поэтому звёзды на одном вертикальном уровне. */
+.weDirectionRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    align-items: center;
+    column-gap: 8px;
+    padding: 2px 0;
+    min-height: 26px;
+}
+
+.weDirectionRow .weDirectionLabel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+}
+
+.weDirectionRow .dirStarsRow {
+    justify-content: flex-start;
+    gap: 2px;
+}
+
+.weDirectionRow .dirStar {
+    width: 14px;
+    height: 14px;
+}
+
 .personRowBig .weDirectionLabel {
     font-size: 14px;
 }

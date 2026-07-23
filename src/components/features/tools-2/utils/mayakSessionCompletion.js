@@ -1,4 +1,4 @@
-import { getUserFromCookies } from "../actions";
+import { getUserFromCookies, clearUserCookie } from "../actions";
 
 export function buildMayakSessionCompletionPayload({ activeUserId, elapsedTime, levels }) {
     const timestamp = new Date().toISOString();
@@ -34,6 +34,11 @@ export function clearMayakSessionCompletionState({ getStorageKey, removeKeyCooki
     sessionStorage.removeItem(getStorageKey("currentTaskIndex"));
     setSelectedRole(null);
     removeKeyCookie();
+    // Завершение = полный выход из сессии. Чистим и cookie личности
+    // (active_user), иначе он живёт 30 дней и при повторном заходе с тем же
+    // токеном syncRegisteredUserState пропустит форму и «воскресит» старую
+    // сессию. После завершения новый заход должен требовать токен и форму заново.
+    clearUserCookie();
     // Данные входа удалены (removeKeyCookie). Сбрасываем и сохранённый экран,
     // чтобы восстановление после F5/возврата не отправило пользователя в
     // тренажёр уже без токена — корректный экран после завершения это «главная».

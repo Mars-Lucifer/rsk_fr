@@ -200,18 +200,24 @@ export default function OverviewPanel({
     // чётное число и иначе осталась бы пустая ячейка). Тогда таймер и
     // статистика раскладываются горизонтально.
     const compactWide = wide && !expanded;
-    const avgDelta = overall?.averageDelta !== undefined ? overall.averageDelta : 0;
+    const avgDelta = overall?.averageDelta === null || overall?.averageDelta === undefined ? "—" : overall.averageDelta;
     const totalTasks = overall?.approvedTotal !== undefined ? overall.approvedTotal : 0;
 
     const pct = timer.totalSeconds > 0 ? timer.remainingSeconds / timer.totalSeconds : 1;
     const strokeDashoffset = 565.48 * (1 - pct);
     const danger = timer.running && timer.remainingSeconds <= 10 && timer.remainingSeconds > 0;
 
+    // Максимум части «Мы» — 36 на стол (6 направлений × 6 звёзд), независимо от
+    // числа людей. Счётчик стола капим по 36, дальше не считаем; итог по всем
+    // столам — сумма капнутых. Знаменатель = столов × 36.
+    const WE_TABLE_MAX = 36;
     const totalWeTasks = useMemo(() => {
         return tables.reduce((sum, t) => {
-            return sum + (t.participants?.reduce((pSum, p) => pSum + (p.we?.approvedCount || 0), 0) || 0);
+            const tableWe = t.participants?.reduce((pSum, p) => pSum + (p.we?.approvedCount || 0), 0) || 0;
+            return sum + Math.min(tableWe, WE_TABLE_MAX);
         }, 0);
     }, [tables]);
+    const totalWeMax = tables.length * WE_TABLE_MAX;
 
     return (
         <section className={`${styles.panel} ${styles.overviewPanel} ${expanded ? styles.panelExpanded : ""} ${compactWide ? styles.overviewWide : ""}`}>
@@ -338,7 +344,7 @@ export default function OverviewPanel({
                                 <div className={styles.statInfo} style={{ gap: "2px" }}>
                                     <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
                                     <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
-                                        {mode === "we" ? `${totalWeTasks} из ${overall?.participantCount * 6}` : totalTasks}
+                                        {mode === "we" ? `${totalWeTasks} из ${totalWeMax}` : totalTasks}
                                     </span>
                                 </div>
                             </div>

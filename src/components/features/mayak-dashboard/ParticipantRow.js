@@ -2,7 +2,7 @@ import { memo } from "react";
 
 import styles from "./dashboard.module.css";
 import { ROLE_OPTIONS, roleLabel } from "./dashboardConstants";
-import { StarIcon, CloseIcon } from "./icons";
+import { StarIcon, CloseIcon, EyeOffIcon } from "./icons";
 
 function ParticipantRow({
     participant,
@@ -12,8 +12,10 @@ function ParticipantRow({
     dragging = false,
     rowIndex = 0,
     directionsMeta = [],
+    tableDirections = [],
     onChangeRole,
     onRemove,
+    onHide,
     onDragStart,
     onDragEnd,
 }) {
@@ -62,7 +64,22 @@ function ParticipantRow({
             onDragEnd={editorMode ? onDragEnd : undefined}
         >
             <td className={styles.tdName}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span className={styles.tdNameInner}>
+                    {editorMode && onHide && (
+                        <button
+                            type="button"
+                            title="Скрыть из дашборда (сессия участника не завершается)"
+                            onClick={(event) => { event.stopPropagation(); onHide(participant); }}
+                            style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                width: 20, height: 20, flexShrink: 0, padding: 0,
+                                border: "none", borderRadius: 6, cursor: "pointer",
+                                color: "#64748b", background: "rgba(100,116,139,0.14)",
+                            }}
+                        >
+                            <EyeOffIcon className={styles.removeIcon} />
+                        </button>
+                    )}
                     {editorMode && onRemove && (
                         <button
                             type="button"
@@ -78,7 +95,7 @@ function ParticipantRow({
                             <CloseIcon className={styles.removeIcon} />
                         </button>
                     )}
-                    <span className={styles.personName}>{participant.name || "Без имени"}</span>
+                    <span className={styles.personName} title={participant.name || "Без имени"}>{participant.name || "Без имени"}</span>
                 </span>
             </td>
             <td className={styles.tdRole}>
@@ -130,34 +147,7 @@ function ParticipantRow({
                         </div>
                     </td>
                 </>
-            ) : (
-                <>
-                    <td className={styles.tdName}>
-                        {directionsMeta?.[rowIndex]?.label ? (
-                            <span className={styles.weDirectionLabel}>
-                                {directionsMeta[rowIndex].label}
-                            </span>
-                        ) : (
-                            <span className={styles.dirChipEmpty}>—</span>
-                        )}
-                    </td>
-                    <td className={styles.tdProgress}>
-                        <div className={styles.dirStarsRow}>
-                            {(participant.we?.directions || []).map((dir) => (
-                                <span
-                                    key={dir.key}
-                                    title={`${dir.label}: ${dir.count || 0}${dir.viaJoker ? " (звезда-джокер)" : ""}`}
-                                >
-                                    <StarIcon
-                                        className={`${styles.dirStar} ${dir.viaJoker ? styles.dirStarJoker : dir.lit ? styles.dirStarLit : ""}`}
-                                        filled={dir.lit}
-                                    />
-                                </span>
-                            ))}
-                        </div>
-                    </td>
-                </>
-            )}
+            ) : null}
         </tr>
     );
 }

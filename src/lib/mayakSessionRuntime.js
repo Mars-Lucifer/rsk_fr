@@ -534,6 +534,34 @@ export async function removeMayakSessionParticipant({ sessionId, userId }) {
     });
 }
 
+// Скрывает/показывает участника в дашборде (режим редактора). В отличие от
+// removeMayakSessionParticipant НЕ трогает данные: тренажёр скрытого работает
+// как обычно (getMayakSessionRuntimeState флаг hidden не смотрит), прогресс и
+// заявки сохраняются. Дашборд исключает hidden из столов/средних/звёзд/времён
+// (фильтр в mayakSessionDashboard), поэтому админ может скрыть себя, не искажая
+// метрики; сняв флаг — вернуть с уже накопленным прогрессом.
+export async function setMayakSessionParticipantHidden({ sessionId, userId, hidden }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+
+    const normalizedUserId = String(userId || "");
+    if (!normalizedUserId) {
+        throw new Error("Не указан участник");
+    }
+
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const participant = bucket.participants?.[normalizedUserId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
+        }
+        participant.hidden = Boolean(hidden);
+        participant.updatedAt = new Date().toISOString();
+        return participant;
+    });
+}
+
 export async function readSessionReviews(sessionId) {
     const store = await readStore();
     const bucket = store.sessions?.[sessionId] || { reviews: {} };

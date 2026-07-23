@@ -213,6 +213,27 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
         [patchParticipant]
     );
 
+    // Скрыть участника из дашборда: его метрики (столы/средние/звёзды/время) не
+    // учитываются, но сессия участника продолжает работать, прогресс сохраняется.
+    // Возврат — кнопкой «показать» в секции «Скрытые».
+    const handleHideParticipant = useCallback(
+        async (participant) => {
+            if (!participant?.userId) return;
+            const ok = await patchParticipant({ userId: participant.userId, hidden: true }, "Не удалось скрыть участника");
+            if (ok) showToast(`«${participant.name || "участник"}» скрыт из дашборда`);
+        },
+        [patchParticipant, showToast]
+    );
+
+    const handleUnhideParticipant = useCallback(
+        async (participant) => {
+            if (!participant?.userId) return;
+            const ok = await patchParticipant({ userId: participant.userId, hidden: false }, "Не удалось вернуть участника");
+            if (ok) showToast(`«${participant.name || "участник"}» снова в дашборде`);
+        },
+        [patchParticipant, showToast]
+    );
+
     // Удаление участника из запущенной сессии (режим редактора): подтверждение →
     // DELETE → принудительное обновление дашборда. Сессия у участника завершится
     // сама при следующем поллинге его тренажёра (participant=null).
@@ -321,6 +342,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
         draggingUserId,
         onChangeRole: handleChangeRole,
         onRemove: handleRemoveParticipant,
+        onHide: handleHideParticipant,
         onPersonDragStart: handlePersonDragStart,
         onPersonDragEnd: handlePersonDragEnd,
         onTableDragOver: handleTableDragOver,
@@ -414,8 +436,8 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <th>Направление</th>
-                                                    <th>Индекс цифровой зрелости</th>
+                                                    {/* В «Мы» у нераспределённых нет стола, а значит и
+                                                        командных направлений — только участник и роль. */}
                                                 </>
                                             )}
                                         </tr>
@@ -431,6 +453,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={handleChangeRole}
                                                     onRemove={handleRemoveParticipant}
+                                                    onHide={handleHideParticipant}
                                                     onDragStart={handlePersonDragStart}
                                                     onDragEnd={handlePersonDragEnd}
                                                 />
@@ -447,11 +470,58 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                                                     dragging={draggingUserId === participant.userId}
                                                     onChangeRole={handleChangeRole}
                                                     onRemove={handleRemoveParticipant}
+                                                    onHide={handleHideParticipant}
                                                     onDragStart={handlePersonDragStart}
                                                     onDragEnd={handlePersonDragEnd}
                                                 />
                                             ))
                                         )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {editorMode && (data.hidden?.length || 0) > 0 && (
+                    <section className={`${styles.panel} ${styles.tablePanel}`}>
+                        <header className={styles.panelHead}>
+                            <span className={styles.panelBadge} style={{ background: "rgba(100,116,139,0.18)" }}>🙈</span>
+                            <div>
+                                <h3 className={styles.panelTitle}>Скрытые</h3>
+                                <span className={styles.panelMeta}>{data.hidden.length} — не учитываются в метриках</span>
+                            </div>
+                        </header>
+                        <div className={styles.panelBody}>
+                            <div className={styles.tableResponsive}>
+                                <table className={styles.participantTable}>
+                                    <thead>
+                                        <tr>
+                                            <th>УЧАСТНИК</th>
+                                            <th>РОЛЬ</th>
+                                            <th>СТОЛ</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.hidden.map((participant) => (
+                                            <tr key={participant.userId} className={styles.personRow}>
+                                                <td className={styles.tdName}>
+                                                    <span className={styles.personName}>{participant.name || "Без имени"}</span>
+                                                </td>
+                                                <td className={styles.tdRole}>{participant.role || "Участник"}</td>
+                                                <td>{participant.tableNumber || "—"}</td>
+                                                <td style={{ textAlign: "right" }}>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.iconBtn}
+                                                        onClick={() => handleUnhideParticipant(participant)}
+                                                    >
+                                                        Вернуть
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>

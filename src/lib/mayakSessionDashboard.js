@@ -14,6 +14,34 @@ import {
 
 const DELTA_TEST_FILE = path.join(process.cwd(), "data", "DeltaTest.json");
 
+// Кэш парсинга больших JSON по mtime файла. DeltaTest.json (~1 МБ) и
+// taskAttempts.json (~5.5 МБ) читаются на КАЖДЫЙ запрос дашборда (поллинг 5с у
+// каждого открытого экрана). Полное чтение+парсинг каждый раз — лишняя нагрузка.
+// Инвалидация по mtime: файл не менялся — отдаём разобранное из памяти, дёшево.
+const _jsonMtimeCache = new Map();
+async function readJsonCachedByMtime(file, transform) {
+    let stat;
+    try {
+        stat = await fs.stat(file);
+    } catch {
+        _jsonMtimeCache.delete(file);
+        return transform(null);
+    }
+    const cached = _jsonMtimeCache.get(file);
+    if (cached && cached.mtimeMs === stat.mtimeMs) {
+        return cached.value;
+    }
+    let raw = null;
+    try {
+        raw = await fs.readFile(file, "utf8");
+    } catch {
+        raw = null;
+    }
+    const value = transform(raw);
+    _jsonMtimeCache.set(file, { mtimeMs: stat.mtimeMs, value });
+    return value;
+}
+
 // Граница частей внутри стола (по базовому номеру задания = taskIndex + 1).
 // Часть «Я» — задания с базой 10..50, часть «Мы» — с базой 51..99.
 const YA_RANGE = { from: 10, to: 50 };
@@ -79,13 +107,8 @@ function mapTypeToRole(type) {
 }
 
 // Карта userId/name -> дельта 5-го уровня ранжирования (последняя по времени запись).
-async function readDeltaByUser() {
-    let raw;
-    try {
-        raw = await fs.readFile(DELTA_TEST_FILE, "utf8");
-    } catch {
-        return { byUser: {}, byName: {} };
-    }
+function parseDeltaByUser(raw) {
+    if (raw === null) return { byUser: {}, byName: {} };
     let parsed;
     try {
         parsed = JSON.parse(raw);
@@ -133,6 +156,10 @@ async function readDeltaByUser() {
     return result;
 }
 
+function readDeltaByUser() {
+    return readJsonCachedByMtime(DELTA_TEST_FILE, parseDeltaByUser);
+}
+
 function findDeltaForUser(deltaData, userId, name) {
     if (userId && deltaData.byUser?.[userId] !== undefined) {
         return deltaData.byUser[userId];
@@ -153,13 +180,17 @@ function findDeltaForUser(deltaData, userId, name) {
 
 const ATTEMPTS_FILE = path.join(process.cwd(), "data", "taskAttempts.json");
 
-async function readAttempts() {
+function parseAttempts(raw) {
+    if (raw === null) return {};
     try {
-        const raw = await fs.readFile(ATTEMPTS_FILE, "utf8");
         return JSON.parse(raw) || {};
     } catch {
         return {};
     }
+}
+
+function readAttempts() {
+    return readJsonCachedByMtime(ATTEMPTS_FILE, parseAttempts);
 }
 
 // Карта taskIndex -> { contentType, base } из контента секции.
@@ -499,11 +530,27 @@ export async function getMayakSessionDashboardData(sessionId) {
     // Администратор-отладка (userId "dev-bypass") заходит в сессию для проверки
     // инспектора/отладки и НЕ должен попадать в дашборд и учитываться в
     // столах/счётчиках/средних — отсекаем его на уровне источника данных.
-    const participantsRaw = (await readSessionRuntimeParticipants(sessionId)).filter(
+    const allRuntimeRaw = (await readSessionRuntimeParticipants(sessionId)).filter(
         (participant) => participant.userId !== "dev-bypass"
     );
 
+    // Скрытые участники (флаг hidden, ставит админ через редактор) не участвуют
+    // ни в столах, ни в средних/звёздах/времени — их метрики не искажают картину.
+    // Отдаём их отдельным списком, чтобы редактор мог показать и вернуть обратно.
+    const participantsRaw = allRuntimeRaw.filter((participant) => !participant.hidden);
+    const hiddenRaw = allRuntimeRaw.filter((participant) => participant.hidden);
+
     const tableCount = Math.max(1, normalizeTableNumber(session.tableCount) || 1);
+
+    const hidden = hiddenRaw
+        .map((participant) => ({
+            userId: participant.userId,
+            name: participant.name || "",
+            organization: participant.organization || "",
+            tableNumber: normalizeTableNumber(participant.tableNumber),
+            role: normalizeAndMapRole(participant.role) || "Участник",
+        }))
+        .sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
 
     const participants = participantsRaw
         .map((participant) => computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, session.sectionId))
@@ -559,7 +606,7 @@ export async function getMayakSessionDashboardData(sessionId) {
     const participantsWithDelta = participants.filter((p) => typeof p.delta === "number" && p.delta !== null);
     const averageDelta = participantsWithDelta.length > 0
         ? Number((participantsWithDelta.reduce((sum, p) => sum + p.delta, 0) / participantsWithDelta.length).toFixed(1))
-        : 0;
+        : null;
     const totalApproved = participants.reduce((sum, p) => sum + (p.approvedTotal || 0), 0);
 
     const totalSecondsSpent = approvedReviews.reduce((sum, r) => sum + (r.secondsSpent || 0), 0);
@@ -596,6 +643,7 @@ export async function getMayakSessionDashboardData(sessionId) {
         },
         tables,
         unassigned,
+        hidden,
         overall,
         generatedAt: new Date().toISOString(),
     };

@@ -3,6 +3,7 @@ import {
     listMayakSessionParticipants,
     setMayakSessionParticipantRole,
     moveMayakSessionParticipantTable,
+    setMayakSessionParticipantHidden,
     removeMayakSessionParticipant,
 } from "../../../../../lib/mayakSessionRuntime.js";
 
@@ -24,8 +25,19 @@ export default async function handler(req, res) {
 
     if (req.method === "PATCH") {
         try {
-            const { userId, role, tableNumber } = req.body || {};
+            const { userId, role, tableNumber, hidden } = req.body || {};
             const normalizedUserId = String(userId || "");
+
+            // \u0421\u043a\u0440\u044b\u0442\u044c/\u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0430 \u0432 \u0434\u0430\u0448\u0431\u043e\u0440\u0434\u0435 (\u0440\u0435\u0436\u0438\u043c \u0440\u0435\u0434\u0430\u043a\u0442\u043e\u0440\u0430). \u0414\u0430\u043d\u043d\u044b\u0435 \u0438
+            // \u0441\u0435\u0441\u0441\u0438\u044f \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0430 \u043d\u0435 \u0442\u0440\u043e\u0433\u0430\u044e\u0442\u0441\u044f \u2014 \u0442\u043e\u043b\u044c\u043a\u043e \u0432\u0438\u0434\u0438\u043c\u043e\u0441\u0442\u044c \u0432 \u043c\u0435\u0442\u0440\u0438\u043a\u0430\u0445.
+            if (hidden !== undefined) {
+                const participant = await setMayakSessionParticipantHidden({
+                    sessionId,
+                    userId: normalizedUserId,
+                    hidden: Boolean(hidden),
+                });
+                return res.status(200).json({ success: true, data: participant });
+            }
 
             // \u041f\u0435\u0440\u0435\u043c\u0435\u0449\u0435\u043d\u0438\u0435 \u0443\u0447\u0430\u0441\u0442\u043d\u0438\u043a\u0430 \u0437\u0430 \u0434\u0440\u0443\u0433\u043e\u0439 \u0441\u0442\u043e\u043b (\u0440\u0435\u0436\u0438\u043c \u0440\u0435\u0434\u0430\u043a\u0442\u043e\u0440\u0430 \u0434\u0430\u0448\u0431\u043e\u0440\u0434\u0430).
             if (tableNumber !== undefined && tableNumber !== null && tableNumber !== "") {
