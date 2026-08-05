@@ -90,7 +90,7 @@ export default function ContestLessonStepper() {
                             }}>
                             {lesson.status === LESSON_STATUS.done ? "✓" : lesson.lesson_number}
                         </span>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{lesson.lesson_name}</span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{lesson.lesson_name}</span>
                     </button>
                 );
             })}

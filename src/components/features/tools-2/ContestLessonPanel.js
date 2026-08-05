@@ -160,7 +160,7 @@ export default function ContestLessonPanel() {
             {isBriefOpen && brief && <TaskBriefPopup brief={brief} lessonName={activeLesson.lesson_name} onClose={() => setIsBriefOpen(false)} />}
 
             <div className="flex items-start justify-between gap-[0.75rem] flex-wrap">
-                <div className="flex flex-col">
+                <div className="flex items-baseline gap-[0.5rem]">
                     <span className="text-sm text-gray-500">Урок {activeLesson.lesson_number}</span>
                     <span className="font-semibold">{activeLesson.lesson_name}</span>
                 </div>
@@ -245,13 +245,14 @@ export default function ContestLessonPanel() {
                             }}
                         />
 
-                        <div className="flex flex-col gap-[0.25rem]" style={{ flex: "0 0 14rem", maxWidth: "100%" }}>
+                        <div className="flex flex-col gap-[0.25rem] items-center justify-center text-center" style={{ flex: "0 0 14rem", maxWidth: "100%", alignSelf: "stretch" }}>
                             <input
                                 ref={fileInputRef}
                                 type="file"
                                 accept=".doc,.docx,.pdf,.txt,.rtf,.odt,.png,.jpg,.jpeg"
                                 onChange={(event) => setAnswerFile(event.target.files?.[0] || null)}
                                 style={{ fontSize: "0.75rem", maxWidth: "100%" }}
+                                className="mx-auto"
                             />
                             <span className="text-xs" style={{ color: "var(--color-gray-black)" }}>
                                 {answerFile ? answerFile.name : "или приложите файл, до 20 МБ"}
