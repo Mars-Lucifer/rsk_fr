@@ -45,7 +45,20 @@ function TaskBriefPopup({ brief, lessonName, onClose }) {
                         </span>
                         <span className="font-semibold">Задание — формат «{brief.format}»</span>
                     </div>
-                    <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>
+                    <button type="button" onClick={onClose} style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            margin: 0,
+                            width: "1.75rem",
+                            height: "1.75rem",
+                            minWidth: "1.75rem",
+                            flexShrink: 0,
+                            fontSize: "1.25rem",
+                            lineHeight: 1,
+                            color: "var(--color-gray-black)",
+                            cursor: "pointer",
+                        }}>
                         ×
                     </button>
                 </div>

@@ -1,3 +1,4 @@
+import { getContestLessonShortLabel } from "@/lib/contestTrainerTasks";
 import { LESSON_STATUS, useContestLessons } from "@/components/features/tools-2/useContestLessons";
 
 // Лесенка уроков в шапке тренажёра: горизонтальная, на уровне «МАЯК ОКО».
@@ -68,7 +69,7 @@ export default function ContestLessonStepper() {
                             padding: "0.25rem 0.625rem 0.25rem 0.25rem",
                             flex: "0 1 auto",
                             minWidth: 0,
-                            maxWidth: "12.5rem",
+                            maxWidth: "9rem",
                             justifyContent: "center",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -95,7 +96,9 @@ export default function ContestLessonStepper() {
                             }}>
                             {lesson.status === LESSON_STATUS.done ? "✓" : lesson.lesson_number}
                         </span>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{lesson.lesson_name}</span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                            {getContestLessonShortLabel(lesson.lesson_number, lesson.lesson_name)}
+                        </span>
                     </button>
                 );
             })}

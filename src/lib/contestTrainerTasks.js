@@ -13,6 +13,7 @@
 
 const CONTEST_TRAINER_TASKS = {
     1: {
+        short: "Вводный",
         sectionId: "1-100",
         taskRange: "1-4",
         format: "Старт",
@@ -26,6 +27,7 @@ const CONTEST_TRAINER_TASKS = {
         result: "Готовый промт и ответ нейросети, который вас устраивает.",
     },
     2: {
+        short: "Текст",
         sectionId: "1-100",
         taskRange: "5-8",
         format: "Текст",
@@ -39,6 +41,7 @@ const CONTEST_TRAINER_TASKS = {
         result: "Текст, который можно отправить коллегам без переделки.",
     },
     3: {
+        short: "Аудио",
         sectionId: "1-100",
         taskRange: "9-12",
         format: "Аудио",
@@ -51,6 +54,7 @@ const CONTEST_TRAINER_TASKS = {
         result: "Аудиофайл или сценарий озвучки.",
     },
     4: {
+        short: "Изображение",
         sectionId: "1-100",
         taskRange: "13-16",
         format: "Изображение",
@@ -63,6 +67,7 @@ const CONTEST_TRAINER_TASKS = {
         result: "Изображение, пригодное для рабочего документа или соцсетей.",
     },
     5: {
+        short: "Интерактив",
         sectionId: "1-100",
         taskRange: "17-20",
         format: "Интерактив",
@@ -75,6 +80,7 @@ const CONTEST_TRAINER_TASKS = {
         result: "Готовая структура опроса или сценария.",
     },
     6: {
+        short: "Видео",
         sectionId: "1-100",
         taskRange: "21-24",
         format: "Видео",
@@ -87,6 +93,7 @@ const CONTEST_TRAINER_TASKS = {
         result: "Сценарий видео с покадровой структурой.",
     },
     7: {
+        short: "Данные",
         sectionId: "1-100",
         taskRange: "25-28",
         format: "Данные",
@@ -99,6 +106,7 @@ const CONTEST_TRAINER_TASKS = {
         result: "Аналитический вывод, который можно показать руководству.",
     },
     8: {
+        short: "Итог",
         sectionId: "1-100",
         taskRange: "29-32",
         format: "Итог",
@@ -111,6 +119,12 @@ const CONTEST_TRAINER_TASKS = {
         result: "Сформулированная задача для этапа «Мы».",
     },
 };
+
+// Короткая подпись для лесенки в шапке: полные названия уроков туда не
+// помещаются — восемь чипов не влезают в строку даже на широком экране.
+export function getContestLessonShortLabel(lessonNumber, fallback = "") {
+    return CONTEST_TRAINER_TASKS[Number(lessonNumber)]?.short || fallback;
+}
 
 export function getContestTrainerTask(lessonNumber) {
     return CONTEST_TRAINER_TASKS[Number(lessonNumber)] || null;
