@@ -8,6 +8,7 @@ import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
 import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
 import ContestLessonStepper from "./ContestLessonStepper";
+import { ContestLessonsProvider } from "./useContestLessons";
 import { SecretMissionPopup } from "./SecretMission";
 import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup, YaDirectionSelectionPopup } from "./TrainerPopups";
 
@@ -2020,7 +2021,9 @@ export default function TrainerPage({ goTo }) {
     );
 
     return (
-        <>
+        // Провайдер общий для шапки и панели: переключение урока в лесенке
+        // сразу меняет карточку задания, без перезагрузки страницы.
+        <ContestLessonsProvider>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
                 {tokenType === "contest" && <ContestLessonStepper />}
@@ -2096,16 +2099,18 @@ export default function TrainerPage({ goTo }) {
                     </div>
                 )}
                 <div className="flex items-center gap-2 ml-auto">
-                    <Button
-                        icon
-                        roundeful
-                        disabled={timerState.isRunning}
-                        className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
-                        style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                        onClick={handleOpenHistory}
-                        title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
-                        <TimeIcon className="w-[18px] h-[18px] text-slate-700 block" />
-                    </Button>
+                    {tokenType !== "contest" && (
+                        <Button
+                            icon
+                            roundeful
+                            disabled={timerState.isRunning}
+                            className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                            onClick={handleOpenHistory}
+                            title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
+                            <TimeIcon className="w-[18px] h-[18px] text-slate-700 block" />
+                        </Button>
+                    )}
                     {isAdmin && (
                         <Button
                             icon
@@ -2272,7 +2277,7 @@ export default function TrainerPage({ goTo }) {
                     onResetAchievements={handleResetBypassAchievements}
                 />
             )}
-        </>
+        </ContestLessonsProvider>
     );
 }
 

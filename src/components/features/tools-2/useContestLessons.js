@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { getKeyFromCookies } from "@/components/features/tools-2/actions";
-import { parseContestToken } from "@/lib/mayakContestAccess";
+import { addKeyToCookies, getKeyFromCookies } from "@/components/features/tools-2/actions";
+import { buildContestToken, parseContestToken } from "@/lib/mayakContestAccess";
 
 export const LESSON_STATUS = {
     done: "done",
@@ -28,30 +28,22 @@ function resolveLessonStatuses(lessons) {
     });
 }
 
-// Общий источник для шапки и панели урока: иначе оба компонента дёргают
-// /api/cours на каждый рендер экрана.
-let inFlightRequest = null;
+// Общее состояние уроков для шапки и панели задания.
+//
+// Через контекст, а не двумя вызовами хука: иначе переключение урока в шапке
+// не видно панели, и пришлось бы перезагружать страницу — а перезагрузка на
+// каждом переходе между уроками выглядит рвано.
+const ContestLessonsContext = createContext(null);
 
-async function fetchLessonsOnce() {
-    if (!inFlightRequest) {
-        inFlightRequest = fetch("/api/cours", { credentials: "include" })
-            .then((response) => response.json())
-            .finally(() => {
-                // Ответ не кэшируем: прогресс меняется прямо на этом экране.
-                inFlightRequest = null;
-            });
-    }
-    return inFlightRequest;
-}
-
-export function useContestLessons() {
+export function ContestLessonsProvider({ children }) {
     const [lessons, setLessons] = useState([]);
     const [lessonNumber, setLessonNumber] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const reload = useCallback(async () => {
         try {
-            const payload = await fetchLessonsOnce();
+            const response = await fetch("/api/cours", { credentials: "include" });
+            const payload = await response.json();
             if (payload?.success && Array.isArray(payload.data)) {
                 setLessons(resolveLessonStatuses(payload.data));
             }
@@ -70,8 +62,32 @@ export function useContestLessons() {
         });
     }, [reload]);
 
-    const activeLesson = lessons.find((lesson) => Number(lesson.lesson_number) === Number(lessonNumber)) || null;
-    const nextLesson = lessons.find((lesson) => Number(lesson.lesson_number) === Number(lessonNumber) + 1) || null;
+    // Переключение урока без перезагрузки: обновляем ключ (его читает
+    // access-gate при следующем входе) и активный номер в состоянии.
+    const openLesson = useCallback((nextLessonNumber) => {
+        addKeyToCookies(buildContestToken(nextLessonNumber));
+        setLessonNumber(Number(nextLessonNumber));
+    }, []);
 
-    return { lessons, lessonNumber, activeLesson, nextLesson, isLoading, reload };
+    const value = useMemo(() => {
+        const activeLesson = lessons.find((lesson) => Number(lesson.lesson_number) === Number(lessonNumber)) || null;
+        const nextLesson = lessons.find((lesson) => Number(lesson.lesson_number) === Number(lessonNumber) + 1) || null;
+        return { lessons, lessonNumber, activeLesson, nextLesson, isLoading, reload, openLesson };
+    }, [lessons, lessonNumber, isLoading, reload, openLesson]);
+
+    return <ContestLessonsContext.Provider value={value}>{children}</ContestLessonsContext.Provider>;
+}
+
+export function useContestLessons() {
+    return (
+        useContext(ContestLessonsContext) || {
+            lessons: [],
+            lessonNumber: null,
+            activeLesson: null,
+            nextLesson: null,
+            isLoading: true,
+            reload: () => {},
+            openLesson: () => {},
+        }
+    );
 }
