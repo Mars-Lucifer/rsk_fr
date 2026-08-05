@@ -1,95 +1,51 @@
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/router";
+import { useState } from "react";
 
-import Button from "@/components/ui/Button";
-import { addKeyToCookies, getKeyFromCookies } from "@/components/features/tools-2/actions";
-import { buildContestToken, parseContestToken } from "@/lib/mayakContestAccess";
+import { addKeyToCookies } from "@/components/features/tools-2/actions";
+import { buildContestToken } from "@/lib/mayakContestAccess";
+import { useContestLessons } from "@/components/features/tools-2/useContestLessons";
 
 // Конкурсный режим тренажёра: панель урока вместо управления сессией.
 //
-// Отличия от обычного входа (сессия/легаси-токен):
-//   - вверху лесенка уроков, а не переключатель номеров задач;
-//   - нет ролей и инспектора — это командный этап «Мы», здесь его нет;
-//   - завершение задания сразу закрывает урок и открывает следующий.
+// Лесенка уроков живёт в шапке (ContestLessonStepper), здесь — само задание
+// и видеоурок под рукой, чтобы не возвращаться на страницу урока.
 //
 // ponytail: содержимого задания пока нет — «Начать/Завершить» работает как
-// заглушка, чтобы можно было пройти цепочку целиком. Когда появится
-// конкурсная колода, сюда встанут реальные задачи.
+// заглушка, чтобы цепочку можно было пройти целиком. Появится вместе с
+// конкурсной колодой.
 
-const STATUS = {
-    done: "done",
-    current: "current",
-    locked: "locked",
+// Цвета инлайном: глобальные стили портала красят <button> в чёрный.
+const ACTION_LOOK = {
+    start: { background: "var(--color-green-noise)", color: "var(--color-green-peace)" },
+    finish: { background: "var(--color-red-noise)", color: "var(--color-red)" },
+    next: { background: "var(--color-blue-noise)", color: "var(--color-blue)" },
 };
 
-function resolveLessonStatuses(lessons) {
-    let currentTaken = false;
-
-    return lessons.map((lesson) => {
-        const isDone = lesson.is_completed === "true";
-        let status = STATUS.locked;
-
-        if (isDone) {
-            status = STATUS.done;
-        } else if (!currentTaken) {
-            status = STATUS.current;
-            currentTaken = true;
-        }
-
-        return { ...lesson, status };
-    });
+function actionButtonStyle(look, disabled) {
+    return {
+        ...look,
+        border: "none",
+        borderRadius: "0.75rem",
+        padding: "0.5rem 1rem",
+        fontSize: "0.875rem",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+    };
 }
 
 export default function ContestLessonPanel() {
-    const router = useRouter();
-    // Номер урока берём из того же ключа, по которому пустил access-gate, —
-    // отдельного канала не заводим.
-    const [lessonNumber, setLessonNumber] = useState(null);
-    const [lessons, setLessons] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { activeLesson, nextLesson, isLoading, reload } = useContestLessons();
     const [isRunning, setIsRunning] = useState(false);
     const [isFinished, setIsFinished] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [isVideoOpen, setIsVideoOpen] = useState(false);
+    const [isVideoOpen, setIsVideoOpen] = useState(true);
 
-    const loadLessons = useCallback(async () => {
-        try {
-            const response = await fetch("/api/cours", { credentials: "include" });
-            const payload = await response.json();
-            if (payload.success && Array.isArray(payload.data)) {
-                setLessons(resolveLessonStatuses(payload.data));
-            }
-        } catch (error) {
-            console.error("Не удалось загрузить уроки конкурса:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    if (isLoading || !activeLesson) {
+        return null;
+    }
 
-    useEffect(() => {
-        loadLessons();
-
-        getKeyFromCookies().then((key) => {
-            const parsed = parseContestToken(key?.text);
-            setLessonNumber(parsed?.lessonNumber ?? null);
-        });
-    }, [loadLessons]);
-
-    const activeLesson = lessons.find((lesson) => Number(lesson.lesson_number) === Number(lessonNumber)) || null;
-    const nextLesson = lessons.find((lesson) => Number(lesson.lesson_number) === Number(lessonNumber) + 1) || null;
-
-    // Смена урока внутри тренажёра: меняем ключ и перезагружаем — access-gate
-    // перепроверит доступ и подтянет задачи нужного урока.
-    const openLesson = (lesson) => {
-        if (lesson.status === STATUS.locked || Number(lesson.lesson_number) === Number(lessonNumber)) {
-            return;
-        }
-        addKeyToCookies(buildContestToken(lesson.lesson_number));
-        router.reload();
-    };
+    const isLessonDone = isFinished || activeLesson.is_completed === "true";
 
     const finishTask = async () => {
-        if (!activeLesson) return;
         setIsSaving(true);
         try {
             const response = await fetch("/api/cours/progress", {
@@ -102,7 +58,7 @@ export default function ContestLessonPanel() {
             if (payload.success) {
                 setIsRunning(false);
                 setIsFinished(true);
-                await loadLessons();
+                await reload();
             } else {
                 console.error("Не удалось закрыть урок:", payload.error);
             }
@@ -115,86 +71,57 @@ export default function ContestLessonPanel() {
 
     const goToNextLesson = () => {
         if (!nextLesson) {
-            router.push("/cours");
+            window.location.href = "/cours";
             return;
         }
         addKeyToCookies(buildContestToken(nextLesson.lesson_number));
-        router.reload();
+        window.location.reload();
     };
-
-    if (isLoading) {
-        return <div className="text-sm text-gray-500">Загружаем уроки...</div>;
-    }
 
     return (
         <div className="flex flex-col gap-[0.75rem]">
-            {/* Лесенка уроков: видно, где участник и что ещё закрыто. */}
-            <div className="flex flex-wrap gap-[0.375rem]">
-                {lessons.map((lesson) => {
-                    const isActive = Number(lesson.lesson_number) === Number(lessonNumber);
-                    const base = "px-[0.75rem] py-[0.375rem] rounded-full text-sm whitespace-nowrap transition";
-                    const look = isActive
-                        ? "bg-(--color-blue) text-white"
-                        : lesson.status === STATUS.done
-                          ? "bg-(--color-green-noise) text-(--color-green-peace) cursor-pointer"
-                          : lesson.status === STATUS.current
-                            ? "bg-(--color-blue-noise) text-(--color-blue) cursor-pointer"
-                            : "bg-slate-100 text-slate-400 cursor-not-allowed";
+            <div className="flex items-center justify-between gap-[0.75rem] flex-wrap">
+                <span className="text-sm text-gray-500">
+                    Урок {activeLesson.lesson_number} — {activeLesson.lesson_name}
+                </span>
 
-                    return (
+                <div className="flex items-center gap-[0.5rem]">
+                    {!isLessonDone && (
                         <button
-                            key={lesson.id}
                             type="button"
-                            className={`${base} ${look}`}
-                            onClick={() => openLesson(lesson)}
-                            disabled={lesson.status === STATUS.locked}
-                            title={lesson.lesson_name}>
-                            {lesson.lesson_number}. {lesson.lesson_name}
+                            disabled={isSaving}
+                            onClick={isRunning ? finishTask : () => setIsRunning(true)}
+                            style={actionButtonStyle(isRunning ? ACTION_LOOK.finish : ACTION_LOOK.start, isSaving)}>
+                            {isRunning ? (isSaving ? "Сохраняем..." : "Завершить задание") : "Начать задание"}
                         </button>
-                    );
-                })}
+                    )}
+
+                    {isLessonDone && (
+                        <button type="button" onClick={goToNextLesson} style={actionButtonStyle(ACTION_LOOK.next, false)}>
+                            {nextLesson ? "Перейти к следующему уроку" : "Вернуться к урокам"}
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {activeLesson && (
-                <div className="flex flex-col gap-[0.5rem]">
-                    <span className="text-sm text-gray-500">
-                        Урок {activeLesson.lesson_number} — {activeLesson.lesson_name}
-                    </span>
-
-                    <div className="flex flex-wrap gap-[0.5rem]">
-                        {!isFinished && activeLesson.is_completed !== "true" && (
-                            <Button
-                                className={isRunning ? "!bg-(--color-red-noise) !text-(--color-red)" : "!bg-(--color-green-noise) !text-(--color-green-peace)"}
-                                disabled={isSaving}
-                                onClick={isRunning ? finishTask : () => setIsRunning(true)}>
-                                {isRunning ? (isSaving ? "Сохраняем..." : "Завершить задание") : "Начать задание"}
-                            </Button>
-                        )}
-
-                        {(isFinished || activeLesson.is_completed === "true") && (
-                            <Button className="!bg-(--color-blue-noise) !text-(--color-blue)" onClick={goToNextLesson}>
-                                {nextLesson ? "Перейти к следующему уроку" : "Вернуться к урокам"}
-                            </Button>
-                        )}
-                    </div>
-
-                    {/* Видеоурок под рукой: не нужно возвращаться на страницу урока. */}
-                    {activeLesson.download_url?.includes("rutube.ru") && (
-                        <div className="flex flex-col gap-[0.375rem]">
-                            <button type="button" className="text-sm text-(--color-blue) w-fit" onClick={() => setIsVideoOpen((open) => !open)}>
-                                {isVideoOpen ? "Свернуть видеоурок" : "Показать видеоурок"}
-                            </button>
-                            {isVideoOpen && (
-                                <iframe
-                                    src={activeLesson.download_url}
-                                    width="100%"
-                                    style={{ border: "none", borderRadius: "0.75rem", aspectRatio: 16 / 9 }}
-                                    allow="autoplay; fullscreen"
-                                    allowFullScreen
-                                />
-                            )}
-                        </div>
+            {activeLesson.download_url?.includes("rutube.ru") && (
+                <div className="flex flex-col gap-[0.375rem]">
+                    {isVideoOpen && (
+                        <iframe
+                            src={activeLesson.download_url}
+                            width="100%"
+                            style={{ border: "none", borderRadius: "0.75rem", aspectRatio: 16 / 9 }}
+                            allow="autoplay; fullscreen"
+                            allowFullScreen
+                        />
                     )}
+                    <button
+                        type="button"
+                        className="text-sm w-fit"
+                        style={{ background: "none", border: "none", padding: 0, color: "var(--color-blue)", cursor: "pointer" }}
+                        onClick={() => setIsVideoOpen((open) => !open)}>
+                        {isVideoOpen ? "Свернуть видеоурок" : "Показать видеоурок"}
+                    </button>
                 </div>
             )}
         </div>

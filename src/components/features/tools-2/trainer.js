@@ -7,6 +7,7 @@ import InstructionImageModal from "./InstructionImageModal";
 import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
 import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
+import ContestLessonStepper from "./ContestLessonStepper";
 import { SecretMissionPopup } from "./SecretMission";
 import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup, YaDirectionSelectionPopup } from "./TrainerPopups";
 
@@ -2022,6 +2023,7 @@ export default function TrainerPage({ goTo }) {
         <>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
+                {tokenType === "contest" && <ContestLessonStepper />}
                 {effectiveTableNumber ? (
                     <div className="inline-flex items-center justify-center !rounded-full border border-slate-200 bg-white !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
                         Стол №{effectiveTableNumber}
