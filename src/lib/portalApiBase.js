@@ -25,3 +25,26 @@ export const PORTAL_API_BASE = normalizeBase(process.env.RSK_API_BASE) || DEFAUL
 
 // Клиентский код: ссылки и редиректы, которые открывает браузер (OAuth).
 export const PUBLIC_PORTAL_API_BASE = normalizeBase(process.env.NEXT_PUBLIC_RSK_API_BASE) || DEFAULT_PORTAL_API_BASE;
+
+// Работаем против локального стенда, а не против api.rosdk.ru.
+export const IS_LOCAL_PORTAL_API = /^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/i.test(PORTAL_API_BASE);
+
+// Бэкенд выдаёт сессионную куку с `Domain=.rosdk.ru; Secure; SameSite=None`.
+// На http://localhost браузер её молча выбрасывает: домен чужой, а Secure
+// требует https. Поэтому в локальном режиме снимаем привязку к домену и
+// ослабляем флаги. В проде функция возвращает заголовок как есть.
+export function adaptPortalSetCookie(setCookieValue) {
+    if (!setCookieValue || !IS_LOCAL_PORTAL_API) {
+        return setCookieValue;
+    }
+
+    const asList = Array.isArray(setCookieValue) ? setCookieValue : [setCookieValue];
+    const adapted = asList.map((cookie) =>
+        String(cookie)
+            .replace(/;\s*Domain=[^;]*/gi, "")
+            .replace(/;\s*Secure/gi, "")
+            .replace(/;\s*SameSite=None/gi, "; SameSite=Lax")
+    );
+
+    return Array.isArray(setCookieValue) ? adapted : adapted[0];
+}

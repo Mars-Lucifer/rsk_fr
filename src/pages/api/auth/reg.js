@@ -1,4 +1,4 @@
-import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+import { adaptPortalSetCookie, PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 function toSafeString(value, fallback = "") {
     if (value === undefined || value === null) {
@@ -56,7 +56,7 @@ export default async function RegHandler(req, res) {
 
         const setCookie = response.headers.get("set-cookie");
         if (setCookie) {
-            res.setHeader("Set-Cookie", setCookie);
+            res.setHeader("Set-Cookie", adaptPortalSetCookie(setCookie));
         }
 
         const rawText = await response.text();

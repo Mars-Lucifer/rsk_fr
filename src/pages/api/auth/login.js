@@ -1,4 +1,4 @@
-import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+import { adaptPortalSetCookie, PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 export default async function RegHandler(req, res) {
     try {
@@ -16,7 +16,7 @@ export default async function RegHandler(req, res) {
         const setCookie = response.headers.get("set-cookie");
 
         if (setCookie) {
-            res.setHeader("Set-Cookie", setCookie);
+            res.setHeader("Set-Cookie", adaptPortalSetCookie(setCookie));
         }
 
         const data = await response.json();
