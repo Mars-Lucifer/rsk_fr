@@ -40,7 +40,11 @@ export default function ContestLessonStepper() {
     }
 
     return (
-        <div className="flex items-center gap-[0.25rem] max-[1200px]:hidden" style={{ flex: "1 1 0", minWidth: 0, overflow: "hidden" }}>
+        // Лесенка начинается сразу за заголовком и тянется до кнопки справа:
+        // иначе между «МАЯК ОКО» и чипами зияет пустота, а сами чипы сжаты.
+        <div
+            className="flex items-center gap-[0.25rem] max-[1200px]:hidden"
+            style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", justifyContent: "flex-start", marginLeft: "1.5rem" }}>
             {lessons.map((lesson) => {
                 const isActive = Number(lesson.lesson_number) === Number(lessonNumber);
                 const isLocked = lesson.status === LESSON_STATUS.locked;
@@ -62,8 +66,9 @@ export default function ContestLessonStepper() {
                             border: isLocked ? "1.5px solid var(--color-gray-plus-50)" : "1.5px solid transparent",
                             borderRadius: "6.25rem",
                             padding: "0.25rem 0.625rem 0.25rem 0.25rem",
-                            flex: "1 1 0",
+                            flex: "0 1 auto",
                             minWidth: 0,
+                            maxWidth: "10rem",
                             justifyContent: "center",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
