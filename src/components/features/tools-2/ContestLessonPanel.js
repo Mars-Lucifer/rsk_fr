@@ -5,14 +5,16 @@ import { useContestLessons } from "@/components/features/tools-2/useContestLesso
 
 // Конкурсный режим тренажёра: карточка задания вместо управления сессией.
 //
-// Слева — что нужно сделать и поле ответа, справа — видеоурок.
-// Лесенка уроков живёт в шапке (ContestLessonStepper).
+// Раскладка: сверху краткое задание и видеоурок в две колонки, под ними —
+// широкий блок ответа. Подробное описание задания вынесено в попап, чтобы
+// шаги не съедали высоту экрана.
 
 // Цвета инлайном: глобальные стили портала красят <button> в чёрный.
 const LOOK = {
     start: { background: "var(--color-green-noise)", color: "var(--color-green-peace)" },
     finish: { background: "var(--color-red-noise)", color: "var(--color-red)" },
     next: { background: "var(--color-blue-noise)", color: "var(--color-blue)" },
+    ghost: { background: "var(--color-white)", color: "var(--color-blue)" },
 };
 
 function buttonStyle(look, disabled) {
@@ -28,6 +30,45 @@ function buttonStyle(look, disabled) {
     };
 }
 
+function TaskBriefPopup({ brief, lessonName, onClose }) {
+    return (
+        <div
+            onClick={onClose}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+            <div
+                onClick={(event) => event.stopPropagation()}
+                style={{ background: "var(--color-white)", borderRadius: "1rem", padding: "1.5rem", maxWidth: "34rem", width: "100%", maxHeight: "80vh", overflowY: "auto" }}>
+                <div className="flex items-start justify-between gap-[0.75rem] mb-[0.75rem]">
+                    <div className="flex flex-col">
+                        <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                            {lessonName}
+                        </span>
+                        <span className="font-semibold">Задание — формат «{brief.format}»</span>
+                    </div>
+                    <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: "1.25rem", cursor: "pointer", lineHeight: 1 }}>
+                        ×
+                    </button>
+                </div>
+
+                <p className="text-sm mb-[0.75rem]" style={{ color: "var(--color-gray-black)" }}>
+                    {brief.goal}
+                </p>
+
+                <ol className="text-sm flex flex-col gap-[0.375rem] mb-[0.75rem]" style={{ color: "var(--color-gray-black)", paddingLeft: "1.1rem", listStyle: "decimal" }}>
+                    {brief.steps.map((step) => (
+                        <li key={step}>{step}</li>
+                    ))}
+                </ol>
+
+                <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                    <span style={{ fontWeight: 600 }}>Результат: </span>
+                    {brief.result}
+                </p>
+            </div>
+        </div>
+    );
+}
+
 export default function ContestLessonPanel() {
     const { activeLesson, nextLesson, isLoading, reload, openLesson } = useContestLessons();
     const fileInputRef = useRef(null);
@@ -37,6 +78,7 @@ export default function ContestLessonPanel() {
     const [answerText, setAnswerText] = useState("");
     const [answerFile, setAnswerFile] = useState(null);
     const [error, setError] = useState("");
+    const [isBriefOpen, setIsBriefOpen] = useState(false);
 
     // Сброс при переходе на другой урок — иначе новый урок открывался бы уже
     // запущенным и с чужим ответом в поле.
@@ -45,6 +87,7 @@ export default function ContestLessonPanel() {
         setAnswerText("");
         setAnswerFile(null);
         setError("");
+        setIsBriefOpen(false);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
@@ -75,11 +118,7 @@ export default function ContestLessonPanel() {
                 form.append("file", answerFile);
             }
 
-            const answerResponse = await fetch("/api/contest/answer", {
-                method: "POST",
-                credentials: "include",
-                body: form,
-            });
+            const answerResponse = await fetch("/api/contest/answer", { method: "POST", credentials: "include", body: form });
             const answerPayload = await answerResponse.json();
             if (!answerPayload.success) {
                 setError(answerPayload.error || "Не удалось сохранить ответ");
@@ -118,6 +157,8 @@ export default function ContestLessonPanel() {
 
     return (
         <div className="flex flex-col gap-[0.75rem]">
+            {isBriefOpen && brief && <TaskBriefPopup brief={brief} lessonName={activeLesson.lesson_name} onClose={() => setIsBriefOpen(false)} />}
+
             <div className="flex items-start justify-between gap-[0.75rem] flex-wrap">
                 <div className="flex flex-col">
                     <span className="text-sm text-gray-500">Урок {activeLesson.lesson_number}</span>
@@ -156,66 +197,20 @@ export default function ContestLessonPanel() {
             </div>
 
             <div className="grid grid-cols-2 gap-[0.75rem] max-[900px]:grid-cols-1">
-                {/* Слева: что сделать и куда положить ответ. */}
-                <div className="flex flex-col gap-[0.5rem] p-[1rem] rounded-[0.75rem]" style={{ background: "var(--color-white-gray)" }}>
-                    {brief && (
-                        <>
-                            <span className="text-sm font-semibold">Задание — формат «{brief.format}»</span>
-                            <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                                {brief.goal}
-                            </p>
-                            <ol className="text-sm flex flex-col gap-[0.25rem]" style={{ color: "var(--color-gray-black)", paddingLeft: "1.1rem", listStyle: "decimal" }}>
-                                {brief.steps.map((step) => (
-                                    <li key={step}>{step}</li>
-                                ))}
-                            </ol>
-                            <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                                <span style={{ fontWeight: 600 }}>Результат: </span>
-                                {brief.result}
-                            </p>
-                        </>
-                    )}
+                {/* Слева коротко: цель одной фразой, детали — в попапе. */}
+                {brief && (
+                    <div className="flex flex-col gap-[0.5rem] p-[0.875rem] rounded-[0.75rem]" style={{ background: "var(--color-white-gray)" }}>
+                        <span className="text-sm font-semibold">Формат «{brief.format}»</span>
+                        <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                            {brief.goal}
+                        </p>
+                        <button type="button" onClick={() => setIsBriefOpen(true)} style={{ ...buttonStyle(LOOK.ghost, false), alignSelf: "flex-start", padding: "0.375rem 0.75rem", fontSize: "0.8125rem" }}>
+                            Задание целиком
+                        </button>
+                    </div>
+                )}
 
-                    {!isLessonDone && (
-                        <div className="flex flex-col gap-[0.375rem] mt-[0.25rem]">
-                            <span className="text-sm font-semibold">Ваш ответ</span>
-                            <textarea
-                                value={answerText}
-                                onChange={(event) => setAnswerText(event.target.value)}
-                                placeholder="Вставьте текст ответа или опишите, что сделали"
-                                rows={4}
-                                style={{
-                                    width: "100%",
-                                    border: "1.5px solid var(--color-gray-plus-50)",
-                                    borderRadius: "0.75rem",
-                                    padding: "0.625rem 0.75rem",
-                                    fontSize: "0.875rem",
-                                    resize: "vertical",
-                                    background: "var(--color-white)",
-                                }}
-                            />
-
-                            <label className="text-sm flex items-center gap-[0.5rem] flex-wrap" style={{ color: "var(--color-gray-black)" }}>
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept=".doc,.docx,.pdf,.txt,.rtf,.odt,.png,.jpg,.jpeg"
-                                    onChange={(event) => setAnswerFile(event.target.files?.[0] || null)}
-                                    style={{ fontSize: "0.8125rem" }}
-                                />
-                                {answerFile ? <span>{answerFile.name}</span> : <span>или приложите файл, до 20 МБ</span>}
-                            </label>
-
-                            {error && (
-                                <span className="text-sm" style={{ color: "var(--color-red)" }}>
-                                    {error}
-                                </span>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* Справа: видеоурок. */}
+                {/* Справа видеоурок. */}
                 {activeLesson.download_url?.includes("rutube.ru") && (
                     <iframe
                         src={activeLesson.download_url}
@@ -225,6 +220,52 @@ export default function ContestLessonPanel() {
                     />
                 )}
             </div>
+
+            {/* Ответ — широким блоком под видео: текст слева, файл справа. */}
+            {!isLessonDone && (
+                <div className="flex flex-col gap-[0.5rem] p-[0.875rem] rounded-[0.75rem]" style={{ background: "var(--color-white-gray)" }}>
+                    <span className="text-sm font-semibold">Ваш ответ</span>
+
+                    <div className="flex gap-[0.75rem] items-start max-[900px]:flex-col">
+                        <textarea
+                            value={answerText}
+                            onChange={(event) => setAnswerText(event.target.value)}
+                            placeholder="Вставьте текст ответа или опишите, что сделали"
+                            rows={3}
+                            style={{
+                                flex: "1 1 auto",
+                                minWidth: 0,
+                                width: "100%",
+                                border: "1.5px solid var(--color-gray-plus-50)",
+                                borderRadius: "0.75rem",
+                                padding: "0.625rem 0.75rem",
+                                fontSize: "0.875rem",
+                                resize: "vertical",
+                                background: "var(--color-white)",
+                            }}
+                        />
+
+                        <div className="flex flex-col gap-[0.25rem]" style={{ flex: "0 0 14rem", maxWidth: "100%" }}>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".doc,.docx,.pdf,.txt,.rtf,.odt,.png,.jpg,.jpeg"
+                                onChange={(event) => setAnswerFile(event.target.files?.[0] || null)}
+                                style={{ fontSize: "0.75rem", maxWidth: "100%" }}
+                            />
+                            <span className="text-xs" style={{ color: "var(--color-gray-black)" }}>
+                                {answerFile ? answerFile.name : "или приложите файл, до 20 МБ"}
+                            </span>
+                        </div>
+                    </div>
+
+                    {error && (
+                        <span className="text-sm" style={{ color: "var(--color-red)" }}>
+                            {error}
+                        </span>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

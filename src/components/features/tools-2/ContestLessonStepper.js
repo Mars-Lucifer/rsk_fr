@@ -40,7 +40,7 @@ export default function ContestLessonStepper() {
     }
 
     return (
-        <div className="flex items-center gap-[0.375rem] flex-1 w-full max-[1200px]:hidden">
+        <div className="flex items-center gap-[0.25rem] max-[1200px]:hidden" style={{ flex: "1 1 0", minWidth: 0, overflow: "hidden" }}>
             {lessons.map((lesson) => {
                 const isActive = Number(lesson.lesson_number) === Number(lessonNumber);
                 const isLocked = lesson.status === LESSON_STATUS.locked;
@@ -90,7 +90,7 @@ export default function ContestLessonStepper() {
                             }}>
                             {lesson.status === LESSON_STATUS.done ? "✓" : lesson.lesson_number}
                         </span>
-                        {lesson.lesson_name}
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{lesson.lesson_name}</span>
                     </button>
                 );
             })}
