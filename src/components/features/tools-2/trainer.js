@@ -2119,13 +2119,25 @@ export default function TrainerPage({ goTo }) {
                             </svg>
                         </Button>
                     )}
-                    <Button
-                        inverted
-                        roundeful
-                        className="inline-flex items-center justify-center !rounded-full !bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
-                        onClick={handleCompleteSession}>
-                        Завершить&nbsp;сессию
-                    </Button>
+                    {tokenType === "contest" ? (
+                        // Конкурсный вход — не сессия: завершать нечего, участник
+                        // просто возвращается к списку уроков.
+                        <Button
+                            inverted
+                            roundeful
+                            className="inline-flex items-center justify-center !rounded-full !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                            onClick={() => { window.location.href = "/cours"; }}>
+                            Вернуться&nbsp;к&nbsp;урокам
+                        </Button>
+                    ) : (
+                        <Button
+                            inverted
+                            roundeful
+                            className="inline-flex items-center justify-center !rounded-full !bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                            onClick={handleCompleteSession}>
+                            Завершить&nbsp;сессию
+                        </Button>
+                    )}
                 </div>
             </Header>
 

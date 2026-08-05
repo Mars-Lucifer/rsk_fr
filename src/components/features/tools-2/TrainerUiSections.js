@@ -2,6 +2,7 @@ import { memo, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import Button from "@/components/ui/Button";
+import ContestLessonPanel from "@/components/features/tools-2/ContestLessonPanel";
 import Input from "@/components/ui/Input/Input";
 import Switcher from "@/components/ui/Switcher";
 
@@ -171,6 +172,11 @@ export const TrainerControls = memo(function TrainerControls({
     tokenType,
 }) {
 
+    // Конкурсный вход: вместо управления задачами — лесенка уроков.
+    // Ролей и переключателя номеров здесь нет: роли относятся к командному
+    // этапу «Мы», а задание задаётся уроком, а не выбором номера.
+    const isContestMode = tokenType === "contest";
+
     const formatTaskTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -300,7 +306,8 @@ export const TrainerControls = memo(function TrainerControls({
             )}
 
             <div className="flex flex-col gap-[0.75rem]">
-                <div className="flex flex-col gap-[0.75rem]">
+                {isContestMode && <ContestLessonPanel />}
+                {!isContestMode && <div className="flex flex-col gap-[0.75rem]">
                     <div className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-[0.5rem]">
                             <span className="text-sm text-gray-500">Задание №{tasks.length > 0 && tasks[currentTaskIndex] ? tasks[currentTaskIndex].number || currentTaskIndex + 1 : 0}</span>
@@ -328,9 +335,9 @@ export const TrainerControls = memo(function TrainerControls({
                             </span>
                         )}
                     </div>
-                </div>
+                </div>}
                 <div className="flex flex-wrap lg:flex-nowrap gap-[0.5rem] items-center">
-                    {(isCurrentTaskAllowed || isTaskRunning || isReworkTask) && (
+                    {!isContestMode && (isCurrentTaskAllowed || isTaskRunning || isReworkTask) && (
                         <Button className={isTaskRunning || isReworkTask ? "!bg-(--color-red-noise) !text-(--color-red)" : isTaskActionDisabled ? "!bg-slate-100 !text-slate-500" : "!bg-(--color-green-noise) !text-(--color-green-peace)"} onClick={onToggleTaskTimer} disabled={isTaskActionDisabled}>
                             {isTaskRunning ? (isCurrentTaskIntro || isReworkTask ? "Завершить" : `Завершить (${formatTaskTime(taskElapsedTime)})`) : taskActionLabel || "Начать задание"}
                         </Button>
@@ -437,7 +444,7 @@ export const TrainerControls = memo(function TrainerControls({
                             </Button>
                         </span>
                     )}
-                    {isCurrentTaskRoleSelection && who === "im" && (
+                    {!isContestMode && isCurrentTaskRoleSelection && who === "im" && (
 
                             <span className="w-full" title={!canAccessTaskResources ? "Сначала начните задание" : ""}>
                                 <Button inverted onClick={onShowRolePopup} disabled={!canAccessTaskResources} className={`w-full ${!canAccessTaskResources ? "opacity-50 cursor-not-allowed" : ""}`}>
