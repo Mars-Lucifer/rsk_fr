@@ -2,6 +2,7 @@ import { validateToken, useToken as consumeLegacyToken } from "@/utils/mayakToke
 import { useMayakSessionToken as consumeMayakSessionToken, validateMayakSessionToken } from "@/lib/mayakSessionTokens";
 import { findActiveMayakSessionByTokenId, getOrCreateMayakDebugSession } from "@/lib/mayakSessions";
 import { readManifest } from "@/lib/mayakContentStorage";
+import { buildContestValidationResponse, hasPortalSession, parseContestToken } from "@/lib/mayakContestAccess";
 
 const DEV_BYPASS_TOKEN = "fffff";
 const MAYAK_GUEST_SUFFIX = "aaaaa";
@@ -274,6 +275,22 @@ export default async function handler(req, res) {
                     valid: false,
                     error: "Токен не указан",
                 });
+            }
+
+            // Конкурсный вход: ключ не выдаётся и не расходуется, право на вход
+            // даёт авторизация участника на портале. Проверяем до байпасов, но
+            // ветка срабатывает только на префикс `contest-` — остальные типы
+            // входа идут прежними путями.
+            const contestToken = parseContestToken(token);
+            if (contestToken) {
+                if (!hasPortalSession(req)) {
+                    return res.status(401).json({
+                        success: false,
+                        valid: false,
+                        error: "Нужно войти на портал",
+                    });
+                }
+                return res.status(200).json(buildContestValidationResponse(contestToken.lessonNumber));
             }
 
             if (detectAdminBypass(req, token)) {

@@ -1,26 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Layout from "@/components/layout/Layout";
 import Warning from "@/assets/general/warning.svg";
 import TimeBefore from "@/assets/general/timeBefore.svg";
 import Button from "@/components/ui/Button";
 import { buildTrainerSubmissionMarker, getContestTrainerTask } from "@/lib/contestTrainerTasks";
-
-// ponytail: вход в тренажёр по отладочному bypass-токену — работает только
-// локально. В бою нужна ветка tokenType: "contest" в resolveMayakTokenContext,
-// которая пускает по авторизации портала (docs/contest-core.md, §1.4).
-const TRAINER_ENTRY_TOKEN = "fffff";
+import { buildContestToken } from "@/lib/mayakContestAccess";
+import { addKeyToCookies, addUserToCookies } from "@/components/features/tools-2/actions";
 
 export default function Task() {
     const params = useParams();
+    const router = useRouter();
     const task = params?.task;
     const [lesson, setLesson] = useState(null);
     const [loading, setLoading] = useState(true);
     const [submitted, setSubmitted] = useState("false");
     const [isSending, setIsSending] = useState(false);
+    const [isOpeningTrainer, setIsOpeningTrainer] = useState(false);
 
     // Урок конкурса → колода и диапазон задач в тренажёре.
     const trainerTask = getContestTrainerTask(lesson?.lesson_number);
@@ -54,6 +53,34 @@ export default function Task() {
         }
         if (task) fetchData();
     }, [task]);
+
+    // Переход в тренажёр. Ключ участнику не выдаётся: тренажёр опознаёт
+    // конкурсный вход по префиксу `contest-` и пускает по сессии портала,
+    // открывая сразу нужный диапазон задач. Личность берём из профиля —
+    // тренажёр держит её в куке active_user.
+    const openTrainer = async () => {
+        setIsOpeningTrainer(true);
+        try {
+            const response = await fetch("/api/profile/info", { credentials: "include" });
+            const payload = await response.json();
+            const profile = payload?.data || {};
+            const participantId = String(profile.username || profile.email || "").trim();
+            const participantName = `${profile.Surname || ""} ${profile.NameIRL || ""}`.trim();
+
+            if (!participantId) {
+                console.error("Не удалось определить участника для входа в тренажёр");
+                setIsOpeningTrainer(false);
+                return;
+            }
+
+            await addKeyToCookies(buildContestToken(lesson.lesson_number));
+            await addUserToCookies(participantId, participantName || participantId, { tokenType: "contest" });
+            router.push("/tools/mayak-oko");
+        } catch (err) {
+            console.error("Ошибка перехода в тренажёр:", err);
+            setIsOpeningTrainer(false);
+        }
+    };
 
     // Задание выполняется в тренажёре, поэтому сюда прилетает не ссылка на файл,
     // а отметка о прохождении. Сдача уходит в ту же очередь модерации.
@@ -149,15 +176,15 @@ export default function Task() {
                                             Формат «{trainerTask.format}». Задачи {trainerTask.taskRange} в тренажёре МАЯК ОКО.
                                         </p>
                                         <div className="flex flex-row gap-[0.75rem] max-[640px]:flex-col">
-                                            <a href={`/tools/mayak-oko?token=${TRAINER_ENTRY_TOKEN}`} target="_blank" rel="noopener noreferrer">
-                                                <Button className="!w-fit">Выполнить задание в тренажёре</Button>
-                                            </a>
+                                            <Button className="!w-fit" disabled={isOpeningTrainer} onClick={openTrainer}>
+                                                {isOpeningTrainer ? "Открываем..." : "Выполнить задание в тренажёре"}
+                                            </Button>
                                             <Button className="!w-fit" inverted disabled={isSending} onClick={handleSubmit}>
                                                 {isSending ? "Отправляем..." : "Задание выполнено"}
                                             </Button>
                                         </div>
                                         <p className="text-(--color-gray-black) text-[0.8125rem]">
-                                            Тренажёр откроется в новой вкладке. Выполните задачи и вернитесь сюда, чтобы отправить работу на проверку.
+                                            Тренажёр откроется на задачах этого урока. Ключ вводить не нужно — вход по вашей учётной записи.
                                         </p>
                                     </>
                                 ) : (
