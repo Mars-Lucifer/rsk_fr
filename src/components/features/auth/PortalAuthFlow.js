@@ -107,7 +107,10 @@ export default function PortalAuthFlow({
                 return;
             }
 
-            router.replace(isMissingPortalProfilePayload(profilePayload) ? "/profile?tab=settings" : "/profile");
+            // Участник пришёл на конкурс, а не заполнять анкету: после входа ведём
+            // сразу в обучение. Исключение — незаполненный профиль: без ФИО и
+            // организации дальше этапа «Я» всё равно не пройти.
+            router.replace(isMissingPortalProfilePayload(profilePayload) ? "/profile?tab=settings" : "/cours");
         },
         [onAuthenticated, router]
     );
