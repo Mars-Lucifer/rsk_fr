@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Layout from "@/components/layout/Layout";
 import { getContestTrainerTask } from "@/lib/contestTrainerTasks";
+import { buildContestToken } from "@/lib/mayakContestAccess";
+import { addKeyToCookies, addUserToCookies } from "@/components/features/tools-2/actions";
 
 // Список уроков конкурса. Состояния и подписи совпадают с лесенкой в шапке
 // тренажёра (ContestLessonStepper): участник ходит между двумя экранами и
@@ -67,6 +69,7 @@ export default function Cours() {
     const [lessons, setLessons] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [openingLesson, setOpeningLesson] = useState(null);
 
     useEffect(() => {
         const loadLessons = async () => {
@@ -89,6 +92,34 @@ export default function Cours() {
 
         loadLessons();
     }, []);
+
+    // Промежуточной страницы урока нет: из списка ведём прямо в тренажёр.
+    // Ключ участнику не выдаётся — тренажёр опознаёт конкурсный вход по
+    // префиксу `contest-` и пускает по сессии портала.
+    const openLessonInTrainer = async (lesson) => {
+        setOpeningLesson(lesson.id);
+        try {
+            const response = await fetch("/api/profile/info", { credentials: "include" });
+            const payload = await response.json();
+            const profile = payload?.data || {};
+            const participantId = String(profile.username || profile.email || "").trim();
+            const participantName = `${profile.Surname || ""} ${profile.NameIRL || ""}`.trim();
+
+            if (!participantId) {
+                setError("Не удалось определить участника");
+                setOpeningLesson(null);
+                return;
+            }
+
+            await addKeyToCookies(buildContestToken(lesson.lesson_number));
+            await addUserToCookies(participantId, participantName || participantId, { tokenType: "contest" });
+            router.push("/tools/mayak-oko");
+        } catch (err) {
+            console.error("Ошибка перехода в тренажёр:", err);
+            setError("Не удалось открыть тренажёр");
+            setOpeningLesson(null);
+        }
+    };
 
     const completedCount = lessons.filter((lesson) => lesson.status === STATUS.done).length;
     const progress = lessons.length ? Math.round((completedCount / lessons.length) * 100) : 0;
@@ -143,12 +174,23 @@ export default function Cours() {
                                     key={lesson.id}
                                     className="flex flex-col justify-between gap-[.75rem] p-[1.25rem] rounded-[1rem] border-[1.5px] transition"
                                     style={{
-                                        minHeight: "170px",
+                                        minHeight: "260px",
                                         borderColor: lesson.status === STATUS.current ? "var(--color-blue)" : "var(--color-gray-plus-50)",
                                         background: lesson.status === STATUS.current ? "var(--color-blue-noise)" : "var(--color-white)",
                                         opacity: isLocked ? 0.7 : 1,
                                     }}>
                                     <div className="flex flex-col gap-[.5rem]">
+                                        {/* Ролик прямо в карточке: отдельная страница урока
+                                            больше не нужна, смотреть можно отсюда. */}
+                                        {lesson.download_url?.includes("rutube.ru") && (
+                                            <iframe
+                                                src={lesson.download_url}
+                                                loading="lazy"
+                                                style={{ border: "none", borderRadius: "0.75rem", aspectRatio: 16 / 9, width: "100%" }}
+                                                allow="autoplay; fullscreen"
+                                                allowFullScreen
+                                            />
+                                        )}
                                         <div className="flex items-center justify-between gap-[.5rem]">
                                             <span
                                                 style={{
@@ -190,8 +232,8 @@ export default function Cours() {
 
                                     <button
                                         type="button"
-                                        disabled={isLocked}
-                                        onClick={() => !isLocked && router.push(`/cours/${lesson.id}`)}
+                                        disabled={isLocked || openingLesson === lesson.id}
+                                        onClick={() => !isLocked && openLessonInTrainer(lesson)}
                                         style={{
                                             background: isLocked ? "var(--color-gray-plus-50)" : lesson.status === STATUS.done ? "var(--color-green-noise)" : "var(--color-blue)",
                                             color: isLocked ? "var(--color-gray-white)" : lesson.status === STATUS.done ? "var(--color-green-peace)" : "var(--color-white)",
@@ -203,7 +245,7 @@ export default function Cours() {
                                             cursor: isLocked ? "not-allowed" : "pointer",
                                             width: "100%",
                                         }}>
-                                        {isLocked ? "Закрыт" : lesson.status === STATUS.done ? "Открыть снова" : "К уроку"}
+                                        {isLocked ? "Закрыт" : openingLesson === lesson.id ? "Открываем..." : lesson.status === STATUS.done ? "Открыть снова" : "К уроку"}
                                     </button>
                                 </div>
                             );
