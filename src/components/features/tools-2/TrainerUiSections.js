@@ -170,12 +170,8 @@ export const TrainerControls = memo(function TrainerControls({
     isSessionMode,
     onShowYaDirectionSelection,
     tokenType,
+    isContestMode = false,
 }) {
-
-    // Конкурсный вход: вместо управления задачами — лесенка уроков.
-    // Ролей и переключателя номеров здесь нет: роли относятся к командному
-    // этапу «Мы», а задание задаётся уроком, а не выбором номера.
-    const isContestMode = tokenType === "contest";
 
     const formatTaskTime = (seconds) => {
         const mins = Math.floor(seconds / 60);

@@ -114,7 +114,7 @@ export default function Cours() {
 
             await addKeyToCookies(buildContestToken(lesson.lesson_number));
             await addUserToCookies(participantId, participantName || participantId, { tokenType: "contest" });
-            router.push("/tools/mayak-oko");
+            router.push("/tools/mayak-oko?contest=1");
         } catch (err) {
             console.error("Ошибка перехода в тренажёр:", err);
             setError("Не удалось открыть тренажёр");

@@ -8,6 +8,7 @@ import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
 import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
 import ContestLessonStepper from "./ContestLessonStepper";
+import { isContestModeActive } from "@/lib/mayakContestAccess";
 import { ContestLessonsProvider } from "./useContestLessons";
 import { SecretMissionPopup } from "./SecretMission";
 import { RoleSelectionPopup, ConfirmationPopup, FirstQuestionnairePopup, SecondQuestionnairePopup, ThirdQuestionnairePopup, SessionCompletionPopup, TaskCompletionPopup, YaDirectionSelectionPopup } from "./TrainerPopups";
@@ -59,6 +60,7 @@ import { useMayakCompletionActions } from "./hooks/useMayakCompletionActions";
 import { useMayakTaskExecutionActions } from "./hooks/useMayakTaskExecutionActions";
 import { useMayakPopupState } from "./hooks/useMayakPopupState";
 import { useMayakTypeUiState } from "./hooks/useMayakTypeUiState";
+import MasterDashboardLink from "./MasterDashboardLink";
 
 const TRAINER_PREFIX = "trainer_v2"; // Уникальный префикс для этого тренажера
 const PREVIEW_WIDTH_MIN = 320;
@@ -402,6 +404,13 @@ export default function TrainerPage({ goTo }) {
 
     const { activeUserId, activeUserName, activeUser, mayakData, sessionId: runtimeSessionId, tokenType, tableNumber } = useMayakRuntimeData();
     const isSessionMode = tokenType === "session" && !!runtimeSessionId;
+    // Конкурсный вид включаем только при заходе из урока. Кука с конкурсным
+    // ключом живёт долго, и по ней одной обычное открытие тренажёра через
+    // меню тоже превращалось бы в конкурсное прохождение.
+    const [isContestMode, setIsContestMode] = useState(false);
+    useEffect(() => {
+        setIsContestMode(tokenType === "contest" && isContestModeActive());
+    }, [tokenType]);
 
     // Вне сессии: если роль сменилась, прежняя локальная миссия больше не актуальна —
     // сбрасываем, чтобы участник мог получить миссию под новую роль.
@@ -815,7 +824,11 @@ export default function TrainerPage({ goTo }) {
         // Источник «ручного» прогресса части «Я»: bypass-режим (локальное
         // состояние) ИЛИ клиентский админ-override в сессии (sessionDebugOverride,
         // не уходит на сервер). Если есть — рисуем из него, иначе считаем из задач.
-        const sessionDebug = isSessionMode ? sessionDebugOverride : null;
+        // Override читается из localStorage и не привязан ни к сессии, ни к
+        // пользователю: без проверки прав он «прилипал» к следующему входу в этом
+        // браузере (мастер видел чужую фазу WE_INDEX и лишнюю звезду-джокер).
+        // Применяем только тем, у кого панель отладки реально доступна.
+        const sessionDebug = isSessionMode && isAdmin ? sessionDebugOverride : null;
         const manualSource =
             tokenType === "bypass"
                 ? { phase: bypassPhase, progress: bypassProgress, weProgress: bypassWeProgress, direction: bypassDirection }
@@ -837,7 +850,7 @@ export default function TrainerPage({ goTo }) {
             tasks,
             fallbackSectionId: tokenSectionId,
         });
-    }, [sessionRuntimeState?.participant?.taskStates, sessionRuntimeState?.participant?.yaDirection, sessionDebugOverride, isSessionMode, tasks, sessionRuntimeState?.participant?.sectionId, tokenSectionId, tokenType, bypassPhase, bypassProgress, bypassDirection, bypassWeProgress]);
+    }, [sessionRuntimeState?.participant?.taskStates, sessionRuntimeState?.participant?.yaDirection, sessionDebugOverride, isSessionMode, isAdmin, tasks, sessionRuntimeState?.participant?.sectionId, tokenSectionId, tokenType, bypassPhase, bypassProgress, bypassDirection, bypassWeProgress]);
 
     // Баланс звёзд-джокеров: 1 начисляется за зажжённую звезду специализации
     // части «Я» минус уже потраченные (jokerSpent из рантайма). earned берётся
@@ -1845,6 +1858,7 @@ export default function TrainerPage({ goTo }) {
         isSessionMode,
         onShowYaDirectionSelection: () => setShowYaDirectionPopup(true),
         tokenType,
+        isContestMode,
         yaDirectionOptions,
         onBypassPhaseChange: handleBypassPhaseChange,
         onBypassProgressChange: handleBypassProgressChange,
@@ -2026,7 +2040,7 @@ export default function TrainerPage({ goTo }) {
         <ContestLessonsProvider>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
-                {tokenType === "contest" && <ContestLessonStepper />}
+                {isContestMode && <ContestLessonStepper />}
                 {effectiveTableNumber ? (
                     <div className="inline-flex items-center justify-center !rounded-full border border-slate-200 bg-white !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
                         Стол №{effectiveTableNumber}
@@ -2099,7 +2113,8 @@ export default function TrainerPage({ goTo }) {
                     </div>
                 )}
                 <div className="flex items-center gap-2 ml-auto">
-                    {tokenType !== "contest" && (
+                    <MasterDashboardLink />
+                    {!isContestMode && (
                         <Button
                             icon
                             roundeful
@@ -2126,7 +2141,7 @@ export default function TrainerPage({ goTo }) {
                             </svg>
                         </Button>
                     )}
-                    {tokenType === "contest" ? (
+                    {isContestMode ? (
                         // Конкурсный вход — не сессия: завершать нечего, участник
                         // просто возвращается к списку уроков.
                         <Button

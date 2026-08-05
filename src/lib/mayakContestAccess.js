@@ -12,6 +12,20 @@ import { getContestTrainerTask } from "@/lib/contestTrainerTasks";
 
 export const CONTEST_TOKEN_PREFIX = "contest-";
 
+// Флаг «мы сейчас в конкурсном прохождении». Живёт в sessionStorage, а не в
+// куке: конкурсный ключ остаётся на 30 дней, и по нему нельзя отличить заход
+// из урока от обычного открытия тренажёра через меню.
+export const CONTEST_MODE_KEY = "mayak_contest_mode";
+
+export function isContestModeActive() {
+    if (typeof window === "undefined") return false;
+    try {
+        return sessionStorage.getItem(CONTEST_MODE_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
 export function parseContestToken(token) {
     const normalized = String(token || "").trim().toLowerCase();
     if (!normalized.startsWith(CONTEST_TOKEN_PREFIX)) {
