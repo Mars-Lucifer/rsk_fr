@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function Cours(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -6,7 +8,7 @@ export default async function Cours(req, res) {
         }
 
         // Получаем основную инфу профиля
-        const response_info = await fetch("https://api.rosdk.ru/learning/api/courses/", {
+        const response_info = await fetch(`${PORTAL_API_BASE}/learning/api/courses/`, {
             headers: {
                 "Content-Type": "application/json",
                 Cookie: req.headers.cookie || "",

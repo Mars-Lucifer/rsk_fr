@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 // /pages/api/auth/logout.js
 export default async function handler(req, res) {
     if (req.method !== "POST") {
@@ -5,7 +7,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        await fetch("https://api.rosdk.ru/auth/users_interaction/logout/", {
+        await fetch(`${PORTAL_API_BASE}/auth/users_interaction/logout/`, {
             method: "POST",
             headers: {
                 Cookie: req.headers.cookie || "",

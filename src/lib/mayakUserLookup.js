@@ -1,5 +1,6 @@
 import { readLocalProfileMockStore, shouldUseLocalProfileMock } from "@/lib/localProfileMock";
 import { getPortalAuthHeadersFromRequest } from "@/lib/mayakRequestAuth";
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 function normalizeString(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -64,7 +65,7 @@ export async function fetchMayakUsersBatchByIds(req, userIds = []) {
         throw new Error("Нужна авторизация портала для поиска пользователя по ID");
     }
 
-    const response = await fetch("https://api.rosdk.ru/users/profile_interaction/get_users_batch", {
+    const response = await fetch(`${PORTAL_API_BASE}/users/profile_interaction/get_users_batch`, {
         method: "POST",
         headers: {
             ...headers,

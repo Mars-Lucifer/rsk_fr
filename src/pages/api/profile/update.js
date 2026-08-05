@@ -1,5 +1,6 @@
 
 import { shouldUseLocalProfileMock, updateLocalProfileMock } from "@/lib/localProfileMock";
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 function sanitizeProfileFieldsForUpstream(fields) {
     const out = { ...fields };
@@ -58,7 +59,7 @@ export default async function ProfileUpdateHandler(req, res) {
             });
         }
 
-        const response = await fetch("https://api.rosdk.ru/users/profile_interaction/update_my_profile/", {
+        const response = await fetch(`${PORTAL_API_BASE}/users/profile_interaction/update_my_profile/`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
@@ -96,7 +97,7 @@ export default async function ProfileUpdateHandler(req, res) {
         }
 
         if (role) {
-            const roleResponse = await fetch("https://api.rosdk.ru/users/profile_interaction/my-role", {
+            const roleResponse = await fetch(`${PORTAL_API_BASE}/users/profile_interaction/my-role`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",

@@ -10,6 +10,7 @@ import Yandex from "@/assets/general/yandex.svg";
 import VK from "@/assets/general/vk.svg";
 import VKWidget from "@/components/features/auth/VKWidget";
 import Link from "next/link";
+import { PUBLIC_PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 export default function LoginStage0({ onForgotPassword, pageVariants, custom = 1, onAuthenticated, onOAuthStart }) {
     const router = useRouter();
@@ -141,7 +142,7 @@ export default function LoginStage0({ onForgotPassword, pageVariants, custom = 1
                             if (typeof onOAuthStart === "function") {
                                 onOAuthStart("yandex");
                             }
-                            window.location.href = "https://api.rosdk.ru/auth/users_interaction/auth/yandex/login";
+                            window.location.href = `${PUBLIC_PORTAL_API_BASE}/auth/users_interaction/auth/yandex/login`;
                         }}>
                         Яндекс ID <Yandex />
                     </Button>

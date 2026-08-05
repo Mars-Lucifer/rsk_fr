@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function RegHandler(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -5,7 +7,7 @@ export default async function RegHandler(req, res) {
             return res.status(401).json({ success: false, error: "No token provided" });
         }
 
-        const response = await fetch("https://api.rosdk.ru/teams/teams/register", {
+        const response = await fetch(`${PORTAL_API_BASE}/teams/teams/register`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

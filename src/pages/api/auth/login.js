@@ -1,6 +1,8 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function RegHandler(req, res) {
     try {
-        const response = await fetch("https://api.rosdk.ru/auth/users_interaction/login/", {
+        const response = await fetch(`${PORTAL_API_BASE}/auth/users_interaction/login/`, {
             method: "POST",
             headers: { "Content-Type": "application/json", accept: "application/json" },
             body: JSON.stringify({

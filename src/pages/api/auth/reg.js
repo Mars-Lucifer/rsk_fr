@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 function toSafeString(value, fallback = "") {
     if (value === undefined || value === null) {
         return fallback;
@@ -43,7 +45,7 @@ export default async function RegHandler(req, res) {
             last_name: lastName,
         };
 
-        const response = await fetch("https://api.rosdk.ru/auth/users_interaction/register/", {
+        const response = await fetch(`${PORTAL_API_BASE}/auth/users_interaction/register/`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

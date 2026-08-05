@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function getOrg(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -8,7 +10,7 @@ export default async function getOrg(req, res) {
         // читаем skip, limit и search из query
         const { skip = 0, limit = 20, search = "" } = req.query;
 
-        const response_info = await fetch(`https://api.rosdk.ru/orgs/organizations/?skip=${skip}&limit=${limit}&search=${encodeURIComponent(search)}`, {
+        const response_info = await fetch(`${PORTAL_API_BASE}/orgs/organizations/?skip=${skip}&limit=${limit}&search=${encodeURIComponent(search)}`, {
             headers: {
                 Accept: "application/json",
                 Cookie: req.headers.cookie || "",

@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function changeUserRole(req, res) {
     try {
         if (req.method !== "POST") {
@@ -25,7 +27,7 @@ export default async function changeUserRole(req, res) {
             });
         }
 
-        const response = await fetch("https://api.rosdk.ru/users/profile_interaction/admin-role", {
+        const response = await fetch(`${PORTAL_API_BASE}/users/profile_interaction/admin-role`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",

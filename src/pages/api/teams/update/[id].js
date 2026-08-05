@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function RegHandler(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -8,7 +10,7 @@ export default async function RegHandler(req, res) {
         const bodyData = req.body;
         bodyData.direction = "Наука";
 
-        const response = await fetch(`https://api.rosdk.ru/teams/teams/update_team_data/${req.query.id}`, {
+        const response = await fetch(`${PORTAL_API_BASE}/teams/teams/update_team_data/${req.query.id}`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",

@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function CoursSubmit(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -10,7 +12,7 @@ export default async function CoursSubmit(req, res) {
             return res.status(405).json({ success: false, error: "Method not allowed" });
         }
 
-        const response = await fetch("https://api.rosdk.ru/learning/api/submissions/submit", {
+        const response = await fetch(`${PORTAL_API_BASE}/learning/api/submissions/submit`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

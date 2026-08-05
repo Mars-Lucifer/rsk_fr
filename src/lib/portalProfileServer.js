@@ -1,4 +1,5 @@
 import { normalizePortalProfile } from "@/lib/portalProfile";
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 export class PortalProfileRequestError extends Error {
     constructor(message, status = 500) {
@@ -46,7 +47,7 @@ export async function fetchPortalProfileFromRequest(req) {
         throw new PortalProfileRequestError("Portal session is required", 401);
     }
 
-    const response = await fetch("https://api.rosdk.ru/users/profile_interaction/get_my_profile/", {
+    const response = await fetch(`${PORTAL_API_BASE}/users/profile_interaction/get_my_profile/`, {
         method: "GET",
         headers,
         cache: "no-store",

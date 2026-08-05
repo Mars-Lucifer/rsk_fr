@@ -6,6 +6,7 @@ import Switcher from "@/components/ui/Switcher";
 
 import Yandex from "@/assets/general/yandex.svg";
 import VKWidget from "@/components/features/auth/VKWidget";
+import { PUBLIC_PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 export default function RegStage0({ onContinue, pageVariants, custom = 1, onOAuthStart }) {
     const [userType, setUserType] = useState("student");
@@ -157,7 +158,7 @@ export default function RegStage0({ onContinue, pageVariants, custom = 1, onOAut
                             if (typeof onOAuthStart === "function") {
                                 onOAuthStart("yandex");
                             }
-                            window.location.href = "https://api.rosdk.ru/auth/users_interaction/auth/yandex/login";
+                            window.location.href = `${PUBLIC_PORTAL_API_BASE}/auth/users_interaction/auth/yandex/login`;
                         }}>
                         Яндекс ID <Yandex />
                     </Button>
