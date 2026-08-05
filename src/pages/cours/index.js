@@ -42,7 +42,7 @@ export default function Cours() {
     return (
         <Layout>
             <Header>
-                <Header.Heading>Обучение</Header.Heading>
+                <Header.Heading>Конкурс</Header.Heading>
             </Header>
 
             <div className="hero overflow-hidden" style={{ placeItems: "center" }}>
