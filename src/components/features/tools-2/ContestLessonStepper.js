@@ -68,7 +68,7 @@ export default function ContestLessonStepper() {
                             padding: "0.25rem 0.625rem 0.25rem 0.25rem",
                             flex: "0 1 auto",
                             minWidth: 0,
-                            maxWidth: "10rem",
+                            maxWidth: "12.5rem",
                             justifyContent: "center",
                             overflow: "hidden",
                             textOverflow: "ellipsis",

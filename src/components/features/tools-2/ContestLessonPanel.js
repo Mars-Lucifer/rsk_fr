@@ -245,16 +245,41 @@ export default function ContestLessonPanel() {
                             }}
                         />
 
-                        <div className="flex flex-col gap-[0.25rem] items-center justify-center text-center" style={{ flex: "0 0 14rem", maxWidth: "100%", alignSelf: "stretch" }}>
+                        {/* Системный вид input[type=file] («Файл не выбран») выбивается
+                            из интерфейса — прячем его и рисуем обычную кнопку загрузки. */}
+                        <div className="flex flex-col gap-[0.375rem] items-center justify-center text-center" style={{ flex: "0 0 14rem", maxWidth: "100%", alignSelf: "stretch" }}>
                             <input
                                 ref={fileInputRef}
                                 type="file"
                                 accept=".doc,.docx,.pdf,.txt,.rtf,.odt,.png,.jpg,.jpeg"
                                 onChange={(event) => setAnswerFile(event.target.files?.[0] || null)}
-                                style={{ fontSize: "0.75rem", maxWidth: "100%" }}
-                                className="mx-auto"
+                                style={{ display: "none" }}
+                                id="contest-answer-file"
                             />
-                            <span className="text-xs" style={{ color: "var(--color-gray-black)" }}>
+                            <label
+                                htmlFor="contest-answer-file"
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "0.375rem",
+                                    background: "var(--color-white)",
+                                    color: "var(--color-blue)",
+                                    border: "1.5px solid var(--color-gray-plus-50)",
+                                    borderRadius: "0.75rem",
+                                    padding: "0.5rem 0.875rem",
+                                    fontSize: "0.8125rem",
+                                    fontWeight: 500,
+                                    cursor: "pointer",
+                                    whiteSpace: "nowrap",
+                                }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                Загрузить файл
+                            </label>
+                            <span className="text-xs" style={{ color: "var(--color-gray-black)", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 {answerFile ? answerFile.name : "или приложите файл, до 20 МБ"}
                             </span>
                         </div>
