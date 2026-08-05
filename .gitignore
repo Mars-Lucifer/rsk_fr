@@ -15,12 +15,17 @@ data/mayakTokens.json
 data/mayak-sessions.json
 data/mayak-session-tokens.json
 data/mayak-session-runtime.json
+data/mayak-session-links.json
+data/mayak-lesson-progress.json
 data/mayak-admin-rights.json
 data/mayak-payments.json
 data/mayak-token-materials.json
 data/mayak-token-material-files/
 data/mayakTaskAttempts.json
 data/sessionLogs.json
+
+# ответы участников конкурса: рантайм-данные, не исходники
+data/contest-answers/
 
 # testing
 /coverage

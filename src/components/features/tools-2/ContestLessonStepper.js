@@ -40,7 +40,7 @@ export default function ContestLessonStepper() {
     }
 
     return (
-        <div className="flex items-center gap-[0.375rem] overflow-x-auto max-[1200px]:hidden">
+        <div className="flex items-center gap-[0.375rem] flex-1 w-full max-[1200px]:hidden">
             {lessons.map((lesson) => {
                 const isActive = Number(lesson.lesson_number) === Number(lessonNumber);
                 const isLocked = lesson.status === LESSON_STATUS.locked;
@@ -62,6 +62,11 @@ export default function ContestLessonStepper() {
                             border: isLocked ? "1.5px solid var(--color-gray-plus-50)" : "1.5px solid transparent",
                             borderRadius: "6.25rem",
                             padding: "0.25rem 0.625rem 0.25rem 0.25rem",
+                            flex: "1 1 0",
+                            minWidth: 0,
+                            justifyContent: "center",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
                             fontSize: "0.75rem",
                             fontWeight: isActive ? 600 : 500,
                             lineHeight: 1.2,
