@@ -6,6 +6,7 @@ import Layout from "@/components/layout/Layout";
 import { getContestTrainerTask } from "@/lib/contestTrainerTasks";
 import { buildContestToken } from "@/lib/mayakContestAccess";
 import { addKeyToCookies, addUserToCookies } from "@/components/features/tools-2/actions";
+import VideoFacade from "@/components/ui/VideoFacade";
 
 // Список уроков конкурса. Состояния и подписи совпадают с лесенкой в шапке
 // тренажёра (ContestLessonStepper): участник ходит между двумя экранами и
@@ -182,15 +183,7 @@ export default function Cours() {
                                     <div className="flex flex-col gap-[.5rem]">
                                         {/* Ролик прямо в карточке: отдельная страница урока
                                             больше не нужна, смотреть можно отсюда. */}
-                                        {lesson.download_url?.includes("rutube.ru") && (
-                                            <iframe
-                                                src={lesson.download_url}
-                                                loading="lazy"
-                                                style={{ border: "none", borderRadius: "0.75rem", aspectRatio: 16 / 9, width: "100%" }}
-                                                allow="autoplay; fullscreen"
-                                                allowFullScreen
-                                            />
-                                        )}
+                                        {lesson.download_url?.includes("rutube.ru") && <VideoFacade url={lesson.download_url} title={lesson.lesson_name} eager={!isLocked} />}
                                         <div className="flex items-center justify-between gap-[.5rem]">
                                             <span
                                                 style={{

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { getContestTrainerTask } from "@/lib/contestTrainerTasks";
 import { useContestLessons } from "@/components/features/tools-2/useContestLessons";
+import VideoFacade from "@/components/ui/VideoFacade";
 
 // Конкурсный режим тренажёра: карточка задания вместо управления сессией.
 //
@@ -224,14 +225,7 @@ export default function ContestLessonPanel() {
                 )}
 
                 {/* Справа видеоурок. */}
-                {activeLesson.download_url?.includes("rutube.ru") && (
-                    <iframe
-                        src={activeLesson.download_url}
-                        style={{ border: "none", borderRadius: "0.75rem", aspectRatio: 16 / 9, width: "100%" }}
-                        allow="autoplay; fullscreen"
-                        allowFullScreen
-                    />
-                )}
+                {activeLesson.download_url?.includes("rutube.ru") && <VideoFacade url={activeLesson.download_url} title={activeLesson.lesson_name} eager />}
             </div>
 
             {/* Ответ — широким блоком под видео: текст слева, файл справа. */}
