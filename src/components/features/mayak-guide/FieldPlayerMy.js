@@ -446,9 +446,10 @@ export default function FieldPlayerMy({ bare = false, onPlayer }) {
             <style jsx>{`
                 .player {
                     display: grid;
-                    grid-template-columns: minmax(0, 1fr) 360px;
+                    /* как в плеере «Я»: поле своего размера, остаток ширины — колонке */
+                    grid-template-columns: minmax(0, 894px) minmax(360px, 1fr);
                     gap: 26px;
-                    align-items: start;
+                    align-items: stretch;
                 }
                 .player.bare {
                     display: block;
@@ -536,8 +537,7 @@ export default function FieldPlayerMy({ bare = false, onPlayer }) {
                     display: flex;
                     flex-direction: column;
                     gap: 14px;
-                    position: sticky;
-                    top: 24px;
+                    height: 100%;
                 }
                 .play {
                     font: inherit;
@@ -576,6 +576,8 @@ export default function FieldPlayerMy({ bare = false, onPlayer }) {
                     display: flex;
                     flex-direction: column;
                     gap: 2px;
+                    flex: 1;
+                    justify-content: space-between;
                 }
                 .phase {
                     font: inherit;

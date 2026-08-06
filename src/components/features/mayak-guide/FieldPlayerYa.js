@@ -439,9 +439,11 @@ export default function FieldPlayerYa({ bare = false, onPlayer }) {
             <style jsx>{`
                 .player {
                     display: grid;
-                    grid-template-columns: minmax(0, 1fr) 360px;
+                    /* поле держит свой размер, вся лишняя ширина уходит колонке —
+                       иначе справа от неё оставалась пустая половина экрана */
+                    grid-template-columns: minmax(0, 894px) minmax(360px, 1fr);
                     gap: 26px;
-                    align-items: start;
+                    align-items: stretch;
                 }
                 .player.bare {
                     display: block;
@@ -512,8 +514,13 @@ export default function FieldPlayerYa({ bare = false, onPlayer }) {
                     display: flex;
                     flex-direction: column;
                     gap: 14px;
-                    position: sticky;
-                    top: 24px;
+                    /* колонка занимает всю высоту поля: список фаз растягивается,
+                       низ блока встаёт вровень с нижним краем поля */
+                    height: 100%;
+                }
+                .phases {
+                    flex: 1;
+                    justify-content: space-between;
                 }
                 .play {
                     font: inherit;

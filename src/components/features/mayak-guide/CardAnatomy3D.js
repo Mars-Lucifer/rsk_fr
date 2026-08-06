@@ -107,22 +107,32 @@ export default function CardAnatomy3D({ side, onSide, pins, hint = null }) {
                     <div className={`face back ${facing(spin) === "back" ? "" : "away"}`}>
                         <img src={BACK_IMG} alt="Рубашка карты задания" draggable="false" />
                         {pins.back.map((pin, index) => (
-                            <span
-                                key={pin.t}
-                                className={`pin ${pin.x > 40 && pin.x < 60 ? "toup" : pin.x < 50 ? "toleft" : "toright"} ${hint === index ? "on" : ""}`}
-                                style={{ left: `${pin.x}%`, top: `${pin.y}%` }}>
-                                <b>{index + 1}</b>
+                            <span key={pin.t}>
+                                <span
+                                    className={`zone ${hint === index ? "on" : ""}`}
+                                    style={{ left: `${pin.x}%`, top: `${pin.y}%`, width: `${pin.w}%`, height: `${pin.h}%` }}
+                                />
+                                <b
+                                    className={`num ${pin.x + pin.w / 2 < 50 ? "left" : "right"} ${hint === index ? "on" : ""}`}
+                                    style={{ top: `${pin.y + pin.h / 2}%` }}>
+                                    {index + 1}
+                                </b>
                             </span>
                         ))}
                     </div>
                     <div className={`face front ${facing(spin) === "face" ? "" : "away"}`}>
                         <img src={FACE_IMG} alt="Лицо карты задания" draggable="false" />
                         {pins.face.map((pin, index) => (
-                            <span
-                                key={pin.t}
-                                className={`pin ${pin.x > 40 && pin.x < 60 ? "toup" : pin.x < 50 ? "toleft" : "toright"} ${hint === index ? "on" : ""}`}
-                                style={{ left: `${pin.x}%`, top: `${pin.y}%` }}>
-                                <b>{index + 1}</b>
+                            <span key={pin.t}>
+                                <span
+                                    className={`zone ${hint === index ? "on" : ""}`}
+                                    style={{ left: `${pin.x}%`, top: `${pin.y}%`, width: `${pin.w}%`, height: `${pin.h}%` }}
+                                />
+                                <b
+                                    className={`num ${pin.x + pin.w / 2 < 50 ? "left" : "right"} ${hint === index ? "on" : ""}`}
+                                    style={{ top: `${pin.y + pin.h / 2}%` }}>
+                                    {index + 1}
+                                </b>
                             </span>
                         ))}
                     </div>
@@ -190,51 +200,53 @@ export default function CardAnatomy3D({ side, onSide, pins, hint = null }) {
                     object-fit: cover;
                     display: block;
                 }
-                /* точка стоит ровно на элементе, номер вынесен вбок — ничего не перекрывается */
-                .pin {
+                /* Элемент карты обводится рамкой по своей площади. Рамка проявляется
+                   только при наведении на строку легенды — иначе шесть рамок сразу
+                   превращают карту в чертёж. Номер живёт у ближнего края карты. */
+                .zone {
                     position: absolute;
-                    width: 9px;
-                    height: 9px;
-                    margin: -4.5px 0 0 -4.5px;
-                    border-radius: 50%;
-                    background: #c9503f;
-                    box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, 0.3);
+                    border-radius: 8px;
+                    border: 2px solid transparent;
+                    background: transparent;
+                    transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+                    pointer-events: none;
                 }
-                .pin b {
+                .zone.on {
+                    border-color: #c9503f;
+                    background: rgba(201, 80, 63, 0.1);
+                    box-shadow: 0 0 0 9999px rgba(21, 32, 34, 0.28);
+                }
+                /* Номер живёт на поле карты у ближнего края — на уровне своего элемента,
+                   но вне его площади: перекрывать текст и иконку ему нечем. */
+                .num {
                     position: absolute;
-                    top: 50%;
-                    width: 20px;
-                    height: 20px;
-                    margin-top: -10px;
+                    width: 19px;
+                    height: 19px;
+                    margin-top: -9.5px;
                     border-radius: 50%;
                     display: grid;
                     place-items: center;
-                    font-size: 11px;
+                    font-size: 10.5px;
                     font-weight: 700;
-                    color: #fff;
+                    font-style: normal;
+                    color: #46565f;
+                    background: rgba(255, 255, 255, 0.9);
+                    border: 1px solid rgba(21, 32, 34, 0.16);
+                    z-index: 2;
+                    transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+                }
+                .num.left {
+                    left: 5px;
+                }
+                .num.right {
+                    right: 5px;
+                }
+                .num.on {
                     background: #c9503f;
-                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-                    transition: transform 0.16s ease, background 0.16s ease;
-                }
-                .pin.toleft b {
-                    right: 16px;
-                }
-                .pin.toright b {
-                    left: 16px;
-                }
-                /* у центральных элементов номер уходит вверх, иначе он ложится на текст */
-                .pin.toup b {
-                    top: auto;
-                    bottom: 14px;
-                    left: 50%;
-                    margin: 0 0 0 -10px;
-                }
-                .pin.on {
-                    background: #152022;
-                }
-                .pin.on b {
-                    background: #152022;
-                    transform: scale(1.25);
+                    border-color: #c9503f;
+                    color: #fff;
+                    transform: scale(1.18);
+                    z-index: 3;
                 }
                 .flipbtn {
                     font: inherit;
