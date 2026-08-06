@@ -5,7 +5,7 @@
 // прод-значение остаётся дефолтом — если переменную не задать, поведение
 // ровно то же, что и раньше.
 //
-// Локальный контур (см. docs/contest-core.md):
+// Локальный контур (см. docs/contest/04-infrastructure.md):
 //   RSK_API_BASE=http://localhost:8002            — для серверного кода
 //   NEXT_PUBLIC_RSK_API_BASE=http://localhost:8002 — для редиректов в браузере
 //
