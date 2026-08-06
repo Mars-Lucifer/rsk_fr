@@ -14,12 +14,15 @@ import {
 // (session-токен delegated-admin, который считается в лимит доступа) на каждую
 // сессию заводим:
 //   - plainToken   — обычная ссылка без инспектора (независимый legacy-токен);
-//   - masterToken  — мастер-вход: session-токен той же сессии, но НЕ учитывается
-//                    (source != delegated-admin → не попадает в счётчик входов);
+//   - masterToken  — мастер-вход: session-токен той же сессии с тем же source
+//                    delegated-admin, то есть расход учитывается в общем лимите
+//                    доступа. Мастеру это стоит один вход на сессию: после
+//                    первого захода токен лежит в куке и повторные открытия
+//                    ссылки его не тратят (см. isStoredTokenActive в settings.js).
+//                    Слетела кука или другое устройство — спишется ещё один вход;
 //   - masterSecret / dashboardSecret — секреты для страниц мастера и дашборда,
 //                    авторизация по секрету в URL, без admin-пароля.
 const LINKS_FILE = path.join(process.cwd(), "data", "mayak-session-links.json");
-const MASTER_TOKEN_USAGE_LIMIT = 100000;
 const DEFAULT_PLAIN_USAGE_LIMIT = 180;
 
 function createEmptyStore() {
@@ -76,17 +79,18 @@ export async function createSessionLinks({ session, accessId } = {}) {
     //    поднимет его как tokenType "legacy" (без инспектора/ролей/ревью).
     const legacyToken = createLegacyToken(`${baseName} — обычная`, plainUsageLimit, taskRange, null, sectionId);
 
-    // 2. Мастер-токен — session-токен той же сессии, но источник delegated-master:
-    //    расход по нему не учитывается в лимите доступа (счётчик берёт только
-    //    delegated-admin), а функционал полный, как у инспекторской ссылки.
+    // 2. Мастер-токен — session-токен той же сессии с тем же источником
+    //    delegated-admin: функционал полный, как у инспекторской ссылки, и
+    //    расход честно попадает в общий лимит доступа. Лимит — как у сессии,
+    //    чтобы повторный вход после слетевшей куки не упирался в потолок.
     const masterToken = await createMayakSessionToken({
         name: `${baseName} — мастер`,
-        usageLimit: MASTER_TOKEN_USAGE_LIMIT,
+        usageLimit: plainUsageLimit,
         sectionId,
         taskRange,
         ownerUserId: normalizeString(session.ownerUserId),
         ownerFullName: normalizeString(session.ownerFullName),
-        source: "delegated-master",
+        source: "delegated-admin",
         expiresAt: session.expiresAt || null,
     });
     await attachTokenIdToMayakSession(session.id, masterToken.id);

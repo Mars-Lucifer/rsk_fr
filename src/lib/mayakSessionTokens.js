@@ -4,6 +4,7 @@ import crypto from "crypto";
 
 import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
 import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
+import { countAccessLedgerEntries, recordAccessLedgerEntry } from "@/lib/mayakAccessLedger";
 
 const SESSION_TOKENS_FILE = path.join(process.cwd(), "data", "mayak-session-tokens.json");
 const SESSIONS_FILE = path.join(process.cwd(), "data", "mayak-sessions.json");
@@ -100,11 +101,17 @@ async function getDelegatedOwnerUsageState(ownerUserId, tokens = []) {
     if (!right) return null;
 
     const totalLimit = normalizeUsageLimit(right.totalParticipantLimit || 180);
-    const usedCount = tokens
+    const liveUsedCount = tokens
         .filter((token) => String(token.source || "") === "delegated-admin")
         .filter((token) => normalizeString(token.ownerUserId) === ownerKey)
         .filter((token) => token.isActive !== false && !isExpiredToken(token))
         .reduce((sum, token) => sum + Math.max(0, Number(token.usedCount) || 0), 0);
+
+    // Источник истины по расходу — журнал: он переживает истечение и удаление
+    // токенов. Живые токены берём как нижнюю границу на случай, если запись в
+    // журнал не прошла — иначе такой вход стал бы бесплатным.
+    const ledgerUsedCount = await countAccessLedgerEntries(ownerKey);
+    const usedCount = Math.max(ledgerUsedCount, liveUsedCount);
 
     return {
         totalLimit,
@@ -288,6 +295,28 @@ export async function useMayakSessionToken(tokenValue) {
         // затираются (актуальная копия), а инкремент атомарен относительно
         // других расходов.
         await writeJsonFileAtomic(SESSION_TOKENS_FILE, store);
+
+        // Списание фиксируем в журнале доступа сразу после успешной записи
+        // счётчика: токен через сутки исчезнет, запись останется. Только для
+        // delegated-admin — расход по остальным токенам в лимит не входит.
+        if (delegatedUsageState) {
+            try {
+                const sessions = await readSessionsStore();
+                const session = sessions.find(
+                    (item) => Array.isArray(item?.tokenIds) && item.tokenIds.includes(updatedToken.id)
+                );
+                await recordAccessLedgerEntry({
+                    accessId: normalizeString(updatedToken.ownerUserId),
+                    tokenId: updatedToken.id,
+                    sessionId: session?.id || "",
+                });
+            } catch (ledgerError) {
+                // Вход уже оплачен инкрементом usedCount — ронять его из-за
+                // журнала нельзя. Пока токен жив, расход виден по нему
+                // (max(журнал, живые токены)), потеряется только после TTL.
+                console.error("Не удалось записать списание входа в журнал доступа:", ledgerError);
+            }
+        }
 
         const responseToken = delegatedUsageState
             ? {

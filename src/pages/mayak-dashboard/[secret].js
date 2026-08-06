@@ -20,6 +20,11 @@ export default function MayakMasterDashboardPage() {
     }
 
     const encoded = encodeURIComponent(secret);
+    // «Назад» показываем только когда пришли из тренажёра в этой же вкладке
+    // (метку ставит MasterDashboardLink). Ссылку, открытую напрямую — на
+    // проекторе или со второго устройства — некуда возвращать: router.back()
+    // там уводил из приложения на предыдущий сайт.
+    const cameFromTrainer = router.query.from === "trainer";
 
     return (
         <SessionDashboard
@@ -27,9 +32,9 @@ export default function MayakMasterDashboardPage() {
             dashboardUrl={`/api/mayak/master/dashboard?secret=${encoded}`}
             participantsUrl={`/api/mayak/master/participants?secret=${encoded}`}
             onAuthFail={handleAuthFail}
-            // Дашборд открывается в той же вкладке — мастеру нужен путь назад.
+            hideBack={!cameFromTrainer}
             onBack={() => router.back()}
-            backLabel="← Назад"
+            backLabel="← В тренажёр"
         />
     );
 }

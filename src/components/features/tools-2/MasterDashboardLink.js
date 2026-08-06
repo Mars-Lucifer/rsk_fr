@@ -40,7 +40,10 @@ export default function MasterDashboardLink() {
 
     return (
         <a
-            href={`/mayak-dashboard/${encodeURIComponent(dashSecret)}`}
+            // from=trainer — метка «пришли из тренажёра в этой же вкладке».
+            // По ней дашборд решает, показывать ли «Назад»: при открытии ссылки
+            // напрямую (проектор, второе устройство) возвращаться некуда.
+            href={`/mayak-dashboard/${encodeURIComponent(dashSecret)}?from=trainer`}
             title="Открыть дашборд сессии"
             aria-label="Открыть дашборд сессии"
             className="inline-flex items-center justify-center gap-1.5 !rounded-full border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 !px-3 !h-8 leading-none text-sm font-semibold text-indigo-700 whitespace-nowrap no-underline transition-colors">
