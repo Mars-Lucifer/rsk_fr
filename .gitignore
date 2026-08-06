@@ -18,6 +18,7 @@ data/mayak-session-runtime.json
 data/mayak-session-links.json
 data/mayak-lesson-progress.json
 data/mayak-admin-rights.json
+data/mayak-access-ledger.json
 data/mayak-payments.json
 data/mayak-token-materials.json
 data/mayak-token-material-files/
