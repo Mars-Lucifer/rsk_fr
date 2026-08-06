@@ -14,7 +14,7 @@ const BACK_IMG = "/mayak-guide/cards/text.png?v=2";
 const DRAG_SPEED = 0.55;
 const MAX_TILT = 24;
 
-export default function CardAnatomy3D({ side, onSide, pins }) {
+export default function CardAnatomy3D({ side, onSide, pins, hint = null }) {
     const [spin, setSpin] = useState(0);
     const [tilt, setTilt] = useState(0);
     const [dragging, setDragging] = useState(false);
@@ -107,22 +107,34 @@ export default function CardAnatomy3D({ side, onSide, pins }) {
                     <div className={`face back ${facing(spin) === "back" ? "" : "away"}`}>
                         <img src={BACK_IMG} alt="Рубашка карты задания" draggable="false" />
                         {pins.back.map((pin, index) => (
-                            <span key={pin.t} className="pin" style={{ left: `${pin.x}%`, top: `${pin.y}%` }}>
-                                {index + 1}
+                            <span
+                                key={pin.t}
+                                className={`pin ${pin.x > 40 && pin.x < 60 ? "toup" : pin.x < 50 ? "toleft" : "toright"} ${hint === index ? "on" : ""}`}
+                                style={{ left: `${pin.x}%`, top: `${pin.y}%` }}>
+                                <b>{index + 1}</b>
                             </span>
                         ))}
                     </div>
                     <div className={`face front ${facing(spin) === "face" ? "" : "away"}`}>
                         <img src={FACE_IMG} alt="Лицо карты задания" draggable="false" />
                         {pins.face.map((pin, index) => (
-                            <span key={pin.t} className="pin" style={{ left: `${pin.x}%`, top: `${pin.y}%` }}>
-                                {index + 1}
+                            <span
+                                key={pin.t}
+                                className={`pin ${pin.x > 40 && pin.x < 60 ? "toup" : pin.x < 50 ? "toleft" : "toright"} ${hint === index ? "on" : ""}`}
+                                style={{ left: `${pin.x}%`, top: `${pin.y}%` }}>
+                                <b>{index + 1}</b>
                             </span>
                         ))}
                     </div>
                 </div>
             </div>
-            <p className="tip">Потяните карту мышью, чтобы повернуть. Двойной клик — перевернуть.</p>
+            <button type="button" className="flipbtn" onClick={flip}>
+                <span className="ico" aria-hidden="true">
+                    ⟳
+                </span>
+                Перевернуть карту
+            </button>
+            <p className="tip">Карту можно и просто крутить мышью.</p>
 
             <style jsx>{`
                 .wrap {
@@ -178,19 +190,74 @@ export default function CardAnatomy3D({ side, onSide, pins }) {
                     object-fit: cover;
                     display: block;
                 }
+                /* точка стоит ровно на элементе, номер вынесен вбок — ничего не перекрывается */
                 .pin {
                     position: absolute;
-                    width: 25px;
-                    height: 25px;
-                    margin: -12px 0 0 -12px;
+                    width: 9px;
+                    height: 9px;
+                    margin: -4.5px 0 0 -4.5px;
+                    border-radius: 50%;
+                    background: #c9503f;
+                    box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0, 0, 0, 0.3);
+                }
+                .pin b {
+                    position: absolute;
+                    top: 50%;
+                    width: 20px;
+                    height: 20px;
+                    margin-top: -10px;
                     border-radius: 50%;
                     display: grid;
                     place-items: center;
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 700;
                     color: #fff;
                     background: #c9503f;
-                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+                    transition: transform 0.16s ease, background 0.16s ease;
+                }
+                .pin.toleft b {
+                    right: 16px;
+                }
+                .pin.toright b {
+                    left: 16px;
+                }
+                /* у центральных элементов номер уходит вверх, иначе он ложится на текст */
+                .pin.toup b {
+                    top: auto;
+                    bottom: 14px;
+                    left: 50%;
+                    margin: 0 0 0 -10px;
+                }
+                .pin.on {
+                    background: #152022;
+                }
+                .pin.on b {
+                    background: #152022;
+                    transform: scale(1.25);
+                }
+                .flipbtn {
+                    font: inherit;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 9px;
+                    width: 100%;
+                    padding: 11px 16px;
+                    font-size: 14px;
+                    font-weight: 700;
+                    border-radius: 999px;
+                    border: 1px solid #152022;
+                    background: #152022;
+                    color: #fff;
+                    cursor: pointer;
+                    transition: background 0.18s ease;
+                }
+                .flipbtn:hover {
+                    background: #24343a;
+                }
+                .flipbtn .ico {
+                    font-size: 15px;
                 }
                 .tip {
                     margin: 0;
