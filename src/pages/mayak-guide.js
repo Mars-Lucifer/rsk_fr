@@ -18,13 +18,46 @@ const NAV = [
     { id: "s4", n: "03", t: "Этап «МЫ»" },
 ];
 
+// Что делает роль — короткими утверждениями, по одному на строку. Пометки
+// «Постоянно» / «Активно» убраны: они делили роли на два сорта, хотя в игре
+// разница считывается из самого действия.
 const ROLES = [
-    { img: "role_kapitan.jpg", nm: "Капитан", vice: "формирует требовательность", ln: "Постоянно: внутренний гарант дисциплины и выполнения ролевых функций." },
-    { img: "role_mediator.jpg", nm: "Медиатор", vice: "противоядие от недоверия", ln: "Постоянно: создаёт безопасную атмосферу диалога, вовлекает «тихих»." },
-    { img: "role_inspector.jpg", nm: "Инспектор", vice: "борется с безответственностью", ln: "Активно: выносит вердикт с аргументацией. Молчание две минуты — задание принято." },
-    { img: "role_hranitel.jpg", nm: "Хранитель Маяка", vice: "противостоит боязни конфликта", ln: "Постоянно: держит темп и энергию, не даёт «огню» погаснуть." },
-    { img: "role_engineer.jpg", nm: "Инженер", vice: "убирает технический барьер", ln: "Постоянно: следит за доступностью инструментов, решает технические вопросы." },
-    { img: "role_letopisec.jpg", nm: "Летописец", vice: "лечит безразличие к результату", ln: "Постоянно: снимает фото и видео прорывов, эмоций, командной работы." },
+    {
+        img: "role_kapitan.jpg",
+        nm: "Капитан",
+        vice: "Формирует требовательность",
+        ln: ["Внутренний гарант дисциплины.", "Следит за выполнением ролевых функций."],
+    },
+    {
+        img: "role_mediator.jpg",
+        nm: "Медиатор",
+        vice: "Противоядие от недоверия",
+        ln: ["Создаёт безопасную атмосферу диалога.", "Вовлекает «тихих»."],
+    },
+    {
+        img: "role_inspector.jpg",
+        nm: "Инспектор",
+        vice: "Борется с безответственностью",
+        ln: ["Выносит вердикт с аргументацией.", "Молчание две минуты — задание принято."],
+    },
+    {
+        img: "role_hranitel.jpg",
+        nm: "Хранитель Маяка",
+        vice: "Противостоит боязни конфликта",
+        ln: ["Держит темп и энергию.", "Не даёт «огню» погаснуть."],
+    },
+    {
+        img: "role_engineer.jpg",
+        nm: "Инженер",
+        vice: "Убирает технический барьер",
+        ln: ["Следит за доступностью инструментов.", "Решает технические вопросы."],
+    },
+    {
+        img: "role_letopisec.jpg",
+        nm: "Летописец",
+        vice: "Лечит безразличие к результату",
+        ln: ["Снимает фото и видео прорывов.", "Фиксирует эмоции и командную работу."],
+    },
 ];
 
 // Элемент карты — это область, а не точка: x/y — левый верхний угол, w/h — размер,
@@ -38,23 +71,15 @@ const PINS = {
         { x: 24, y: 28, w: 52, h: 48, t: "Цветной гекс с иконкой", d: "По нему карта опознаётся, не переворачивая." },
     ],
     face: [
-        { x: 3.5, y: 3.5, w: 11, h: 7.5, t: "Знак вопроса", d: "Есть дополнительные материалы. Нет знака — задание выполняется без них." },
-        { x: 36, y: 4, w: 28, h: 6, t: "Раздел колоды", d: "К какому разделу относится задание." },
-        { x: 82, y: 3.5, w: 15, h: 7, t: "Номер карты", d: "Ключ к дополнительным материалам в тренажёре." },
-        { x: 8, y: 12.5, w: 84, h: 7, t: "Название задания", d: "Короткий заголовок-крючок." },
-        { x: 8, y: 20, w: 84, h: 19, t: "История", d: "Контекст-ситуация, в которую попадает участник." },
-        { x: 8, y: 76, w: 84, h: 18, t: "Задание", d: "Что конкретно нужно сделать и какой результат сдать." },
+        { x: 3.6, y: 4, w: 7, h: 5, t: "Знак вопроса", d: "Есть дополнительные материалы. Нет знака — задание выполняется без них." },
+        { x: 34, y: 4.2, w: 32, h: 4.8, t: "Раздел колоды", d: "К какому разделу относится задание." },
+        { x: 82.5, y: 4, w: 14, h: 5, t: "Номер карты", d: "Ключ к дополнительным материалам в тренажёре." },
+        { x: 15, y: 10.4, w: 70, h: 5.6, t: "Название задания", d: "Короткий заголовок-крючок." },
+        { x: 10, y: 16.6, w: 80, h: 21, t: "История", d: "Контекст-ситуация, в которую попадает участник." },
+        { x: 10, y: 74.5, w: 80, h: 17, t: "Задание", d: "Что конкретно нужно сделать и какой результат сдать." },
     ],
 };
 
-const TACT_STEPS = [
-    ["Планирование", "Команда выбирает до 9 задач такта из шести направлений «ЗВЕЗДЫ». Это общее решение, а не сумма личных предпочтений."],
-    ["Выкладка", "Девять жетонов выбранных направлений кладутся на поле такта белой рубашкой вверх. План зафиксирован."],
-    ["Разбор", "Участники сами берут жетон и соответствующую карту задания."],
-    ["Выполнение", "Задача решается через МАЯК-ОКО и ИИ-сервисы, результат отправляется на проверку."],
-    ["Вердикт инспектора", "Инспектор соседней команды принимает или отклоняет с аргументом. Молчание две минуты — принято."],
-    ["Переворот", "Жетон переворачивается цветной стороной вверх, на трек индекса ставится звезда в это направление."],
-];
 
 const RULES = [
     ["Такт закрывается целиком", "Такт 2 не начинается, пока не закрыты все девять задач такта 1."],
@@ -161,7 +186,11 @@ export default function MayakGuidePage() {
                                 <div className="b">
                                     <span className="nm">{role.nm}</span>
                                     <span className="vice">{role.vice}</span>
-                                    <span className="ln">{role.ln}</span>
+                                    <ul className="ln">
+                                        {role.ln.map((line) => (
+                                            <li key={line}>{line}</li>
+                                        ))}
+                                    </ul>
                                 </div>
                             </article>
                         ))}
@@ -267,17 +296,7 @@ export default function MayakGuidePage() {
                         <FieldPlayerMy />
                     </div>
 
-                    <h3 className="sub-h">Ход такта</h3>
-                    <ol className="steps">
-                        {TACT_STEPS.map(([title, text]) => (
-                            <li key={title}>
-                                <b>{title}</b>
-                                <span>{text}</span>
-                            </li>
-                        ))}
-                    </ol>
-
-                    <div className="rules">
+                    <div className="rules spaced">
                         {RULES.map(([title, text]) => (
                             <div key={title} className="rule">
                                 <b>{title}</b>
@@ -286,10 +305,6 @@ export default function MayakGuidePage() {
                         ))}
                     </div>
 
-                    <div className="end">
-                        <b>Конец тренажёра.</b> Этап и весь тренажёр заканчиваются, как только одна из команд проходит все четыре такта и
-                        закрывает трек индекса цифровой зрелости. Остальные команды фиксируют результат на момент финиша.
-                    </div>
                 </section>
             </main>
 
@@ -531,11 +546,25 @@ export default function MayakGuidePage() {
                     margin-top: 14px;
                     overflow-x: auto;
                     scroll-snap-type: x mandatory;
-                    scrollbar-width: none;
-                    padding-bottom: 4px;
+                    /* дорожка прокрутки оставлена видимой и оформлена под страницу:
+                       это заодно «история» ленты — видно, где ты и сколько осталось */
+                    scrollbar-width: thin;
+                    scrollbar-color: var(--line-strong) transparent;
+                    padding-bottom: 14px;
                 }
                 .roles::-webkit-scrollbar {
-                    display: none;
+                    height: 8px;
+                }
+                .roles::-webkit-scrollbar-track {
+                    background: var(--wash);
+                    border-radius: 999px;
+                }
+                .roles::-webkit-scrollbar-thumb {
+                    background: var(--line-strong);
+                    border-radius: 999px;
+                }
+                .roles::-webkit-scrollbar-thumb:hover {
+                    background: var(--muted);
                 }
                 .role {
                     scroll-snap-align: center;
@@ -553,18 +582,17 @@ export default function MayakGuidePage() {
                     animation-range: entry 0% exit 100%;
                     transform-origin: center 42%;
                 }
+                /* дальние карточки не гасим — их должно быть видно и читаемо;
+                   разница только в размере, поэтому центр читается как главный */
                 @keyframes carousel {
                     0% {
-                        transform: scale(0.84);
-                        opacity: 0.45;
+                        transform: scale(0.93);
                     }
                     50% {
-                        transform: scale(1);
-                        opacity: 1;
+                        transform: scale(1.02);
                     }
                     100% {
-                        transform: scale(0.84);
-                        opacity: 0.45;
+                        transform: scale(0.93);
                     }
                 }
                 .role:hover {
@@ -606,7 +634,14 @@ export default function MayakGuidePage() {
                     letter-spacing: 0.04em;
                 }
                 .ln {
+                    list-style: none;
+                    margin: 4px 0 0;
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
                     font-size: 14px;
+                    line-height: 1.35;
                     color: #46565f;
                 }
                 .anatomy {
@@ -696,41 +731,7 @@ export default function MayakGuidePage() {
                     font-size: 14px;
                     color: #46565f;
                 }
-                .steps {
-                    list-style: none;
-                    counter-reset: s;
-                    margin: 22px 0 0;
-                    padding: 0;
-                    max-width: 76ch;
-                }
-                .steps :global(li) {
-                    counter-increment: s;
-                    position: relative;
-                    padding-left: 46px;
-                    margin-bottom: 20px;
-                }
-                .steps :global(li)::before {
-                    content: counter(s, decimal-leading-zero);
-                    position: absolute;
-                    left: 0;
-                    top: 1px;
-                    font-size: 12.5px;
-                    font-weight: 700;
-                    color: var(--signal);
-                    border: 1px solid var(--line-strong);
-                    border-radius: 6px;
-                    padding: 3px 7px;
-                }
-                .steps :global(b) {
-                    display: block;
-                    font-size: 16px;
-                    margin-bottom: 3px;
-                }
-                .steps :global(span) {
-                    font-size: 15px;
-                    color: #46565f;
-                }
-                .cap .t {
+                                                                                                .cap .t {
                     font-size: 12.5px;
                     letter-spacing: 0.14em;
                     text-transform: uppercase;
@@ -765,19 +766,7 @@ export default function MayakGuidePage() {
                     font-size: 14.5px;
                     color: #46565f;
                 }
-                .end {
-                    border: 1px solid var(--line-strong);
-                    border-radius: 14px;
-                    padding: 20px 22px;
-                    margin-top: 34px;
-                    background: var(--wash);
-                    font-size: 15.5px;
-                    color: #33444d;
-                }
-                .end b {
-                    color: var(--signal);
-                }
-                @media (max-width: 1080px) {
+                                                @media (max-width: 1080px) {
                     .topbar {
                         padding: 12px 20px;
                         gap: 20px;
