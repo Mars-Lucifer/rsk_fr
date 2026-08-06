@@ -60,7 +60,6 @@ import { useMayakCompletionActions } from "./hooks/useMayakCompletionActions";
 import { useMayakTaskExecutionActions } from "./hooks/useMayakTaskExecutionActions";
 import { useMayakPopupState } from "./hooks/useMayakPopupState";
 import { useMayakTypeUiState } from "./hooks/useMayakTypeUiState";
-import MasterDashboardLink from "./MasterDashboardLink";
 
 const TRAINER_PREFIX = "trainer_v2"; // Уникальный префикс для этого тренажера
 const PREVIEW_WIDTH_MIN = 320;
@@ -2115,7 +2114,6 @@ export default function TrainerPage({ goTo }) {
                     </div>
                 )}
                 <div className="flex items-center gap-2 ml-auto">
-                    <MasterDashboardLink />
                     {!isContestMode && (
                         <Button
                             icon
