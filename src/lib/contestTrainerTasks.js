@@ -1,21 +1,22 @@
-// Связь урока конкурса с заданием в тренажёре.
+// Задание урока конкурса.
 //
-// ponytail: карта живёт во фронте, потому что в learning_service у курса нет
-// полей под тренажёр. Как только в `courses` появятся trainer_section_id и
-// trainer_task_range (docs/contest-core.md, §1.6), этот файл удаляется, а
-// данные приходят вместе с уроком из API.
+// В конкурсе нет колод и карт — это другой формат, чем тренажёрные сессии
+// (решение от 06.08.2026, docs/contest/01-stage-ya.md §1а). На урок приходится
+// одно задание, и живёт оно здесь.
+//
+// ponytail: задание лежит во фронте, потому что в learning_service у курса нет
+// полей под него. Когда в `courses` появятся поля задания, этот файл удаляется,
+// а текст приходит вместе с уроком из API — форма ответа остаётся прежней.
 //
 // Ключ — lesson_number, не id: номер урока стабилен, id зависит от порядка
 // заливки в базу.
 //
 // ponytail: тексты заданий — рыба под структуру экрана. Настоящие
-// формулировки приходят вместе с конкурсной колодой.
+// формулировки приходят вместе с материалами уроков.
 
 const CONTEST_TRAINER_TASKS = {
     1: {
         short: "Вводный",
-        sectionId: "1-100",
-        taskRange: "1-4",
         format: "Старт",
         goal: "Освоить фреймворк МАЯК ОКО и собрать первый осмысленный запрос к нейросети.",
         steps: [
@@ -28,8 +29,6 @@ const CONTEST_TRAINER_TASKS = {
     },
     2: {
         short: "Текст",
-        sectionId: "1-100",
-        taskRange: "5-8",
         format: "Текст",
         goal: "Научиться ставить задачу, когда результат — текстовый материал.",
         steps: [
@@ -42,8 +41,6 @@ const CONTEST_TRAINER_TASKS = {
     },
     3: {
         short: "Аудио",
-        sectionId: "1-100",
-        taskRange: "9-12",
         format: "Аудио",
         goal: "Поставить задачу на озвучку или голосовой материал.",
         steps: [
@@ -55,8 +52,6 @@ const CONTEST_TRAINER_TASKS = {
     },
     4: {
         short: "Изображение",
-        sectionId: "1-100",
-        taskRange: "13-16",
         format: "Изображение",
         goal: "Сформулировать задачу на визуальный материал.",
         steps: [
@@ -68,8 +63,6 @@ const CONTEST_TRAINER_TASKS = {
     },
     5: {
         short: "Интерактив",
-        sectionId: "1-100",
-        taskRange: "17-20",
         format: "Интерактив",
         goal: "Спроектировать интерактивный материал: опрос, квиз, сценарий.",
         steps: [
@@ -81,8 +74,6 @@ const CONTEST_TRAINER_TASKS = {
     },
     6: {
         short: "Видео",
-        sectionId: "1-100",
-        taskRange: "21-24",
         format: "Видео",
         goal: "Поставить задачу на видеоматериал или его сценарий.",
         steps: [
@@ -94,8 +85,6 @@ const CONTEST_TRAINER_TASKS = {
     },
     7: {
         short: "Данные",
-        sectionId: "1-100",
-        taskRange: "25-28",
         format: "Данные",
         goal: "Научиться работать с таблицами и аналитикой через нейросеть.",
         steps: [
@@ -107,8 +96,6 @@ const CONTEST_TRAINER_TASKS = {
     },
     8: {
         short: "Итог",
-        sectionId: "1-100",
-        taskRange: "29-32",
         format: "Итог",
         goal: "Собрать опыт этапа «Я» и подготовиться к командному этапу.",
         steps: [
@@ -120,6 +107,28 @@ const CONTEST_TRAINER_TASKS = {
     },
 };
 
+// Слаг раздела для конкурсного захода. Тренажёр грузит задачи по sectionId, и
+// конкурс подставляет сюда свой слаг вместо номера колоды — по нему
+// content-bundle отдаёт задание урока, а не читает колоду с диска.
+export const CONTEST_SECTION_PREFIX = "contest-";
+
+// Одна задача на урок: диапазон всегда «первая и единственная».
+export const CONTEST_TASK_RANGE = "1-1";
+
+export function buildContestSectionId(lessonNumber) {
+    return `${CONTEST_SECTION_PREFIX}${Number(lessonNumber)}`;
+}
+
+export function parseContestSectionId(sectionId) {
+    const normalized = String(sectionId || "").trim().toLowerCase();
+    if (!normalized.startsWith(CONTEST_SECTION_PREFIX)) {
+        return null;
+    }
+
+    const lessonNumber = Number(normalized.slice(CONTEST_SECTION_PREFIX.length));
+    return Number.isInteger(lessonNumber) && lessonNumber > 0 ? lessonNumber : null;
+}
+
 // Короткая подпись для лесенки в шапке: полные названия уроков туда не
 // помещаются — восемь чипов не влезают в строку даже на широком экране.
 export function getContestLessonShortLabel(lessonNumber, fallback = "") {
@@ -130,10 +139,45 @@ export function getContestTrainerTask(lessonNumber) {
     return CONTEST_TRAINER_TASKS[Number(lessonNumber)] || null;
 }
 
-// Отметка о сдаче тренажёрного задания. В submissions.file_url поле обязательное
-// и рассчитано на ссылку, а тренажёр ссылки не отдаёт — кладём машиночитаемый
-// маркер, чтобы модератор видел, что это не забытая пустая строка.
-export function buildTrainerSubmissionMarker(trainerTask) {
-    if (!trainerTask) return "trainer://unknown";
-    return `trainer://${trainerTask.sectionId}/${trainerTask.taskRange}`;
+// Бандл в форме, которую ждёт тренажёр от /api/mayak/content-bundle: список
+// задач, тексты и meta с границами диапазона. Материалов у конкурсного задания
+// нет — ни файла, ни инструкции, ни карты, поэтому все ссылки пустые, а флаги
+// сняты: кнопки материалов в интерфейсе просто не появляются.
+export function buildContestTaskBundle(lessonNumber) {
+    const task = getContestTrainerTask(lessonNumber);
+    if (!task) {
+        return null;
+    }
+
+    return {
+        sectionId: buildContestSectionId(lessonNumber),
+        tasks: [
+            {
+                number: "1",
+                title: `Урок ${lessonNumber}. ${task.short}`,
+                name: `Урок ${lessonNumber}. ${task.short}`,
+                contentType: task.format,
+                description: task.goal,
+                file: "",
+                instruction: "",
+                map: "",
+                sourceLink: "",
+                hasFile: false,
+                hasInstruction: false,
+                hasMap: false,
+                hasSource: false,
+                instructionText: "",
+                materialText: "",
+                mapText: "",
+                toolName: "",
+                toolLink1: "",
+                toolName1: "",
+                services: "",
+            },
+        ],
+        texts: [],
+        // Границы задаём явно: без них тренажёр разбирает номер из слага, а в
+        // `contest-3` цифра означает урок, а не первую задачу диапазона.
+        meta: { rangeStart: 1, rangeEnd: 1 },
+    };
 }

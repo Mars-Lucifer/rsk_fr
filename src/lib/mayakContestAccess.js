@@ -8,11 +8,10 @@
 // Существующие типы входа не затрагиваются: ветка срабатывает только на
 // префикс `contest-`. См. docs/contest/01-stage-ya.md, §3.
 //
-// TODO: колоды в конкурсе не будет (решение от 06.08.2026, §1а того же файла).
-// sectionId и taskRange здесь — временная подпорка: без них тренажёр остаётся
-// без «текущей задачи». Уходят вместе с переносом задания урока в БД.
+// Колод в конкурсе нет: sectionId вида `contest-3` не указывает на колоду, по
+// нему content-bundle отдаёт задание урока (§1а того же файла).
 
-import { getContestTrainerTask } from "@/lib/contestTrainerTasks";
+import { buildContestSectionId, CONTEST_TASK_RANGE, getContestTrainerTask } from "@/lib/contestTrainerTasks";
 
 export const CONTEST_TOKEN_PREFIX = "contest-";
 
@@ -63,8 +62,8 @@ export function buildContestAccessContext(lessonNumber) {
     return {
         tokenType: "contest",
         lessonNumber,
-        sectionId: trainerTask.sectionId,
-        taskRange: trainerTask.taskRange,
+        sectionId: buildContestSectionId(lessonNumber),
+        taskRange: CONTEST_TASK_RANGE,
         // Конкурс — одиночное прохождение: ни сессии, ни столов, ни инспектора.
         // Поэтому эти заходы не попадают в сессионный дашборд.
         sessionId: null,

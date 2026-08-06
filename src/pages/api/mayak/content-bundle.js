@@ -1,4 +1,5 @@
 ﻿import { getAllSectionsIndexBundles, getSectionBundle, readManifest } from "../../../lib/mayakContentStorage.js";
+import { buildContestTaskBundle, parseContestSectionId } from "../../../lib/contestTrainerTasks.js";
 
 export default async function handler(req, res) {
     if (req.method !== "GET") {
@@ -7,6 +8,19 @@ export default async function handler(req, res) {
 
     try {
         const { sectionId, includeTexts } = req.query;
+
+        // Конкурсный заход: колоды нет, задание берётся из урока. Диск не
+        // читаем — иначе конкурс зависел бы от того, где лежит контент
+        // тренажёра. См. docs/contest/01-stage-ya.md §1а.
+        const contestLessonNumber = parseContestSectionId(sectionId);
+        if (contestLessonNumber) {
+            const contestBundle = buildContestTaskBundle(contestLessonNumber);
+            if (!contestBundle) {
+                return res.status(404).json({ success: false, error: "Задание к этому уроку не настроено" });
+            }
+            return res.status(200).json({ success: true, data: contestBundle });
+        }
+
         if (sectionId) {
             // validateFiles: рантайм тренажёра получает ссылки, выверенные по
             // диску — битая ссылка в index.json не доходит до клиента и не даёт 404.

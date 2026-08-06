@@ -726,7 +726,10 @@ export default function TrainerPage({ goTo }) {
         getStorageKey,
         buildPromptDraft: () => buildPromptDraftRef.current?.(),
         currentTaskIndex,
-        isIntroTask,
+        // «Первые три задания колоды» — правило колоды: там это выбор роли,
+        // входная анкета и тест. В конкурсе колоды нет, задание на урок одно,
+        // и без этой оговорки оценка СОВЫ была бы закрыта на всех восьми уроках.
+        isIntroTask: isContestMode ? () => false : isIntroTask,
     });
 
     const buildPromptDraftRef = useRef(null);
@@ -1692,7 +1695,7 @@ export default function TrainerPage({ goTo }) {
     const cleanupPrompt = cleanupMayakPrompt;
 
     const isCreateDisabled = Object.values(fields).some((v) => !v);
-    const isEvaluationBlockedForIntroTask = isIntroTask(currentTaskIndex);
+    const isEvaluationBlockedForIntroTask = !isContestMode && isIntroTask(currentTaskIndex);
     const isCopyDisabled = !prompt || isCopied || prompt.includes("Пожалуйста, заполните") || isPromptCopyAwaitingEvaluation;
     const copyDisabledReason = isPromptCopyAwaitingEvaluation ? "Дождитесь ответа нейросети" : !prompt ? "Сначала создайте промт" : prompt.includes("Пожалуйста, заполните") ? "Сначала заполните все поля" : "";
     const createWithEvaluationDisabledReason = isEvaluationBlockedForIntroTask
