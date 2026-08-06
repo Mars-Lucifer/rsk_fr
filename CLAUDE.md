@@ -40,6 +40,42 @@ different agent sessions at the same time. Read this before your first commit.
 `main` holds only what is ready for production. Unfinished work lives on its
 own branch for as long as needed — never partially committed to `main`.
 
+### Branch Status Board
+
+Что где находится на сегодня. Обновлять в том же коммите, что меняет статус
+ветки: начали работу, закоммитили, запушили, слили в `main`, выкатили на прод.
+
+Проверено 2026-08-06. `main` = `origin/main` = прод = `16a4132`.
+
+| Ветка | Статус | Сверх `main` | На `origin` | На проде |
+|---|---|---|---|---|
+| `main` | продовая | — | да | да, `16a4132` |
+| `feat/mayak-master-dashboard` | в работе: контур доступов, мастер-ссылка, дашборд, журнал списаний | 31 | нет | нет |
+| `chore/portal-api-base` | в работе: портал/BFF, база знаний конкурса | 33 | да | нет |
+| `feat/mayak-guide-live` | в работе: живая версия гайда | 26 | нет | нет |
+| `feat/mayak-guide-page` | в работе: страница гайда, интерактивные поля | 25 | нет | нет |
+| `feat/mayak-guide` | слита в `main` | 0 | да | да |
+| `feat/mayak-instruction-templates` | слита в `main` | 0 | да | да |
+| `feat/mayak-fffff-session-joker` | слита в `main` | 0 | да | да |
+| `feature/mayak-we-directions` | слита в `main` | 0 | да | да |
+| `mayak/session-sim-and-concurrency-fixes` | слита в `main`, локальная | 0 | нет | да |
+
+Ветки со статусом «слита в `main`» можно удалять локально — их содержимое уже
+в проде. Ветки «в работе» на прод не выкатывать без отдельной проверки.
+
+Как проверить статус, не гадая:
+
+```bash
+git merge-base --is-ancestor <ветка> main && echo "в main"   # слита или нет
+git rev-list --count main..<ветка>                            # своих коммитов
+git ls-remote --heads origin <ветка>                          # запушена или нет
+ssh root@91.228.225.182 'git -C /root/rsk_fr log --oneline -1'  # что на проде
+```
+
+Каталог деплоя на проде — `/root/rsk_fr`. Рядом лежат `/root/rsk_test` и
+несколько копий бэкенда (`RSK_back`, `RSK_BACK_COPY`, `RSK_back_latest`,
+`RSK_back_oldest_worked`) — не перепутать при проверке.
+
 **Before touching anything:**
 
 1. Run `git status` and `git branch --show-current`.
@@ -77,12 +113,25 @@ of creating a second one.
 |---|---|---|
 | repo root | whatever the current session took | `npm run dev`, port 1234 |
 | `.worktrees/mayak-master` | `feat/mayak-master-dashboard` | config `mayak-master-dev`, port 1235 |
+| `.worktrees/mayak-guide` | ветка гайда | config `mayak-guide-dev`, port 1236 |
 
 Each worktree needs its own `node_modules` and `.env.local` — neither is
 tracked, so a fresh worktree starts without them. Dev servers are declared in
 `.claude/launch.json` (repo root); a worktree entry runs
-`cd /d .worktrees\<name> && npx next dev --webpack -p <port>` and every
-workstream gets its own port, because `npm run dev` hardcodes 1234.
+`cd /d .worktrees\<name> && npx next dev --webpack -p <port>`.
+
+**Свой порт и свой каталог — обязательны, это не вопрос удобства.**
+
+- Один порт держит ровно один процесс: второй падает с `EADDRINUSE`. Поэтому
+  `npm run dev` (жёстко 1234) годится только для той копии, что заняла корень.
+- Каталог сборки `.next` принадлежит копии, а не порту. Два процесса на одной
+  копии — даже на разных портах — пишут в один `.next` и портят друг другу
+  чанки: `next dev` пересобирает то, что `next start` в этот момент отдаёт.
+  Так что «разные порты, одна папка» не спасает — нужна отдельная копия.
+- `data/` в worktree по умолчанию свой. Если подключить его junction'ом к
+  корневому (удобно для проверок на живых данных) — рантайм становится общим:
+  сессии, токены и журнал списаний видят обе копии. Файловые локи это
+  выдерживают, но цифры в кабинете будут общими на всех.
 
 ### Never Commit
 
