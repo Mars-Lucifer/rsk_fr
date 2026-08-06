@@ -14,10 +14,33 @@ How to use this file:
 - use `Task Index` when you need the fastest path to the right files.
 
 Related files:
+- `docs/contest/README.md` is the entry point for all contest work — read it first if the task mentions the contest, lessons, or stages «Я» / «Мы».
 - `AGENTS.md` defines the required workflow for Codex work in this repo.
 - `CODEX_LEARNINGS.md` stores reusable pitfalls and prevention rules.
 - `docs/mayak-refactor-status.md` stores MAYAK refactor progress/status.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
+
+## Contest (конкурс РСК)
+
+The contest is an active, separately documented product line inside this repo.
+It reuses the MAYAK trainer instead of duplicating it, and it has its own
+knowledge base under `docs/contest/`:
+
+- `docs/contest/README.md` — entry point: what the contest is, document map, current focus
+- `docs/contest/01-stage-ya.md` — stage «Я»: 8 lessons + trainer tasks (built)
+- `docs/contest/02-stage-my.md` — stage «Мы»: not started, open questions
+- `docs/contest/03-teams-and-orgs.md` — organizations, teams, 3+1 composition
+- `docs/contest/04-infrastructure.md` — backend, prod state, local stack, known mines
+- `docs/contest/05-decisions.md` — decision log and open questions
+- `docs/contest/CHANGELOG.md` — what was done, newest first
+
+Rules when working on the contest:
+- read `docs/contest/README.md` before touching contest code;
+- keep these files current **in the same commit** as the change: update the
+  relevant stage file, add a line to `CHANGELOG.md`, move answered questions
+  into the decisions table with a date;
+- contest entry into the trainer is a separate access type (`tokenType: "contest"`
+  in `src/lib/mayakContestAccess.js`) — existing token/session paths must stay untouched.
 
 ## What Is Easy To Confuse First
 
@@ -601,6 +624,14 @@ When a task says:
 - start with the frontend proxy route under `src/pages/api/*`
 - map it to the owning service in `../back/RSK_back`
 - inspect backend route, schema, and any event-driven side effects before changing response handling
+
+`change contest behavior (уроки, этапы «Я»/«Мы», доступ в тренажёр)`
+- start with `docs/contest/README.md`
+- lessons list: `src/pages/cours/index.js`
+- contest access into the trainer: `src/lib/mayakContestAccess.js`
+- lesson → deck mapping and task texts: `src/lib/contestTrainerTasks.js`
+- contest screen inside the trainer: `src/components/features/tools-2/ContestLessonPanel.js`
+- update `docs/contest/*` in the same commit
 
 `change MAYAK trainer behavior`
 - start with `src/pages/tools/mayak-oko.js`
