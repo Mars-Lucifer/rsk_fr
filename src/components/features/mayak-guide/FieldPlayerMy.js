@@ -469,7 +469,7 @@ export default function FieldPlayerMy({ bare = false, onPlayer }) {
                 .player {
                     display: grid;
                     /* как в плеере «Я»: поле своего размера, остаток ширины — колонке */
-                    grid-template-columns: minmax(0, 894px) minmax(360px, 1fr);
+                    grid-template-columns: max-content minmax(360px, 1fr);
                     gap: 26px;
                     align-items: stretch;
                 }
@@ -478,7 +478,10 @@ export default function FieldPlayerMy({ bare = false, onPlayer }) {
                 }
                 .stage {
                     position: relative;
-                    width: 100%;
+                    /* как в плеере «Я»: высота от экрана, ширина по пропорции поля */
+                    height: min(702px, calc(100vh - 230px));
+                    width: auto;
+                    max-width: 100%;
                     aspect-ratio: ${VB_W} / ${VB_H};
                     border: 1px solid #e3eaef;
                     border-radius: 18px;

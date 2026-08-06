@@ -441,7 +441,7 @@ export default function FieldPlayerYa({ bare = false, onPlayer }) {
                     display: grid;
                     /* поле держит свой размер, вся лишняя ширина уходит колонке —
                        иначе справа от неё оставалась пустая половина экрана */
-                    grid-template-columns: minmax(0, 894px) minmax(360px, 1fr);
+                    grid-template-columns: max-content minmax(360px, 1fr);
                     gap: 26px;
                     align-items: stretch;
                 }
@@ -450,7 +450,11 @@ export default function FieldPlayerYa({ bare = false, onPlayer }) {
                 }
                 .stage {
                     position: relative;
-                    width: 100%;
+                    /* поле считает высоту от экрана: этап должен читаться целиком,
+                       без прокрутки. Ширину задаёт пропорция, а не колонка грида. */
+                    height: min(702px, calc(100vh - 230px));
+                    width: auto;
+                    max-width: 100%;
                     aspect-ratio: ${VB_W} / ${VB_H};
                     border: 1px solid #e3eaef;
                     border-radius: 18px;

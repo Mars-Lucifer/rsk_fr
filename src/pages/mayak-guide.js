@@ -63,20 +63,25 @@ const ROLES = [
 // Элемент карты — это область, а не точка: x/y — левый верхний угол, w/h — размер,
 // всё в процентах от карты. При наведении на строку легенды подсвечивается обводка
 // области, а номер стоит у края карты и ничего не перекрывает.
+//
+// Границы сняты не на глаз: обе картинки разобраны попиксельно (public/mayak-guide/
+// cards/text.png — 297×420, cards-ya/text-face-sample.png — 481×667), у каждого
+// элемента взят его bounding box плюс 3 пикселя воздуха. Если картинки карт
+// заменят — пересчитать, а не подгонять руками.
 const PINS = {
     back: [
-        { x: 5.5, y: 3.5, w: 13, h: 6, t: "Идентификатор этапа", d: "Метка «Я» или «МЫ» в овале." },
-        { x: 81.5, y: 3.5, w: 13, h: 6, t: "Номер", d: "Порядковый номер задания внутри раздела." },
-        { x: 28, y: 14.5, w: 44, h: 10, t: "Название раздела", d: "Тип контента на этапе «Я» или направление «ЗВЕЗДЫ» на этапе «МЫ»." },
-        { x: 24, y: 28, w: 52, h: 48, t: "Цветной гекс с иконкой", d: "По нему карта опознаётся, не переворачивая." },
+        { x: 4.7, y: 4, w: 12.8, h: 6.4, t: "Идентификатор этапа", d: "Метка «Я» или «МЫ» в овале." },
+        { x: 82.5, y: 4, w: 12.8, h: 6.2, t: "Номер", d: "Порядковый номер задания внутри раздела." },
+        { x: 38.4, y: 16.2, w: 22.9, h: 5.7, t: "Название раздела", d: "Тип контента на этапе «Я» или направление «ЗВЕЗДЫ» на этапе «МЫ»." },
+        { x: 20.2, y: 30.2, w: 60.6, h: 40.5, t: "Цветной гекс с иконкой", d: "По нему карта опознаётся, не переворачивая." },
     ],
     face: [
-        { x: 3.6, y: 4, w: 7, h: 5, t: "Знак вопроса", d: "Есть дополнительные материалы. Нет знака — задание выполняется без них." },
-        { x: 34, y: 4.2, w: 32, h: 4.8, t: "Раздел колоды", d: "К какому разделу относится задание." },
-        { x: 82.5, y: 4, w: 14, h: 5, t: "Номер карты", d: "Ключ к дополнительным материалам в тренажёре." },
-        { x: 15, y: 10.4, w: 70, h: 5.6, t: "Название задания", d: "Короткий заголовок-крючок." },
-        { x: 10, y: 16.6, w: 80, h: 21, t: "История", d: "Контекст-ситуация, в которую попадает участник." },
-        { x: 10, y: 74.5, w: 80, h: 17, t: "Задание", d: "Что конкретно нужно сделать и какой результат сдать." },
+        { x: 6, y: 4.8, w: 7.3, h: 5.2, t: "Знак вопроса", d: "Есть дополнительные материалы. Нет знака — задание выполняется без них." },
+        { x: 34.9, y: 4.6, w: 30.1, h: 5.5, t: "Раздел колоды", d: "К какому разделу относится задание." },
+        { x: 81.5, y: 4.6, w: 12.1, h: 5.5, t: "Номер карты", d: "Ключ к дополнительным материалам в тренажёре." },
+        { x: 16.8, y: 12.1, w: 63.2, h: 4.6, t: "Название задания", d: "Короткий заголовок-крючок." },
+        { x: 9.8, y: 17.5, w: 81.7, h: 19.8, t: "История", d: "Контекст-ситуация, в которую попадает участник." },
+        { x: 7.9, y: 77.2, w: 83.6, h: 13.8, t: "Задание", d: "Что конкретно нужно сделать и какой результат сдать." },
     ],
 };
 
@@ -154,28 +159,11 @@ export default function MayakGuidePage() {
             <main>
                 {/* 01 — роли и карты */}
                 <section id="s2">
-                    <span className="eyebrow">Команда</span>
-                    <h2>Шесть ролей и устройство карты</h2>
+                    <h2 className="stagehead">Команда · Шесть ролей и устройство карты</h2>
                     <p className="lede">
                         Роль — не должность, а функция, без которой команда буксует. Каждая закрывает одну типовую болезнь: недоверие,
                         уход от спора, размытую ответственность, нетребовательность, безразличие к результату.
                     </p>
-                    <p className="hint spaced">
-                        Карты раздаются рубашкой вверх, каждый берёт одну. У роли два действия: постоянное — фон на весь день, активное —
-                        поступок в конкретный момент.
-                    </p>
-
-                    <div className="rolesbar">
-                        <span className="rolesnote">Шесть ролей команды — пролистайте ленту</span>
-                        <span className="arrows">
-                            <button type="button" onClick={() => slide(-1)} disabled={edge.start} aria-label="Предыдущие роли">
-                                ‹
-                            </button>
-                            <button type="button" onClick={() => slide(1)} disabled={edge.end} aria-label="Следующие роли">
-                                ›
-                            </button>
-                        </span>
-                    </div>
 
                     <div className="roles" ref={railRef} onScroll={syncEdges}>
                         {ROLES.map((role) => (
@@ -196,9 +184,15 @@ export default function MayakGuidePage() {
                         ))}
                     </div>
 
-                    <div className="block spaced">
-                        <h3>Если участников меньше шести</h3>
-                        <p>В первую очередь сохраняются Инспектор и Капитан: без них ломается проверка и темп. Летописец и Хранитель Маяка совмещаются.</p>
+                    {/* Стрелки стоят под лентой по центру — прямо под карточкой,
+                        которая в этот момент главная. */}
+                    <div className="rolesbar">
+                        <button type="button" onClick={() => slide(-1)} disabled={edge.start} aria-label="Предыдущие роли">
+                            ‹
+                        </button>
+                        <button type="button" onClick={() => slide(1)} disabled={edge.end} aria-label="Следующие роли">
+                            ›
+                        </button>
                     </div>
 
                     <h3 className="sub-h">Из чего устроена карта задания</h3>
@@ -229,8 +223,7 @@ export default function MayakGuidePage() {
                                 ))}
                             </div>
                             <p className="hint spaced">
-                                Наведите на строку — на карте подсветится нужный элемент. Кнопка под картой переворачивает её, карту
-                                можно и просто крутить мышью.
+                                Наведите на строку — на карте подсветится нужный элемент.
                             </p>
 
                             <div className="block">
@@ -247,26 +240,11 @@ export default function MayakGuidePage() {
 
                 {/* 02 — этап «Я» */}
                 <section id="s3">
-                    <span className="eyebrow">Этап 1 · Я — цифровой эксперт</span>
-                    <h2>Как читается поле и что делает участник</h2>
+                    <h2 className="stagehead">Этап 1 · Я — цифровой эксперт</h2>
                     <p className="lede">
                         Цель этапа: каждый осваивает работу с ИИ через МАЯК-ОКО и углубляется в один тип контента, чтобы на командном
                         этапе не тратить силы на инструменты.
                     </p>
-
-                    <div className="kit">
-                        {[
-                            "Поле стороной «Я» вверх",
-                            "6 карт ролей",
-                            "Миплы по одному на участника",
-                            "Планшет игрока",
-                            "Раздел «Старт» — 9 карт",
-                            "Первые карты шести типов",
-                            "Шесть разделов по типам контента",
-                        ].map((item) => (
-                            <span key={item}>{item}</span>
-                        ))}
-                    </div>
 
                     <div className="playerwrap">
                         <FieldPlayerYa />
@@ -276,21 +254,8 @@ export default function MayakGuidePage() {
 
                 {/* 03 — этап «МЫ» */}
                 <section id="s4">
-                    <span className="eyebrow">Этап 2 · МЫ — цифровая организация</span>
-                    <h2>Такт: от девяти жетонов до девяти звёзд</h2>
+                    <h2 className="stagehead">Этап 2 · МЫ — цифровая организация</h2>
                     <p className="lede">Цель этапа: закрыть трек индекса цифровой зрелости по всем шести направлениям «ЗВЕЗДЫ» раньше соперников.</p>
-
-                    <div className="kit">
-                        {[
-                            "Поле стороной «МЫ» вверх",
-                            "36 жетонов, по 6 на направление",
-                            "Обычные звёзды",
-                            "Красные Звёзды-Джокеры с этапа «Я»",
-                            "Шесть разделов колоды по направлениям",
-                        ].map((item) => (
-                            <span key={item}>{item}</span>
-                        ))}
-                    </div>
 
                     <div className="playerwrap">
                         <FieldPlayerMy />
@@ -404,7 +369,7 @@ export default function MayakGuidePage() {
                     font-weight: 600;
                 }
                 section {
-                    padding: 64px 40px 76px;
+                    padding: 34px 40px 40px;
                     max-width: 1760px;
                     margin: 0 auto;
                     border-bottom: 1px solid var(--line);
@@ -412,15 +377,7 @@ export default function MayakGuidePage() {
                        чтобы заголовок раздела не уезжал под липкую шапку */
                     scroll-margin-top: 78px;
                 }
-                .eyebrow {
-                    display: block;
-                    font-size: 11px;
-                    letter-spacing: 0.18em;
-                    text-transform: uppercase;
-                    color: var(--muted);
-                    margin-bottom: 16px;
-                }
-                h1 {
+                                h1 {
                     margin: 0;
                     font-size: clamp(38px, 5vw, 62px);
                     line-height: 1.02;
@@ -433,6 +390,11 @@ export default function MayakGuidePage() {
                     line-height: 1.05;
                     letter-spacing: -0.025em;
                     font-weight: 800;
+                }
+                /* Раздел открывается одной строкой-заголовком: подпись-надзаголовок и
+                   второй заголовок убраны, чтобы этап помещался в экран без прокрутки. */
+                .stagehead {
+                    font-size: clamp(24px, 2.1vw, 30px);
                 }
                 h3 {
                     margin: 0 0 10px;
@@ -450,8 +412,9 @@ export default function MayakGuidePage() {
                 /* лид идёт по ширине поля, а не узкой колонкой: под ним стоит плеер,
                    и разная ширина двух соседних блоков читалась как сбой вёрстки */
                 .lede {
-                    margin-top: 20px;
-                    font-size: 18px;
+                    margin-top: 12px;
+                    margin-bottom: 0;
+                    font-size: 17px;
                     color: #3f5058;
                     max-width: 1280px;
                 }
@@ -463,7 +426,7 @@ export default function MayakGuidePage() {
                     margin-top: 26px;
                 }
                 .playerwrap {
-                    margin-top: 34px;
+                    margin-top: 20px;
                     /* ширину держит сам плеер: поле ограничено своей колонкой грида,
                        а боковая колонка забирает остаток строки */
                 }
@@ -476,20 +439,7 @@ export default function MayakGuidePage() {
                     color: #46565f;
                     margin: 0;
                 }
-                .kit {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                    margin-top: 18px;
-                }
-                .kit :global(span) {
-                    font-size: 13.5px;
-                    color: #46565f;
-                    border: 1px solid var(--line);
-                    border-radius: 999px;
-                    padding: 7px 14px;
-                }
-                .flip.turned {
+                                                .flip.turned {
                     transform: rotateY(180deg);
                 }
                 .face.back {
@@ -503,22 +453,15 @@ export default function MayakGuidePage() {
                 .act.ghost:hover {
                     background: var(--wash);
                 }
+                /* стрелки под лентой, по центру — под той карточкой, что сейчас главная */
                 .rolesbar {
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
-                    gap: 20px;
-                    margin-top: 30px;
+                    justify-content: center;
+                    gap: 10px;
+                    margin-top: 14px;
                 }
-                .rolesnote {
-                    font-size: 13.5px;
-                    color: var(--muted);
-                }
-                .arrows {
-                    display: flex;
-                    gap: 8px;
-                }
-                .arrows button {
+                .rolesbar button {
                     width: 38px;
                     height: 38px;
                     border-radius: 50%;
@@ -530,14 +473,14 @@ export default function MayakGuidePage() {
                     cursor: pointer;
                     transition: background 0.18s ease, opacity 0.18s ease;
                 }
-                .arrows button:hover:not(:disabled) {
+                .rolesbar button:hover:not(:disabled) {
                     background: var(--wash);
                 }
-                .arrows button:disabled {
+                .rolesbar button:disabled {
                     opacity: 0.35;
                     cursor: default;
                 }
-                /* лента ролей: видно три карточки, остальные листаются вбок */
+                                                                                                /* лента ролей: видно три карточки, остальные листаются вбок */
                 .roles {
                     display: grid;
                     grid-auto-flow: column;
@@ -546,25 +489,12 @@ export default function MayakGuidePage() {
                     margin-top: 14px;
                     overflow-x: auto;
                     scroll-snap-type: x mandatory;
-                    /* дорожка прокрутки оставлена видимой и оформлена под страницу:
-                       это заодно «история» ленты — видно, где ты и сколько осталось */
-                    scrollbar-width: thin;
-                    scrollbar-color: var(--line-strong) transparent;
-                    padding-bottom: 14px;
+                    /* листаем кнопками под лентой, полосу прокрутки прячем */
+                    scrollbar-width: none;
+                    padding-bottom: 2px;
                 }
                 .roles::-webkit-scrollbar {
-                    height: 8px;
-                }
-                .roles::-webkit-scrollbar-track {
-                    background: var(--wash);
-                    border-radius: 999px;
-                }
-                .roles::-webkit-scrollbar-thumb {
-                    background: var(--line-strong);
-                    border-radius: 999px;
-                }
-                .roles::-webkit-scrollbar-thumb:hover {
-                    background: var(--muted);
+                    display: none;
                 }
                 .role {
                     scroll-snap-align: center;

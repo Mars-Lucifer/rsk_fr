@@ -144,7 +144,6 @@ export default function CardAnatomy3D({ side, onSide, pins, hint = null }) {
                 </span>
                 Перевернуть карту
             </button>
-            <p className="tip">Карту можно и просто крутить мышью.</p>
 
             <style jsx>{`
                 .wrap {
