@@ -1286,7 +1286,9 @@ export default function TrainerPage({ goTo }) {
     const isCurrentTaskRejected = !!(sessionBlockingTask && Number(sessionBlockingTask.taskIndex) === currentTaskIndex && sessionBlockingTask.status === "rejected");
     const isCurrentTaskPendingReview = !!(sessionBlockingTask && Number(sessionBlockingTask.taskIndex) === currentTaskIndex && sessionBlockingTask.status === "pending_review");
     const isCurrentTaskApproved = ["approved", "expired", "rework_expired"].includes(currentTaskState?.status);
-    const canAccessCurrentTaskResources = timerState.isRunning || isCurrentTaskRejected || isCurrentTaskPendingReview;
+    // В конкурсе материалы (PDF задания, инструкция, карта) доступны сразу:
+    // там нет таймера сессии, к которому привязан доступ в обычном режиме.
+    const canAccessCurrentTaskResources = isContestMode || timerState.isRunning || isCurrentTaskRejected || isCurrentTaskPendingReview;
     const currentTaskReviewComment = isCurrentTaskRejected ? sessionBlockingTask?.comment || "" : "";
     const inspectorQueue = Array.isArray(sessionRuntimeState?.inspectorQueue) ? sessionRuntimeState.inspectorQueue : [];
     const activeInspectorReview = inspectorQueue.find((review) => review.id === openedInspectorReviewId) || null;
