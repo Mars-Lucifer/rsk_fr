@@ -42,7 +42,7 @@ const START_DECK = { x: 1836, y: 196 };
 // Стопка «Старт» мельче колод типов контента — она лежит на краю стола, а не в пазу.
 const START_SCALE = 0.95;
 // Откуда «прилетают» стопки при раскладке — из-за правого края поля.
-const OFFSTAGE = { x: 2200, y: 1450 };
+const OFFSTAGE = { x: 2350, y: 170 };
 
 const MEEPLES = ["#2f6fd0", "#c9503f", "#1d2126", "#e2a03f", "#6aa838", "#eef1f4"];
 
@@ -201,8 +201,10 @@ const DECK_BY_ID = DECKS.reduce((acc, deck, order) => ({ ...acc, [deck.id]: { ..
 const pct = (value, total) => `${(value / total) * 100}%`;
 const MOVE = { duration: 0.95, ease: [0.33, 0, 0.2, 1] };
 
-export default function FieldPlayerYa() {
-    const script = useMemo(buildScript, []);
+// bare / onPlayer — см. FieldPlayerMy: режим «только поле» для интерактивного стола,
+// где поле лежит в 3D-сцене, а кнопки живут в немасштабируемом слое.
+export default function FieldPlayerYa({ bare = false, onPlayer }) {
+    const script = useMemo(() => buildScript(), []);
     const [index, setIndex] = useState(0);
     const [playing, setPlaying] = useState(false);
     const [started, setStarted] = useState(false);
@@ -266,8 +268,27 @@ export default function FieldPlayerYa() {
     const phaseSteps = script.filter((item) => item.phase === step.phase);
     const phasePosition = phaseSteps.indexOf(step) + 1;
 
+    const idle = "Нажмите «Показать раскладку» — поле разложится само: стопки карт, стартовые задания, внешний круг и лучи специализации.";
+
+    useEffect(() => {
+        if (!onPlayer) return;
+        onPlayer({
+            started,
+            playing,
+            phase: step.phase,
+            phases: PHASES,
+            phasePosition,
+            phaseTotal: phaseSteps.length,
+            progress: started ? (index + 1) / script.length : 0,
+            caption: started ? step.caption : idle,
+            counter: finished ? "раскладка пройдена" : "",
+            playLabel: !started ? "Показать раскладку" : playing ? "Пауза" : "Продолжить",
+            api: { start, play: () => setPlaying(true), pause: () => setPlaying(false), jumpToPhase },
+        });
+    }, [onPlayer, started, playing, index, step, phasePosition, phaseSteps.length, script.length, finished, start, jumpToPhase, idle]);
+
     return (
-        <div className="player">
+        <div className={`player ${bare ? "bare" : ""}`}>
             <div className="stage">
                 <img className="fieldimg" src="/mayak-guide/field-ya.svg" alt="Поле МАЯК, сторона «Я»" />
 
@@ -342,6 +363,7 @@ export default function FieldPlayerYa() {
                 ))}
             </div>
 
+            {bare ? null : (
             <aside className="side">
                 <button type="button" className={`play ${started && playing ? "is-playing" : ""}`} onClick={started && playing ? () => setPlaying(false) : started ? () => setPlaying(true) : start}>
                     <span className="ico" aria-hidden="true">
@@ -385,6 +407,7 @@ export default function FieldPlayerYa() {
                     {finished ? "Показать заново" : "В начало"}
                 </button>
             </aside>
+            )}
 
             <style jsx>{`
                 .player {
@@ -392,6 +415,9 @@ export default function FieldPlayerYa() {
                     grid-template-columns: minmax(0, 1fr) 360px;
                     gap: 26px;
                     align-items: start;
+                }
+                .player.bare {
+                    display: block;
                 }
                 .stage {
                     position: relative;
