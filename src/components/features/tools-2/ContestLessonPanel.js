@@ -225,7 +225,7 @@ export default function ContestLessonPanel() {
                 )}
 
                 {/* Справа видеоурок. */}
-                {activeLesson.download_url?.includes("rutube.ru") && <VideoFacade url={activeLesson.download_url} title={activeLesson.lesson_name} eager />}
+                {activeLesson.download_url?.includes("rutube.ru") && <VideoFacade url={activeLesson.download_url} title={activeLesson.lesson_name} label="Смотреть урок" />}
             </div>
 
             {/* Ответ — широким блоком под видео: текст слева, файл справа. */}

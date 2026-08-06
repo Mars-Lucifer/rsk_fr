@@ -183,7 +183,7 @@ export default function Cours() {
                                     <div className="flex flex-col gap-[.5rem]">
                                         {/* Ролик прямо в карточке: отдельная страница урока
                                             больше не нужна, смотреть можно отсюда. */}
-                                        {lesson.download_url?.includes("rutube.ru") && <VideoFacade url={lesson.download_url} title={lesson.lesson_name} eager={!isLocked} />}
+                                        {lesson.download_url?.includes("rutube.ru") && <VideoFacade url={lesson.download_url} title={lesson.lesson_name} />}
                                         <div className="flex items-center justify-between gap-[.5rem]">
                                             <span
                                                 style={{
