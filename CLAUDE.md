@@ -47,9 +47,39 @@ own branch for as long as needed — never partially committed to `main`.
    for a separate worktree instead of switching branches under someone else's
    uncommitted files.
 
+**Re-check the branch immediately before every write.** A branch check from a
+few tool calls ago is stale: another session sharing the directory can
+`checkout` under you between calls, and the commit lands in their branch. Run
+`git branch --show-current` in the same command as the commit/cherry-pick, or
+work in a worktree where nobody else switches branches.
+
+**Never `git reset --hard` in a directory another session may be using.** Check
+`git status --porcelain` first: uncommitted files there may be someone's
+in-flight work, and `--hard` destroys it unrecoverably. To drop your own commit
+from a shared branch, wait for that session to finish or use `git rebase --onto`
+on a clean tree.
+
+### Worktrees
+
 Parallel sessions are isolated with worktrees under `.worktrees/` (gitignored),
 one directory per workstream. Prefer the harness's native worktree tool over
 `git worktree add` when one is available.
+
+A branch can be checked out in only one worktree at a time — `git worktree add`
+fails with `already used by worktree at ...` if it is taken. Run
+`git worktree list` first; if the directory already exists, work in it instead
+of creating a second one.
+
+| Directory | Branch | Dev server |
+|---|---|---|
+| repo root | whatever the current session took | `npm run dev`, port 1234 |
+| `.worktrees/mayak-master` | `feat/mayak-master-dashboard` | config `mayak-master-dev`, port 1235 |
+
+Each worktree needs its own `node_modules` and `.env.local` — neither is
+tracked, so a fresh worktree starts without them. Dev servers are declared in
+`.claude/launch.json` (repo root); a worktree entry runs
+`cd /d .worktrees\<name> && npx next dev --webpack -p <port>` and every
+workstream gets its own port, because `npm run dev` hardcodes 1234.
 
 ### Never Commit
 
