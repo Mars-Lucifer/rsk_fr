@@ -20,6 +20,113 @@ Related files:
 - `docs/mayak-refactor-status.md` stores MAYAK refactor progress/status.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
 
+## Work Organization: One Workstream = One Branch
+
+Several product lines are built in parallel in this repository, often by
+different agent sessions at the same time. Read this before your first commit.
+
+**Rule: one workstream, one branch, one working copy.**
+
+| Workstream | Branch prefix |
+|---|---|
+| Contest (конкурс РСК) | `feat/contest-*` |
+| MAYAK guide / master playbook | `feat/mayak-guide-*`, `feat/mayak-master-*` |
+| MAYAK sessions and dashboard | `feat/mayak-session-*` |
+| Portal / BFF / backend contract | `feat/portal-*`, `chore/portal-*` |
+
+`main` holds only what is ready for production. Unfinished work lives on its
+own branch for as long as needed — never partially committed to `main`.
+
+**Before touching anything:**
+
+1. Run `git status` and `git branch --show-current`.
+2. If the working copy contains changes belonging to another workstream — stop
+   and report it. Do not commit around them, and never run `git add -A` /
+   `git commit -a` in a mixed working copy: stage explicit paths only.
+3. If your task belongs to a different workstream than the current branch, ask
+   for a separate worktree instead of switching branches under someone else's
+   uncommitted files.
+
+Parallel sessions are isolated with worktrees under `.worktrees/` (gitignored),
+one directory per workstream. Prefer the harness's native worktree tool over
+`git worktree add` when one is available.
+
+### Never Commit
+
+| What | Why |
+|---|---|
+| `mayak_transfer.tar.gz` and any `*.tar.gz` | production transfer archive: contains `.env.local` and live task decks (~83 MB). `.gitignore` matches file names, not archive contents — a secret inside an archive slips through any `.env*` rule |
+| `_mayak_rospatent/` | patent-filing package; a generated snapshot of `src`/`data` |
+| `check*.mjs`, root-level `*.png` | one-off browser check scripts and their screenshots |
+| `docs/mayak-master-playbook/assets/` | duplicates the tracked assets in `public/mayak-guide/`, which is what the code actually loads (`const A = "/mayak-guide"`) |
+| runtime files under `data/` | operator state, not sources — see the ignore list |
+
+If any of these ever reach the history, removing them requires rewriting
+history, and for the archive also rotating every key in `.env.local`.
+
+## Production Server Access
+
+Продовый сервер: `root@91.228.225.182`. Вход по ключу `~/.ssh/id_rsa`, ключ уже
+в `authorized_keys`, пароль не нужен и спрашивать его нельзя. Команды идут
+через обычный Bash: `ssh root@91.228.225.182 '<команда>'`.
+
+Работа ведётся под `root` — это осознанное решение владельца. Значит,
+единственный ограничитель — правила ниже. Соблюдать их буквально.
+
+### Главное ограничение: бэкапов нет
+
+На сервере шесть отдельных баз PostgreSQL (`auth`, `profile`, `teams`, `orgs`,
+`projects`, `learning`) плюс рантайм в `data/`. Ничего из этого не хранится
+локально: `data/*.json`, `data/contest-answers/`, `.env.local` и содержимое БД
+перечислены в `.gitignore`. Локальная копия репозитория дублирует только
+исходный код — данные участников при потере не восстановить ничем.
+
+Отсюда: **удалённое на этом сервере потеряно навсегда.**
+
+### Что можно без спроса
+
+Только чтение, ничего не меняющее:
+
+- `docker ps`, `docker logs`, `docker stats`, `docker inspect`
+- `df -h`, `free -m`, `uptime`, `top -bn1`
+- `cat`, `head`, `tail`, `grep`, `ls` по логам и конфигам
+- `git log`, `git status`, `git diff` в каталоге деплоя
+- `SELECT` в базах — только на чтение
+
+### Что требует явного подтверждения пользователя
+
+Сначала показать точную команду, объяснить последствие, дождаться «да»:
+
+- любой `docker restart`, `stop`, `down`, `up`, `compose`
+- деплой, `git pull`, `git checkout`, пересборка образов
+- правка любого файла на сервере, включая `.env*` и конфиги
+- миграции БД, любой `INSERT` / `UPDATE` / `DELETE` / `DROP`
+- `systemctl`, изменение сети, портов, firewall
+
+### Запрещено всегда
+
+- `rm -rf`, `docker volume rm`, `docker system prune`, `DROP DATABASE`, `TRUNCATE`
+- вывод содержимого `.env*` в переписку — там боевые ключи
+- копирование дампов БД в репозиторий или в рабочий каталог
+
+### Карта сервиса
+
+| Сервис | Порт приложения | Порт БД |
+|---|---|---|
+| auth | 8002 | 5433 |
+| profile | 8003 | 5434 |
+| teams | 8004 | 5435 |
+| orgs | 8005 | 5436 |
+| projects | 8010 | 5437 |
+| learning | 8011 | 5445 |
+
+Инфраструктура: `traefik` (80/443), `rabbitmq` (5672/15672), `redis` (6379),
+`celery_worker` + `celery_beat`, мониторинг `grafana` (3001) / `prometheus` (9090).
+Контейнеры подняты около трёх месяцев назад, аптайм хоста больше года.
+
+Код на сервере разошёлся с репозиторием — не считать, что там то же самое,
+что локально. Подробности и известные мины: `docs/contest/04-infrastructure.md`.
+
 ## Contest (конкурс РСК)
 
 The contest is an active, separately documented product line inside this repo.

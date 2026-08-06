@@ -97,3 +97,21 @@ tmp_mascot_compare/
 public/tasks-2/v2/
 
 data/mayak-content/
+
+# скриншоты и логи проверки браузером
+.playwright-mcp/
+check*.mjs
+# скриншоты, которые проверочные скрипты кидают в корень
+/*.png
+
+# архивы переноса на прод: внутри .env.local и боевые колоды
+*.tar.gz
+
+# пакет патентной заявки: генерируется из src, в репо не нужен
+_mayak_rospatent/
+
+# ассеты плейбука дублируют public/mayak-guide/
+docs/mayak-master-playbook/assets/
+
+# изолированные рабочие копии (git worktree)
+.worktrees/
