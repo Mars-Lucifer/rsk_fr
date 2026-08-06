@@ -42,6 +42,13 @@ const TEMP_GUEST_PROFILE = {
     lastName: "Участник",
     patronymic: "",
 };
+// Мастер заходит по своей ссылке (?dash=...) — ФИО у него не спрашиваем,
+// подставляем служебный профиль и пускаем сразу, как временного гостя.
+const MASTER_DEMO_PROFILE = {
+    firstName: "демо",
+    lastName: "Мастер",
+    patronymic: "",
+};
 const EMPTY_GUEST_FORM = {
     firstName: "",
     lastName: "",
@@ -129,6 +136,9 @@ async function loginMayakAdmin(password) {
 
 export default function SettingsPage({ goTo }) {
     const router = useRouter();
+    // Мастерский вход опознаём по секрету дашборда в ссылке — он есть только у
+    // мастера. Такой вход не спрашивает ФИО и не выбирает стол.
+    const isMasterEntry = router.isReady && Boolean(String(router.query.dash || "").trim());
     const skipNextTokenEffectRef = useRef(false);
     const portalProfilePayloadRef = useRef(getCachedPortalProfilePayload());
     const isPortalCheckedRef = useRef(hasResolvedPortalProfileCache());
@@ -626,9 +636,12 @@ export default function SettingsPage({ goTo }) {
         }
 
         const tokenMeta = parseMayakGuestToken(token);
-        const firstName = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.firstName : guestForm.firstName) || "").trim();
-        const lastName = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.lastName : guestForm.lastName) || "").trim();
-        const patronymic = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.patronymic : guestForm.patronymic) || "").trim();
+        // Профиль берём: у мастера — служебный, у временного гостя — гостевой,
+        // у обычного участника — из формы ФИО.
+        const autoProfile = isMasterEntry ? MASTER_DEMO_PROFILE : tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE : null;
+        const firstName = String((autoProfile ? autoProfile.firstName : guestForm.firstName) || "").trim();
+        const lastName = String((autoProfile ? autoProfile.lastName : guestForm.lastName) || "").trim();
+        const patronymic = String((autoProfile ? autoProfile.patronymic : guestForm.patronymic) || "").trim();
 
         if (!lastName || !firstName) {
             setGuestFormError("Р”Р»СЏ РІС…РѕРґР° Р·Р°РїРѕР»РЅРёС‚Рµ С„Р°РјРёР»РёСЋ Рё РёРјСЏ.");
@@ -636,7 +649,9 @@ export default function SettingsPage({ goTo }) {
         }
 
         const resolvedTableNumber =
-            sessionInfo.tokenType === "session" && !String(tableNumber || "").trim() && Number(sessionInfo.tableCount) === 1 ? "1" : String(tableNumber || "").trim();
+            sessionInfo.tokenType === "session" && !String(tableNumber || "").trim() && (Number(sessionInfo.tableCount) === 1 || isMasterEntry)
+                ? "1"
+                : String(tableNumber || "").trim();
 
         if (sessionInfo.tokenType === "session" && !resolvedTableNumber) {
             setGuestFormError("РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІР°С€ СЃС‚РѕР».");
@@ -658,7 +673,12 @@ export default function SettingsPage({ goTo }) {
             }
 
             const baseToken = tokenMeta.baseToken || String(token || "").trim();
-            const userId = buildMayakGuestUserId(sessionInfo);
+            // У мастера id стабильный: иначе каждый его вход плодил бы нового
+            // участника в рантайме сессии. Префикс master-demo- отсекается в
+            // дашборде, чтобы демо-вход не попадал в метрики столов.
+            const userId = isMasterEntry
+                ? `master-demo-${String(sessionInfo.sessionId || "session").replace(/[^a-zA-Z0-9_-]+/g, "-")}`
+                : buildMayakGuestUserId(sessionInfo);
             const fullName = [lastName, firstName, patronymic].filter(Boolean).join(" ").trim();
 
             const saveResponse = await fetch("/api/mayak/save", {
@@ -735,7 +755,7 @@ export default function SettingsPage({ goTo }) {
         } finally {
             setIsLoading(false);
         }
-    }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isStoredTokenActive, isTokenValid, sessionInfo, tableNumber, token]);
+    }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isMasterEntry, isStoredTokenActive, isTokenValid, sessionInfo, tableNumber, token]);
 
     useEffect(() => {
         if (!showNotification || !isTokenValid || !isGuestMode || !isTemporaryGuestToken || hasRegisteredUser || isLoading || isValidating) {
@@ -744,6 +764,21 @@ export default function SettingsPage({ goTo }) {
 
         activateGuestUser();
     }, [activateGuestUser, hasRegisteredUser, isGuestMode, isLoading, isTemporaryGuestToken, isTokenValid, isValidating, showNotification]);
+
+    // Мастер приходит по своей ссылке (?dash=...): ФИО у него не спрашиваем и
+    // стол не выбираем — если он уже зарегистрирован, ведём внутрь, иначе
+    // регистрируем служебным профилем. Участников это не касается: у них в
+    // ссылке нет dash.
+    useEffect(() => {
+        if (!isMasterEntry || !isTokenValid || isLoading || isValidating) return;
+        if (hasRegisteredUser) {
+            goTo("trainer");
+            return;
+        }
+        if (isGuestMode) {
+            activateGuestUser();
+        }
+    }, [isMasterEntry, isTokenValid, hasRegisteredUser, isGuestMode, isLoading, isValidating, activateGuestUser, goTo]);
 
     const savePortalIdentity = useCallback(async () => {
         const firstName = String(portalIdentityForm.firstName || "").trim();
@@ -915,6 +950,16 @@ export default function SettingsPage({ goTo }) {
     const renderPortalGate = () => {
         if (!showNotification || isDevBypass) {
             return null;
+        }
+
+        // Мастер входит без формы ФИО и без выбора стола: пока идёт регистрация,
+        // показываем спокойный лоадер, а не мелькающую форму участника.
+        if (isMasterEntry) {
+            return (
+                <div className="flex flex-col gap-[1rem] items-center">
+                    <span className="big p-3 bg-green-100 text-green-700 rounded-md">Открываем сессию…</span>
+                </div>
+            );
         }
 
         if (isGuestMode) {

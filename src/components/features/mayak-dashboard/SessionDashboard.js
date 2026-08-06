@@ -25,8 +25,12 @@ function formatDuration(totalSeconds) {
     return `${mm}:${ss}`;
 }
 
-export default function SessionDashboard({ sessionId, onAuthFail }) {
+export default function SessionDashboard({ sessionId, onAuthFail, dashboardUrl, participantsUrl, hideBack = false, onBack, backLabel }) {
     const router = useRouter();
+    // По умолчанию — admin-эндпоинты (обратная совместимость). Мастерский дашборд
+    // передаёт свои URL с секретом в query.
+    const resolvedDashboardUrl = dashboardUrl || `/api/admin/mayak-sessions/${encodeURIComponent(sessionId)}/dashboard`;
+    const resolvedParticipantsUrl = participantsUrl || `/api/admin/mayak-sessions/${encodeURIComponent(sessionId)}/participants`;
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -67,7 +71,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
             inFlightRef.current = true;
             if (isManual) setRefreshing(true);
             try {
-                const response = await fetch(`/api/admin/mayak-sessions/${encodeURIComponent(sessionId)}/dashboard`, {
+                const response = await fetch(resolvedDashboardUrl, {
                     cache: "no-store",
                 });
                 if (response.status === 401) {
@@ -95,7 +99,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                 if (isManual) setRefreshing(false);
             }
         },
-        [sessionId, onAuthFail]
+        [resolvedDashboardUrl, onAuthFail]
     );
 
     // editorMode держим в ref, чтобы fetchData (стабильный useCallback) видел
@@ -187,7 +191,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
     const patchParticipant = useCallback(
         async (body, fallbackError) => {
             try {
-                const response = await fetch(`/api/admin/mayak-sessions/${encodeURIComponent(sessionId)}/participants`, {
+                const response = await fetch(resolvedParticipantsUrl, {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(body),
@@ -203,7 +207,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                 return false;
             }
         },
-        [sessionId, fetchData, showToast]
+        [resolvedParticipantsUrl, fetchData, showToast]
     );
 
     const handleChangeRole = useCallback(
@@ -243,7 +247,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
             const name = participant.name || "участника";
             if (!window.confirm(`Удалить «${name}» из сессии? Его сессия будет завершена.`)) return;
             try {
-                const response = await fetch(`/api/admin/mayak-sessions/${encodeURIComponent(sessionId)}/participants`, {
+                const response = await fetch(resolvedParticipantsUrl, {
                     method: "DELETE",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ userId: participant.userId }),
@@ -258,7 +262,7 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
                 showToast(err.message || "Не удалось удалить участника");
             }
         },
-        [sessionId, fetchData, showToast]
+        [resolvedParticipantsUrl, fetchData, showToast]
     );
 
     const handlePersonDragStart = useCallback((event, participant) => {
@@ -354,9 +358,11 @@ export default function SessionDashboard({ sessionId, onAuthFail }) {
         <div className={styles.root}>
             <header className={styles.header}>
                 <div className={styles.headerLeft}>
-                    <button type="button" className={styles.backLink} onClick={() => router.push("/admin/mayak-sessions")}>
-                        ← В список токенов
-                    </button>
+                    {!hideBack ? (
+                        <button type="button" className={styles.backLink} onClick={onBack || (() => router.push("/admin/mayak-sessions"))}>
+                            {backLabel || "← В список токенов"}
+                        </button>
+                    ) : null}
                     <h1 className={styles.title}>{data.session.name || "Сессия: 1"}</h1>
                 </div>
 

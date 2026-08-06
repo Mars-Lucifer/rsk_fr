@@ -250,6 +250,8 @@ export default function AdminMayakTokens() {
     const [editingId, setEditingId] = useState("");
     const [editDraft, setEditDraft] = useState({});
     const [actionFeedback, setActionFeedback] = useState({ id: "", text: "", type: "success" });
+    // Раскрытый пароль — по одному за раз: пароль нужен, чтобы разово скопировать/продиктовать.
+    const [revealedPasswordId, setRevealedPasswordId] = useState("");
 
     useEffect(() => {
         if (!router.isReady) return;
@@ -357,6 +359,16 @@ export default function AdminMayakTokens() {
         if (!text) return;
         try {
             await navigator.clipboard.writeText(text);
+            setActionFeedback({ id: item.id, text: "Скопировано", type: "success" });
+        } catch {
+            setActionFeedback({ id: item.id, text: "Не скопировано", type: "error" });
+        }
+    };
+
+    const copyValue = async (item, value) => {
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
             setActionFeedback({ id: item.id, text: "Скопировано", type: "success" });
         } catch {
             setActionFeedback({ id: item.id, text: "Не скопировано", type: "error" });
@@ -733,21 +745,52 @@ export default function AdminMayakTokens() {
 
                                     <div className="value-grid">
                                         {item.token ? (
-                                            <div>
+                                            <div className="grow">
                                                 <span>Токен</span>
                                                 <code>{item.token}</code>
                                             </div>
                                         ) : null}
                                         {item.link ? (
-                                            <div>
+                                            <div className="grow">
                                                 <span>Ссылка</span>
-                                                <code>{buildAbsoluteUrl(item.link)}</code>
+                                                <div className="value-line">
+                                                    <code>{buildAbsoluteUrl(item.link)}</code>
+                                                    <button
+                                                        type="button"
+                                                        className="pw-button"
+                                                        title="Скопировать ссылку"
+                                                        aria-label="Скопировать ссылку"
+                                                        onClick={() => copyValue(item, buildAbsoluteUrl(item.link))}
+                                                    >
+                                                        ⧉
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : null}
-                                        {item.password && item.type !== "external_link" ? (
+                                        {item.password ? (
                                             <div>
                                                 <span>Пароль</span>
-                                                <code>{item.password}</code>
+                                                <div className="value-line password-line">
+                                                    <code>{revealedPasswordId === item.id ? item.password : "••••••••"}</code>
+                                                    <button
+                                                        type="button"
+                                                        className="pw-button"
+                                                        title={revealedPasswordId === item.id ? "Скрыть пароль" : "Показать пароль"}
+                                                        aria-label={revealedPasswordId === item.id ? "Скрыть пароль" : "Показать пароль"}
+                                                        onClick={() => setRevealedPasswordId((current) => (current === item.id ? "" : item.id))}
+                                                    >
+                                                        {revealedPasswordId === item.id ? "🙈" : "👁"}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="pw-button"
+                                                        title="Скопировать пароль"
+                                                        aria-label="Скопировать пароль"
+                                                        onClick={() => copyValue(item, item.password)}
+                                                    >
+                                                        ⧉
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : null}
                                     </div>
@@ -1075,7 +1118,9 @@ export default function AdminMayakTokens() {
 
                 .access-card {
                     display: grid;
-                    grid-template-columns: minmax(240px, 1.15fr) minmax(360px, 1.65fr) minmax(250px, auto);
+                    /* Колонка действий фиксирована: у сессии кнопок 4 (есть дашборд),
+                       у остальных 3 — при auto карточки разъезжались по ширине. */
+                    grid-template-columns: minmax(240px, 1.15fr) minmax(360px, 1.65fr) 300px;
                     gap: 12px;
                     align-items: center;
                     border: 1px solid #e2e8f0;
@@ -1183,12 +1228,23 @@ export default function AdminMayakTokens() {
                     background: #0f766e;
                 }
 
+                /* Flex вместо равных колонок: длинные значения (токен/ссылка) тянутся,
+                   короткий пароль занимает только свою ширину — без пустой полосы. */
                 .value-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: stretch;
                     gap: 8px;
                     margin-top: 0;
                     min-width: 0;
+                }
+
+                .value-grid > div {
+                    flex: 0 0 auto;
+                }
+
+                .value-grid > div.grow {
+                    flex: 1 1 220px;
                 }
 
                 .value-grid div {
@@ -1197,6 +1253,54 @@ export default function AdminMayakTokens() {
                     border-radius: 8px;
                     background: #f8fafc;
                     padding: 7px 9px;
+                }
+
+                .value-grid .value-line {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    border: 0;
+                    border-radius: 0;
+                    padding: 0;
+                    background: none;
+                }
+
+                .value-line code {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    margin-top: 0;
+                }
+
+                /* Пароль короткий — кнопки прижимаем к тексту, без пустой полосы.
+                   Моноширинный + фиксированная ширина: маска и сам пароль занимают
+                   одинаковое место, блок не дёргается при показе/скрытии. */
+                .password-line code {
+                    flex: 0 0 auto;
+                    width: 9ch;
+                    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                    letter-spacing: 0.5px;
+                }
+
+                .pw-button {
+                    flex: 0 0 auto;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 26px;
+                    height: 24px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    background: #fff;
+                    color: #0f172a;
+                    font-size: 12px;
+                    line-height: 1;
+                    font-weight: 900;
+                    cursor: pointer;
+                }
+
+                .pw-button:hover {
+                    border-color: #94a3b8;
+                    background: #f1f5f9;
                 }
 
                 .value-grid span {
@@ -1223,6 +1327,15 @@ export default function AdminMayakTokens() {
                     justify-content: flex-end;
                     margin-top: 0;
                     flex-wrap: nowrap;
+                }
+
+                /* Одна ширина для всех кнопок: иначе ряды с 3 и 4 кнопками
+                   растягивают их по-разному и колонка выглядит рваной. */
+                .actions .icon-button {
+                    flex: 0 0 44px;
+                    width: 44px;
+                    min-width: 44px;
+                    padding: 6px 0;
                 }
 
                 .empty {

@@ -215,6 +215,36 @@ export async function findActiveMayakSessionByTokenId(tokenId) {
     );
 }
 
+// Привязать дополнительный session-токен к существующей сессии (например,
+// мастер-токен для демо-входа без учёта). findActiveMayakSessionByTokenId ищет
+// сессию по вхождению tokenId в session.tokenIds, поэтому доп. токен обязан быть
+// в этом массиве, иначе тренажёр не поднимет по нему сессию.
+export async function attachTokenIdToMayakSession(sessionId, tokenId) {
+    const normalizedSessionId = normalizeString(String(sessionId || ""));
+    const normalizedTokenId = normalizeString(String(tokenId || ""));
+    if (!normalizedSessionId || !normalizedTokenId) return null;
+
+    const store = await readMayakSessionsStore();
+    const index = store.sessions.findIndex((session) => session.id === normalizedSessionId);
+    if (index === -1) {
+        throw new Error("Сессия не найдена");
+    }
+
+    const current = store.sessions[index];
+    const tokenIds = Array.isArray(current.tokenIds) ? current.tokenIds.slice() : [];
+    if (tokenIds.includes(normalizedTokenId)) {
+        return current;
+    }
+    tokenIds.push(normalizedTokenId);
+    store.sessions[index] = {
+        ...current,
+        tokenIds,
+        updatedAt: new Date().toISOString(),
+    };
+    await writeStore(store, [current.id]);
+    return store.sessions[index];
+}
+
 export async function createMayakSession(payload) {
     const store = await readMayakSessionsStore();
     const basePayload = normalizeMayakSession(payload);

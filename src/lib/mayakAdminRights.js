@@ -5,6 +5,7 @@ import { promises as fs } from "fs";
 import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
 import { createMayakSession, deleteMayakSession, listMayakSessions } from "@/lib/mayakSessions";
 import { listMayakSessionTokens } from "@/lib/mayakSessionTokens";
+import { createSessionLinks, getSessionLinksBySessionId } from "@/lib/mayakSessionLinks";
 
 const RIGHTS_FILE = path.join(process.cwd(), "data", "mayak-admin-rights.json");
 const DEFAULT_TOTAL_QUOTA = 1000000;
@@ -172,16 +173,23 @@ async function collectDelegatedSessionsForRight(right) {
     const tokenMap = new Map(tokens.map((token) => [token.id, token]));
     const ownerKeys = new Set([normalizeString(right.accessId), normalizeString(right.userId)].filter(Boolean));
 
-    return sessions
+    const activeSessions = sessions
         .filter((session) => String(session.source || "") === "delegated-admin")
         .filter((session) => ownerKeys.has(normalizeString(session.ownerUserId)))
-        .filter((session) => String(session.status || "") === "active")
-        .map((session) => {
+        .filter((session) => String(session.status || "") === "active");
+
+    const items = await Promise.all(
+        activeSessions.map(async (session) => {
             const primaryToken =
                 (Array.isArray(session?.tokenIds) ? session.tokenIds : []).map((tokenId) => tokenMap.get(tokenId)).find(Boolean) || null;
-            return { session, token: primaryToken };
+            const links = await getSessionLinksBySessionId(session.id).catch(() => null);
+            return { session, token: primaryToken, links };
         })
-        .sort((left, rightItem) => String(rightItem.session?.createdAt || "").localeCompare(String(left.session?.createdAt || "")));
+    );
+
+    return items.sort((left, rightItem) =>
+        String(rightItem.session?.createdAt || "").localeCompare(String(left.session?.createdAt || ""))
+    );
 }
 
 export async function listMayakAdminRights() {
@@ -359,6 +367,17 @@ async function createDelegatedMayakSessionForRightIndex(store, index, { sessionN
         store.rights[index] = nextRight;
         await writeStore(store);
 
+        // Помимо базовой инспекторской ссылки заводим комплект доп. ссылок
+        // (обычная без инспектора, мастер, дашборд). Не критично для создания
+        // сессии: при сбое сессия остаётся валидной, ссылки досоздать нельзя
+        // только автоматически — поэтому ошибку логируем, но не роняем поток.
+        let links = null;
+        try {
+            links = await createSessionLinks({ session: createdSession, accessId: getRightOwnerKey(currentRight) });
+        } catch (linksError) {
+            console.error("Не удалось создать доп. ссылки сессии:", linksError);
+        }
+
         const tokens = await listMayakSessionTokens();
         const tokenMap = new Map(tokens.map((token) => [token.id, token]));
         const primaryToken =
@@ -368,6 +387,7 @@ async function createDelegatedMayakSessionForRightIndex(store, index, { sessionN
             right: toPublicRight(nextRight, tokens),
             session: createdSession,
             token: primaryToken,
+            links,
         };
     } catch (error) {
         if (createdSession?.id) {
