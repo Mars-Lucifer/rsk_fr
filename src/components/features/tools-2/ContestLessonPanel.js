@@ -113,6 +113,7 @@ export default function ContestLessonPanel() {
 
     const brief = getContestTrainerTask(activeLesson.lesson_number);
     const isLessonDone = activeLesson.is_completed === "true";
+    const isLastLesson = !nextLesson;
     const hasAnswer = Boolean(answerText.trim() || answerFile);
 
     const finishTask = async () => {
@@ -218,9 +219,23 @@ export default function ContestLessonPanel() {
                         <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
                             {brief.goal}
                         </p>
-                        <button type="button" onClick={() => setIsBriefOpen(true)} style={{ ...buttonStyle(LOOK.ghost, false), alignSelf: "flex-start", padding: "0.375rem 0.75rem", fontSize: "0.8125rem" }}>
-                            Задание целиком
-                        </button>
+                        <div className="flex gap-[0.5rem] flex-wrap">
+                            <button type="button" onClick={() => setIsBriefOpen(true)} style={{ ...buttonStyle(LOOK.ghost, false), padding: "0.375rem 0.75rem", fontSize: "0.8125rem" }}>
+                                Задание целиком
+                            </button>
+                            {/* Последний урок подводит к этапу «Мы»: организация выбирается
+                                в профиле, и без неё команду не создать. */}
+                            {isLastLesson && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        window.location.href = "/profile?tab=settings";
+                                    }}
+                                    style={{ ...buttonStyle(LOOK.ghost, false), padding: "0.375rem 0.75rem", fontSize: "0.8125rem" }}>
+                                    Перейти в профиль
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
 
