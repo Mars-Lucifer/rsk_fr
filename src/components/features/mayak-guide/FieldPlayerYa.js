@@ -42,7 +42,7 @@ const START_DECK = { x: 1836, y: 196 };
 // Стопка «Старт» мельче колод типов контента — она лежит на краю стола, а не в пазу.
 const START_SCALE = 0.95;
 // Откуда «прилетают» стопки при раскладке — из-за правого края поля.
-const OFFSTAGE = { x: 2200, y: 1450 };
+const OFFSTAGE = { x: 2350, y: 170 };
 
 const MEEPLES = ["#2f6fd0", "#c9503f", "#1d2126", "#e2a03f", "#6aa838", "#eef1f4"];
 
@@ -124,37 +124,34 @@ function buildScript() {
         });
     });
 
-    // Внешний круг: команда встаёт на одиночный гекс типа и получает оттуда первую карту.
-    // Это задание №1 из четырёх — дальше три задания по лучу.
+    // Внешний круг карт не выдаёт: команда обходит шесть ячеек, чтобы увидеть все типы
+    // контента и выбрать свой. Все четыре задания типа участник берёт уже в специализации,
+    // начиная с той же ячейки, на которую встал при расхождении.
     TYPES.forEach((type) => {
         steps.push({
             phase: 2,
-            caption: `Внешний круг, ${type.name.toLowerCase()}: команда идёт по ячейке кольца и берёт первую карту этого типа — задание 1 из 4.`,
+            caption: `Внешний круг, ${type.name.toLowerCase()}: команда идёт по ячейке кольца и разбирается, что это за тип контента. Карту здесь не берут.`,
             meeples: MEEPLES.map((_, i) => cluster(type.sector, i, 6, 0.95)),
-            taken: { ...taken, [type.id]: (taken[type.id] += 1) },
-            delays: { [`${type.id}-0`]: 0 },
-            restack: { [type.id]: 0 },
-            hold: 1400,
+            taken: { ...taken },
+            delays: {},
+            restack: {},
+            hold: 1000,
         });
     });
 
-    steps.push({
-        phase: 3,
-        caption: "Выбор специализации: участники расходятся, каждый встаёт на сектор своего типа контента.",
-        meeples: TYPES.map((type) => type.sector),
-        taken: { ...taken },
-        delays: {},
-        restack: {},
-        hold: 1700,
-    });
-
-    for (let level = 0; level < 3; level += 1) {
+    // Расхождение — уже первый такт специализации: участник встал на свою ячейку и сразу
+    // берёт с неё карту. Дальше три гекса луча — итого четыре задания, ровно столько
+    // карт в разделе типа.
+    for (let level = 0; level < 4; level += 1) {
         steps.push({
             phase: 3,
-            caption: `Задание ${level + 2} из 4: мипл делает шаг по лучу и берёт следующую карту своего типа.`,
-            meeples: TYPES.map((type) => type.ray[level]),
+            caption:
+                level === 0
+                    ? "Участники расходятся по своим типам. Расхождение — уже такт: каждый встаёт на ячейку своего типа и берёт с неё карту, задание 1 из 4."
+                    : `Задание ${level + 1} из 4: мипл делает шаг по лучу и берёт следующую карту своего типа.`,
+            meeples: TYPES.map((type) => (level === 0 ? type.sector : type.ray[level - 1])),
             taken: TYPES.reduce((acc, type) => ({ ...acc, [type.id]: (taken[type.id] += 1) }), { ...taken }),
-            delays: Object.fromEntries(TYPES.map((type, order) => [`${type.id}-${level + 1}`, order * 0.08])),
+            delays: Object.fromEntries(TYPES.map((type, order) => [`${type.id}-${level}`, order * 0.08])),
             restack: Object.fromEntries(TYPES.map((type, order) => [type.id, order * 0.08])),
             hold: 1700,
         });
@@ -162,7 +159,7 @@ function buildScript() {
 
     steps.push({
         phase: 4,
-        caption: "Одиночный гекс дал первую карту, луч — ещё три. Четыре выполненных задания. Участник приносит команде красную Звезду-Джокер.",
+        caption: "Четыре такта специализации — четыре выполненных задания у каждого. Участник приносит команде красную Звезду-Джокер.",
         meeples: TYPES.map((type) => type.ray[2]),
         taken: { ...taken },
         delays: {},
@@ -176,9 +173,9 @@ function buildScript() {
 const PHASES = [
     { id: 0, label: "Раскладка", text: "Стопка «Старт» ложится в верхний правый угол поля, шесть колод по типам контента — на свои гексы. Миплы встают на центральный гекс СТАРТ." },
     { id: 1, label: "Внутренний круг", text: "Четыре ячейки вокруг центра. Команда идёт по часовой стрелке — вправо, вниз, влево, вверх — и решает стартовые задания вместе. Из верхней ячейки выходит на кольцо типов." },
-    { id: 2, label: "Внешний круг", text: "Команда обходит шесть ячеек кольца — по одной на каждый тип контента. На каждой берёт первую карту типа: это задание 1 из 4." },
-    { id: 3, label: "Специализация", text: "Участники расходятся по своим типам. Каждый идёт по лучу наружу: ещё три задания, три гекса — задания 2, 3 и 4." },
-    { id: 4, label: "Итог", text: "Первая карта — на одиночном гексе внешнего круга, ещё три — по лучу. Итого четыре задания. Участник приносит команде красную Звезду-Джокер." },
+    { id: 2, label: "Внешний круг", text: "Команда обходит шесть ячеек кольца — по одной на каждый тип контента. Карт здесь не берут: круг нужен, чтобы увидеть все шесть типов и выбрать свой." },
+    { id: 3, label: "Специализация", text: "Участники расходятся по своим типам. Расхождение — уже первый такт: на своей ячейке каждый берёт карту, дальше три гекса луча. Всего четыре задания." },
+    { id: 4, label: "Итог", text: "Четыре такта специализации — четыре задания, ровно столько карт в разделе типа. Участник приносит команде красную Звезду-Джокер." },
 ];
 
 // Наклон стопки: верх карты смотрит от центра поля наружу — карта развёрнута
@@ -201,8 +198,10 @@ const DECK_BY_ID = DECKS.reduce((acc, deck, order) => ({ ...acc, [deck.id]: { ..
 const pct = (value, total) => `${(value / total) * 100}%`;
 const MOVE = { duration: 0.95, ease: [0.33, 0, 0.2, 1] };
 
-export default function FieldPlayerYa() {
-    const script = useMemo(buildScript, []);
+// bare / onPlayer — см. FieldPlayerMy: режим «только поле», сейчас без вызывающих,
+// где поле лежит в 3D-сцене, а кнопки живут в немасштабируемом слое.
+export default function FieldPlayerYa({ bare = false, onPlayer }) {
+    const script = useMemo(() => buildScript(), []);
     const [index, setIndex] = useState(0);
     const [playing, setPlaying] = useState(false);
     const [started, setStarted] = useState(false);
@@ -266,8 +265,27 @@ export default function FieldPlayerYa() {
     const phaseSteps = script.filter((item) => item.phase === step.phase);
     const phasePosition = phaseSteps.indexOf(step) + 1;
 
+    const idle = "Нажмите «Показать раскладку» — поле разложится само: стопки карт, стартовые задания, внешний круг и лучи специализации.";
+
+    useEffect(() => {
+        if (!onPlayer) return;
+        onPlayer({
+            started,
+            playing,
+            phase: step.phase,
+            phases: PHASES,
+            phasePosition,
+            phaseTotal: phaseSteps.length,
+            progress: started ? (index + 1) / script.length : 0,
+            caption: started ? step.caption : idle,
+            counter: finished ? "раскладка пройдена" : "",
+            playLabel: !started ? "Показать раскладку" : playing ? "Пауза" : "Продолжить",
+            api: { start, play: () => setPlaying(true), pause: () => setPlaying(false), jumpToPhase },
+        });
+    }, [onPlayer, started, playing, index, step, phasePosition, phaseSteps.length, script.length, finished, start, jumpToPhase, idle]);
+
     return (
-        <div className="player">
+        <div className={`player ${bare ? "bare" : ""}`}>
             <div className="stage">
                 <img className="fieldimg" src="/mayak-guide/field-ya.svg" alt="Поле МАЯК, сторона «Я»" />
 
@@ -342,6 +360,7 @@ export default function FieldPlayerYa() {
                 ))}
             </div>
 
+            {bare ? null : (
             <aside className="side">
                 <button type="button" className={`play ${started && playing ? "is-playing" : ""}`} onClick={started && playing ? () => setPlaying(false) : started ? () => setPlaying(true) : start}>
                     <span className="ico" aria-hidden="true">
@@ -385,6 +404,7 @@ export default function FieldPlayerYa() {
                     {finished ? "Показать заново" : "В начало"}
                 </button>
             </aside>
+            )}
 
             <style jsx>{`
                 .player {
@@ -392,6 +412,9 @@ export default function FieldPlayerYa() {
                     grid-template-columns: minmax(0, 1fr) 360px;
                     gap: 26px;
                     align-items: start;
+                }
+                .player.bare {
+                    display: block;
                 }
                 .stage {
                     position: relative;

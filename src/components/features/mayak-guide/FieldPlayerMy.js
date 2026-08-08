@@ -72,7 +72,7 @@ const PLANS = [
 ];
 
 // Откуда «прилетают» стопки при раскладке — из-за правого нижнего угла поля.
-const OFFSTAGE = { x: 1980, y: 1420 };
+const OFFSTAGE = { x: 1700, y: 120 };
 
 // Куда уходят взятые карты — влево за планшет такта 3, в одну точку (рука команды).
 const HAND = { x: -40, y: 850 };
@@ -191,8 +191,12 @@ const ENTER = { duration: 0.62, ease: [0.16, 1, 0.3, 1] };
 const LEAVE = { duration: 0.86, ease: [0.4, 0, 1, 1] };
 const STAGGER = 0.075;
 
-export default function FieldPlayerMy() {
-    const script = useMemo(buildScript, []);
+// bare — режим «только поле»: боковая панель не рендерится, а состояние и управление
+// уходят наружу через onPlayer. Единственным его потребителем был интерактивный стол
+// /mayak-guide-live; страницу вытеснила настоящая 3D-сцена и удалили, так что режим
+// сейчас без вызывающих. Оставлен до решения, нужен ли он ещё кому-то.
+export default function FieldPlayerMy({ bare = false, onPlayer }) {
+    const script = useMemo(() => buildScript(), []);
     const [index, setIndex] = useState(0);
     const [playing, setPlaying] = useState(false);
     const [started, setStarted] = useState(false);
@@ -253,8 +257,27 @@ export default function FieldPlayerMy() {
     const phasePosition = phaseSteps.indexOf(step) + 1;
     const closed = started ? step.stars.reduce((sum, value) => sum + value, 0) : 0;
 
+    const idle = "Нажмите «Показать такты» — поле «МЫ» разложится само: разделы колоды, девять жетонов такта, перевороты и звёзды индекса.";
+
+    useEffect(() => {
+        if (!onPlayer) return;
+        onPlayer({
+            started,
+            playing,
+            phase: step.phase,
+            phases: PHASES,
+            phasePosition,
+            phaseTotal: phaseSteps.length,
+            progress: started ? (index + 1) / script.length : 0,
+            caption: started ? step.caption : idle,
+            counter: `${closed}/36 задач закрыто`,
+            playLabel: !started ? "Показать такты" : playing ? "Пауза" : "Продолжить",
+            api: { start, play: () => setPlaying(true), pause: () => setPlaying(false), jumpToPhase },
+        });
+    }, [onPlayer, started, playing, index, step, phasePosition, phaseSteps.length, script.length, closed, start, jumpToPhase, idle]);
+
     return (
-        <div className="player">
+        <div className={`player ${bare ? "bare" : ""}`}>
             <div className="stage">
                 <img className="fieldimg" src="/mayak-guide/pole_my.png" alt="Поле МАЯК, сторона «МЫ»" />
 
@@ -374,6 +397,7 @@ export default function FieldPlayerMy() {
                 )}
             </div>
 
+            {bare ? null : (
             <aside className="side">
                 <button type="button" className={`play ${started && playing ? "is-playing" : ""}`} onClick={started && playing ? () => setPlaying(false) : started ? () => setPlaying(true) : start}>
                     <span className="ico" aria-hidden="true">
@@ -418,6 +442,7 @@ export default function FieldPlayerMy() {
                     Начать сначала
                 </button>
             </aside>
+            )}
 
             <style jsx>{`
                 .player {
@@ -425,6 +450,9 @@ export default function FieldPlayerMy() {
                     grid-template-columns: minmax(0, 1fr) 360px;
                     gap: 26px;
                     align-items: start;
+                }
+                .player.bare {
+                    display: block;
                 }
                 .stage {
                     position: relative;
