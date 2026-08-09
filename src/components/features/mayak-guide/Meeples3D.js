@@ -34,7 +34,9 @@ const noRaycast = () => null;
 
 function meepleGeometry() {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB} ${VB}"><path d="${MEEPLE_D}"/></svg>`;
-    const shapes = new SVGLoader().parse(svg).paths.flatMap((path) => SVGLoader.createShapes(path));
+    // path.toShapes(), а не SVGLoader.createShapes(): второй объявлен устаревшим и на
+    // каждый путь пишет предупреждение в консоль. Результат тот же — это его же тело.
+    const shapes = new SVGLoader().parse(svg).paths.flatMap((path) => path.toShapes(true));
     const geometry = new THREE.ExtrudeGeometry(shapes, {
         depth: (VB * DEPTH) / HEIGHT,
         bevelEnabled: true,

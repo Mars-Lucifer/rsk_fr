@@ -172,7 +172,7 @@ function place(state, index) {
     };
 }
 
-export const TableDecks3D = forwardRef(function TableDecks3D({ position = [0, 0, 0], side = "ya" }, ref) {
+export const TableDecks3D = forwardRef(function TableDecks3D({ position = [0, 0, 0], side = "ya", onReady }, ref) {
     const backs = useTexture(BACK_URLS, tuneTextures);
     const faces = useTexture(FACE_URLS, tuneTextures);
 
@@ -241,7 +241,11 @@ export const TableDecks3D = forwardRef(function TableDecks3D({ position = [0, 0,
 
     useLayoutEffect(() => {
         applyLayout(true);
-    }, [applyLayout]);
+        // Сюда доходит только загруженная колода: useTexture выше саспендится, пока не
+        // приедут все растры. Значит это и есть «колода на столе» — сцене нужен сигнал,
+        // чтобы не давать запускать партию по пустой ручке.
+        onReady?.();
+    }, [applyLayout, onReady]);
 
     useImperativeHandle(
         ref,

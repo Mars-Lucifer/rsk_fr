@@ -416,6 +416,12 @@ export default function MayakTable3D() {
     // "flip" — ткань в воздухе. Пока не null, команды не принимаются.
     const [busy, setBusy] = useState(null);
 
+    // Колода приезжает позже остального стола — у неё своя граница ожидания. Пока она
+    // не встала, запускать партию нечем: startFrom упирается в пустую ручку и тихо
+    // возвращается, то есть кнопка выглядит нажатой и не делает ничего.
+    const [decksReady, setDecksReady] = useState(false);
+    const onDecksReady = useCallback(() => setDecksReady(true), []);
+
     // Сторона и состояние плеера живут одним значением. Раздельно их держать нельзя:
     // переворот полотна меняет сценарий, и шаг от прошлой стороны обязан обнулиться в тот
     // же момент — иначе между рендерами существует кадр с чужим шагом в чужом сценарии.
@@ -611,8 +617,12 @@ export default function MayakTable3D() {
                 полмегабайта не нужны, пока никто не нажал пуск. */}
             <audio ref={voiceRef} src={VOICE_SRC} preload="metadata" />
 
+            {/* Тип карты теней задан явно. По умолчанию r3f ставит PCFSoftShadowMap,
+                а three его объявил устаревшим и молча подменяет на PCFShadowMap —
+                картинка та же, но консоль на каждой пересборке теней сыпет
+                предупреждением. Ставим сразу то, что и так будет использовано. */}
             <Canvas
-                shadows
+                shadows={{ type: THREE.PCFShadowMap }}
                 dpr={[1, 2]}
                 camera={{ position: OVERVIEW.eye, fov: 42 }}
                 onPointerMissed={() => {
@@ -649,20 +659,30 @@ export default function MayakTable3D() {
                             исчезают от переворота полотна. В партии «Я» жетоны просто не
                             участвуют — лежат в своих ячейках. */}
                         <JetonsGroup ref={jetonsRef} position={[0, CLOTH_SURFACE, 0]} />
-                        <TableDecks3D ref={decksRef} side={side} position={[0, CLOTH_SURFACE, 0]} />
-                        {/* Карта разбора — верхняя карта выбранной стопки и единственная
-                            карта набора, которую можно взять руками: остальные курсор не
-                            ловят вовсе, иначе по столу не попасть. */}
-                        <CardPinsGroup
-                            stack={openStack}
-                            groundY={CLOTH_SURFACE}
-                            open={anatomy.open}
-                            pin={anatomy.pin}
-                            hint={anatomy.hint}
-                            onToggle={() => setAnatomy((current) => ({ ...current, open: !current.open, pin: null, hint: null }))}
-                            onPin={(pin) => setAnatomy((current) => ({ ...current, pin }))}
-                            onHint={(hint) => setAnatomy((current) => ({ ...current, hint }))}
-                        />
+
+                        {/* У колоды своя граница ожидания, и это самая дорогая правка
+                            загрузки во всей сцене. Лица 85 карт весят почти шесть мегабайт
+                            против одного у всего остального, а на общем плане их не видно
+                            вовсе — там стопки лежат рубашками вверх. Под общим Suspense
+                            стол не появлялся, пока не догрузится последняя карта; со своей
+                            границей поле, жетоны, звёзды и миплы встают сразу, а колода
+                            дотекает следом. */}
+                        <Suspense fallback={null}>
+                            <TableDecks3D ref={decksRef} side={side} position={[0, CLOTH_SURFACE, 0]} onReady={onDecksReady} />
+                            {/* Карта разбора — верхняя карта выбранной стопки и единственная
+                                карта набора, которую можно взять руками: остальные курсор не
+                                ловят вовсе, иначе по столу не попасть. */}
+                            <CardPinsGroup
+                                stack={openStack}
+                                groundY={CLOTH_SURFACE}
+                                open={anatomy.open}
+                                pin={anatomy.pin}
+                                hint={anatomy.hint}
+                                onToggle={() => setAnatomy((current) => ({ ...current, open: !current.open, pin: null, hint: null }))}
+                                onPin={(pin) => setAnatomy((current) => ({ ...current, pin }))}
+                                onHint={(hint) => setAnatomy((current) => ({ ...current, hint }))}
+                            />
+                        </Suspense>
                         <Meeples3D ref={meeplesRef} position={[0, CLOTH_SURFACE, 0]} />
                         <Stars3D ref={starsRef} position={[0, CLOTH_SURFACE, 0]} />
                         <RoleCardsGroup ref={rolesRef} position={ROLES_AT} active={spot?.id === "roles"} onFocusRole={setRole} />
@@ -804,7 +824,7 @@ export default function MayakTable3D() {
                     {/* «Сначала», а не «Начать сначала»: полное название стороны «Мы
                         цифровая организация» длиннее «Я цифровой эксперт», и с длинной
                         подписью кнопка вылезала за правую кромку панели именно на «МЫ». */}
-                    <button type="button" className="restart" disabled={Boolean(busy)} onClick={() => startFrom(0)}>
+                    <button type="button" className="restart" disabled={Boolean(busy) || !decksReady} onClick={() => startFrom(0)}>
                         Сначала
                     </button>
                 </div>
@@ -816,12 +836,20 @@ export default function MayakTable3D() {
                     type="button"
                     className={`play ${playing ? "on" : ""}`}
                     aria-label={playing ? "Пауза" : started && !finished ? "Продолжить" : "Показать раскладку"}
-                    disabled={Boolean(busy)}
+                    disabled={Boolean(busy) || !decksReady}
                     onClick={() =>
                         !started || finished ? startFrom(0) : setPlay((current) => ({ ...current, playing: !current.playing }))
                     }>
                     <span className="glyph" aria-hidden="true" />
-                    {playing ? "Пауза" : started && !finished ? "Продолжить" : finished ? "Показать заново" : "Показать раскладку"}
+                    {!decksReady
+                        ? "Колода ещё едет…"
+                        : playing
+                        ? "Пауза"
+                        : started && !finished
+                        ? "Продолжить"
+                        : finished
+                        ? "Показать заново"
+                        : "Показать раскладку"}
                 </button>
 
                 <ol className="phases">
@@ -834,7 +862,7 @@ export default function MayakTable3D() {
                                 <button
                                     type="button"
                                     className={`phase ${active ? "on" : ""} ${passed ? "passed" : ""}`}
-                                    disabled={Boolean(busy)}
+                                    disabled={Boolean(busy) || !decksReady}
                                     onClick={() => startFrom(script.findIndex((item) => item.phase === phase.id))}>
                                     <span className="num">{passed ? "✓" : String(order + 1).padStart(2, "0")}</span>
                                     <span className="txt">
