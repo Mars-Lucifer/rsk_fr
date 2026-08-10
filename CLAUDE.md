@@ -19,6 +19,54 @@ Related files:
 - `docs/mayak-refactor-status.md` stores MAYAK refactor progress/status.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
 
+## Work Organization: One Workstream = One Branch
+
+Several product lines are built in parallel in this repository, often by
+different agent sessions at the same time. Read this before your first commit.
+
+**Rule: one workstream, one branch, one working copy.**
+
+| Workstream | Branch prefix |
+|---|---|
+| Contest (конкурс РСК) | `feat/contest-*` |
+| Conference package (`/conferencia`) | `feat/conferencia-*` |
+| MAYAK guide / master playbook | `feat/mayak-guide-*`, `feat/mayak-master-*` |
+| MAYAK sessions and dashboard | `feat/mayak-session-*` |
+| Portal / BFF / backend contract | `feat/portal-*`, `chore/portal-*` |
+
+`main` holds only what is ready for production. Unfinished work lives on its
+own branch for as long as needed — never partially committed to `main`.
+
+**Before touching anything:**
+
+1. Run `git status` and `git branch --show-current`.
+2. If the working copy contains changes belonging to another workstream — stop
+   and report it. Do not commit around them, and never run `git add -A` /
+   `git commit -a` in a mixed working copy: stage explicit paths only.
+3. If your task belongs to a different workstream than the current branch, ask
+   for a separate worktree instead of switching branches under someone else's
+   uncommitted files.
+
+Parallel sessions are isolated with worktrees under `.worktrees/` (gitignored),
+one directory per workstream. Each copy needs its own dev-server port, and its
+own `npm install` plus a copy of `.env.local` — both are gitignored and do not
+travel with the branch.
+
+### Never Commit
+
+| What | Why |
+|---|---|
+| `data/rsk.sqlite*`, `data/uploads/` | conference submissions: personal data and passport scans. Already gitignored, but the database file is still tracked in history — ignoring does not apply to tracked files, they need `git rm --cached` |
+| `mayak_transfer.tar.gz` and any `*.tar.gz` | production transfer archive: contains `.env.local` and live task decks (~83 MB). `.gitignore` matches file names, not archive contents — a secret inside an archive slips through any `.env*` rule |
+| `_mayak_rospatent/` | patent-filing package; a generated snapshot of `src`/`data` |
+| `check*.mjs` at repo root, root-level `*.png` | one-off browser check scripts and their screenshots |
+| `docs/mayak-master-playbook/assets/` | duplicates the tracked assets in `public/mayak-guide/`, which is what the code actually loads (`const A = "/mayak-guide"`) |
+| runtime files under `data/` | operator state, not sources — see the ignore list |
+
+If any of these ever reach the history, removing them requires rewriting
+history: for the archive it also means rotating every key in `.env.local`, and
+for the conference database it means personal data was published.
+
 ## What Is Easy To Confuse First
 
 This repository is not a clean single-purpose app. It is a mixed operational shell with several layers living together:
