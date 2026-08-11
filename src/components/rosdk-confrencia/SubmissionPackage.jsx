@@ -4,6 +4,7 @@ import {
   UPLOAD_SLOTS,
   uploadProgress,
 } from "@/lib/rosdk-confrencia/slots";
+import { ScanExamples } from "./ScanExamples";
 
 const fileInputClass =
   "block w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 transition cursor-pointer";
@@ -22,7 +23,10 @@ export function SubmissionPackage({ submission: initial, pageUrl }) {
     setError("");
     setSuccess("");
 
-    const form = new FormData(event.currentTarget);
+    // Ссылку на форму держим отдельно: после await у события currentTarget
+    // уже null, и form.reset() уронил бы обработчик в catch.
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const chosen = [...form.entries()].filter(([, value]) => value?.size > 0);
 
     if (chosen.length === 0) {
@@ -49,7 +53,7 @@ export function SubmissionPackage({ submission: initial, pageUrl }) {
       }
 
       setSubmission(result.submission);
-      event.currentTarget.reset();
+      formElement.reset();
       setSuccess(
         `Загружено файлов: ${chosen.length}. ` +
           (uploadProgress(result.submission.files).isComplete
@@ -150,6 +154,8 @@ export function SubmissionPackage({ submission: initial, pageUrl }) {
               телефона, до 25 МБ на файл.
             </p>
           </div>
+
+          <ScanExamples />
 
           <div className="grid gap-4 md:grid-cols-2">
             {UPLOAD_SLOTS.map((item) => {

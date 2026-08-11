@@ -40,9 +40,21 @@ import {
   buildProtocolDocument,
 } from "../src/lib/rosdk-confrencia/documents.js";
 
+const SURNAMES = [
+  "Иванов",
+  "Петров",
+  "Сидоров",
+  "Кузнецов",
+  "Смирнов",
+  "Волков",
+  "Зайцев",
+  "Морозов",
+  "Соколов",
+];
+
 function attendees(count) {
   return Array.from({ length: count }, (_, index) => ({
-    fullName: "Иванов Иван Иванович",
+    fullName: `${SURNAMES[index % SURNAMES.length]} Иван Иванович`,
     passportSeries: "4510",
     passportNumber: `12345${index}`,
     contact: `+7 (999) 000-00-0${index}`,
@@ -118,6 +130,33 @@ rejects({ votesFor: 3, votesAgainst: 3, votesAbstain: 0 }, /не менее 2\/3
 
 // --- Пустой явочный лист.
 rejects({ attendees: [] }, /явочный лист/i);
+
+// --- Один человек дважды: иначе кворум и 2/3 считаются от завышенного числа.
+const withDuplicate = attendees(6);
+withDuplicate[4] = { ...withDuplicate[1], passportNumber: "999999" };
+rejects({ attendees: withDuplicate }, /встречается дважды/i);
+
+// --- Тот же паспорт под разными фамилиями тоже не проходит.
+const withSamePassport = attendees(6);
+withSamePassport[3] = { ...withSamePassport[3], passportNumber: withSamePassport[0].passportNumber };
+rejects({ attendees: withSamePassport }, /один и тот же паспорт/i);
+
+// --- Контакт участника: либо 11 цифр телефона, либо e-mail.
+const badContact = attendees(6);
+badContact[2] = { ...badContact[2], contact: "позвонить в колледж" };
+rejects({ attendees: badContact }, /телефон — 11 цифр/i);
+
+const shortPhone = attendees(6);
+shortPhone[0] = { ...shortPhone[0], contact: "+7 999 12-34" };
+rejects({ attendees: shortPhone }, /телефон — 11 цифр/i);
+
+const emailContact = attendees(6);
+emailContact[0] = { ...emailContact[0], contact: "member@college.ru" };
+assert.equal(
+  parseSubmissionInput(payload({ attendees: emailContact })).attendees[0].contact,
+  "member@college.ru",
+  "e-mail вместо телефона допустим",
+);
 
 // --- Реквизиты паспорта в явочном листе собираются на сервере из серии и номера.
 assert.equal(

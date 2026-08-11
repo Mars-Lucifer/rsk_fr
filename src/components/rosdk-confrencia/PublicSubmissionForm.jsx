@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { regions } from "@/lib/rosdk-confrencia/regions";
 import { CONFERENCE_DATE } from "@/lib/rosdk-confrencia/slots";
 import {
   PASSPORT_NUMBER_LENGTH,
   PASSPORT_SERIES_LENGTH,
+  contactError,
   digitsOnly,
+  normalizeFio,
   requiredQuorum,
   requiredVotesFor,
 } from "@/lib/rosdk-confrencia/validation";
+import { RegionCombobox } from "./RegionCombobox";
 
 const fieldClass = "h-10 w-full rounded-md modern-input px-3 text-sm outline-none";
 const labelClass = "mb-1.5 block text-sm font-semibold text-slate-700";
@@ -60,8 +63,11 @@ export function PublicSubmissionForm() {
   const router = useRouter();
 
   const [region, setRegion] = useState("");
+  const [addressRegion, setAddressRegion] = useState("");
+  const [addressRegionEdited, setAddressRegionEdited] = useState(false);
   const [totalMembers, setTotalMembers] = useState(3);
   const [votesFor, setVotesFor] = useState(3);
+  const [votesForEdited, setVotesForEdited] = useState(false);
   const [votesAgainst, setVotesAgainst] = useState(0);
   const [votesAbstain, setVotesAbstain] = useState(0);
 
@@ -86,7 +92,15 @@ export function PublicSubmissionForm() {
   const presentMembers = attendees.filter((item) => item.fullName.trim()).length;
   const quorum = requiredQuorum(totalMembers || 0);
   const minimumVotes = requiredVotesFor(presentMembers);
-  const votesTotal = (votesFor || 0) + (votesAgainst || 0) + (votesAbstain || 0);
+
+  // Пока «За» не правили руками, оно идёт за явочным листом: типовой случай —
+  // единогласное решение, и человеку не приходится пересчитывать сумму.
+  const effectiveVotesFor = votesForEdited ? votesFor : presentMembers;
+  const votesTotal = (effectiveVotesFor || 0) + (votesAgainst || 0) + (votesAbstain || 0);
+
+  // Адрес регистрации почти всегда в том же субъекте — подставляем, но не
+  // запираем: делегат может быть прописан в соседнем регионе.
+  const effectiveAddressRegion = addressRegionEdited ? addressRegion : region;
 
   const regionError = region && !regions.includes(region) ? "Выберите регион из списка." : null;
   const hasExcessMembersWarning = presentMembers > 0 && presentMembers > totalMembers;
@@ -94,11 +108,62 @@ export function PublicSubmissionForm() {
     totalMembers > 0 && presentMembers > 0 && presentMembers < quorum && !hasExcessMembersWarning;
   const hasVotesSumWarning = presentMembers > 0 && votesTotal !== presentMembers;
   const hasVoteWarning =
-    presentMembers > 0 && !hasVotesSumWarning && (votesFor || 0) < minimumVotes;
+    presentMembers > 0 && !hasVotesSumWarning && (effectiveVotesFor || 0) < minimumVotes;
 
   const delegateFioError = useMemo(() => validateFio(delegateName), [delegateName]);
   const chairFioError = useMemo(() => validateFio(chairName), [chairName]);
   const secretaryFioError = useMemo(() => validateFio(secretaryName), [secretaryName]);
+
+  // Строки явочного листа, где одного человека внесли дважды.
+  const duplicateRows = useMemo(() => {
+    const seen = new Map();
+    const duplicates = new Set();
+
+    attendees.forEach((item, index) => {
+      const key = normalizeFio(item.fullName);
+      if (!key) return;
+      if (seen.has(key)) {
+        duplicates.add(seen.get(key));
+        duplicates.add(index);
+      } else {
+        seen.set(key, index);
+      }
+    });
+
+    return duplicates;
+  }, [attendees]);
+
+  // Председатель, секретарь и делегат избираются на собрании, значит должны
+  // стоять в явочном листе. Опечатка здесь разводит протокол и явочный лист.
+  const missingInAttendance = useMemo(() => {
+    const present = new Set(
+      attendees.map((item) => normalizeFio(item.fullName)).filter(Boolean),
+    );
+
+    return [
+      ["председатель", chairName],
+      ["секретарь", secretaryName],
+      ["делегат", delegateName],
+    ]
+      .filter(([, name]) => name.trim() && !present.has(normalizeFio(name)))
+      .map(([role, name]) => `${role} — ${name.trim()}`);
+  }, [attendees, chairName, secretaryName, delegateName]);
+
+  // Черновик не сохраняется, а форма длинная: случайное закрытие вкладки
+  // стоит отделению получаса работы. Браузер спросит подтверждение.
+  const isDirty = Boolean(region || delegateName || attendees[0]?.fullName.trim());
+
+  useEffect(() => {
+    if (!isDirty || busy) return undefined;
+
+    const onBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty, busy]);
 
   const handleNumericChange = (setter) => (event) => {
     const digits = digitsOnly(event.target.value).replace(/^0+(?=\d)/, "");
@@ -181,14 +246,20 @@ export function PublicSubmissionForm() {
           return `Явочный лист, строка ${index + 1}: серия паспорта — ${PASSPORT_SERIES_LENGTH} цифры.`;
         if (item.passportNumber.length !== PASSPORT_NUMBER_LENGTH)
           return `Явочный лист, строка ${index + 1}: номер паспорта — ${PASSPORT_NUMBER_LENGTH} цифр.`;
-        if (!item.contact.trim())
-          return `Явочный лист, строка ${index + 1}: укажите телефон или e-mail.`;
+        const contactProblem = contactError(item.contact);
+        if (contactProblem) return `Явочный лист, строка ${index + 1}: ${contactProblem}`;
         return null;
       })
       .find(Boolean);
 
     if (attendeeError) {
       return fail(attendeeError);
+    }
+
+    if (duplicateRows.size > 0) {
+      return fail(
+        "В явочном листе есть повторяющиеся Ф.И.О. Один человек — одна строка, иначе кворум посчитается неверно.",
+      );
     }
 
     if (delegateFioError || chairFioError || secretaryFioError) {
@@ -221,8 +292,9 @@ export function PublicSubmissionForm() {
       const payload = Object.fromEntries(form.entries());
 
       payload.region = region;
+      payload.addressRegion = effectiveAddressRegion;
       payload.totalMembers = totalMembers;
-      payload.votesFor = votesFor;
+      payload.votesFor = effectiveVotesFor;
       payload.votesAgainst = votesAgainst;
       payload.votesAbstain = votesAbstain;
       payload.delegatePhone = delegatePhone;
@@ -267,27 +339,20 @@ export function PublicSubmissionForm() {
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Субъект Российской Федерации" className="xl:col-span-2">
-            <input
+            <RegionCombobox
               name="region"
-              required
-              list="conferencia-regions"
-              autoComplete="off"
-              placeholder="Начните вводить: Псков…"
               value={region}
-              onChange={(event) => setRegion(event.target.value)}
-              className={inputClassWithError(regionError)}
+              onChange={setRegion}
+              placeholder="Нажмите и выберите или начните вводить: Псков…"
+              invalid={Boolean(regionError)}
+              inputClassName={inputClassWithError(regionError)}
             />
-            <datalist id="conferencia-regions">
-              {regions.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
             <span
               className={`mt-1.5 block text-xs font-semibold ${
                 regionError ? "text-rose-600" : "text-slate-400"
               }`}
             >
-              {regionError ?? "Введите несколько букв и выберите вариант из подсказки."}
+              {regionError ?? `Список из ${regions.length} субъектов открывается по клику.`}
             </span>
           </Field>
 
@@ -383,7 +448,9 @@ export function PublicSubmissionForm() {
 
           <div className="space-y-2">
             {attendees.map((attendee, index) => {
-              const fioError = Boolean(validateFio(attendee.fullName));
+              const fioError = Boolean(validateFio(attendee.fullName)) || duplicateRows.has(index);
+              const rowContactError =
+                attendee.contact.trim().length > 0 && Boolean(contactError(attendee.contact));
               const seriesError =
                 attendee.passportSeries.length > 0 &&
                 attendee.passportSeries.length !== PASSPORT_SERIES_LENGTH;
@@ -435,9 +502,10 @@ export function PublicSubmissionForm() {
                   />
                   <input
                     placeholder="+7 (999) 000-00-00 или e-mail"
+                    aria-label={`Телефон или e-mail, строка ${index + 1}`}
                     value={attendee.contact}
                     onChange={(event) => updateAttendee(index, "contact", event.target.value)}
-                    className={fieldClass}
+                    className={inputClassWithError(rowContactError)}
                   />
                   <button
                     type="button"
@@ -460,6 +528,20 @@ export function PublicSubmissionForm() {
           >
             + Добавить участника
           </button>
+
+          {duplicateRows.size > 0 && (
+            <p className="text-xs font-semibold text-rose-600">
+              Один человек внесён дважды. Уберите повтор: от числа присутствующих считаются кворум
+              и порог в две трети голосов.
+            </p>
+          )}
+
+          {missingInAttendance.length > 0 && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Не найдены в явочном листе: {missingInAttendance.join("; ")}. Председатель, секретарь
+              и делегат избираются из присутствующих — проверьте, нет ли опечатки в Ф.И.О.
+            </p>
+          )}
         </div>
 
         {/* Голосование */}
@@ -489,10 +571,18 @@ export function PublicSubmissionForm() {
                 name="votesFor"
                 required
                 inputMode="numeric"
-                value={votesFor}
-                onChange={handleNumericChange(setVotesFor)}
+                value={effectiveVotesFor}
+                onChange={(event) => {
+                  setVotesForEdited(true);
+                  handleNumericChange(setVotesFor)(event);
+                }}
                 className={inputClassWithError(hasVoteWarning || hasVotesSumWarning)}
               />
+              {!votesForEdited && presentMembers > 0 && (
+                <span className="mt-1.5 block text-xs font-semibold text-slate-400">
+                  Проставлено единогласно по явочному листу — исправьте, если голосовали иначе.
+                </span>
+              )}
             </Field>
             <Field label="«Против»">
               <input
@@ -638,12 +728,21 @@ export function PublicSubmissionForm() {
               />
             </Field>
             <Field label="Субъект РФ, край или область" className="xl:col-span-2">
-              <input
+              <RegionCombobox
                 name="addressRegion"
-                required
+                value={effectiveAddressRegion}
+                onChange={(value) => {
+                  setAddressRegionEdited(true);
+                  setAddressRegion(value);
+                }}
                 placeholder="Псковская область"
-                className={fieldClass}
+                inputClassName={fieldClass}
               />
+              <span className="mt-1.5 block text-xs font-semibold text-slate-400">
+                {addressRegionEdited
+                  ? "Задан вручную."
+                  : "Подставлен из субъекта отделения — измените, если делегат прописан в другом регионе."}
+              </span>
             </Field>
             <Field label="Район">
               <input

@@ -53,6 +53,33 @@ export function digitsOnly(value) {
   return String(value ?? "").replace(/\D/g, "");
 }
 
+/** Ф.И.О. для сравнения: регистр, ё и лишние пробелы не должны разводить людей. */
+export function normalizeFio(value) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/ё/gi, "е")
+    .toLowerCase();
+}
+
+/**
+ * Контакт участника — телефон (11 цифр) либо e-mail. Проверяется и в форме,
+ * и на сервере: по этим контактам Мандатная комиссия сверяет явочный лист.
+ */
+export function contactError(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "укажите телефон или e-mail.";
+
+  if (raw.includes("@")) {
+    return EMAIL_REGEX.test(raw) ? null : "некорректный e-mail.";
+  }
+
+  const digits = digitsOnly(raw);
+  if (digits.length === 11) return null;
+
+  return "телефон — 11 цифр, либо укажите e-mail.";
+}
+
 /** «45 10 № 123456» — вид, в котором реквизиты печатаются в явочном листе. */
 export function formatPassportRef(series, number) {
   const cleanSeries = digitsOnly(series);
@@ -165,10 +192,33 @@ export function parseSubmissionInput(value) {
     throw new Error("Добавьте в явочный лист хотя бы одного присутствующего члена отделения.");
   }
 
+  const seenNames = new Map();
+  const seenPassports = new Map();
+
   attendees.forEach((attendee, index) => {
     const fioError = validateFioServer(attendee.fullName);
     if (fioError) {
       throw new Error(`Явочный лист, строка ${index + 1}: Ф.И.О. ${fioError}`);
+    }
+
+    // Одного человека нельзя посчитать дважды: от числа присутствующих
+    // зависят и кворум, и порог в 2/3 голосов.
+    const nameKey = normalizeFio(attendee.fullName);
+    if (seenNames.has(nameKey)) {
+      throw new Error(
+        `Явочный лист: «${attendee.fullName}» встречается дважды — строки ${seenNames.get(nameKey) + 1} и ${index + 1}.`,
+      );
+    }
+    seenNames.set(nameKey, index);
+
+    const passportKey = `${attendee.passportSeries}${attendee.passportNumber}`;
+    if (passportKey.length > 0 && seenPassports.has(passportKey)) {
+      throw new Error(
+        `Явочный лист: один и тот же паспорт в строках ${seenPassports.get(passportKey) + 1} и ${index + 1}.`,
+      );
+    }
+    if (passportKey) {
+      seenPassports.set(passportKey, index);
     }
 
     if (attendee.passportSeries || attendee.passportNumber || !attendee.documentRef) {
@@ -185,8 +235,9 @@ export function parseSubmissionInput(value) {
       attendee.documentRef = formatPassportRef(attendee.passportSeries, attendee.passportNumber);
     }
 
-    if (!attendee.contact) {
-      throw new Error(`Явочный лист, строка ${index + 1}: укажите телефон или e-mail.`);
+    const contactProblem = contactError(attendee.contact);
+    if (contactProblem) {
+      throw new Error(`Явочный лист, строка ${index + 1}: ${contactProblem}`);
     }
   });
 

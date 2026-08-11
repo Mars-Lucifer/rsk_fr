@@ -160,27 +160,6 @@ export function getSubmission(id) {
   return row ? toSubmission(row) : null;
 }
 
-export function listSubmissions(query = "", status = "") {
-  const q = `%${query.trim().toLowerCase()}%`;
-  const statusFilter = status.trim();
-  const rows = getDb()
-    .prepare(
-      `SELECT * FROM submissions
-       WHERE (@status = '' OR status = @status)
-       AND (
-        @query = '%%'
-        OR lower(region) LIKE @query
-        OR lower(city) LIKE @query
-        OR lower(delegate_name) LIKE @query
-        OR lower(protocol_number) LIKE @query
-       )
-       ORDER BY created_at DESC`,
-    )
-    .all({ query: q, status: statusFilter });
-
-  return rows.map(toSubmission);
-}
-
 /** Сколько заявок уже прислал субъект РФ. Регион берётся из справочника, сверка точная. */
 export function countSubmissionsForRegion(region) {
   const row = getDb()

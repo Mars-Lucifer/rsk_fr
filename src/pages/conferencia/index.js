@@ -1,6 +1,7 @@
 import Head from "next/head";
 import Image from "next/image";
 import { PublicSubmissionForm } from "@/components/rosdk-confrencia/PublicSubmissionForm";
+import { ScanExamples } from "@/components/rosdk-confrencia/ScanExamples";
 import { CONFERENCE_DATE, SUBMISSION_COOKIE } from "@/lib/rosdk-confrencia/slots";
 
 /** Ссылку на заявку легко потерять — держим последний id в кукисе как подсказку. */
@@ -210,6 +211,8 @@ export default function Home({ submissionId }) {
               </div>
             </div>
           </div>
+
+          <ScanExamples />
 
           <div className="rounded-xl border border-slate-200 p-4 text-xs leading-relaxed text-slate-600">
             <span className="font-semibold text-slate-900">Требования к собранию.</span> Собрание
