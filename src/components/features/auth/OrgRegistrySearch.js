@@ -12,7 +12,7 @@ import Input from "@/components/ui/Input/Input";
 //
 // Здесь он вводит название или ИНН, выбирает свою организацию из реестра, и она
 // заводится в базе. Название, регион и тип приходят из реестра, а не из формы.
-export default function OrgRegistrySearch({ onSelected }) {
+export default function OrgRegistrySearch({ onSelected, showHint = true }) {
     const [query, setQuery] = useState("");
     const [items, setItems] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
@@ -75,26 +75,32 @@ export default function OrgRegistrySearch({ onSelected }) {
 
     return (
         <div className="flex flex-col gap-[.5rem]">
-            <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                Не нашли свою организацию в списке? Найдите её в реестре по ИНН.
-            </span>
+            {showHint && (
+                <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                    Не нашли свою организацию в списке? Найдите её в реестре по ИНН.
+                </span>
+            )}
 
-            <div className="flex gap-[.5rem] max-[640px]:flex-col">
-                <Input
-                    type="text"
-                    id="org-registry-query"
-                    name="org-registry-query"
-                    placeholder="ИНН организации"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                            event.preventDefault();
-                            search();
-                        }
-                    }}
-                />
-                <Button small type="button" onClick={search} disabled={isSearching}>
+            <div className="flex gap-[.5rem] items-center max-[640px]:flex-col max-[640px]:items-stretch">
+                {/* Поле тянется, кнопка — по содержимому: иначе «Найти»
+                    расползается на половину карточки. */}
+                <div className="flex-1 min-w-0">
+                    <Input
+                        type="text"
+                        id="org-registry-query"
+                        name="org-registry-query"
+                        placeholder="Введите ИНН организации"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                search();
+                            }
+                        }}
+                    />
+                </div>
+                <Button small type="button" onClick={search} disabled={isSearching} className="w-fit! shrink-0 max-[640px]:w-full!">
                     {isSearching ? "Ищем..." : "Найти"}
                 </Button>
             </div>
@@ -111,7 +117,14 @@ export default function OrgRegistrySearch({ onSelected }) {
                             type="button"
                             onClick={() => pick(item)}
                             disabled={Boolean(pendingInn)}
-                            className="flex flex-col items-start gap-[.125rem] p-[.75rem] rounded-[.75rem] text-left border-solid border-[1.5px] border-(--color-gray-plus-50) hover:bg-(--color-gray-plus-50) transition">
+                            className="flex flex-col items-start gap-[.125rem] p-[.75rem] rounded-[.75rem] text-left transition"
+                            style={{
+                                // Цвета задаём явно: глобальный стиль кнопки красит
+                                // подсказку в чёрное, и она выпадает из карточки.
+                                background: "var(--color-white)",
+                                color: "var(--color-black)",
+                                border: "1.5px solid var(--color-gray-plus-50)",
+                            }}>
                             <span className="link">{item.short_name || item.full_name}</span>
                             <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
                                 ИНН {item.inn}

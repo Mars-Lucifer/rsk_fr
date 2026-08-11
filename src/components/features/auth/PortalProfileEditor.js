@@ -31,6 +31,54 @@ function buildInitialFormState(profilePayload) {
     };
 }
 
+// Подпись над полем: в макете у каждого поля есть название, а плейсхолдер
+// исчезает при вводе и перестаёт объяснять, что именно заполнено.
+function Field({ label, children }) {
+    return (
+        <label className="flex flex-col gap-[0.375rem]">
+            <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                {label}
+            </span>
+            {children}
+        </label>
+    );
+}
+
+// Тип профиля карточками, а не переключателем: у каждого варианта есть
+// пояснение, и промахнуться сложнее.
+function RoleCard({ value, current, onSelect, title, hint }) {
+    const isActive = current === value;
+    return (
+        <button
+            type="button"
+            onClick={() => onSelect(value)}
+            className="flex flex-col gap-[0.25rem] p-[0.875rem] rounded-[0.75rem] text-left transition"
+            style={{
+                border: `1.5px solid ${isActive ? "var(--color-blue)" : "var(--color-gray-plus-50)"}`,
+                background: isActive ? "var(--color-blue-noise)" : "transparent",
+            }}>
+            <span className="flex items-center justify-between gap-[0.5rem]">
+                {/* Цвет задаём явно: у неактивной карточки текст сливался с фоном. */}
+                <span className="big" style={{ fontWeight: 600, color: "var(--color-black)" }}>
+                    {title}
+                </span>
+                <span
+                    className="inline-block rounded-full"
+                    style={{
+                        width: "0.875rem",
+                        height: "0.875rem",
+                        border: `1.5px solid ${isActive ? "var(--color-blue)" : "var(--color-gray-white)"}`,
+                        background: isActive ? "var(--color-blue)" : "transparent",
+                    }}
+                />
+            </span>
+            <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                {hint}
+            </span>
+        </button>
+    );
+}
+
 function resolveSelectedOrganization(orgList, organizationId) {
     return orgList.find((item) => String(item.id ?? item.organization_id ?? "") === String(organizationId || "")) || null;
 }
@@ -263,94 +311,151 @@ export default function PortalProfileEditor({
         }
     };
 
+    const handleOrgFromRegistry = (org) => {
+        const id = org?.id ?? org?.organization_id;
+        if (!id) return;
+
+        setOrgList((prev) => (prev.some((item) => String(item.id) === String(id)) ? prev : [...prev, org]));
+        updateField("Organization", String(id));
+        setOrgFieldTyped(true);
+        // Регион берём из реестра: он обязателен для команды, а руками участник
+        // впишет его иначе, чем в справочнике.
+        if (org.region) {
+            setRegion(org.region);
+            setFormData((prev) => ({ ...prev, Region: org.region }));
+        }
+    };
+
     const content = (
         <>
-            {title ? <h6>{title}</h6> : null}
-            {description ? <p className="text-(--color-gray-black)">{description}</p> : null}
-            <div className="flex flex-col gap-[0.75rem]">
-                <div className="flex gap-[0.75rem] max-[640px]:flex-col">
-                    <div className="flex flex-col gap-[0.5rem] flex-1">
-                        <Input type="text" name="Surname" placeholder="Фамилия" value={formData.Surname} onChange={(event) => updateField("Surname", event.target.value)} required />
-                        <Input type="text" name="NameIRL" placeholder="Имя" value={formData.NameIRL} onChange={(event) => updateField("NameIRL", event.target.value)} required />
-                        <Input type="text" name="Patronymic" placeholder="Отчество" value={formData.Patronymic} onChange={(event) => updateField("Patronymic", event.target.value)} />
+            {/* Раскладка в две колонки: слева кто участник, справа откуда он.
+                Раньше всё шло одной узкой лентой, и на широком экране форма
+                занимала треть ширины, а поиск организации терялся между полями. */}
+            <div className="flex flex-col gap-[1.25rem] p-[1.5rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ background: "var(--color-white)", border: "1.5px solid var(--color-gray-plus-50)" }}>
+                <div className="flex flex-col gap-[0.25rem]">
+                    <h5>{title || "Профиль портала"}</h5>
+                    <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                        {description || "Эти данные используются в личном кабинете, МАЯК и сертификатах."}
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-[1.25rem] items-start max-[900px]:grid-cols-1">
+                    {/* Левая колонка — человек */}
+                    <div className="flex flex-col gap-[0.75rem]">
+                        <Field label="Фамилия">
+                            <Input type="text" name="Surname" placeholder="Введите фамилию" value={formData.Surname} onChange={(event) => updateField("Surname", event.target.value)} required />
+                        </Field>
+                        <Field label="Имя">
+                            <Input type="text" name="NameIRL" placeholder="Введите имя" value={formData.NameIRL} onChange={(event) => updateField("NameIRL", event.target.value)} required />
+                        </Field>
+                        <Field label="Отчество">
+                            <Input type="text" name="Patronymic" placeholder="Введите отчество" value={formData.Patronymic} onChange={(event) => updateField("Patronymic", event.target.value)} />
+                        </Field>
+
+                        {showDescription ? (
+                            <Field label="О себе">
+                                <Textarea inverted name="Description" placeholder="Краткое описание поможет другим участникам лучше вас узнать" value={formData.Description} onChange={(event) => updateField("Description", event.target.value)} />
+                            </Field>
+                        ) : null}
+
+                        <Field label="Организация">
+                            <DropdownInput
+                                ref={orgDropdownRef}
+                                id="Organization"
+                                name="Organization"
+                                placeholder={region ? "Выберите организацию" : "Сначала выберите регион"}
+                                value={formData.Organization}
+                                options={orgList}
+                                onChange={(event) => updateField("Organization", event.target.value)}
+                                onQueryChange={() => setOrgFieldTyped(true)}
+                                disabled={!region}
+                            />
+                        </Field>
+
+                        <div className="flex gap-[0.625rem] p-[0.875rem] rounded-[0.75rem]" style={{ background: "var(--color-blue-noise)" }}>
+                            <span className="text-sm">
+                                <span style={{ fontWeight: 600 }}>Не нашли свою организацию в списке?</span>
+                                <br />
+                                Найдите её в реестре по ИНН — блок справа.
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Правая колонка — откуда участник */}
+                    <div className="flex flex-col gap-[1.25rem]">
+                        <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
+                            <h6>Поиск организации</h6>
+
+                            <Field label="ИНН организации">
+                                {/* Организации из реестра: список в базе неполный, и без
+                                    этого участник из непопавшего колледжа не двигается. */}
+                                <OrgRegistrySearch showHint={false} onSelected={handleOrgFromRegistry} />
+                            </Field>
+
+                            <Field label="Регион">
+                                <DropdownInput
+                                    id="Region"
+                                    name="Region"
+                                    placeholder="Выберите регион"
+                                    value={region}
+                                    onChange={(event) => {
+                                        const nextRegion = event.target.value || "";
+                                        setRegion(nextRegion);
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            Region: nextRegion,
+                                            Organization: "",
+                                        }));
+                                    }}
+                                    src="/data/regions.txt"
+                                />
+                            </Field>
+
+                            <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                                Если вашей организации нет ни в списке, ни в реестре, заполните{" "}
+                                <Link target="_blank" className="text-(--color-blue)" href="https://forms.yandex.ru/u/690391e1068ff0a3ba625eef">
+                                    форму
+                                </Link>
+                                .
+                            </p>
+                        </div>
+
+                        {showRole ? (
+                            <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
+                                <h6>Тип профиля</h6>
+                                <div className="grid grid-cols-2 gap-[0.75rem] max-[640px]:grid-cols-1">
+                                    <RoleCard value="student" current={role} onSelect={setRole} title="Студент" hint="Учебная деятельность" />
+                                    <RoleCard value="teacher" current={role} onSelect={setRole} title="Сотрудник" hint="Рабочая деятельность" />
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
-                {showDescription ? <Textarea inverted name="Description" placeholder="Расскажите о себе кратко" value={formData.Description} onChange={(event) => updateField("Description", event.target.value)} /> : null}
-
-                <DropdownInput
-                    ref={orgDropdownRef}
-                    id="Organization"
-                    name="Organization"
-                    placeholder="Организация"
-                    value={formData.Organization}
-                    options={orgList}
-                    onChange={(event) => updateField("Organization", event.target.value)}
-                    onQueryChange={() => setOrgFieldTyped(true)}
-                    disabled={!region}
-                />
-                {/* Организации из реестра: список в базе неполный, и без этого
-                    участник из непопавшего колледжа никуда не двигается. */}
-                <OrgRegistrySearch
-                    onSelected={(org) => {
-                        const id = org?.id ?? org?.organization_id;
-                        if (!id) return;
-
-                        setOrgList((prev) => (prev.some((item) => String(item.id) === String(id)) ? prev : [...prev, org]));
-                        updateField("Organization", String(id));
-                        setOrgFieldTyped(true);
-                        // Регион берём из реестра: он обязателен для команды,
-                        // а руками участник впишет его иначе, чем в справочнике.
-                        if (org.region) {
-                            setRegion(org.region);
-                            setFormData((prev) => ({ ...prev, Region: org.region }));
-                        }
-                    }}
-                />
-                <DropdownInput
-                    id="Region"
-                    name="Region"
-                    placeholder="Регион"
-                    value={region}
-                    onChange={(event) => {
-                        const nextRegion = event.target.value || "";
-                        setRegion(nextRegion);
-                        setFormData((prev) => ({
-                            ...prev,
-                            Region: nextRegion,
-                            Organization: "",
-                        }));
-                    }}
-                    src="/data/regions.txt"
-                />
-                {!region ? <p className="text-(--color-gray-black)">Сначала выберите регион, после этого станет доступна организация.</p> : null}
-                <p className="text-(--color-gray-black)">
-                    Если вашей организации нет в списке, заполните{" "}
-                    <Link target="_blank" className="text-(--color-blue)" href="https://forms.yandex.ru/u/690391e1068ff0a3ba625eef">
-                        форму
-                    </Link>
-                    .
-                </p>
-
-                {showRole ? (
-                    <div className="flex flex-col gap-[0.5rem]">
-                        <span className="big">Тип профиля</span>
-                        <Switcher value={role} onChange={setRole}>
-                            <Switcher.Option value="student">Студент</Switcher.Option>
-                            <Switcher.Option value="teacher">Сотрудник</Switcher.Option>
-                        </Switcher>
-                    </div>
-                ) : null}
-
-                <Button onClick={handleSubmit} disabled={isSaving || !isDirty}>
-                    {isSaving ? "Сохранение..." : submitLabel}
-                </Button>
+                <div className="flex items-center justify-between gap-[1rem] pt-[0.25rem] max-[640px]:flex-col max-[640px]:items-stretch">
+                    <Button className="w-fit! max-[640px]:w-full!" onClick={handleSubmit} disabled={isSaving || !isDirty}>
+                        {isSaving ? "Сохранение..." : submitLabel}
+                    </Button>
+                    {!region ? (
+                        <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                            Организация станет доступна после выбора региона — или найдите её по ИНН.
+                        </span>
+                    ) : null}
+                </div>
             </div>
         </>
     );
 
     if (mode === "full") {
-        return <div className="hero grid-cols-1">{content}</div>;
+        // `.hero` — сетка из 12 колонок, и без col-span-12 карточка занимает
+        // одну колонку: форма сжимается в узкую ленту, а поля наезжают друг
+        // на друга. Tailwind-класс grid-cols-1 здесь не помогает — правило
+        // из spacing.css перебивает его.
+        return (
+            <div className="hero">
+                <div className="col-span-12">{content}</div>
+            </div>
+        );
     }
 
     return <div className="flex flex-col gap-[1rem] w-full">{content}</div>;
