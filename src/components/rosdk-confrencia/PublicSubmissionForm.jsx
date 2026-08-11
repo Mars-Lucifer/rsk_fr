@@ -1,8 +1,16 @@
 import { useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import { regions } from "@/lib/rosdk-confrencia/regions";
+import { CONFERENCE_DATE } from "@/lib/rosdk-confrencia/slots";
+import {
+  PASSPORT_NUMBER_LENGTH,
+  PASSPORT_SERIES_LENGTH,
+  digitsOnly,
+  requiredQuorum,
+  requiredVotesFor,
+} from "@/lib/rosdk-confrencia/validation";
 
-const fieldClass =
-  "h-10 w-full rounded-md modern-input px-3 text-sm outline-none";
+const fieldClass = "h-10 w-full rounded-md modern-input px-3 text-sm outline-none";
 const labelClass = "mb-1.5 block text-sm font-semibold text-slate-700";
 
 function validateFio(value) {
@@ -12,7 +20,6 @@ function validateFio(value) {
   if (parts.length !== 3) {
     return "ФИО должно состоять ровно из 3 слов (Фамилия Имя Отчество).";
   }
-  // Check that all parts contain only Russian letters and hyphens
   const nameRegex = /^[а-яё\-]+$/i;
   for (const part of parts) {
     if (!nameRegex.test(part)) {
@@ -22,220 +29,208 @@ function validateFio(value) {
   return null;
 }
 
+function formatPhone(value) {
+  let digits = digitsOnly(value);
+  if (digits.startsWith("7") || digits.startsWith("8")) {
+    digits = digits.substring(1);
+  }
+  digits = digits.substring(0, 10);
+
+  let formatted = "";
+  if (digits.length > 0) {
+    formatted = "+7 (" + digits.substring(0, 3);
+  }
+  if (digits.length >= 3) {
+    formatted += ") " + digits.substring(3, 6);
+  }
+  if (digits.length >= 6) {
+    formatted += "-" + digits.substring(6, 8);
+  }
+  if (digits.length >= 8) {
+    formatted += "-" + digits.substring(8, 10);
+  }
+  return formatted;
+}
+
+const emptyAttendee = { fullName: "", passportSeries: "", passportNumber: "", contact: "" };
+
 export function PublicSubmissionForm() {
-  const [submission, setSubmission] = useState(null);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
-  
-  // Default numeric values to 3
-  const [presentMembers, setPresentMembers] = useState(3);
+  const router = useRouter();
+
+  const [region, setRegion] = useState("");
   const [totalMembers, setTotalMembers] = useState(3);
   const [votesFor, setVotesFor] = useState(3);
+  const [votesAgainst, setVotesAgainst] = useState(0);
+  const [votesAbstain, setVotesAbstain] = useState(0);
 
-  // Focus dropdown states
-  const [showPresentDropdown, setShowPresentDropdown] = useState(false);
-  const [showTotalDropdown, setShowTotalDropdown] = useState(false);
-  const [showVotesDropdown, setShowVotesDropdown] = useState(false);
+  const [attendees, setAttendees] = useState([
+    { ...emptyAttendee },
+    { ...emptyAttendee },
+    { ...emptyAttendee },
+  ]);
 
-  // Custom region search states
-  const [regionSearch, setRegionSearch] = useState("");
-  const [showRegionDropdown, setShowRegionDropdown] = useState(false);
-
-  // States for form validation and formatting
   const [delegateName, setDelegateName] = useState("");
   const [delegatePhone, setDelegatePhone] = useState("");
   const [chairName, setChairName] = useState("");
   const [secretaryName, setSecretaryName] = useState("");
-  
+
   const [passportSeries, setPassportSeries] = useState("");
   const [passportNumber, setPassportNumber] = useState("");
   const [passportDeptCode, setPassportDeptCode] = useState("");
+  const [addressPostalCode, setAddressPostalCode] = useState("");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
-  // Validation warnings
-  const minimumVotes = presentMembers > 0 ? Math.ceil((presentMembers * 2) / 3) : 0;
-  const hasVoteWarning = presentMembers > 0 && votesFor > 0 && votesFor < minimumVotes;
-  
-  const requiredQuorum = Math.ceil((totalMembers * 2) / 3);
-  const hasQuorumWarning = totalMembers > 0 && presentMembers > 0 && presentMembers < requiredQuorum;
+  const presentMembers = attendees.filter((item) => item.fullName.trim()).length;
+  const quorum = requiredQuorum(totalMembers || 0);
+  const minimumVotes = requiredVotesFor(presentMembers);
+  const votesTotal = (votesFor || 0) + (votesAgainst || 0) + (votesAbstain || 0);
 
-  const hasExcessMembersWarning = totalMembers > 0 && presentMembers > 0 && presentMembers > totalMembers;
-  const hasExcessVotesWarning = presentMembers > 0 && votesFor > 0 && votesFor > presentMembers;
+  const regionError = region && !regions.includes(region) ? "Выберите регион из списка." : null;
+  const hasExcessMembersWarning = presentMembers > 0 && presentMembers > totalMembers;
+  const hasQuorumWarning =
+    totalMembers > 0 && presentMembers > 0 && presentMembers < quorum && !hasExcessMembersWarning;
+  const hasVotesSumWarning = presentMembers > 0 && votesTotal !== presentMembers;
+  const hasVoteWarning =
+    presentMembers > 0 && !hasVotesSumWarning && (votesFor || 0) < minimumVotes;
 
   const delegateFioError = useMemo(() => validateFio(delegateName), [delegateName]);
   const chairFioError = useMemo(() => validateFio(chairName), [chairName]);
   const secretaryFioError = useMemo(() => validateFio(secretaryName), [secretaryName]);
 
-  const filteredRegions = useMemo(() => {
-    const q = regionSearch.trim().toLowerCase();
-    if (!q) return regions;
-    return regions.filter((r) => r.toLowerCase().includes(q));
-  }, [regionSearch]);
-
-  const numericOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-  // Helper to handle and format number inputs: no leading zero, no lone zero
-  const handleNumericChange = (setter) => (e) => {
-    let val = e.target.value;
-    if (val.length > 1 && val.startsWith("0")) {
-      val = val.replace(/^0+/, "");
-    }
-    if (val === "0") {
-      val = "";
-    }
-    setter(val === "" ? "" : Number(val));
+  const handleNumericChange = (setter) => (event) => {
+    const digits = digitsOnly(event.target.value).replace(/^0+(?=\d)/, "");
+    setter(digits === "" ? "" : Number(digits));
   };
 
-  // Phone input auto-formatter (+7 (XXX) XXX-XX-XX)
-  const handlePhoneChange = (e) => {
-    let val = e.target.value;
-
-    // If user deleted character(s)
-    if (val.length < delegatePhone.length) {
-      let oldDigits = delegatePhone.replace(/\D/g, "");
-      let newDigits = val.replace(/\D/g, "");
-      // If the number of digits is the same, it means a formatting character (like '-', ')' or space) was deleted.
-      // In this case, we manually delete the last digit.
-      if (oldDigits.length === newDigits.length && newDigits.length > 0) {
-        newDigits = newDigits.slice(0, -1);
-      }
-      let digits = newDigits;
-      if (digits.startsWith("7") || digits.startsWith("8")) {
-        digits = digits.substring(1);
-      }
-      digits = digits.substring(0, 10);
-
-      let formatted = "";
-      if (digits.length > 0) {
-        formatted = "+7 (" + digits.substring(0, 3);
-      }
-      if (digits.length >= 3) {
-        formatted += ") " + digits.substring(3, 6);
-      }
-      if (digits.length >= 6) {
-        formatted += "-" + digits.substring(6, 8);
-      }
-      if (digits.length >= 8) {
-        formatted += "-" + digits.substring(8, 10);
-      }
-      setDelegatePhone(formatted);
-      return;
-    }
-
-    // Default formatting logic for typing
-    let digits = val.replace(/\D/g, "");
-    if (digits.startsWith("7") || digits.startsWith("8")) {
-      digits = digits.substring(1);
-    }
-    digits = digits.substring(0, 10);
-
-    let formatted = "";
-    if (digits.length > 0) {
-      formatted = "+7 (" + digits.substring(0, 3);
-    }
-    if (digits.length >= 3) {
-      formatted += ") " + digits.substring(3, 6);
-    }
-    if (digits.length >= 6) {
-      formatted += "-" + digits.substring(6, 8);
-    }
-    if (digits.length >= 8) {
-      formatted += "-" + digits.substring(8, 10);
-    }
-    setDelegatePhone(formatted);
+  const updateAttendee = (index, key, value) => {
+    setAttendees((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [key]: value } : item,
+      ),
+    );
   };
 
-  const handleSeriesChange = (e) => {
-    const val = e.target.value.replace(/\D/g, "").substring(0, 4);
-    setPassportSeries(val);
-  };
+  const addAttendee = () => setAttendees((current) => [...current, { ...emptyAttendee }]);
 
-  const handlePassportNumberChange = (e) => {
-    const val = e.target.value.replace(/\D/g, "").substring(0, 6);
-    setPassportNumber(val);
-  };
+  const removeAttendee = (index) =>
+    setAttendees((current) =>
+      current.length > 1 ? current.filter((_, itemIndex) => itemIndex !== index) : current,
+    );
 
-  const handleDeptCodeChange = (e) => {
-    let val = e.target.value.replace(/\D/g, "").substring(0, 6);
-    if (val.length > 3) {
-      val = val.substring(0, 3) + "-" + val.substring(3);
-    }
-    setPassportDeptCode(val);
-  };
-
-  const inputClassWithError = (hasError) => 
+  const inputClassWithError = (hasError) =>
     `${fieldClass} ${hasError ? "border-rose-500! focus:border-rose-500! focus:ring-rose-100!" : ""}`;
 
   async function onSubmit(event) {
     event.preventDefault();
     setBusy(true);
     setError("");
-    setSuccess("");
 
-    // Final checks
-    if (hasExcessMembersWarning) {
-      setError("Присутствовало членов не может быть больше, чем всего членов отделения.");
+    const fail = (message) => {
+      setError(message);
       setBusy(false);
-      return;
+    };
+
+    if (!regions.includes(region)) {
+      return fail("Выберите субъект Российской Федерации из списка.");
     }
 
-    if (hasExcessVotesWarning) {
-      setError("Голосов за не может быть больше, чем присутствовало членов.");
-      setBusy(false);
-      return;
+    if (presentMembers === 0) {
+      return fail("Заполните явочный лист: нужен хотя бы один присутствующий член отделения.");
+    }
+
+    if (hasExcessMembersWarning) {
+      return fail(
+        "В явочном листе больше человек, чем всего членов, состоящих на учёте в отделении.",
+      );
     }
 
     if (hasQuorumWarning) {
-      setError(`Собрание нелегитимно. Должно присутствовать не менее 2/3 членов (минимум ${requiredQuorum}).`);
-      setBusy(false);
-      return;
+      return fail(
+        `Собрание неправомочно: кворум — более половины членов отделения (минимум ${quorum}).`,
+      );
+    }
+
+    if (hasVotesSumWarning) {
+      return fail(
+        `Сумма голосов должна равняться числу присутствующих (${presentMembers}), сейчас ${votesTotal}.`,
+      );
     }
 
     if (hasVoteWarning) {
-      setError(`Недостаточно голосов. За делегата должно проголосовать не менее 2/3 присутствующих (минимум ${minimumVotes}).`);
-      setBusy(false);
-      return;
+      return fail(
+        `Делегат не избран: «За» должно быть не менее 2/3 присутствующих (минимум ${minimumVotes}).`,
+      );
+    }
+
+    const filledAttendees = attendees.filter(
+      (item) =>
+        item.fullName.trim() ||
+        item.passportSeries ||
+        item.passportNumber ||
+        item.contact.trim(),
+    );
+
+    const attendeeError = filledAttendees
+      .map((item, index) => {
+        const fioError = validateFio(item.fullName);
+        if (fioError) return `Явочный лист, строка ${index + 1}: ${fioError}`;
+        if (item.passportSeries.length !== PASSPORT_SERIES_LENGTH)
+          return `Явочный лист, строка ${index + 1}: серия паспорта — ${PASSPORT_SERIES_LENGTH} цифры.`;
+        if (item.passportNumber.length !== PASSPORT_NUMBER_LENGTH)
+          return `Явочный лист, строка ${index + 1}: номер паспорта — ${PASSPORT_NUMBER_LENGTH} цифр.`;
+        if (!item.contact.trim())
+          return `Явочный лист, строка ${index + 1}: укажите телефон или e-mail.`;
+        return null;
+      })
+      .find(Boolean);
+
+    if (attendeeError) {
+      return fail(attendeeError);
     }
 
     if (delegateFioError || chairFioError || secretaryFioError) {
-      setError("Пожалуйста, исправьте ошибки в ФИО (должно быть 3 русских слова).");
-      setBusy(false);
-      return;
+      return fail("Исправьте ошибки в ФИО (должно быть 3 русских слова).");
     }
 
-    const phoneDigits = delegatePhone.replace(/\D/g, "");
-    if (phoneDigits.length !== 11) {
-      setError("Номер телефона должен содержать 11 цифр.");
-      setBusy(false);
-      return;
+    if (digitsOnly(delegatePhone).length !== 11) {
+      return fail("Номер телефона делегата должен содержать 11 цифр.");
     }
 
-    if (passportSeries.length !== 4 || passportNumber.length !== 6) {
-      setError("Серия паспорта должна состоять из 4 цифр, а номер — из 6.");
-      setBusy(false);
-      return;
+    if (
+      passportSeries.length !== PASSPORT_SERIES_LENGTH ||
+      passportNumber.length !== PASSPORT_NUMBER_LENGTH
+    ) {
+      return fail(
+        `Паспорт делегата: серия — ${PASSPORT_SERIES_LENGTH} цифры, номер — ${PASSPORT_NUMBER_LENGTH} цифр.`,
+      );
     }
 
-    if (passportDeptCode.replace("-", "").length !== 6) {
-      setError("Код подразделения должен состоять из 6 цифр.");
-      setBusy(false);
-      return;
+    if (digitsOnly(passportDeptCode).length !== 6) {
+      return fail("Код подразделения должен состоять из 6 цифр.");
+    }
+
+    if (addressPostalCode.length !== 6) {
+      return fail("Почтовый индекс в адресе регистрации — 6 цифр.");
     }
 
     try {
       const form = new FormData(event.currentTarget);
       const payload = Object.fromEntries(form.entries());
-      
-      // Sync numerical and validated states
-      payload.presentMembers = presentMembers;
+
+      payload.region = region;
       payload.totalMembers = totalMembers;
       payload.votesFor = votesFor;
+      payload.votesAgainst = votesAgainst;
+      payload.votesAbstain = votesAbstain;
       payload.delegatePhone = delegatePhone;
       payload.passportSeries = passportSeries;
       payload.passportNumber = passportNumber;
       payload.passportDepartmentCode = passportDeptCode;
+      payload.addressPostalCode = addressPostalCode;
+      payload.attendees = filledAttendees;
 
       const response = await fetch("/api/conferencia/submissions", {
         method: "POST",
@@ -245,44 +240,15 @@ export function PublicSubmissionForm() {
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result.error || "Не удалось создать протокол.");
+        setError(result.error || "Не удалось создать документы.");
+        setBusy(false);
         return;
       }
 
-      setSubmission(result.submission);
-    } catch (err) {
+      // Дальше работа идёт на странице заявки: туда можно вернуться через дни.
+      await router.push(`/conferencia/${result.submission.id}`);
+    } catch {
       setError("Не удалось связаться с сервером. Проверьте подключение и попробуйте еще раз.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onUpload(event) {
-    event.preventDefault();
-    if (!submission) return;
-
-    setBusy(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const form = new FormData(event.currentTarget);
-      const response = await fetch(`/api/conferencia/submissions/${submission.id}/upload`, {
-        method: "POST",
-        body: form,
-      });
-      const result = await response.json();
-
-      if (!response.ok) {
-        setError(result.error || "Не удалось загрузить файлы.");
-        return;
-      }
-
-      setSubmission(result.submission);
-      setSuccess("Документы и фотография успешно загружены.");
-    } catch (err) {
-      setError("Не удалось загрузить файлы. Проверьте подключение и попробуйте еще раз.");
-    } finally {
       setBusy(false);
     }
   }
@@ -290,299 +256,503 @@ export function PublicSubmissionForm() {
   return (
     <div className="glass-card rounded-2xl p-6 sm:p-8 bg-white border border-slate-200 text-slate-800 space-y-6">
       <form onSubmit={onSubmit} className="space-y-6">
-        {/* Step 2 Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider">
-              Шаг 2
-            </div>
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-wide">Заполните протокол собрания</h2>
-          </div>
+        <div className="border-b border-slate-100 pb-4">
+          <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Данные собрания</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-relaxed text-slate-500">
+            Вносите по итогам уже проведённого собрания. Из этих данных соберутся три бланка:
+            протокол, список присутствовавших и согласие делегата. Проверять и подписывать их вы
+            будете на бумаге, поэтому вводите так, как должно быть в документе.
+          </p>
         </div>
 
-        {/* Input fields */}
-        <div className="grid gap-4 xl:grid-cols-3">
-          {/* Custom Autocomplete Region Selector */}
-          <div className="relative">
-            <Field label="Субъект РФ">
-              <input
-                type="text"
-                name="region"
-                required
-                autoComplete="off"
-                placeholder="Выберите регион РФ"
-                value={regionSearch}
-                onChange={(e) => {
-                  setRegionSearch(e.target.value);
-                  setShowRegionDropdown(true);
-                }}
-                onFocus={() => setShowRegionDropdown(true)}
-                onBlur={() => {
-                  setTimeout(() => setShowRegionDropdown(false), 200);
-                }}
-                className={fieldClass}
-              />
-            </Field>
-            {showRegionDropdown && filteredRegions.length > 0 && (
-              <ul className="absolute left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1.5 shadow-lg z-30 divide-y divide-slate-50">
-                {filteredRegions.map((region) => (
-                  <li
-                    key={region}
-                    onMouseDown={() => {
-                      setRegionSearch(region);
-                      setShowRegionDropdown(false);
-                    }}
-                    className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
-                  >
-                    {region}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <Field label="Город">
-            <input name="city" required placeholder="Например, Москва" className={fieldClass} />
-          </Field>
-          <Field label="Дата проведения">
-            <input name="meetingDate" required type="date" max={today} defaultValue={today} className={fieldClass} />
-          </Field>
-
-          {/* Autocomplete-like Number Selector for "Всего членов отделения" */}
-          <div className="relative">
-            <Field label="Всего членов отделения">
-              <input
-                name="totalMembers"
-                required
-                type="number"
-                min="1"
-                value={totalMembers}
-                onChange={handleNumericChange(setTotalMembers)}
-                onFocus={() => setShowTotalDropdown(true)}
-                onBlur={() => {
-                  setTimeout(() => setShowTotalDropdown(false), 200);
-                }}
-                className={inputClassWithError(hasExcessMembersWarning)}
-              />
-            </Field>
-            {showTotalDropdown && (
-              <ul className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg z-30 divide-y divide-slate-50">
-                {numericOptions.map((num) => (
-                  <li
-                    key={num}
-                    onMouseDown={() => {
-                      setTotalMembers(num);
-                      setShowTotalDropdown(false);
-                    }}
-                    className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
-                  >
-                    {num}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Autocomplete-like Number Selector for "Присутствовало членов" */}
-          <div className="relative">
-            <Field label="Присутствовало членов">
-              <input
-                name="presentMembers"
-                required
-                type="number"
-                min="1"
-                value={presentMembers}
-                onChange={handleNumericChange(setPresentMembers)}
-                onFocus={() => setShowPresentDropdown(true)}
-                onBlur={() => {
-                  setTimeout(() => setShowPresentDropdown(false), 200);
-                }}
-                className={inputClassWithError(hasQuorumWarning || hasExcessMembersWarning)}
-              />
-            </Field>
-            {showPresentDropdown && (
-              <ul className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg z-30 divide-y divide-slate-50">
-                {numericOptions.map((num) => (
-                  <li
-                    key={num}
-                    onMouseDown={() => {
-                      setPresentMembers(num);
-                      setShowPresentDropdown(false);
-                    }}
-                    className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
-                  >
-                    {num}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {hasQuorumWarning && !hasExcessMembersWarning && (
-              <span className="mt-1.5 block text-xs font-semibold text-rose-600">
-                Кворум не достигнут (нужно минимум 2/3, т.е. {requiredQuorum}).
-              </span>
-            )}
-            {hasExcessMembersWarning && (
-              <span className="mt-1.5 block text-xs font-semibold text-rose-600">
-                Присутствовало членов не может быть больше, чем членов отделения.
-              </span>
-            )}
-          </div>
-
-          {/* Autocomplete-like Number Selector for "Голосов за" */}
-          <div className="relative">
-            <Field label="Голосов за">
-              <input
-                name="votesFor"
-                required
-                type="number"
-                min="1"
-                value={votesFor}
-                onChange={handleNumericChange(setVotesFor)}
-                onFocus={() => setShowVotesDropdown(true)}
-                onBlur={() => {
-                  setTimeout(() => setShowVotesDropdown(false), 200);
-                }}
-                className={inputClassWithError(hasVoteWarning || hasExcessVotesWarning)}
-              />
-            </Field>
-            {showVotesDropdown && (
-              <ul className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg z-30 divide-y divide-slate-50">
-                {numericOptions.map((num) => (
-                  <li
-                    key={num}
-                    onMouseDown={() => {
-                      setVotesFor(num);
-                      setShowVotesDropdown(false);
-                    }}
-                    className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
-                  >
-                    {num}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {hasVoteWarning && !hasExcessVotesWarning && (
-              <span className="mt-1.5 block text-xs font-semibold text-rose-600">
-                Нужно минимум {minimumVotes} голосов: не меньше 2/3 от присутствующих.
-              </span>
-            )}
-            {hasExcessVotesWarning && (
-              <span className="mt-1.5 block text-xs font-semibold text-rose-600">
-                Голосов за не может быть больше, чем присутствовало членов.
-              </span>
-            )}
-          </div>
-
-          <Field label="ФИО делегата">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Субъект Российской Федерации" className="xl:col-span-2">
             <input
-              name="delegateName"
+              name="region"
               required
-              placeholder="Иванов Иван Иванович"
-              value={delegateName}
-              onChange={(e) => setDelegateName(e.target.value)}
-              className={inputClassWithError(delegateFioError)}
+              list="conferencia-regions"
+              autoComplete="off"
+              placeholder="Начните вводить: Псков…"
+              value={region}
+              onChange={(event) => setRegion(event.target.value)}
+              className={inputClassWithError(regionError)}
             />
-            {delegateFioError && (
-              <span className="mt-1.5 block text-xs font-semibold text-rose-600">
-                {delegateFioError}
-              </span>
-            )}
+            <datalist id="conferencia-regions">
+              {regions.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+            <span
+              className={`mt-1.5 block text-xs font-semibold ${
+                regionError ? "text-rose-600" : "text-slate-400"
+              }`}
+            >
+              {regionError ?? "Введите несколько букв и выберите вариант из подсказки."}
+            </span>
           </Field>
 
-          <Field label="Телефон делегата">
+          <Field label="Город проведения собрания">
+            <input name="city" required placeholder="Например, Псков" className={fieldClass} />
+          </Field>
+
+          <Field label="Дата проведения">
             <input
-              name="delegatePhone"
+              name="meetingDate"
               required
-              type="tel"
-              placeholder="+7 (900) 000-00-00"
-              value={delegatePhone}
-              onChange={handlePhoneChange}
+              type="date"
+              max={today}
+              defaultValue={today}
               className={fieldClass}
             />
           </Field>
-          <div />
 
-          <Field label="Председатель собрания">
+          <Field label="Номер протокола">
             <input
-              name="chairName"
+              name="protocolNumber"
               required
-              placeholder="Иванов Иван Иванович"
-              value={chairName}
-              onChange={(e) => setChairName(e.target.value)}
-              className={inputClassWithError(chairFioError)}
+              defaultValue="1"
+              placeholder="1"
+              className={fieldClass}
             />
-            {chairFioError && (
+          </Field>
+
+          <Field label="Всего членов отделения на учёте">
+            <input
+              name="totalMembers"
+              required
+              inputMode="numeric"
+              value={totalMembers}
+              onChange={handleNumericChange(setTotalMembers)}
+              className={inputClassWithError(hasExcessMembersWarning)}
+            />
+            {hasExcessMembersWarning && (
               <span className="mt-1.5 block text-xs font-semibold text-rose-600">
-                {chairFioError}
+                В явочном листе {presentMembers} человек — больше, чем членов на учёте.
               </span>
             )}
           </Field>
 
-          <Field label="Секретарь собрания">
-            <input
-              name="secretaryName"
-              required
-              placeholder="Иванов Иван Иванович"
-              value={secretaryName}
-              onChange={(e) => setSecretaryName(e.target.value)}
-              className={inputClassWithError(secretaryFioError)}
-            />
-            {secretaryFioError && (
-              <span className="mt-1.5 block text-xs font-semibold text-rose-600">
-                {secretaryFioError}
+          {/* Считается из явочного листа, поэтому поле не редактируется */}
+          <div className="md:col-span-2">
+            <span className={labelClass}>Присутствовало на собрании</span>
+            <div
+              className={`flex h-10 items-center gap-2 rounded-md border px-3 ${
+                hasQuorumWarning
+                  ? "border-rose-200 bg-rose-50"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <span className="text-base font-extrabold text-slate-900">{presentMembers}</span>
+              <span className="text-xs font-medium text-slate-500">
+                из {totalMembers || 0} на учёте
               </span>
-            )}
-          </Field>
+              <span className="ml-auto text-xs font-medium text-slate-400">
+                кворум — от {quorum}
+              </span>
+            </div>
+            <span
+              className={`mt-1.5 block text-xs font-semibold ${
+                hasQuorumWarning ? "text-rose-600" : "text-slate-400"
+              }`}
+            >
+              {hasQuorumWarning
+                ? `Кворума нет: нужно более половины членов отделения, минимум ${quorum}.`
+                : "Считается автоматически по заполненным строкам явочного листа ниже."}
+            </span>
+          </div>
         </div>
 
-        {/* Passport fields */}
+        {/* Явочный лист */}
+        <div className="border-t border-slate-100 pt-5 space-y-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Кто присутствовал на собрании</h3>
+            <p className="mt-1 max-w-3xl text-sm text-slate-500">
+              Одна строка — один член отделения. Каждая строка попадёт в список присутствовавших,
+              где участник поставит подпись от руки. Отсюда же считается кворум.
+            </p>
+          </div>
+
+          <div className="hidden gap-2 px-1 md:grid md:grid-cols-[28px_1.6fr_88px_112px_1.2fr_32px] text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <span />
+            <span>Фамилия Имя Отчество</span>
+            <span>Серия</span>
+            <span>Номер</span>
+            <span>Телефон или e-mail</span>
+            <span />
+          </div>
+
+          <div className="space-y-2">
+            {attendees.map((attendee, index) => {
+              const fioError = Boolean(validateFio(attendee.fullName));
+              const seriesError =
+                attendee.passportSeries.length > 0 &&
+                attendee.passportSeries.length !== PASSPORT_SERIES_LENGTH;
+              const numberError =
+                attendee.passportNumber.length > 0 &&
+                attendee.passportNumber.length !== PASSPORT_NUMBER_LENGTH;
+
+              return (
+                <div
+                  key={index}
+                  className="grid gap-2 md:grid-cols-[28px_1.6fr_88px_112px_1.2fr_32px] md:items-center"
+                >
+                  <span className="text-xs font-bold text-slate-400 max-md:hidden">
+                    {index + 1}
+                  </span>
+                  <input
+                    placeholder="Иванов Иван Иванович"
+                    value={attendee.fullName}
+                    onChange={(event) => updateAttendee(index, "fullName", event.target.value)}
+                    className={inputClassWithError(fioError)}
+                  />
+                  <input
+                    inputMode="numeric"
+                    placeholder="4510"
+                    aria-label={`Серия паспорта, строка ${index + 1}`}
+                    value={attendee.passportSeries}
+                    onChange={(event) =>
+                      updateAttendee(
+                        index,
+                        "passportSeries",
+                        digitsOnly(event.target.value).slice(0, PASSPORT_SERIES_LENGTH),
+                      )
+                    }
+                    className={inputClassWithError(seriesError)}
+                  />
+                  <input
+                    inputMode="numeric"
+                    placeholder="123456"
+                    aria-label={`Номер паспорта, строка ${index + 1}`}
+                    value={attendee.passportNumber}
+                    onChange={(event) =>
+                      updateAttendee(
+                        index,
+                        "passportNumber",
+                        digitsOnly(event.target.value).slice(0, PASSPORT_NUMBER_LENGTH),
+                      )
+                    }
+                    className={inputClassWithError(numberError)}
+                  />
+                  <input
+                    placeholder="+7 (999) 000-00-00 или e-mail"
+                    value={attendee.contact}
+                    onChange={(event) => updateAttendee(index, "contact", event.target.value)}
+                    className={fieldClass}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAttendee(index)}
+                    disabled={attendees.length === 1}
+                    title="Удалить строку"
+                    className="h-10 w-8! rounded-md border border-slate-200! bg-white! px-0! text-slate-400! transition hover:border-rose-300! hover:text-rose-600! disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={addAttendee}
+            className="h-9 w-auto! rounded-lg border border-indigo-200! bg-indigo-50! px-4 text-sm font-semibold text-indigo-700! transition hover:bg-indigo-100! cursor-pointer"
+          >
+            + Добавить участника
+          </button>
+        </div>
+
+        {/* Голосование */}
         <div className="border-t border-slate-100 pt-5">
-          <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Паспортные данные делегата
-          </h3>
+          <h3 className="text-base font-bold text-slate-900">Как голосовали по второму вопросу</h3>
+          <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+            <p className="font-semibold text-slate-700">Вопрос, поставленный на голосование:</p>
+            <p className="mt-1 text-slate-600">
+              «Избрать делегатом на Конференцию Общероссийской общественной организации,
+              назначенную на {CONFERENCE_DATE}, —{" "}
+              <span className="font-semibold text-slate-900">
+                {delegateName.trim() || "Ф. И. О. делегата"}
+              </span>
+              ».
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Первый вопрос повестки — избрание председателя и секретаря собрания — печатается в
+              протоколе как принятый единогласно.
+            </p>
+          </div>
+          <p className="mt-3 mb-4 text-sm text-slate-500">
+            Три числа в сумме должны дать число присутствующих ({presentMembers}).
+          </p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="«За»">
+              <input
+                name="votesFor"
+                required
+                inputMode="numeric"
+                value={votesFor}
+                onChange={handleNumericChange(setVotesFor)}
+                className={inputClassWithError(hasVoteWarning || hasVotesSumWarning)}
+              />
+            </Field>
+            <Field label="«Против»">
+              <input
+                name="votesAgainst"
+                required
+                inputMode="numeric"
+                value={votesAgainst}
+                onChange={handleNumericChange(setVotesAgainst)}
+                className={inputClassWithError(hasVotesSumWarning)}
+              />
+            </Field>
+            <Field label="«Воздержались»">
+              <input
+                name="votesAbstain"
+                required
+                inputMode="numeric"
+                value={votesAbstain}
+                onChange={handleNumericChange(setVotesAbstain)}
+                className={inputClassWithError(hasVotesSumWarning)}
+              />
+            </Field>
+          </div>
+          {hasVotesSumWarning && (
+            <span className="mt-2 block text-xs font-semibold text-rose-600">
+              Сумма голосов {votesTotal}, а присутствовало {presentMembers}.
+            </span>
+          )}
+          {hasVoteWarning && (
+            <span className="mt-2 block text-xs font-semibold text-rose-600">
+              Нужно минимум {minimumVotes} голосов «За»: не менее 2/3 от присутствующих.
+            </span>
+          )}
+        </div>
+
+        {/* Президиум */}
+        <div className="border-t border-slate-100 pt-5">
+          <h3 className="text-base font-bold text-slate-900">Кто вёл собрание</h3>
+          <p className="mt-1 mb-4 text-sm text-slate-500">
+            Председатель и секретарь подписывают протокол и список присутствовавших.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Председатель собрания">
+              <input
+                name="chairName"
+                required
+                placeholder="Иванов Иван Иванович"
+                value={chairName}
+                onChange={(event) => setChairName(event.target.value)}
+                className={inputClassWithError(chairFioError)}
+              />
+              {chairFioError && (
+                <span className="mt-1.5 block text-xs font-semibold text-rose-600">
+                  {chairFioError}
+                </span>
+              )}
+            </Field>
+
+            <Field label="Секретарь собрания">
+              <input
+                name="secretaryName"
+                required
+                placeholder="Иванов Иван Иванович"
+                value={secretaryName}
+                onChange={(event) => setSecretaryName(event.target.value)}
+                className={inputClassWithError(secretaryFioError)}
+              />
+              {secretaryFioError && (
+                <span className="mt-1.5 block text-xs font-semibold text-rose-600">
+                  {secretaryFioError}
+                </span>
+              )}
+            </Field>
+          </div>
+        </div>
+
+        {/* Делегат */}
+        <div className="border-t border-slate-100 pt-5">
+          <h3 className="text-base font-bold text-slate-900">Избранный делегат</h3>
+          <p className="mt-1 mb-4 max-w-3xl text-sm text-slate-500">
+            По этим контактам Оргкомитет пришлёт подключение к Конференции, поэтому проверьте
+            e-mail внимательно.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Field label="ФИО делегата">
+              <input
+                name="delegateName"
+                required
+                placeholder="Иванов Иван Иванович"
+                value={delegateName}
+                onChange={(event) => setDelegateName(event.target.value)}
+                className={inputClassWithError(delegateFioError)}
+              />
+              {delegateFioError && (
+                <span className="mt-1.5 block text-xs font-semibold text-rose-600">
+                  {delegateFioError}
+                </span>
+              )}
+            </Field>
+
+            <Field label="Телефон делегата">
+              <input
+                name="delegatePhone"
+                required
+                type="tel"
+                placeholder="+7 (900) 000-00-00"
+                value={delegatePhone}
+                onChange={(event) => setDelegatePhone(formatPhone(event.target.value))}
+                className={fieldClass}
+              />
+            </Field>
+
+            <Field label="E-mail делегата">
+              <input
+                name="delegateEmail"
+                required
+                type="email"
+                placeholder="delegate@example.ru"
+                className={fieldClass}
+              />
+            </Field>
+          </div>
+        </div>
+
+        {/* Адрес регистрации */}
+        <div className="border-t border-slate-100 pt-5">
+          <h3 className="text-base font-bold text-slate-900">Адрес регистрации делегата</h3>
+          <p className="mt-1 mb-4 max-w-3xl text-sm text-slate-500">
+            Как в паспорте, по строке регистрации. Адрес печатается в протоколе и в согласии на
+            обработку данных.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Field label="Почтовый индекс">
+              <input
+                name="addressPostalCode"
+                required
+                inputMode="numeric"
+                placeholder="180000"
+                value={addressPostalCode}
+                onChange={(event) => setAddressPostalCode(digitsOnly(event.target.value).slice(0, 6))}
+                className={inputClassWithError(
+                  addressPostalCode.length > 0 && addressPostalCode.length !== 6,
+                )}
+              />
+            </Field>
+            <Field label="Субъект РФ, край или область" className="xl:col-span-2">
+              <input
+                name="addressRegion"
+                required
+                placeholder="Псковская область"
+                className={fieldClass}
+              />
+            </Field>
+            <Field label="Район">
+              <input
+                name="addressDistrict"
+                placeholder="Печорский район, если есть"
+                className={fieldClass}
+              />
+            </Field>
+            <Field label="Город или населённый пункт">
+              <input
+                name="addressSettlement"
+                required
+                placeholder="г. Псков"
+                className={fieldClass}
+              />
+            </Field>
+            <Field label="Улица">
+              <input name="addressStreet" required placeholder="Советская" className={fieldClass} />
+            </Field>
+            <Field label="Дом">
+              <input name="addressHouse" required placeholder="5" className={fieldClass} />
+            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Корпус">
+                <input name="addressBuilding" placeholder="—" className={fieldClass} />
+              </Field>
+              <Field label="Квартира">
+                <input name="addressFlat" placeholder="12" className={fieldClass} />
+              </Field>
+            </div>
+          </div>
+        </div>
+
+        {/* Паспорт */}
+        <div className="border-t border-slate-100 pt-5">
+          <h3 className="text-base font-bold text-slate-900">Паспорт делегата</h3>
+          <p className="mt-1 mb-4 max-w-3xl text-sm text-slate-500">
+            Нужен для протокола и согласия на обработку данных: по нему делегата опознают при
+            подключении к Конференции. Данные видны только Оргкомитету.
+          </p>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <Field label="Серия">
+            <Field label={`Серия — ${PASSPORT_SERIES_LENGTH} цифры`}>
               <input
                 name="passportSeries"
                 required
                 inputMode="numeric"
-                placeholder="0000"
+                placeholder="4510"
                 value={passportSeries}
-                onChange={handleSeriesChange}
-                className={fieldClass}
+                onChange={(event) =>
+                  setPassportSeries(digitsOnly(event.target.value).slice(0, PASSPORT_SERIES_LENGTH))
+                }
+                className={inputClassWithError(
+                  passportSeries.length > 0 && passportSeries.length !== PASSPORT_SERIES_LENGTH,
+                )}
               />
             </Field>
-            <Field label="Номер">
+            <Field label={`Номер — ${PASSPORT_NUMBER_LENGTH} цифр`}>
               <input
                 name="passportNumber"
                 required
                 inputMode="numeric"
-                placeholder="000000"
+                placeholder="123456"
                 value={passportNumber}
-                onChange={handlePassportNumberChange}
-                className={fieldClass}
+                onChange={(event) =>
+                  setPassportNumber(digitsOnly(event.target.value).slice(0, PASSPORT_NUMBER_LENGTH))
+                }
+                className={inputClassWithError(
+                  passportNumber.length > 0 && passportNumber.length !== PASSPORT_NUMBER_LENGTH,
+                )}
               />
             </Field>
             <Field label="Дата выдачи">
-              <input name="passportIssuedDate" required type="date" max={today} className={fieldClass} />
+              <input
+                name="passportIssuedDate"
+                required
+                type="date"
+                max={today}
+                className={fieldClass}
+              />
             </Field>
             <Field label="Код подразделения">
               <input
                 name="passportDepartmentCode"
                 required
-                placeholder="000-000"
+                inputMode="numeric"
+                placeholder="600-014"
                 value={passportDeptCode}
-                onChange={handleDeptCodeChange}
-                className={fieldClass}
+                onChange={(event) => {
+                  const digits = digitsOnly(event.target.value).slice(0, 6);
+                  setPassportDeptCode(
+                    digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits,
+                  );
+                }}
+                className={inputClassWithError(
+                  passportDeptCode.length > 0 && digitsOnly(passportDeptCode).length !== 6,
+                )}
               />
             </Field>
-            <Field label="Кем выдан" className="md:col-span-2 xl:col-span-1">
-              <input name="passportIssuedBy" required className={fieldClass} />
+            <Field label="Кем выдан">
+              <input
+                name="passportIssuedBy"
+                required
+                placeholder="УМВД России по Псковской области"
+                className={fieldClass}
+              />
             </Field>
           </div>
         </div>
 
-        {/* Legal compliance check and submit button */}
         <div className="border-t border-slate-100 pt-5 space-y-4">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
@@ -591,100 +761,41 @@ export function PublicSubmissionForm() {
               className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
             />
             <span className="text-xs text-slate-500 leading-relaxed select-none">
-              Согласен на обработку персональных данных (ФИО, телефон, паспортные данные) в соответствии с Федеральным законом № 152-ФЗ «О персональных данных» для целей подготовки конференции и делегирования.
+              Подтверждаю, что данные внесены с согласия участников собрания и делегата. Согласие
+              делегата на обработку персональных данных и видеозапись по № 152-ФЗ он подпишет на
+              бумажном бланке из комплекта.
             </span>
           </label>
 
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
               {error}
             </div>
           )}
-          {success && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {success}
-            </div>
-          )}
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="max-w-lg text-xs text-slate-500">
+              После отправки откроется страница вашей заявки с тремя бланками и ссылкой на неё.
+              Сохраните ссылку — по ней вы вернётесь догружать подписанные документы.
+            </p>
             <button
               type="submit"
               disabled={busy}
               className="btn-primary inline-flex h-11 items-center justify-center rounded-lg px-8 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
             >
-              {busy ? "Обработка..." : "Сгенерировать протокол"}
+              {busy ? "Готовим бланки..." : "Составить бланки и получить ссылку"}
             </button>
           </div>
         </div>
       </form>
-
-      {/* Step 3 Form */}
-      {submission && (
-        <div className="mt-6 border-t border-slate-100 pt-6 space-y-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <div className="flex-1">
-              <h2 className="text-lg font-bold text-slate-900">Загрузка печатной версии</h2>
-              <p className="mt-1 text-sm text-slate-500">Скачайте заполненный протокол в формате DOCX, распечатайте и подпишите его ручкой.</p>
-            </div>
-            <a
-              href={`/api/conferencia/submissions/${submission.id}/document`}
-              className="file-link px-5 py-2.5 h-11 text-white border-indigo-600 bg-indigo-600 hover:bg-indigo-700 font-bold hover:text-white"
-            >
-              Скачать DOCX
-            </a>
-          </div>
-
-          <form onSubmit={onUpload} className="space-y-4 bg-slate-50 p-5 rounded-xl border border-slate-100">
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wider">
-                Шаг 3
-              </div>
-              <h2 className="text-lg font-extrabold text-slate-900">Отправьте подписанный протокол и фото</h2>
-              <p className="text-sm text-slate-500">Прикрепите подписанный протокол (скан в PDF или фото/скан в JPG/PNG) и фотографию с проведенной конференции.</p>
-            </div>
-            
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Фото / скан подписанного протокола">
-                <input
-                  name="file"
-                  required
-                  type="file"
-                  accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png"
-                  className="block w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 transition cursor-pointer"
-                />
-              </Field>
-              <Field label="Фото / скриншот с собрания конференции">
-                <input
-                  name="photo"
-                  required
-                  type="file"
-                  accept="image/*"
-                  className="block w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 file:mr-4 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 transition cursor-pointer"
-                />
-              </Field>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="submit"
-                disabled={busy}
-                className="btn-primary inline-flex h-11 items-center justify-center rounded-lg px-6 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-              >
-                {busy ? "Загрузка файлов..." : "Отправить подписанные документы"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }
 
-function Field({
-  label,
-  className,
-  children,
-}) {
+function Field({ label, className, children }) {
   return (
     <label className={className}>
       <span className={labelClass}>{label}</span>

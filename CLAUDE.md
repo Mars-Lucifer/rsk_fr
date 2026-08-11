@@ -170,8 +170,15 @@ Main portal/user-facing areas observed in this repo:
 - `/cours/*`
 - `/tools/mayak-oko`
 - `/admin` MAYAK admin hub
-- `/rosdk/confrencia` Conference delegate selection protocol form
-- `/rosdk/confrencia/admin` Admin panel for delegate protocols
+- `/conferencia` Regional-branch delegate package: form generates protocol, attendance list and consent, then collects signed scans
+- `/conferencia/admin` Admin panel for received packages
+
+Conference package notes (code lives under `src/lib/rosdk-confrencia/`, despite the route being `/conferencia`):
+- `documents.js` builds the three DOCX blanks with the `docx` package — there is no template file to patch;
+- `slots.js` is the shared, dependency-free description of every generated and uploaded file, imported by both the form and the API;
+- `validation.js` owns the legal thresholds: quorum is more than half of members on record, the delegate needs at least 2/3 of those present;
+- `data/rsk.sqlite` and `data/uploads/` hold passport data and scans — gitignored, never commit them;
+- `node scripts/check-conferencia-package.mjs` covers thresholds, attendance list, DOCX generation and archive assembly.
 
 Shared navigation is defined in:
 - `src/components/layout/Aside/Nav.js`

@@ -92,3 +92,12 @@ tmp_mascot_compare/
 public/tasks-2/v2/
 
 data/mayak-content/
+
+# скриншоты и логи проверки браузером
+.playwright-mcp/
+
+# заявки региональных отделений на Конференцию: персданные и сканы паспортов
+data/rsk.sqlite
+data/rsk.sqlite-shm
+data/rsk.sqlite-wal
+data/uploads/

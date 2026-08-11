@@ -1,4 +1,14 @@
-import { attachStoredSignedPdfAndPhoto, getStoredSubmission } from "@/lib/rosdk-confrencia/storage";
+import {
+  attachStoredUploads,
+  getStoredSubmission,
+  toPublicSubmission,
+} from "@/lib/rosdk-confrencia/storage";
+import { UPLOAD_SLOTS } from "@/lib/rosdk-confrencia/files";
+import {
+  MAX_UPLOAD_BYTES,
+  UPLOAD_LIMIT,
+  rejectIfRateLimited,
+} from "@/lib/rosdk-confrencia/rateLimit";
 import { IncomingForm } from "formidable";
 
 export const config = {
@@ -7,11 +17,14 @@ export const config = {
   },
 };
 
+const DOCUMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png"];
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
+
 function parseForm(req) {
   return new Promise((resolve, reject) => {
     const form = new IncomingForm({
       keepExtensions: true,
-      maxFileSize: 50 * 1024 * 1024,
+      maxFileSize: MAX_UPLOAD_BYTES,
       multiples: true,
     });
 
@@ -30,9 +43,27 @@ function getSingleFile(fileField) {
   return Array.isArray(fileField) ? fileField[0] : fileField;
 }
 
+function isAllowed(file, extensions) {
+  const name = (file.originalFilename || file.name || "").toLowerCase();
+  const mime = file.mimetype || "";
+
+  if (mime === "application/pdf" && extensions.includes(".pdf")) {
+    return true;
+  }
+  if (mime.startsWith("image/")) {
+    return true;
+  }
+
+  return extensions.some((extension) => name.endsWith(extension));
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (rejectIfRateLimited(res, "upload", req, UPLOAD_LIMIT)) {
+    return undefined;
   }
 
   try {
@@ -44,54 +75,45 @@ export default async function handler(req, res) {
     }
 
     const { files } = await parseForm(req);
-    const pdfFile = getSingleFile(files.file);
-    const photoFile = getSingleFile(files.photo);
+    const uploads = {};
 
-    if (!pdfFile) {
-      return res.status(400).json({ error: "Загрузите фото/скан подписанного протокола." });
+    for (const { slot, label } of UPLOAD_SLOTS) {
+      const file = getSingleFile(files[slot]);
+
+      // Сканы можно докладывать по одному: принимаем то, что пришло.
+      if (!file) {
+        continue;
+      }
+
+      const isPhoto = slot === "photo";
+      const extensions = isPhoto ? IMAGE_EXTENSIONS : DOCUMENT_EXTENSIONS;
+
+      if (!isAllowed(file, extensions)) {
+        return res.status(400).json({
+          error: isPhoto
+            ? `«${label}»: допустимы только изображения (PNG, JPG, JPEG, WEBP).`
+            : `«${label}»: допустимы только PDF или изображения (JPG, JPEG, PNG).`,
+        });
+      }
+
+      uploads[slot] = file;
     }
 
-    const pdfName = pdfFile.originalFilename || pdfFile.name || "";
-    const pdfNameLower = pdfName.toLowerCase();
-    const pdfMime = pdfFile.mimetype || "";
-    const isValidFile =
-      pdfMime === "application/pdf" ||
-      pdfMime.startsWith("image/") ||
-      pdfNameLower.endsWith(".pdf") ||
-      pdfNameLower.endsWith(".jpg") ||
-      pdfNameLower.endsWith(".jpeg") ||
-      pdfNameLower.endsWith(".png");
-
-    if (!isValidFile) {
-      return res.status(400).json({ error: "Допустимы только файлы PDF или изображения (JPG, JPEG, PNG)." });
+    if (Object.keys(uploads).length === 0) {
+      return res.status(400).json({ error: "Не выбрано ни одного файла." });
     }
 
-    if (!photoFile) {
-      return res.status(400).json({ error: "Загрузите фотографию/скриншот с конференции." });
-    }
+    const updated = await attachStoredUploads(id, uploads);
 
-    const photoName = photoFile.originalFilename || photoFile.name || "";
-    const photoNameLower = photoName.toLowerCase();
-    const photoMime = photoFile.mimetype || "";
-    const isValidImage =
-      photoMime.startsWith("image/") ||
-      photoNameLower.endsWith(".png") ||
-      photoNameLower.endsWith(".jpg") ||
-      photoNameLower.endsWith(".jpeg") ||
-      photoNameLower.endsWith(".webp");
-
-    if (!isValidImage) {
-      return res.status(400).json({
-        error: "Допустимы только файлы изображений (PNG, JPG, JPEG, WEBP).",
-      });
-    }
-
-    const updated = await attachStoredSignedPdfAndPhoto(id, pdfFile, photoFile);
-
-    return res.status(200).json({ submission: updated });
+    return res.status(200).json({ submission: toPublicSubmission(updated) });
   } catch (error) {
+    const tooLarge =
+      error?.code === "ETOOBIG" || /maxFileSize|exceeded/i.test(error?.message ?? "");
+
     return res.status(400).json({
-      error: error.message || "Ошибка загрузки файлов.",
+      error: tooLarge
+        ? `Файл слишком большой. Ограничение — ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} МБ на файл: уменьшите разрешение скана или сохраните в JPG.`
+        : error.message || "Ошибка загрузки файлов.",
     });
   }
 }
