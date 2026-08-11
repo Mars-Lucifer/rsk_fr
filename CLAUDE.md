@@ -47,6 +47,9 @@ own branch for as long as needed — never partially committed to `main`.
    for a separate worktree instead of switching branches under someone else's
    uncommitted files.
 
+**Живая карта копий, веток, портов и мин стенда — в `docs/WORKSTREAMS.md`.**
+Читать её первой в новом чате: она отвечает, где именно работать.
+
 Parallel sessions are isolated with worktrees under `.worktrees/` (gitignored),
 one directory per workstream. Prefer the harness's native worktree tool over
 `git worktree add` when one is available.
