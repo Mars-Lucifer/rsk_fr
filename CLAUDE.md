@@ -64,6 +64,56 @@ one directory per workstream. Prefer the harness's native worktree tool over
 If any of these ever reach the history, removing them requires rewriting
 history, and for the archive also rotating every key in `.env.local`.
 
+## Локальный запуск и визуальная проверка
+
+Дев-сервер поднимается только через preview-панель харнесса (`preview_start` по
+имени из `.claude/launch.json`), не через Bash. Порт закреплён за рабочей копией,
+чтобы параллельные сессии не выбивали друг друга:
+
+| Копия | Имя в launch.json | Порт |
+|---|---|---|
+| основная (`rsk_fr-main`) | `rsk-fr-dev` | 1234 |
+| `.worktrees/mayak-master` | `mayak-master-dev` | 1235 |
+| `.worktrees/mayak-guide` | `mayak-guide-dev` | 1236 |
+| `.worktrees/mayak-guide-live` | `mayak-guide-live-dev` | 1237 |
+| конференция | `conferencia-dev` | 1240 |
+
+Форма записи для worktree: `npm --prefix <каталог> run dev -- -p <порт>`.
+
+- `npm --prefix` делает каталог рабочим для скрипта — это единственная из
+  проверенных форм, которая переживает спавн из харнесса;
+- `-- -p <порт>` перебивает порт из `package.json` копии: Next берёт последний
+  флаг, в логе видно `Local: http://localhost:<порт>`;
+- **не писать** `cmd /c cd /d ... && npx next dev`: `cmd` завершается сразу после
+  спавна, харнесс теряет `serverId`, порт остаётся пустым, а `preview_logs` потом
+  отвечает «serverId not found»;
+- `npm exec --prefix` не годится: prefix не меняет cwd, и npm лезет ставить `node`
+  как пакет.
+
+Две копии одного worktree одновременно не поднять: `next dev` держит лок в
+`.next/dev/lock`. Симптом — `Unable to acquire lock`.
+
+### Визуальная проверка 3D-сцен
+
+Скриншот из preview-панели требует, чтобы **панель была открыта в окне
+приложения**. Свёрнутая панель даёт связку симптомов, которую легко принять за
+поломку страницы:
+
+- `screenshot` падает с «Browser pane is not displayed»;
+- в странице `document.hidden === true`, `visibilityState === "hidden"`;
+- `<main>` пустой, канваса нет — скрытая вкладка троттлится, и динамический чанк
+  сцены (`three` + wasm физики) не догружается;
+- при этом сервер отдаёт страницу с 200, ошибок в консоли нет.
+
+Проверять надо именно так, а не по коду: у `/mayak-guide-3d` все числа камеры,
+раскрытия и размеров калибровочные — они правятся по кадру.
+
+Независимый от панели контур — MCP-сервер playwright
+(`claude mcp add playwright -s user -- npx @playwright/mcp@latest`). Именно им
+снималась вся страница в 3D в прошлых сессиях: свой headless-браузер, скриншоты в
+фиксированном вьюпорте 1600 × 900. Если его в сессии нет, визуальная проверка
+упирается в открытую панель.
+
 ## Production Server Access
 
 Продовый сервер: `root@91.228.225.182`. Вход по ключу `~/.ssh/id_rsa`, ключ уже
