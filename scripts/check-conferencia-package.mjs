@@ -42,7 +42,9 @@ import {
   buildConsentDocument,
   buildProtocolDocument,
   buildRegistryDocument,
+  buildTemplateSample,
 } from "../src/lib/rosdk-confrencia/documents.js";
+import { renderTemplate, saveTemplate } from "../src/lib/rosdk-confrencia/templates.js";
 
 const SURNAMES = [
   "Иванов",
@@ -300,6 +302,50 @@ assert.ok(
 );
 assert.match(registryText, /Избрано делегатов: 2 человек от 2 региональных отделений/);
 assert.match(registryText, /Видеокамера \+ Паспорт/);
+
+// --- Свой бланк: подстановка меток, в том числе разрезанных Word-ом на runs.
+const templateXml = `<?xml version="1.0"?><w:document xmlns:w="x"><w:body>
+<w:p><w:r><w:t>Протокол № </w:t></w:r><w:r><w:t>{{proto</w:t></w:r><w:r><w:t>colNumber}}</w:t></w:r></w:p>
+<w:p><w:r><w:t>Делегат: {{delegateName}} из {{region}}</w:t></w:r></w:p>
+<w:tbl><w:tr><w:tc><w:p><w:r><w:t>{{attendees.index}}</w:t></w:r></w:p></w:tc>
+<w:tc><w:p><w:r><w:t>{{attendees.fullName}}</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+<w:p><w:r><w:t>{{unknownField}}</w:t></w:r></w:p>
+</w:body></w:document>`;
+
+const fakeTemplate = new JSZip();
+fakeTemplate.file("word/document.xml", templateXml);
+const fakeTemplateBuffer = await fakeTemplate.generateAsync({ type: "nodebuffer" });
+
+const rendered = await renderTemplate(fakeTemplateBuffer, {
+  values: { protocolNumber: "7", delegateName: "Лебедев Андрей Александрович", region: "Псковская область" },
+  listName: "attendees",
+  items: [
+    { index: 1, fullName: "Иванов Иван Иванович" },
+    { index: 2, fullName: "Петрова Анна & Ко <тест>" },
+  ],
+});
+
+const renderedXml = await (await JSZip.loadAsync(rendered)).file("word/document.xml").async("string");
+const renderedText = renderedXml.replace(/<[^>]+>/g, " ");
+
+assert.match(renderedText, /Протокол № 7/, "метка, разрезанная Word-ом на runs, собирается");
+assert.match(renderedText, /Лебедев Андрей Александрович/);
+assert.ok(!renderedText.includes("{{delegateName}}"), "метки не остаются в готовом документе");
+assert.match(renderedText, /Иванов Иван Иванович/);
+assert.match(renderedText, /Петрова Анна/, "строка таблицы повторяется по числу участников");
+assert.match(renderedXml, /Анна &amp; Ко &lt;тест&gt;/, "спецсимволы экранируются, файл не рвётся");
+assert.match(renderedText, /\{\{unknownField\}\}/, "неизвестная метка остаётся видимой, а не пустеет");
+
+// Переименованный .doc — не .docx: подстановка молча ничего бы не сделала.
+await assert.rejects(
+  () => saveTemplate("protocol", Buffer.from("не zip"), "протокол.doc"),
+  /не файл \.docx/i,
+);
+
+// Образец бланка: вместо значений — те самые метки.
+const sampleText = await documentText(buildTemplateSample("attendance"));
+assert.match(sampleText, /\{\{attendees\.fullName\}\}/);
+assert.match(sampleText, /\{\{quorumPercent\}\}/, "процент кворума в образце тоже метка");
 
 // --- Архив комплекта: имена внутри ZIP не зависят от расширений загруженных сканов.
 const tempDir = await mkdtemp(path.join(tmpdir(), "conferencia-check-"));

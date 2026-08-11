@@ -17,6 +17,7 @@ import {
   regionInPrepositional,
 } from "./format.js";
 import { CONFERENCE_DATE } from "./slots.js";
+import { loadTemplate, renderTemplate } from "./templates.js";
 
 /** Наименование Организации — правится здесь, а не по тексту бланков. */
 export const ORG_NAME =
@@ -90,10 +91,19 @@ function signatureBlock(chairName, secretaryName) {
 }
 
 function quorumPercent(presentMembers, totalMembers) {
-  if (!totalMembers) {
+  const present = Number(presentMembers);
+  const total = Number(totalMembers);
+
+  // В образце бланка вместо чисел стоят «{{...}}» — процент тоже плейсхолдер.
+  if (!Number.isFinite(present) || !Number.isFinite(total)) {
+    return "{{quorumPercent}}";
+  }
+
+  if (!total) {
     return 0;
   }
-  return Math.round((presentMembers / totalMembers) * 100);
+
+  return Math.round((present / total) * 100);
 }
 
 function documentOf(title, children) {
@@ -395,12 +405,14 @@ export function buildConsentDocument(input) {
   ]);
 }
 
+/** Как делегата опознают при подключении — одинаково для всех. */
+export const IDENTIFICATION_METHOD = "Видеокамера + Паспорт";
+
 /**
- * 4. Реестр делегатов для Мандатной комиссии — по бланку Оргкомитета.
  * Одна строка на региональное отделение: если субъект присылал заявку
- * несколько раз, берём самую полную, при равенстве — самую свежую.
+ * несколько раз, берём самую полную.
  */
-export function buildRegistryDocument(submissions) {
+export function registryRows(submissions) {
   const byRegion = new Map();
 
   for (const submission of submissions) {
@@ -413,9 +425,14 @@ export function buildRegistryDocument(submissions) {
     }
   }
 
-  const rows = [...byRegion.values()].sort((left, right) =>
+  return [...byRegion.values()].sort((left, right) =>
     left.region.localeCompare(right.region, "ru"),
   );
+}
+
+/** 4. Реестр делегатов для Мандатной комиссии — по бланку Оргкомитета. */
+export function buildRegistryDocument(submissions) {
+  const rows = registryRows(submissions);
 
   const headerCells = [
     "№",
@@ -462,7 +479,7 @@ export function buildRegistryDocument(submissions) {
                   p(submission.delegatePhone, { after: 0 }),
                 ],
               }),
-              new TableCell({ children: [p("Видеокамера + Паспорт", { after: 0 })] }),
+              new TableCell({ children: [p(IDENTIFICATION_METHOD, { after: 0 })] }),
               // Отметку ставит Мандатная комиссия в день Конференции.
               new TableCell({ children: [p("", { after: 0 })] }),
             ],
@@ -516,18 +533,183 @@ export function buildRegistryDocument(submissions) {
 
 /** Комплект РО: три бланка, которые печатаются и подписываются на собрании. */
 export const GENERATED_DOCUMENTS = [
-  { key: "protocolDocx", fileName: "protocol.docx", build: buildProtocolDocument },
-  { key: "attendanceDocx", fileName: "attendance.docx", build: buildAttendanceDocument },
-  { key: "consentDocx", fileName: "consent.docx", build: buildConsentDocument },
+  {
+    key: "protocolDocx",
+    templateKey: "protocol",
+    fileName: "protocol.docx",
+    build: buildProtocolDocument,
+  },
+  {
+    key: "attendanceDocx",
+    templateKey: "attendance",
+    fileName: "attendance.docx",
+    build: buildAttendanceDocument,
+  },
+  {
+    key: "consentDocx",
+    templateKey: "consent",
+    fileName: "consent.docx",
+    build: buildConsentDocument,
+  },
 ];
 
+/**
+ * Данные заявки для загруженного бланка. Имена ключей — те самые
+ * «{{...}}», которые Оргкомитет пишет в своём .docx.
+ */
+export function submissionTemplateData(input) {
+  return {
+    values: {
+      region: input.region,
+      regionPrepositional: regionInPrepositional(input.region),
+      branchName: regionBranchName(input.region),
+      city: input.city,
+      meetingDate: formatLongDate(input.meetingDate),
+      meetingDateShort: formatShortDate(input.meetingDate),
+      protocolNumber: input.protocolNumber,
+      totalMembers: input.totalMembers,
+      presentMembers: input.presentMembers,
+      quorumPercent: quorumPercent(input.presentMembers, input.totalMembers),
+      votesFor: input.votesFor,
+      votesAgainst: input.votesAgainst,
+      votesAbstain: input.votesAbstain,
+      delegateName: input.delegateName,
+      delegatePhone: input.delegatePhone,
+      delegateEmail: input.delegateEmail,
+      delegateAddress: input.delegateAddress,
+      passportData: input.passportData,
+      chairName: input.chairName,
+      secretaryName: input.secretaryName,
+      conferenceDate: CONFERENCE_DATE,
+      orgName: ORG_NAME,
+      orgGenitive: ORG_GENITIVE,
+    },
+    listName: "attendees",
+    items: (input.attendees ?? []).map((attendee, index) => ({
+      index: index + 1,
+      fullName: attendee.fullName,
+      documentRef: attendee.documentRef,
+      contact: attendee.contact,
+    })),
+  };
+}
+
+/** То же для реестра: строки — отделения, а не участники собрания. */
+export function registryTemplateData(submissions) {
+  const rows = registryRows(submissions);
+
+  return {
+    values: {
+      conferenceDate: CONFERENCE_DATE,
+      orgName: ORG_NAME,
+      orgGenitive: ORG_GENITIVE,
+      delegatesCount: rows.length,
+      branchesCount: rows.length,
+    },
+    listName: "rows",
+    items: rows.map((submission, index) => ({
+      index: index + 1,
+      branchName: regionBranchName(submission.region),
+      region: submission.region,
+      delegateName: submission.delegateName,
+      protocolNumber: submission.protocolNumber,
+      meetingDate: formatShortDate(submission.meetingDate),
+      protocolRef: `Протокол № ${submission.protocolNumber} от ${formatShortDate(submission.meetingDate)}`,
+      delegateEmail: submission.delegateEmail,
+      delegatePhone: submission.delegatePhone,
+      identification: IDENTIFICATION_METHOD,
+    })),
+  };
+}
+
+/**
+ * Заявка-образец: вместо значений — плейсхолдеры. Прогнав её через обычные
+ * сборщики, получаем .docx, который Оргкомитет правит в Word и загружает
+ * обратно, — список полей не приходится расписывать словами.
+ */
+const PLACEHOLDER_INPUT = {
+  // В бланках субъект стоит после «в», поэтому в образце — предложный падеж.
+  region: "{{regionPrepositional}}",
+  city: "{{city}}",
+  meetingDate: "{{meetingDate}}",
+  protocolNumber: "{{protocolNumber}}",
+  presentMembers: "{{presentMembers}}",
+  totalMembers: "{{totalMembers}}",
+  votesFor: "{{votesFor}}",
+  votesAgainst: "{{votesAgainst}}",
+  votesAbstain: "{{votesAbstain}}",
+  delegateName: "{{delegateName}}",
+  delegatePhone: "{{delegatePhone}}",
+  delegateEmail: "{{delegateEmail}}",
+  delegateAddress: "{{delegateAddress}}",
+  passportData: "{{passportData}}",
+  chairName: "{{chairName}}",
+  secretaryName: "{{secretaryName}}",
+  attendees: [
+    {
+      fullName: "{{attendees.fullName}}",
+      documentRef: "{{attendees.documentRef}}",
+      contact: "{{attendees.contact}}",
+    },
+  ],
+};
+
+const PLACEHOLDER_REGISTRY = [
+  {
+    region: "{{rows.branchName}}",
+    delegateName: "{{rows.delegateName}}",
+    protocolNumber: "{{rows.protocolNumber}}",
+    meetingDate: "{{rows.meetingDate}}",
+    delegateEmail: "{{rows.delegateEmail}}",
+    delegatePhone: "{{rows.delegatePhone}}",
+    files: {},
+  },
+];
+
+/** Образец бланка с плейсхолдерами — основа для собственного шаблона. */
+export function buildTemplateSample(templateKey) {
+  if (templateKey === "registry") {
+    return buildRegistryDocument(PLACEHOLDER_REGISTRY);
+  }
+
+  const document = GENERATED_DOCUMENTS.find((item) => item.templateKey === templateKey);
+
+  if (!document) {
+    return null;
+  }
+
+  return document.build(PLACEHOLDER_INPUT);
+}
+
+async function buildOrRender(templateKey, build, input, templateData) {
+  const template = await loadTemplate(templateKey);
+
+  if (template) {
+    return renderTemplate(template, templateData);
+  }
+
+  return Packer.toBuffer(build(input));
+}
+
 export async function generateSubmissionDocuments(input) {
+  const templateData = submissionTemplateData(input);
+
   const entries = await Promise.all(
-    GENERATED_DOCUMENTS.map(async ({ key, fileName, build }) => [
+    GENERATED_DOCUMENTS.map(async ({ key, templateKey, fileName, build }) => [
       key,
-      { fileName, buffer: await Packer.toBuffer(build(input)) },
+      { fileName, buffer: await buildOrRender(templateKey, build, input, templateData) },
     ]),
   );
 
   return Object.fromEntries(entries);
+}
+
+/** Реестр: свой бланк, если загружен, иначе встроенный. */
+export async function generateRegistryDocument(submissions) {
+  return buildOrRender(
+    "registry",
+    () => buildRegistryDocument(submissions),
+    submissions,
+    registryTemplateData(submissions),
+  );
 }

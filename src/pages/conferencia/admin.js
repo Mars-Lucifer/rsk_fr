@@ -27,18 +27,27 @@ export async function getServerSideProps(context) {
     };
   }
 
+  const { listTemplates } = require("@/lib/rosdk-confrencia/templates");
   const submissions = await listStoredSubmissionsByRegion(region);
 
   return {
     props: {
       authorized: true,
       submissions: JSON.parse(JSON.stringify(submissions)),
+      templates: await listTemplates(),
       region,
     },
   };
 }
 
-export default function AdminPage({ authorized, hasError, notConfigured, submissions, region }) {
+export default function AdminPage({
+  authorized,
+  hasError,
+  notConfigured,
+  submissions,
+  templates,
+  region,
+}) {
   if (!authorized) {
     return <LoginPage hasError={hasError} notConfigured={notConfigured} />;
   }
@@ -133,6 +142,8 @@ export default function AdminPage({ authorized, hasError, notConfigured, submiss
           </div>
         </form>
 
+        <TemplatesSection templates={templates} />
+
         {/* Submissions Container */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="grid grid-cols-[56px_1.4fr_1.8fr_1.1fr_56px_260px] gap-4 border-b border-slate-200 bg-slate-50/50 px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-500 max-lg:hidden items-center">
@@ -162,6 +173,174 @@ export default function AdminPage({ authorized, hasError, notConfigured, submiss
         </div>
       </section>
     </main>
+  );
+}
+
+const COMMON_FIELDS = [
+  ["{{region}}", "субъект РФ как в справочнике"],
+  ["{{regionPrepositional}}", "он же в предложном падеже: «Псковской области»"],
+  ["{{branchName}}", "«Региональное отделение в Псковской области»"],
+  ["{{city}}", "город собрания"],
+  ["{{meetingDate}}", "«05» августа 2026"],
+  ["{{meetingDateShort}}", "05.08.2026"],
+  ["{{protocolNumber}}", "номер протокола"],
+  ["{{totalMembers}}", "членов на учёте"],
+  ["{{presentMembers}}", "присутствовало"],
+  ["{{quorumPercent}}", "процент кворума"],
+  ["{{votesFor}} {{votesAgainst}} {{votesAbstain}}", "голоса"],
+  ["{{delegateName}}", "Ф.И.О. делегата"],
+  ["{{delegatePhone}} {{delegateEmail}}", "контакты делегата"],
+  ["{{delegateAddress}}", "адрес регистрации"],
+  ["{{passportData}}", "паспорт делегата одной строкой"],
+  ["{{chairName}} {{secretaryName}}", "председатель и секретарь"],
+  ["{{conferenceDate}}", "дата Конференции"],
+  ["{{orgName}} {{orgGenitive}}", "название Организации"],
+];
+
+const LIST_FIELDS = {
+  attendees: [
+    ["{{attendees.index}}", "номер строки"],
+    ["{{attendees.fullName}}", "Ф.И.О. участника"],
+    ["{{attendees.documentRef}}", "«Паспорт: 45 10 № 123456»"],
+    ["{{attendees.contact}}", "телефон или e-mail"],
+  ],
+  rows: [
+    ["{{rows.index}}", "номер строки"],
+    ["{{rows.branchName}}", "наименование отделения"],
+    ["{{rows.delegateName}}", "Ф.И.О. делегата"],
+    ["{{rows.protocolRef}}", "«Протокол № 7 от 01.08.2026»"],
+    ["{{rows.delegateEmail}} {{rows.delegatePhone}}", "контакты"],
+    ["{{rows.identification}}", "способ идентификации"],
+  ],
+};
+
+/** Свои бланки: скачать образец, поправить в Word, загрузить обратно. */
+function TemplatesSection({ templates = [] }) {
+  return (
+    <details
+      id="templates"
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm [&_summary::-webkit-details-marker]:hidden"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-4">
+        <span className="text-sm font-extrabold text-slate-900">Бланки документов</span>
+        <span className="text-xs font-semibold text-slate-500">
+          {templates.filter((item) => item.custom).length > 0
+            ? `свои: ${templates.filter((item) => item.custom).length} из ${templates.length}`
+            : "все встроенные · заменить"}
+        </span>
+      </summary>
+
+      <div className="space-y-4 border-t border-slate-100 px-6 py-5">
+        <p className="max-w-3xl text-xs leading-relaxed text-slate-500">
+          Порядок такой: скачиваете образец, правите текст в Word, не трогая метки вида{" "}
+          <code className="rounded bg-slate-100 px-1">{"{{delegateName}}"}</code>, и загружаете
+          файл обратно. Метки заменятся данными заявки. Строка таблицы с метками{" "}
+          <code className="rounded bg-slate-100 px-1">{"{{attendees.*}}"}</code> размножится по
+          числу участников — оставьте в шаблоне одну такую строку.
+        </p>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          {templates.map((template) => (
+            <div
+              key={template.key}
+              className="rounded-lg border border-slate-200 p-4 space-y-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-bold text-slate-900">{template.label}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                    template.custom
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {template.custom ? "свой бланк" : "встроенный"}
+                </span>
+              </div>
+
+              {template.custom && (
+                <p className="text-xs text-slate-500">
+                  {template.originalName}, загружен{" "}
+                  {new Date(template.uploadedAt).toLocaleString("ru-RU")}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <a
+                  className="file-link h-8 px-3 text-xs font-semibold"
+                  style={{ whiteSpace: "nowrap" }}
+                  href={`/api/conferencia/admin/templates/${template.key}?mode=sample`}
+                >
+                  Образец с метками
+                </a>
+                {template.custom && (
+                  <a
+                    className="file-link h-8 px-3 text-xs font-semibold"
+                    style={{ whiteSpace: "nowrap" }}
+                    href={`/api/conferencia/admin/templates/${template.key}`}
+                  >
+                    Скачать текущий
+                  </a>
+                )}
+              </div>
+
+              <form
+                action="/api/conferencia/admin/templates"
+                method="post"
+                encType="multipart/form-data"
+                className="flex flex-wrap items-center gap-2"
+              >
+                <input type="hidden" name="key" value={template.key} />
+                <input
+                  type="file"
+                  name="template"
+                  accept=".docx"
+                  required
+                  className="min-w-0 flex-1 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
+                />
+                <button
+                  type="submit"
+                  style={{ width: "auto", flexShrink: 0 }}
+                  className="btn-primary h-8 rounded-lg px-4 text-xs font-semibold text-white cursor-pointer"
+                >
+                  Загрузить
+                </button>
+              </form>
+
+              {template.custom && (
+                <form action="/api/conferencia/admin/templates" method="post" encType="multipart/form-data">
+                  <input type="hidden" name="key" value={template.key} />
+                  <input type="hidden" name="action" value="reset" />
+                  <button
+                    type="submit"
+                    style={{ width: "auto" }}
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 cursor-pointer"
+                  >
+                    Вернуть встроенный
+                  </button>
+                </form>
+              )}
+
+              <details className="text-xs text-slate-500">
+                <summary className="cursor-pointer font-semibold text-indigo-600">
+                  Какие метки доступны
+                </summary>
+                <ul className="mt-2 space-y-1">
+                  {[...COMMON_FIELDS, ...(LIST_FIELDS[template.listName] ?? [])].map(
+                    ([code, hint]) => (
+                      <li key={code}>
+                        <code className="rounded bg-slate-100 px-1 text-[11px]">{code}</code> —{" "}
+                        {hint}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              </details>
+            </div>
+          ))}
+        </div>
+      </div>
+    </details>
   );
 }
 

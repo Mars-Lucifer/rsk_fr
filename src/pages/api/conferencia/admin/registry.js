@@ -1,7 +1,6 @@
-import { Packer } from "docx";
 import { isAdminSession } from "@/lib/rosdk-confrencia/admin";
 import { listStoredSubmissionsByRegion } from "@/lib/rosdk-confrencia/storage";
-import { buildRegistryDocument } from "@/lib/rosdk-confrencia/documents";
+import { generateRegistryDocument } from "@/lib/rosdk-confrencia/documents";
 
 /** Реестр делегатов по бланку Оргкомитета — DOCX, который печатает Мандатная комиссия. */
 export default async function handler(req, res) {
@@ -15,7 +14,7 @@ export default async function handler(req, res) {
 
   const region = req.query.region || "";
   const submissions = await listStoredSubmissionsByRegion(region);
-  const buffer = await Packer.toBuffer(buildRegistryDocument(submissions));
+  const buffer = await generateRegistryDocument(submissions);
 
   const name = `реестр-делегатов-конференции.docx`;
   res.setHeader(

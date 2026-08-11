@@ -89,6 +89,11 @@ const FEDERAL_CITIES = {
  */
 export function regionBranchName(region) {
   const value = String(region ?? "").trim();
+
+  // Образец бланка: плейсхолдер подставляется как есть, без «Отделение в …».
+  if (value.includes("{{")) {
+    return value;
+  }
   const federal = value.replace("город федерального значения ", "");
 
   if (FEDERAL_CITIES[federal]) {

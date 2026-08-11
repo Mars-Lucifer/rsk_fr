@@ -101,3 +101,6 @@ data/rsk.sqlite
 data/rsk.sqlite-shm
 data/rsk.sqlite-wal
 data/uploads/
+
+# бланки, загруженные Оргкомитетом через админку: рантайм, а не исходники
+data/templates/
