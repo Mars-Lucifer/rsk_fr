@@ -691,17 +691,37 @@ async function buildOrRender(templateKey, build, input, templateData) {
   return Packer.toBuffer(build(input));
 }
 
-export async function generateSubmissionDocuments(input) {
+export async function generateSubmissionDocuments(input, keys = null) {
   const templateData = submissionTemplateData(input);
+  const wanted = keys
+    ? GENERATED_DOCUMENTS.filter((item) => keys.includes(item.key))
+    : GENERATED_DOCUMENTS;
 
   const entries = await Promise.all(
-    GENERATED_DOCUMENTS.map(async ({ key, templateKey, fileName, build }) => [
+    wanted.map(async ({ key, templateKey, fileName, build }) => [
       key,
       { fileName, buffer: await buildOrRender(templateKey, build, input, templateData) },
     ]),
   );
 
   return Object.fromEntries(entries);
+}
+
+/** Какие документы можно собрать из того, что уже заполнено. */
+export function readyDocuments(submission) {
+  const ready = [];
+
+  if (submission.attendees?.length) {
+    ready.push("attendanceDocx");
+  }
+  if (submission.delegateName && submission.passportData) {
+    ready.push("consentDocx");
+  }
+  if (ready.length === 2 && submission.votesFor + submission.votesAgainst + submission.votesAbstain > 0) {
+    ready.push("protocolDocx");
+  }
+
+  return ready;
 }
 
 /** Реестр: свой бланк, если загружен, иначе встроенный. */

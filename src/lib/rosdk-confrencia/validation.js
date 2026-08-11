@@ -1,22 +1,6 @@
 import { formatShortDate } from "./format.js";
 import { regions } from "./regions.js";
 
-const requiredFields = [
-  "region",
-  "city",
-  "meetingDate",
-  "protocolNumber",
-  "totalMembers",
-  "votesFor",
-  "delegateName",
-  "delegatePhone",
-  "delegateEmail",
-  "delegateAddress",
-  "passportData",
-  "chairName",
-  "secretaryName",
-];
-
 const FIO_REGEX = /^[а-яё\-]+$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zа-яё]{2,}$/i;
 
@@ -145,13 +129,14 @@ function delegateAddress(data) {
   return parts.filter(Boolean).join(", ");
 }
 
-export function parseSubmissionInput(value) {
-  if (!value || typeof value !== "object") {
-    throw new Error("Некорректные данные формы.");
-  }
+/** Минимум участников на собрании — общее требование Оргкомитета. */
+export const MIN_PRESENT_MEMBERS = 5;
 
-  const data = value;
+/** Шаг 1: собрание и явочный лист. Из него собирается список присутствовавших. */
+export function parseRegistrationInput(value) {
+  const data = requireObject(value);
   const attendees = parseAttendees(data.attendees);
+
   const input = {
     region: text(data.region),
     city: text(data.city),
@@ -159,35 +144,159 @@ export function parseSubmissionInput(value) {
     protocolNumber: text(data.protocolNumber) || "1",
     presentMembers: attendees.length,
     totalMembers: numberValue(data.totalMembers),
-    votesFor: numberValue(data.votesFor),
-    votesAgainst: numberValue(data.votesAgainst),
-    votesAbstain: numberValue(data.votesAbstain),
-    delegateName: text(data.delegateName),
-    delegatePhone: text(data.delegatePhone),
-    delegateEmail: text(data.delegateEmail),
-    delegateAddress: delegateAddress(data),
-    passportData: passportData(data),
     chairName: text(data.chairName),
     secretaryName: text(data.secretaryName),
     attendees,
   };
 
-  for (const field of requiredFields) {
-    if (input[field] === "" || Number.isNaN(input[field])) {
-      throw new Error("Заполните все обязательные поля.");
+  for (const field of ["region", "city", "meetingDate", "chairName", "secretaryName"]) {
+    if (!input[field]) {
+      throw new Error("Заполните все обязательные поля блока «Регистрация».");
     }
   }
 
-  if (Number.isNaN(input.votesAgainst) || Number.isNaN(input.votesAbstain)) {
-    throw new Error("Укажите результаты голосования: «За», «Против», «Воздержались».");
+  if (Number.isNaN(input.totalMembers) || input.totalMembers <= 0) {
+    throw new Error("Укажите, сколько членов состоит на учёте в отделении.");
   }
 
-  // 1. Субъект РФ — только из справочника, иначе реестр по регионам не собрать
+  // Субъект РФ — только из справочника, иначе реестр по регионам не собрать.
   if (!regions.includes(input.region)) {
     throw new Error("Выберите субъект Российской Федерации из списка.");
   }
 
-  // 2. Явочный лист
+  checkAttendees(attendees);
+
+  if (input.presentMembers > input.totalMembers) {
+    throw new Error(
+      "В явочном листе больше человек, чем всего членов, состоящих на учёте в отделении.",
+    );
+  }
+
+  if (input.presentMembers < MIN_PRESENT_MEMBERS) {
+    throw new Error(
+      `На собрании должно присутствовать не меньше ${MIN_PRESENT_MEMBERS} членов отделения, в явочном листе ${input.presentMembers}.`,
+    );
+  }
+
+  const quorum = requiredQuorum(input.totalMembers);
+  if (input.presentMembers < quorum) {
+    throw new Error(
+      `Собрание неправомочно: кворум — более половины членов отделения (минимум ${quorum}).`,
+    );
+  }
+
+  for (const [field, label] of [
+    ["chairName", "Председатель собрания"],
+    ["secretaryName", "Секретарь собрания"],
+  ]) {
+    const error = validateFioServer(input[field]);
+    if (error) {
+      throw new Error(`Ошибка в поле "${label}": ${error}`);
+    }
+  }
+
+  checkMeetingDate(input.meetingDate);
+
+  return input;
+}
+
+/** Шаг 2: делегат. Из него собирается согласие на обработку данных. */
+export function parseDelegateInput(value) {
+  const data = requireObject(value);
+
+  const input = {
+    delegateName: text(data.delegateName),
+    delegatePhone: text(data.delegatePhone),
+    delegateEmail: text(data.delegateEmail),
+    delegateAddress: delegateAddress(data),
+    passportData: passportData(data),
+  };
+
+  for (const field of Object.keys(input)) {
+    if (!input[field]) {
+      throw new Error("Заполните все обязательные поля блока «Делегат».");
+    }
+  }
+
+  const fioError = validateFioServer(input.delegateName);
+  if (fioError) {
+    throw new Error(`Ошибка в поле "ФИО делегата": ${fioError}`);
+  }
+
+  if (digitsOnly(input.delegatePhone).length !== 11) {
+    throw new Error("Некорректный номер телефона делегата (должно быть 11 цифр).");
+  }
+
+  if (!EMAIL_REGEX.test(input.delegateEmail)) {
+    throw new Error("Некорректный e-mail делегата.");
+  }
+
+  return input;
+}
+
+/** Шаг 3: голосование. Из него собирается протокол. */
+export function parseVotesInput(value, presentMembers) {
+  const data = requireObject(value);
+
+  const input = {
+    votesFor: numberValue(data.votesFor),
+    votesAgainst: numberValue(data.votesAgainst),
+    votesAbstain: numberValue(data.votesAbstain),
+  };
+
+  if (Object.values(input).some((count) => Number.isNaN(count))) {
+    throw new Error("Укажите результаты голосования: «За», «Против», «Воздержались».");
+  }
+
+  const votesTotal = input.votesFor + input.votesAgainst + input.votesAbstain;
+  if (votesTotal !== presentMembers) {
+    throw new Error(
+      `Сумма голосов («За» + «Против» + «Воздержались») должна равняться числу присутствующих (${presentMembers}), получено ${votesTotal}.`,
+    );
+  }
+
+  const minimumVotes = requiredVotesFor(presentMembers);
+  if (input.votesFor < minimumVotes) {
+    throw new Error(
+      `Делегат не избран: «За» должно быть не менее 2/3 от присутствующих (минимум ${minimumVotes}).`,
+    );
+  }
+
+  return input;
+}
+
+/** Полный комплект одним куском — обратная совместимость и самопроверка. */
+export function parseSubmissionInput(value) {
+  const registration = parseRegistrationInput(value);
+
+  return {
+    ...registration,
+    ...parseDelegateInput(value),
+    ...parseVotesInput(value, registration.presentMembers),
+  };
+}
+
+function requireObject(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Некорректные данные формы.");
+  }
+  return value;
+}
+
+function checkMeetingDate(meetingDate) {
+  const parsed = new Date(`${meetingDate}T00:00:00`);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Некорректная дата проведения собрания.");
+  }
+  if (parsed > today) {
+    throw new Error("Дата проведения собрания не может быть в будущем.");
+  }
+}
+
+function checkAttendees(attendees) {
   if (attendees.length === 0) {
     throw new Error("Добавьте в явочный лист хотя бы одного присутствующего члена отделения.");
   }
@@ -240,72 +349,6 @@ export function parseSubmissionInput(value) {
       throw new Error(`Явочный лист, строка ${index + 1}: ${contactProblem}`);
     }
   });
-
-  // 3. Кворум — более половины членов, состоящих на учёте
-  if (input.presentMembers > input.totalMembers) {
-    throw new Error(
-      "В явочном листе больше человек, чем всего членов, состоящих на учёте в отделении.",
-    );
-  }
-
-  const quorum = requiredQuorum(input.totalMembers);
-  if (input.presentMembers < quorum) {
-    throw new Error(
-      `Собрание неправомочно: кворум — более половины членов отделения (минимум ${quorum}).`,
-    );
-  }
-
-  // 4. Голосование по делегату — не менее 2/3 голосов присутствующих
-  const votesTotal = input.votesFor + input.votesAgainst + input.votesAbstain;
-  if (votesTotal !== input.presentMembers) {
-    throw new Error(
-      `Сумма голосов («За» + «Против» + «Воздержались») должна равняться числу присутствующих (${input.presentMembers}), получено ${votesTotal}.`,
-    );
-  }
-
-  const minimumVotes = requiredVotesFor(input.presentMembers);
-  if (input.votesFor < minimumVotes) {
-    throw new Error(
-      `Делегат не избран: «За» должно быть не менее 2/3 от присутствующих (минимум ${minimumVotes}).`,
-    );
-  }
-
-  // 5. Ф.И.О. президиума и делегата
-  const fioLabels = {
-    delegateName: "ФИО делегата",
-    chairName: "Председатель собрания",
-    secretaryName: "Секретарь собрания",
-  };
-
-  for (const [field, label] of Object.entries(fioLabels)) {
-    const error = validateFioServer(input[field]);
-    if (error) {
-      throw new Error(`Ошибка в поле "${label}": ${error}`);
-    }
-  }
-
-  // 6. Дата собрания
-  const meetingDateParsed = new Date(`${input.meetingDate}T00:00:00`);
-  const todayDate = new Date();
-  todayDate.setHours(23, 59, 59, 999);
-  if (Number.isNaN(meetingDateParsed.getTime())) {
-    throw new Error("Некорректная дата проведения собрания.");
-  }
-  if (meetingDateParsed > todayDate) {
-    throw new Error("Дата проведения собрания не может быть в будущем.");
-  }
-
-  // 7. Контакты делегата
-  const phoneDigits = input.delegatePhone.replace(/\D/g, "");
-  if (phoneDigits.length !== 11) {
-    throw new Error("Некорректный номер телефона делегата (должно быть 11 цифр).");
-  }
-
-  if (!EMAIL_REGEX.test(input.delegateEmail)) {
-    throw new Error("Некорректный e-mail делегата.");
-  }
-
-  return input;
 }
 
 function passportData(data) {

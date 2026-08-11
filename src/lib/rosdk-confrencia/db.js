@@ -108,7 +108,88 @@ function toSubmission(row) {
   };
 }
 
-export function createSubmission(input, files, submissionId = crypto.randomUUID()) {
+/**
+ * Заявка живёт по шагам собрания: сначала регистрация, потом делегат,
+ * потом голосование. Незаполненные поля лежат пустыми — статус выводится
+ * из состава готовых документов, а не из отдельной колонки.
+ */
+const EMPTY_SUBMISSION = {
+  region: "",
+  city: "",
+  meetingDate: "",
+  protocolNumber: "1",
+  presentMembers: 0,
+  totalMembers: 0,
+  votesFor: 0,
+  votesAgainst: 0,
+  votesAbstain: 0,
+  delegateName: "",
+  delegatePhone: "",
+  delegateEmail: "",
+  delegateAddress: "",
+  passportData: "",
+  chairName: "",
+  secretaryName: "",
+  attendees: [],
+};
+
+const COLUMNS = {
+  region: "region",
+  city: "city",
+  meetingDate: "meeting_date",
+  protocolNumber: "protocol_number",
+  presentMembers: "present_members",
+  totalMembers: "total_members",
+  votesFor: "votes_for",
+  votesAgainst: "votes_against",
+  votesAbstain: "votes_abstain",
+  delegateName: "delegate_name",
+  delegatePhone: "delegate_phone",
+  delegateEmail: "delegate_email",
+  delegateAddress: "delegate_address",
+  passportData: "passport_data",
+  chairName: "chair_name",
+  secretaryName: "secretary_name",
+};
+
+/** Дописывает поля следующего шага и пути к сгенерированным документам. */
+export function updateSubmission(id, patch = {}, files = {}) {
+  const current = getSubmission(id);
+  if (!current) {
+    return null;
+  }
+
+  const assignments = [];
+  const values = {};
+
+  for (const [field, column] of Object.entries(COLUMNS)) {
+    if (patch[field] !== undefined) {
+      assignments.push(`${column} = @${field}`);
+      values[field] = patch[field];
+    }
+  }
+
+  if (patch.attendees !== undefined) {
+    assignments.push("attendees = @attendees");
+    values.attendees = JSON.stringify(patch.attendees);
+  }
+
+  const mergedFiles = { ...current.files, ...files };
+  assignments.push("files = @files", "status = @status", "updated_at = @updatedAt");
+  values.files = JSON.stringify(mergedFiles);
+  values.status = statusFor(mergedFiles);
+  values.updatedAt = new Date().toISOString();
+  values.id = id;
+
+  getDb()
+    .prepare(`UPDATE submissions SET ${assignments.join(", ")} WHERE id = @id`)
+    .run(values);
+
+  return getSubmission(id);
+}
+
+export function createSubmission(partialInput, files, submissionId = crypto.randomUUID()) {
+  const input = { ...EMPTY_SUBMISSION, ...partialInput };
   const now = new Date().toISOString();
 
   getDb()
@@ -144,7 +225,7 @@ export function createSubmission(input, files, submissionId = crypto.randomUUID(
       secretaryName: input.secretaryName,
       attendees: JSON.stringify(input.attendees ?? []),
       id: submissionId,
-      status: STATUS_DOCX_GENERATED,
+      status: statusFor(files),
       docxPath: files.protocolDocx ?? "",
       files: JSON.stringify(files),
       createdAt: now,

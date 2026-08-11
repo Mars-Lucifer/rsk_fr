@@ -17,6 +17,7 @@ import {
 import {
   CONFERENCE_DATE,
   STATUS_COMPLETE,
+  STATUS_DRAFT,
   STATUS_DOCX_GENERATED,
   STATUS_IN_PROGRESS,
   statusFor,
@@ -31,7 +32,10 @@ import {
   isSessionTokenValid,
 } from "../src/lib/rosdk-confrencia/admin.js";
 import {
+  parseDelegateInput,
+  parseRegistrationInput,
   parseSubmissionInput,
+  parseVotesInput,
   requiredQuorum,
   requiredVotesFor,
 } from "../src/lib/rosdk-confrencia/validation.js";
@@ -43,6 +47,7 @@ import {
   buildProtocolDocument,
   buildRegistryDocument,
   buildTemplateSample,
+  readyDocuments,
 } from "../src/lib/rosdk-confrencia/documents.js";
 import { renderTemplate, saveTemplate } from "../src/lib/rosdk-confrencia/templates.js";
 
@@ -122,8 +127,19 @@ function rejects(overrides, pattern, message) {
   assert.throws(() => parseSubmissionInput(payload(overrides)), pattern, message);
 }
 
-// --- Кворум: 4 из 9 — меньше половины.
-rejects({ attendees: attendees(4), votesFor: 4, votesAgainst: 0 }, /кворум/i, "4 из 9 не кворум");
+// --- Минимум пять человек на собрании, сколько бы ни было на учёте.
+rejects(
+  { attendees: attendees(4), votesFor: 4, votesAgainst: 0 },
+  /не меньше 5 членов/i,
+  "четверо — меньше требуемого минимума",
+);
+
+// --- Кворум поверх минимума: 6 присутствующих из 20 на учёте — меньше половины.
+rejects(
+  { attendees: attendees(6), totalMembers: 20, votesFor: 6, votesAgainst: 0 },
+  /кворум/i,
+  "6 из 20 не кворум",
+);
 
 // --- Явочный лист не может быть длиннее списка членов отделения.
 rejects({ totalMembers: 5 }, /больше человек, чем всего членов/i);
@@ -303,6 +319,42 @@ assert.ok(
 assert.match(registryText, /Избрано делегатов: 2 человек от 2 региональных отделений/);
 assert.match(registryText, /Видеокамера \+ Паспорт/);
 
+// --- Шаги собрания разбираются по отдельности: регистрация не требует делегата.
+const registration = parseRegistrationInput(payload({ delegateName: "", votesFor: undefined }));
+assert.equal(registration.presentMembers, 6);
+assert.equal(registration.delegateName, undefined, "регистрация не знает про делегата");
+
+const delegate = parseDelegateInput(payload());
+assert.match(delegate.passportData, /серия 4510/);
+assert.match(delegate.delegateAddress, /Элиста/);
+
+assert.deepEqual(parseVotesInput({ votesFor: 6, votesAgainst: 0, votesAbstain: 0 }, 6), {
+  votesFor: 6,
+  votesAgainst: 0,
+  votesAbstain: 0,
+});
+assert.throws(
+  () => parseVotesInput({ votesFor: 3, votesAgainst: 3, votesAbstain: 0 }, 6),
+  /не менее 2\/3/i,
+);
+assert.throws(() => parseDelegateInput({ delegateName: "Иванов Иван Иванович" }), /Делегат/i);
+
+// Документ появляется только тогда, когда для него есть данные.
+assert.deepEqual(readyDocuments({ attendees: [{ fullName: "Иванов Иван Иванович" }] }), [
+  "attendanceDocx",
+]);
+assert.deepEqual(
+  readyDocuments({
+    attendees: [{ fullName: "Иванов Иван Иванович" }],
+    delegateName: "Лебедев Андрей Александрович",
+    passportData: "серия 4510",
+    votesFor: 6,
+    votesAgainst: 0,
+    votesAbstain: 0,
+  }),
+  ["attendanceDocx", "consentDocx", "protocolDocx"],
+);
+
 // --- Свой бланк: подстановка меток, в том числе разрезанных Word-ом на runs.
 const templateXml = `<?xml version="1.0"?><w:document xmlns:w="x"><w:body>
 <w:p><w:r><w:t>Протокол № </w:t></w:r><w:r><w:t>{{proto</w:t></w:r><w:r><w:t>colNumber}}</w:t></w:r></w:p>
@@ -417,7 +469,10 @@ assert.deepEqual(
     missing: ["protocolScan", "attendanceScan", "consentScan", "passportScan", "photo"],
   },
 );
-assert.equal(statusFor({}), STATUS_DOCX_GENERATED);
+// Пока протокола нет, собрание считается идущим: заявка заполняется по шагам.
+assert.equal(statusFor({}), STATUS_DRAFT);
+assert.equal(statusFor({ attendanceDocx: "/a.docx" }), STATUS_DRAFT, "один бланк — ещё не всё");
+assert.equal(statusFor({ protocolDocx: "/p.docx" }), STATUS_DOCX_GENERATED);
 assert.equal(statusFor({ passportScan: "/x.pdf" }), STATUS_IN_PROGRESS);
 assert.equal(uploadProgress({ passportScan: "/x.pdf", photo: "/y.png" }).done, 2);
 assert.equal(statusFor(storedSubmission.files), STATUS_IN_PROGRESS, "3 из 5 — ещё не пакет");

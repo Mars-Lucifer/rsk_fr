@@ -6,6 +6,7 @@ import {
   createSubmission as createLocalSubmission,
   getSubmission as getLocalSubmission,
   listSubmissionsByRegion as listLocalSubmissionsByRegion,
+  updateSubmission as updateLocalSubmission,
 } from "./db.js";
 import { UPLOADS_DIR } from "./paths.js";
 
@@ -25,6 +26,24 @@ export async function createStoredSubmission(id, input, documents) {
 
 export async function getStoredSubmission(id) {
   return getLocalSubmission(id);
+}
+
+/**
+ * Дописывает данные следующего шага собрания и сохраняет документы,
+ * которые стало возможно собрать.
+ */
+export async function updateStoredSubmission(id, patch, documents = {}) {
+  const dir = path.join(UPLOADS_DIR, id);
+  await fs.mkdir(dir, { recursive: true });
+
+  const files = {};
+  for (const [key, { fileName, buffer }] of Object.entries(documents)) {
+    const filePath = path.join(dir, fileName);
+    await fs.writeFile(filePath, buffer);
+    files[key] = filePath;
+  }
+
+  return updateLocalSubmission(id, patch, files);
 }
 
 export async function listStoredSubmissionsByRegion(region = "") {

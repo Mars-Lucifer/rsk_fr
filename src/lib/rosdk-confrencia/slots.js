@@ -73,15 +73,37 @@ export const SUBMISSION_COOKIE = "conferencia_submission";
 /** Сколько заявок допустимо от одного субъекта РФ: запас на исправление ошибок. */
 export const MAX_SUBMISSIONS_PER_REGION = 3;
 
+export const STATUS_DRAFT = "draft";
 export const STATUS_DOCX_GENERATED = "docx_generated";
 export const STATUS_IN_PROGRESS = "in_progress";
 export const STATUS_COMPLETE = "signed_uploaded";
 
 export const STATUS_LABELS = {
+  [STATUS_DRAFT]: "Собрание идёт",
   [STATUS_DOCX_GENERATED]: "Бланки сформированы",
   [STATUS_IN_PROGRESS]: "Сканы загружаются",
   [STATUS_COMPLETE]: "Пакет собран",
 };
+
+/**
+ * Шаги собрания. Готовность шага видна по появившемуся документу, отдельного
+ * поля состояния не нужно: документ есть — значит данные приняты.
+ */
+export const STEPS = [
+  {
+    key: "registration",
+    title: "Регистрация",
+    document: "attendanceDocx",
+    scan: "attendanceScan",
+  },
+  { key: "delegate", title: "Делегат", document: "consentDocx", scan: "consentScan" },
+  { key: "votes", title: "Голосование", document: "protocolDocx", scan: "protocolScan" },
+];
+
+export function stepDone(files = {}, key) {
+  const step = STEPS.find((item) => item.key === key);
+  return Boolean(step && files[step.document]);
+}
 
 /** Сколько сканов из пяти уже загружено и каких не хватает. */
 export function uploadProgress(files = {}) {
@@ -100,5 +122,8 @@ export function statusFor(files = {}) {
   const { done, isComplete } = uploadProgress(files);
 
   if (isComplete) return STATUS_COMPLETE;
-  return done > 0 ? STATUS_IN_PROGRESS : STATUS_DOCX_GENERATED;
+  if (done > 0) return STATUS_IN_PROGRESS;
+
+  // Протокол появляется последним: пока его нет, собрание ещё идёт.
+  return files.protocolDocx ? STATUS_DOCX_GENERATED : STATUS_DRAFT;
 }

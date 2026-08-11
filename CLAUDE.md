@@ -174,6 +174,10 @@ Main portal/user-facing areas observed in this repo:
 - `/conferencia/admin` Admin panel for received packages
 
 Conference package notes (code lives under `src/lib/rosdk-confrencia/`, despite the route being `/conferencia`):
+- the branch fills the page **during the meeting**, one block per agenda step: registration → delegate → votes → scans. Each block yields its document the moment its data lands (`readyDocuments`), so the attendance list exists before the delegate is known and the protocol comes last — it prints turnout and delegate details;
+- the submission is therefore partial by design: `POST /api/conferencia/submissions` creates it from step 1 only, `POST /api/conferencia/submissions/[id]/step` adds the delegate and the votes. `validation.js` exposes one parser per step; `parseSubmissionInput` composes all three for the self-check;
+- step state is derived from which generated documents exist, not from a separate column — see `STEPS` in `slots.js`;
+- quorum has two thresholds: at least `MIN_PRESENT_MEMBERS` (5) present, and more than half of those on record;
 - `documents.js` builds four DOCX documents with the `docx` package: protocol, attendance list and delegate consent for the branch, plus the delegate registry the Mandate Commission prints from the admin panel. The wording follows the Orgcomittee's `.doc` blanks verbatim;
 - a built-in blank can be replaced from the admin panel: `templates.js` stores the uploaded `.docx` under `data/templates/` (gitignored) and substitutes `{{field}}` marks straight in `word/document.xml` via JSZip. Marks split across Word runs are reassembled per paragraph; a table row containing `{{attendees.*}}` / `{{rows.*}}` repeats per item. The admin downloads a placeholder sample built from the same code, so the field list never drifts from the generator;
 - `slots.js` is the shared, dependency-free description of every generated and uploaded file, imported by both the form and the API;

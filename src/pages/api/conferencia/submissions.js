@@ -4,7 +4,7 @@ import {
   createStoredSubmission,
   toPublicSubmission,
 } from "@/lib/rosdk-confrencia/storage";
-import { parseSubmissionInput } from "@/lib/rosdk-confrencia/validation";
+import { parseRegistrationInput } from "@/lib/rosdk-confrencia/validation";
 import { MAX_SUBMISSIONS_PER_REGION, SUBMISSION_COOKIE } from "@/lib/rosdk-confrencia/slots";
 import { CREATE_SUBMISSION_LIMIT, rejectIfRateLimited } from "@/lib/rosdk-confrencia/rateLimit";
 import crypto from "node:crypto";
@@ -19,7 +19,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const input = parseSubmissionInput(req.body);
+    // Шаг 1 собрания: регистрация. Заявка появляется сразу, чтобы ссылка была
+    // на руках до того, как отделение дойдёт до делегата и голосования.
+    const input = parseRegistrationInput(req.body);
 
     const alreadySent = await countStoredSubmissionsForRegion(input.region);
     if (alreadySent >= MAX_SUBMISSIONS_PER_REGION) {
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     const id = crypto.randomUUID();
-    const documents = await generateSubmissionDocuments(input);
+    const documents = await generateSubmissionDocuments(input, ["attendanceDocx"]);
     const submission = await createStoredSubmission(id, input, documents);
 
     if (!submission) {
