@@ -22,7 +22,7 @@ export default function OrgRegistrySearch({ onSelected }) {
     const search = async () => {
         const value = query.trim();
         if (value.length < 3) {
-            setError("Введите хотя бы три символа названия или ИНН");
+            setError("Введите ИНН организации: 10 или 12 цифр");
             return;
         }
 
@@ -76,7 +76,7 @@ export default function OrgRegistrySearch({ onSelected }) {
     return (
         <div className="flex flex-col gap-[.5rem]">
             <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                Не нашли свою организацию в списке? Найдите её в реестре по названию или ИНН.
+                Не нашли свою организацию в списке? Найдите её в реестре по ИНН.
             </span>
 
             <div className="flex gap-[.5rem] max-[640px]:flex-col">
@@ -84,7 +84,7 @@ export default function OrgRegistrySearch({ onSelected }) {
                     type="text"
                     id="org-registry-query"
                     name="org-registry-query"
-                    placeholder="Название или ИНН"
+                    placeholder="ИНН организации"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     onKeyDown={(event) => {
@@ -101,7 +101,7 @@ export default function OrgRegistrySearch({ onSelected }) {
 
             {error && <p style={{ color: "var(--color-red)" }}>{error}</p>}
 
-            {items && items.length === 0 && <p style={{ color: "var(--color-gray-black)" }}>Ничего не найдено. Попробуйте ввести ИНН.</p>}
+            {items && items.length === 0 && <p style={{ color: "var(--color-gray-black)" }}>Ничего не найдено. Проверьте ИНН — он есть в реквизитах вашей организации.</p>}
 
             {items && items.length > 0 && (
                 <div className="flex flex-col gap-[.375rem]">
