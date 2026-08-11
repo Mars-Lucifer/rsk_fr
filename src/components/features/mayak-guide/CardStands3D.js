@@ -150,10 +150,22 @@ export default function CardStands3D({ origin, sections, chosen, taken, onPick }
                 const from = [item.at.x - origin[0], 0.004 - origin[1], item.at.z - origin[2]];
                 const to = [place.x, place.y, place.z];
                 const lit = chosen === item.index;
+                // На сколько поднят ряд, в котором стоит эта карта. Дальние ряды подняты,
+                // чтобы не прятаться за передними, — и без опоры их подставки висели в
+                // воздухе. Поэтому под ними стоит брусок ровно на эту высоту.
+                const lift = Math.floor(index / PER_ROW) * ROW_LIFT;
 
                 return (
                     <group key={`${item.side}-${item.id}`}>
                         <group position={[place.x, place.y - (H / 2) * Math.cos(LEAN) - STAND.thickness, place.z]}>
+                            {lift > 0 && (
+                                // Брусок-подиум от стола до подставки: та же плита, растянутая
+                                // по высоте. Тон темнее самой подставки — опора не должна
+                                // спорить с рейкой, на которой стоит карта.
+                                <mesh geometry={baseGeometry} scale={[0.92, lift / STAND.thickness, 0.92]} position={[0, -lift / 2, 0.004]}>
+                                    <meshStandardMaterial color="#8f9aa1" roughness={0.6} metalness={0.04} />
+                                </mesh>
+                            )}
                             <mesh geometry={baseGeometry} position={[0, STAND.thickness / 2, 0.004]}>
                                 <meshStandardMaterial
                                     color={lit ? "#e8f4f7" : "#b9c2c7"}

@@ -147,11 +147,12 @@ export default function PromptLaptop3D({ position, active, screenOn = false, chi
         const node = hinge.current;
         if (node) node.rotation.x = Math.PI / 2 - OPEN_ANGLE * t;
 
-        // Экран разгорается вместе с раскрытием: тёмное стекло закрытой крышки и
-        // включённый экран — одна и та же поверхность, и мгновенное включение читается
-        // как подмена материала.
+        // Экран чуть теплеет к концу раскрытия, но остаётся почти чёрным: поверх него
+        // ложится сама форма, и подсветка матрицы под ней не видна вовсе. Прежние 0.15
+        // давали ровный серый прямоугольник — на тёмной сцене он читался как включённый
+        // пустой монитор, а не как погашенный экран, ждущий формы.
         const surface = glow.current;
-        if (surface) surface.color.setScalar(0.05 + t * 0.1);
+        if (surface) surface.color.setScalar(0.02 + t * 0.02);
     });
 
     return (
@@ -168,7 +169,11 @@ export default function PromptLaptop3D({ position, active, screenOn = false, chi
                 а не центр, иначе закрытая крышка висит над корпусом. */}
             <group ref={hinge} position={[0, LAPTOP.base.thickness, -LAPTOP.base.d / 2 + LAPTOP.lid.thickness]}>
                 <group position={[0, LAPTOP.lid.h / 2, 0]}>
-                    <mesh geometry={lidGeometry} castShadow>
+                    {/* Крышка тени не бросает. Раскрытая, она стоит почти отвесно, и её
+                        тень ложилась на стол за ноутбуком чёрным полотном во всю ширину
+                        кадра — в разборе это половина фона. Тень корпуса остаётся: она
+                        мелкая и как раз показывает, что ноутбук лежит на столе. */}
+                    <mesh geometry={lidGeometry}>
                         {/* Лицо крышки — экран: не освещаемый материал, иначе стол подмешивает
                             в него свой тёплый свет, и цвета формы расходятся с тренажёром. */}
                         <meshBasicMaterial ref={glow} attach="material-0" color="#0d0b09" toneMapped={false} />
