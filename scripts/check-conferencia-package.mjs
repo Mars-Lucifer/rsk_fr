@@ -34,6 +34,8 @@ import {
   requiredQuorum,
   requiredVotesFor,
 } from "../src/lib/rosdk-confrencia/validation.js";
+import { regionInPrepositional } from "../src/lib/rosdk-confrencia/format.js";
+import { regions } from "../src/lib/rosdk-confrencia/regions.js";
 import {
   buildAttendanceDocument,
   buildConsentDocument,
@@ -130,6 +132,24 @@ rejects({ votesFor: 3, votesAgainst: 3, votesAbstain: 0 }, /не менее 2\/3
 
 // --- Пустой явочный лист.
 rejects({ attendees: [] }, /явочный лист/i);
+
+// --- Субъект в бланке стоит в предложном падеже: «Регионального отделения в ...».
+assert.equal(regionInPrepositional("Псковская область"), "Псковской области");
+assert.equal(regionInPrepositional("Краснодарский край"), "Краснодарском крае");
+assert.equal(regionInPrepositional("Республика Калмыкия"), "Республике Калмыкия");
+assert.equal(regionInPrepositional("Донецкая Народная Республика"), "Донецкой Народной Республике");
+assert.equal(
+  regionInPrepositional("Ямало-Ненецкий автономный округ"),
+  "Ямало-Ненецком автономном округе",
+);
+assert.equal(
+  regionInPrepositional("город федерального значения Москва"),
+  "городе федерального значения Москва",
+);
+
+// Ни один субъект справочника не должен остаться в именительном падеже.
+const notDeclined = regions.filter((region) => regionInPrepositional(region) === region);
+assert.deepEqual(notDeclined, [], `не склоняются: ${notDeclined.join("; ")}`);
 
 // --- Один человек дважды: иначе кворум и 2/3 считаются от завышенного числа.
 const withDuplicate = attendees(6);
@@ -229,7 +249,8 @@ async function documentText(document) {
 
 const protocolText = await documentText(buildProtocolDocument(input));
 assert.match(protocolText, /ПРОТОКОЛ № 7/);
-assert.match(protocolText, /Республика Калмыкия/);
+// Субъект в шапке — в предложном падеже: «...отделения в Республике Калмыкия».
+assert.match(protocolText, /в Республике Калмыкия/);
 assert.match(protocolText, /«01» августа 2026 г\./);
 assert.match(protocolText, /в количестве 6 человек из 9 членов/);
 assert.match(protocolText, /Кворум имеется \(составляет 67%\)/);
@@ -253,7 +274,7 @@ assert.match(consentText, /СОГЛАСИЕ/);
 assert.match(consentText, /152-ФЗ/);
 assert.match(consentText, /15 сентября 2026 года/);
 assert.match(consentText, /Лебедев Андрей Александрович/);
-assert.match(consentText, /Делегат от: Регионального отделения в Республика Калмыкия/);
+assert.match(consentText, /Делегат от: Регионального отделения в Республике Калмыкия/);
 
 // --- Архив комплекта: имена внутри ZIP не зависят от расширений загруженных сканов.
 const tempDir = await mkdtemp(path.join(tmpdir(), "conferencia-check-"));

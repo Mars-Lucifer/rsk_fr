@@ -10,7 +10,7 @@ import {
   TextRun,
   WidthType,
 } from "docx";
-import { formatLongDate } from "./format.js";
+import { formatLongDate, regionInPrepositional } from "./format.js";
 import { CONFERENCE_DATE } from "./slots.js";
 
 /** Наименование Организации — правится здесь, а не по тексту бланков. */
@@ -121,7 +121,7 @@ export function buildProtocolDocument(input) {
       align: AlignmentType.CENTER,
       after: 0,
     }),
-    p(`в ${input.region}`, { align: AlignmentType.CENTER, after: 0 }),
+    p(`в ${regionInPrepositional(input.region)}`, { align: AlignmentType.CENTER, after: 0 }),
     p(ORG_GENITIVE, { align: AlignmentType.CENTER, after: 240 }),
 
     layoutTable([
@@ -249,7 +249,7 @@ export function buildAttendanceDocument(input) {
       after: 0,
     }),
     p("Регионального отделения", { align: AlignmentType.RIGHT, after: 0 }),
-    p(`в ${input.region}`, { align: AlignmentType.RIGHT, after: 0 }),
+    p(`в ${regionInPrepositional(input.region)}`, { align: AlignmentType.RIGHT, after: 0 }),
     p(`от ${meetingDate} г.`, { align: AlignmentType.RIGHT, after: 360 }),
 
     p("СПИСОК (ЯВОЧНЫЙ ЛИСТ)", {
@@ -258,7 +258,7 @@ export function buildAttendanceDocument(input) {
       after: 0,
     }),
     p("членов Регионального отделения", { align: AlignmentType.CENTER, after: 0 }),
-    p(`в ${input.region}`, { align: AlignmentType.CENTER, after: 0 }),
+    p(`в ${regionInPrepositional(input.region)}`, { align: AlignmentType.CENTER, after: 0 }),
     p(`присутствующих на Общем собрании ${meetingDate} г.`, {
       align: AlignmentType.CENTER,
       after: 240,
@@ -294,7 +294,7 @@ export function buildConsentDocument(input) {
     p(`Паспортные данные: ${input.passportData}`, { after: 0 }),
     p(`Адрес регистрации: ${input.delegateAddress}`, { after: 0 }),
     p(`Телефон: ${input.delegatePhone}    E-mail: ${input.delegateEmail}`, { after: 0 }),
-    p(`Делегат от: Регионального отделения в ${input.region}`, { after: 240 }),
+    p(`Делегат от: Регионального отделения в ${regionInPrepositional(input.region)}`, { after: 240 }),
 
     p(
       [
