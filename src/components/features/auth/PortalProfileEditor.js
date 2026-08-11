@@ -7,6 +7,7 @@ import Textarea from "@/components/ui/Textarea";
 import DropdownInput from "@/components/ui/Input/DropdownInput";
 import Switcher from "@/components/ui/Switcher";
 import { getPortalOrganizationId } from "@/lib/portalProfile";
+import OrgRegistrySearch from "@/components/features/auth/OrgRegistrySearch";
 import { primePortalProfileCache } from "@/lib/portalProfileClient";
 import { removeCookie, setCookie } from "@/utils/cookies";
 
@@ -287,6 +288,24 @@ export default function PortalProfileEditor({
                     onChange={(event) => updateField("Organization", event.target.value)}
                     onQueryChange={() => setOrgFieldTyped(true)}
                     disabled={!region}
+                />
+                {/* Организации из реестра: список в базе неполный, и без этого
+                    участник из непопавшего колледжа никуда не двигается. */}
+                <OrgRegistrySearch
+                    onSelected={(org) => {
+                        const id = org?.id ?? org?.organization_id;
+                        if (!id) return;
+
+                        setOrgList((prev) => (prev.some((item) => String(item.id) === String(id)) ? prev : [...prev, org]));
+                        updateField("Organization", String(id));
+                        setOrgFieldTyped(true);
+                        // Регион берём из реестра: он обязателен для команды,
+                        // а руками участник впишет его иначе, чем в справочнике.
+                        if (org.region) {
+                            setRegion(org.region);
+                            setFormData((prev) => ({ ...prev, Region: org.region }));
+                        }
+                    }}
                 />
                 <DropdownInput
                     id="Region"
