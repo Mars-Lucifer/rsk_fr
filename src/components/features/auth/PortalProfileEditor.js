@@ -7,6 +7,8 @@ import Textarea from "@/components/ui/Textarea";
 import DropdownInput from "@/components/ui/Input/DropdownInput";
 import Switcher from "@/components/ui/Switcher";
 import { getPortalOrganizationId } from "@/lib/portalProfile";
+import StudentIcon from "@/assets/general/cours_les.svg";
+import StaffIcon from "@/assets/general/persons.svg";
 import OrgRegistrySearch from "@/components/features/auth/OrgRegistrySearch";
 import { primePortalProfileCache } from "@/lib/portalProfileClient";
 import { removeCookie, setCookie } from "@/utils/cookies";
@@ -46,7 +48,7 @@ function Field({ label, children }) {
 
 // Тип профиля карточками, а не переключателем: у каждого варианта есть
 // пояснение, и промахнуться сложнее.
-function RoleCard({ value, current, onSelect, title, hint }) {
+function RoleCard({ value, current, onSelect, title, hint, Icon }) {
     const isActive = current === value;
     return (
         <button
@@ -57,10 +59,13 @@ function RoleCard({ value, current, onSelect, title, hint }) {
                 border: `1.5px solid ${isActive ? "var(--color-blue)" : "var(--color-gray-plus-50)"}`,
                 background: isActive ? "var(--color-blue-noise)" : "transparent",
             }}>
-            <span className="flex items-center justify-between gap-[0.5rem]">
-                {/* Цвет задаём явно: у неактивной карточки текст сливался с фоном. */}
-                <span className="big" style={{ fontWeight: 600, color: "var(--color-black)" }}>
-                    {title}
+            <span className="flex items-center justify-between gap-[0.5rem] w-full">
+                <span className="flex items-center gap-[0.5rem]">
+                    {Icon ? <Icon style={{ width: "1.25rem", height: "1.25rem", color: isActive ? "var(--color-blue)" : "var(--color-gray-white)" }} /> : null}
+                    {/* Цвет задаём явно: у неактивной карточки текст сливался с фоном. */}
+                    <span className="big" style={{ fontWeight: 600, color: "var(--color-black)" }}>
+                        {title}
+                    </span>
                 </span>
                 <span
                     className="inline-block rounded-full"
@@ -332,12 +337,12 @@ export default function PortalProfileEditor({
                 Раньше всё шло одной узкой лентой, и на широком экране форма
                 занимала треть ширины, а поиск организации терялся между полями. */}
             <div className="flex flex-col gap-[1.25rem] p-[1.5rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ background: "var(--color-white)", border: "1.5px solid var(--color-gray-plus-50)" }}>
-                <div className="flex flex-col gap-[0.25rem]">
-                    <h5>{title || "Профиль портала"}</h5>
+                <h5>{title || "Профиль"}</h5>
+                {description ? (
                     <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                        {description || "Эти данные используются в личном кабинете, МАЯК и сертификатах."}
+                        {description}
                     </p>
-                </div>
+                ) : null}
 
                 <div className="grid grid-cols-2 gap-[1.25rem] items-start max-[900px]:grid-cols-1">
                     {/* Левая колонка — человек */}
@@ -357,40 +362,14 @@ export default function PortalProfileEditor({
                                 <Textarea inverted name="Description" placeholder="Краткое описание поможет другим участникам лучше вас узнать" value={formData.Description} onChange={(event) => updateField("Description", event.target.value)} />
                             </Field>
                         ) : null}
-
-                        <Field label="Организация">
-                            <DropdownInput
-                                ref={orgDropdownRef}
-                                id="Organization"
-                                name="Organization"
-                                placeholder={region ? "Выберите организацию" : "Сначала выберите регион"}
-                                value={formData.Organization}
-                                options={orgList}
-                                onChange={(event) => updateField("Organization", event.target.value)}
-                                onQueryChange={() => setOrgFieldTyped(true)}
-                                disabled={!region}
-                            />
-                        </Field>
-
-                        <div className="flex gap-[0.625rem] p-[0.875rem] rounded-[0.75rem]" style={{ background: "var(--color-blue-noise)" }}>
-                            <span className="text-sm">
-                                <span style={{ fontWeight: 600 }}>Не нашли свою организацию в списке?</span>
-                                <br />
-                                Найдите её в реестре по ИНН — блок справа.
-                            </span>
-                        </div>
                     </div>
 
-                    {/* Правая колонка — откуда участник */}
+                    {/* Правая колонка — организация целиком: регион, выбор из списка
+                        и поиск по ИНН, если в списке её нет. Порядок сверху вниз
+                        совпадает с порядком действий. */}
                     <div className="flex flex-col gap-[1.25rem]">
                         <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
-                            <h6>Поиск организации</h6>
-
-                            <Field label="ИНН организации">
-                                {/* Организации из реестра: список в базе неполный, и без
-                                    этого участник из непопавшего колледжа не двигается. */}
-                                <OrgRegistrySearch showHint={false} onSelected={handleOrgFromRegistry} />
-                            </Field>
+                            <h6>Организация</h6>
 
                             <Field label="Регион">
                                 <DropdownInput
@@ -411,8 +390,30 @@ export default function PortalProfileEditor({
                                 />
                             </Field>
 
+                            <Field label="Организация">
+                                <DropdownInput
+                                    ref={orgDropdownRef}
+                                    id="Organization"
+                                    name="Organization"
+                                    placeholder={region ? "Начните вводить название" : "Сначала выберите регион"}
+                                    value={formData.Organization}
+                                    options={orgList}
+                                    onChange={(event) => updateField("Organization", event.target.value)}
+                                    onQueryChange={() => setOrgFieldTyped(true)}
+                                    disabled={!region}
+                                />
+                            </Field>
+
+                            <hr style={{ borderColor: "var(--color-gray-plus-50)" }} />
+
+                            <Field label="Нет в списке? Найдите по ИНН">
+                                {/* Список в базе неполный, и без этого участник
+                                    из непопавшего колледжа не двигается дальше. */}
+                                <OrgRegistrySearch showHint={false} onSelected={handleOrgFromRegistry} />
+                            </Field>
+
                             <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                                Если вашей организации нет ни в списке, ни в реестре, заполните{" "}
+                                Если организации нет ни в списке, ни в реестре, заполните{" "}
                                 <Link target="_blank" className="text-(--color-blue)" href="https://forms.yandex.ru/u/690391e1068ff0a3ba625eef">
                                     форму
                                 </Link>
@@ -424,23 +425,18 @@ export default function PortalProfileEditor({
                             <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
                                 <h6>Тип профиля</h6>
                                 <div className="grid grid-cols-2 gap-[0.75rem] max-[640px]:grid-cols-1">
-                                    <RoleCard value="student" current={role} onSelect={setRole} title="Студент" hint="Учебная деятельность" />
-                                    <RoleCard value="teacher" current={role} onSelect={setRole} title="Сотрудник" hint="Рабочая деятельность" />
+                                    <RoleCard value="student" current={role} onSelect={setRole} title="Студент" hint="Учебная деятельность" Icon={StudentIcon} />
+                                    <RoleCard value="teacher" current={role} onSelect={setRole} title="Сотрудник" hint="Рабочая деятельность" Icon={StaffIcon} />
                                 </div>
                             </div>
                         ) : null}
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-[1rem] pt-[0.25rem] max-[640px]:flex-col max-[640px]:items-stretch">
+                <div className="flex items-center gap-[1rem] pt-[0.25rem] max-[640px]:flex-col max-[640px]:items-stretch">
                     <Button className="w-fit! max-[640px]:w-full!" onClick={handleSubmit} disabled={isSaving || !isDirty}>
                         {isSaving ? "Сохранение..." : submitLabel}
                     </Button>
-                    {!region ? (
-                        <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                            Организация станет доступна после выбора региона — или найдите её по ИНН.
-                        </span>
-                    ) : null}
                 </div>
             </div>
         </>
