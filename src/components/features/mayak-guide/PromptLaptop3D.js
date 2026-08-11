@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei/web/Html";
 
@@ -20,11 +20,12 @@ import { roundedPlateGeometry, roundedPlateLying } from "./roundedPlate";
 // поле 700 × 550 мм и карты 104 × 145 мм, и предмет не своего размера ломает масштаб
 // всего стола.
 export const LAPTOP = {
-    base: { w: 0.36, d: 0.245, thickness: 0.012, corner: 0.012 },
-    lid: { w: 0.36, h: 0.225, thickness: 0.008, corner: 0.012 },
-    // Рамка вокруг экрана: чёрное поле по контуру крышки. Ниже по нему считается место
-    // под DOM формы — без рамки текст упирался бы в скруглённый край крышки.
-    bezel: 0.012,
+    base: { w: 0.36, d: 0.245, thickness: 0.01, corner: 0.008 },
+    lid: { w: 0.36, h: 0.225, thickness: 0.005, corner: 0.008 },
+    // Рамка вокруг экрана: поле по контуру крышки, на котором матрицы нет.
+    // 4 мм — столько же, сколько у современного ноутбука. Было 12: на кадре крышка
+    // читалась рамкой с экраном внутри, а не экраном в корпусе.
+    bezel: 0.004,
 };
 
 // Пятно предмета на столе — по раскрытому ноутбуку, а не по закрытому: рамку подсветки и
@@ -57,7 +58,7 @@ const easeOpen = (t) => 1 - (1 - t) ** 3;
 // масштаб, посчитанный по ширине, срежет форму по высоте. Сами числа выбраны по
 // содержимому: на 620 × 372 семь полей не помещались и блок полей уходил в прокрутку —
 // нижние три строки читались только колесом мыши, чего у предмета на столе быть не может.
-const SCREEN_PX = { w: 820, h: 490 };
+const SCREEN_PX = { w: 820, h: 505 };
 const DREI_PX_PER_UNIT = 40;
 const screenInner = { w: LAPTOP.lid.w - LAPTOP.bezel * 2, h: LAPTOP.lid.h - LAPTOP.bezel * 2 };
 const SCREEN_SCALE = screenInner.w / (SCREEN_PX.w / DREI_PX_PER_UNIT);
@@ -127,37 +128,6 @@ function deckTexture() {
     return texture;
 }
 
-// Матрица гасит события, не пуская их в сцену.
-//
-// R3F слушает указатель не на самом холсте, а на его контейнере, и DOM, который drei
-// кладёт на крышку, оказывается потомком того же контейнера. Поэтому клик по полю формы
-// всплывал в сцену, там не попадал ни в один предмет, считался промахом — и зона
-// закрывалась ровно в тот момент, когда в поле собирались писать.
-//
-// Слушатели нативные, а не React-овские: React вешает свои на корень приложения, то есть
-// выше контейнера сцены, и его stopPropagation опаздывает — событие к тому моменту уже
-// прошло через R3F.
-function ScreenGuard({ children }) {
-    const node = useRef(null);
-
-    useEffect(() => {
-        const el = node.current;
-        if (!el) return undefined;
-        const stop = (event) => event.stopPropagation();
-        const kinds = ["pointerdown", "pointerup", "pointermove", "click", "dblclick", "wheel", "contextmenu"];
-        for (const kind of kinds) el.addEventListener(kind, stop);
-        return () => {
-            for (const kind of kinds) el.removeEventListener(kind, stop);
-        };
-    }, []);
-
-    return (
-        <div ref={node} style={{ width: "100%", height: "100%" }}>
-            {children}
-        </div>
-    );
-}
-
 export default function PromptLaptop3D({ position, active, screenOn = false, children }) {
     const baseGeometry = useMemo(() => roundedPlateLying(LAPTOP.base.w, LAPTOP.base.d, LAPTOP.base.thickness, LAPTOP.base.corner), []);
     const lidGeometry = useMemo(() => roundedPlateGeometry(LAPTOP.lid.w, LAPTOP.lid.h, LAPTOP.lid.thickness, LAPTOP.lid.corner), []);
@@ -215,7 +185,7 @@ export default function PromptLaptop3D({ position, active, screenOn = false, chi
                             scale={SCREEN_SCALE}
                             style={{ width: SCREEN_PX.w, height: SCREEN_PX.h }}
                             zIndexRange={[4, 0]}>
-                            <ScreenGuard>{children}</ScreenGuard>
+                            {children}
                         </Html>
                     )}
                 </group>

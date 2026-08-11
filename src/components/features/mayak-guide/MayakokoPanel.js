@@ -183,15 +183,100 @@ export default function MayakokoPanel({ onClose, onPickFromCard, picked, marked 
                     max-height: none;
                     flex-direction: row;
                     gap: 16px;
-                    padding: 14px 16px;
+                    padding: 18px 20px;
                     border-radius: 4px;
-                    background: #100d0b;
+                    /* Экран светлый — тот же, что у формы в тренажёре. Тёмное стекло было
+                       уместно, пока форма висела над столом и должна была читаться его
+                       частью. На матрице ноутбука она обязана выглядеть тем же рабочим
+                       окном, которое участник видит в браузере, иначе это две разные
+                       формы: одна для тренировки, другая для игры. */
+                    background: #f7f9fb;
+                    color: #1d2126;
                     backdrop-filter: none;
                     -webkit-backdrop-filter: none;
                     box-shadow: none;
                     /* Подъём уже сыгран самой крышкой: форма включается на вставшем
                        экране, и второе движение читалось бы как вторая вещь. */
                     animation: mk-wake 0.3s ease-out;
+                }
+
+                /* Светлая тема экрана: заголовки, буквы полей, рамки и плейсхолдеры
+                   повторяют форму тренажёра. Правила идут после базовых тёмных, поэтому
+                   перебивают их без !important. */
+                .mayakoko.mk-screen .mk-group {
+                    color: #1d2126;
+                    font-size: 15px;
+                }
+
+                .mayakoko.mk-screen .mk-letter {
+                    color: #9aa3ad;
+                    font-weight: 600;
+                }
+
+                .mayakoko.mk-screen .mk-input {
+                    background: #ffffff;
+                    border-color: #e3e8ee;
+                }
+
+                .mayakoko.mk-screen .mk-input:focus-within {
+                    background: #ffffff;
+                    border-color: #b8c2cc;
+                }
+
+                .mayakoko.mk-screen .mk-area {
+                    color: #1d2126;
+                }
+
+                .mayakoko.mk-screen .mk-area::placeholder {
+                    color: #9aa3ad;
+                }
+
+                .mayakoko.mk-screen .mk-tool {
+                    color: #6b7480;
+                }
+
+                .mayakoko.mk-screen .mk-tool:hover {
+                    background: #eaeef3;
+                    color: #1d2126;
+                }
+
+                .mayakoko.mk-screen .mk-dice,
+                .mayakoko.mk-screen .mk-take {
+                    color: #4a5560;
+                }
+
+                .mayakoko.mk-screen .mk-take {
+                    color: #1f9ab5;
+                }
+
+                .mayakoko.mk-screen .mk-dice:hover,
+                .mayakoko.mk-screen .mk-take:hover:not(:disabled) {
+                    background: #eaeef3;
+                }
+
+                .mayakoko.mk-screen .mk-picked .mk-input {
+                    border-color: #7fcede;
+                    background: #eaf7fa;
+                }
+
+                .mayakoko.mk-screen .mk-prompt {
+                    background: #ffffff;
+                    border-color: #e3e8ee;
+                    color: #1d2126;
+                }
+
+                .mayakoko.mk-screen .mk-empty {
+                    color: #9aa3ad;
+                }
+
+                .mayakoko.mk-screen .mk-copy {
+                    background: #eef2f6;
+                    border-color: #dbe2e9;
+                    color: #1d2126;
+                }
+
+                .mayakoko.mk-screen .mk-copy:hover {
+                    background: #e3e9ef;
                 }
 
                 .mayakoko.mk-screen::before {
@@ -219,7 +304,7 @@ export default function MayakokoPanel({ onClose, onPickFromCard, picked, marked 
                     margin-top: 0;
                     padding: 0 0 0 16px;
                     border-top: 0;
-                    border-left: 1px solid rgba(255, 255, 255, 0.12);
+                    border-left: 1px solid #e3e8ee;
                 }
 
                 .mayakoko::before {
