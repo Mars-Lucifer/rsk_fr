@@ -343,7 +343,7 @@ export function PublicSubmissionForm() {
               name="region"
               value={region}
               onChange={setRegion}
-              placeholder="Нажмите и выберите или начните вводить: Псков…"
+              placeholder="Например, Псковская область"
               invalid={Boolean(regionError)}
               inputClassName={inputClassWithError(regionError)}
             />

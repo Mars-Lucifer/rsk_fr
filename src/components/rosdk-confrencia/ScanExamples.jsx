@@ -92,7 +92,8 @@ function BadScan() {
           <TextLines x={48} y={38} width={80} count={5} />
         </g>
       </g>
-      <ellipse cx="112" cy="52" rx="30" ry="22" fill="#ffffff" opacity="0.75" />
+      <ellipse cx="112" cy="52" rx="30" ry="22" fill="#fef9c3" opacity="0.95" />
+      <ellipse cx="112" cy="52" rx="30" ry="22" fill="#ffffff" opacity="0.7" />
       <rect x="0" y="86" width="160" height="24" fill="#e2e8f0" />
       <text x="80" y="103" textAnchor="middle" fontSize="9" fill="#be123c">
         край не поместился
@@ -121,10 +122,11 @@ function BadPhoto() {
   return (
     <svg viewBox="0 0 160 110" className="h-28 w-full" role="img" aria-label="Селфи одного человека крупным планом">
       <rect width="160" height="110" fill="#eef2ff" />
-      <circle cx="80" cy="52" r="34" fill="#6366f1" />
-      <path d="M28 110 q52 -46 104 0 z" fill="#818cf8" />
-      <text x="80" y="104" textAnchor="middle" fontSize="9" fill="#be123c">
-        видно одного
+      <circle cx="80" cy="58" r="32" fill="#6366f1" />
+      <path d="M30 110 q50 -44 100 0 z" fill="#818cf8" />
+      <rect x="42" y="6" width="76" height="16" rx="8" fill="#ffffff" opacity="0.92" />
+      <text x="80" y="17" textAnchor="middle" fontSize="9" fill="#be123c">
+        в кадре один
       </text>
     </svg>
   );

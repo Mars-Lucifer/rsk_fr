@@ -159,7 +159,7 @@ export function RegionCombobox({
                 onMouseEnter={() => setHighlight(index)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(option)}
-                className={`block w-full rounded-none! border-0! px-3 py-2 text-left text-sm cursor-pointer ${
+                className={`block w-full rounded-none! border-0! px-3 py-2 text-left! text-sm cursor-pointer ${
                   index === highlight ? "bg-indigo-50! text-indigo-900!" : "bg-white! text-slate-700!"
                 } ${option === value ? "font-semibold" : ""}`}
               >
