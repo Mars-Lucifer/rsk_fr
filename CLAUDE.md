@@ -176,7 +176,9 @@ Main portal/user-facing areas observed in this repo:
 Conference package notes (code lives under `src/lib/rosdk-confrencia/`, despite the route being `/conferencia`):
 - `documents.js` builds the three DOCX blanks with the `docx` package — there is no template file to patch;
 - `slots.js` is the shared, dependency-free description of every generated and uploaded file, imported by both the form and the API;
-- `validation.js` owns the legal thresholds: quorum is more than half of members on record, the delegate needs at least 2/3 of those present;
+- `validation.js` owns the legal thresholds and the anti-nonsense rules: quorum is more than half of members on record, the delegate needs at least 2/3 of those present, one person cannot appear twice in the attendance list, and every contact is either an 11-digit phone or an e-mail;
+- `format.js` declines the subject name into the prepositional case for the blanks — the directory stores nominative, the protocol needs «в Псковской области»;
+- `RegionCombobox.jsx` replaces the native `<datalist>`: it opens on click even when the field is filled, and the same list backs the delegate's registration address (prefilled from the branch subject until edited by hand);
 - `data/rsk.sqlite` and `data/uploads/` hold passport data and scans — gitignored, never commit them;
 - `node scripts/check-conferencia-package.mjs` covers thresholds, attendance list, DOCX generation and archive assembly.
 
