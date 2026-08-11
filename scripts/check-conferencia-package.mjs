@@ -41,6 +41,7 @@ import {
   buildAttendanceDocument,
   buildConsentDocument,
   buildProtocolDocument,
+  buildRegistryDocument,
 } from "../src/lib/rosdk-confrencia/documents.js";
 
 const SURNAMES = [
@@ -280,6 +281,25 @@ assert.ok(
 );
 assert.match(consentText, /Лебедев Андрей Александрович/);
 assert.match(consentText, /Делегат от: Регионального отделения в Республике Калмыкия/);
+
+// --- Реестр делегатов: одна строка на отделение, повторные заявки схлопываются.
+const registryInput = [
+  { region: "Республика Калмыкия", delegateName: "Лебедев Андрей Александрович", protocolNumber: "7", meetingDate: "2026-08-01", delegateEmail: "a@example.ru", delegatePhone: "+7 (999) 111-22-33", files: { protocolDocx: "x" } },
+  { region: "Республика Калмыкия", delegateName: "Петров Петр Петрович", protocolNumber: "8", meetingDate: "2026-08-02", delegateEmail: "b@example.ru", delegatePhone: "+7 (999) 222-33-44", files: { protocolDocx: "x", protocolScan: "y", photo: "z" } },
+  { region: "город федерального значения Москва", delegateName: "Актуганов Антон Николаевич", protocolNumber: "2", meetingDate: "2026-08-10", delegateEmail: "c@example.ru", delegatePhone: "+7 (999) 333-44-55", files: {} },
+];
+
+const registryText = await documentText(buildRegistryDocument(registryInput));
+assert.match(registryText, /РЕЕСТР ДЕЛЕГАТОВ И РЕГИСТРАЦИИ УЧАСТНИКОВ/);
+assert.match(registryText, /Региональное отделение в г\. Москве/, "город федерального значения — «в г. Москве»");
+assert.match(registryText, /Региональное отделение в Республике Калмыкия/);
+assert.match(registryText, /Протокол № 8 от 02\.08\.2026/, "берётся самая полная заявка региона");
+assert.ok(
+  !registryText.includes("Лебедев Андрей Александрович"),
+  "менее полная заявка того же региона в реестр не попадает",
+);
+assert.match(registryText, /Избрано делегатов: 2 человек от 2 региональных отделений/);
+assert.match(registryText, /Видеокамера \+ Паспорт/);
 
 // --- Архив комплекта: имена внутри ZIP не зависят от расширений загруженных сканов.
 const tempDir = await mkdtemp(path.join(tmpdir(), "conferencia-check-"));

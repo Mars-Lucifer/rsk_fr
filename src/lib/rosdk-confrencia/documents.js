@@ -10,7 +10,12 @@ import {
   TextRun,
   WidthType,
 } from "docx";
-import { formatLongDate, regionInPrepositional } from "./format.js";
+import {
+  formatLongDate,
+  formatShortDate,
+  regionBranchName,
+  regionInPrepositional,
+} from "./format.js";
 import { CONFERENCE_DATE } from "./slots.js";
 
 /** Наименование Организации — правится здесь, а не по тексту бланков. */
@@ -384,6 +389,125 @@ export function buildConsentDocument(input) {
             p("(расшифровка подписи: Ф.И.О.)", { after: 0, align: AlignmentType.CENTER }),
             44,
           ),
+        ],
+      }),
+    ]),
+  ]);
+}
+
+/**
+ * 4. Реестр делегатов для Мандатной комиссии — по бланку Оргкомитета.
+ * Одна строка на региональное отделение: если субъект присылал заявку
+ * несколько раз, берём самую полную, при равенстве — самую свежую.
+ */
+export function buildRegistryDocument(submissions) {
+  const byRegion = new Map();
+
+  for (const submission of submissions) {
+    const current = byRegion.get(submission.region);
+    const filled = Object.keys(submission.files ?? {}).length;
+    const currentFilled = current ? Object.keys(current.files ?? {}).length : -1;
+
+    if (!current || filled > currentFilled) {
+      byRegion.set(submission.region, submission);
+    }
+  }
+
+  const rows = [...byRegion.values()].sort((left, right) =>
+    left.region.localeCompare(right.region, "ru"),
+  );
+
+  const headerCells = [
+    "№",
+    "Наименование Регионального отделения (Субъект РФ)",
+    "Ф.И.О. делегата",
+    "Реквизиты Протокола РО об избрании делегата",
+    "Контактный E-mail / Телефон",
+    "Способ идентификации при подключении",
+    "Отметка о присутствии / Подпись Секретаря",
+  ];
+
+  const table = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({
+        tableHeader: true,
+        children: headerCells.map(
+          (title) =>
+            new TableCell({
+              children: [p(title, { align: AlignmentType.CENTER, after: 0, bold: true })],
+            }),
+        ),
+      }),
+      ...rows.map(
+        (submission, index) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [p(String(index + 1), { align: AlignmentType.CENTER, after: 0 })],
+              }),
+              new TableCell({ children: [p(regionBranchName(submission.region), { after: 0 })] }),
+              new TableCell({ children: [p(submission.delegateName, { after: 0 })] }),
+              new TableCell({
+                children: [
+                  p(
+                    `Протокол № ${submission.protocolNumber} от ${formatShortDate(submission.meetingDate)}`,
+                    { after: 0 },
+                  ),
+                ],
+              }),
+              new TableCell({
+                children: [
+                  p(submission.delegateEmail, { after: 0 }),
+                  p(submission.delegatePhone, { after: 0 }),
+                ],
+              }),
+              new TableCell({ children: [p("Видеокамера + Паспорт", { after: 0 })] }),
+              // Отметку ставит Мандатная комиссия в день Конференции.
+              new TableCell({ children: [p("", { after: 0 })] }),
+            ],
+          }),
+      ),
+    ],
+  });
+
+  return documentOf("Реестр делегатов Конференции", [
+    p("РЕЕСТР ДЕЛЕГАТОВ И РЕГИСТРАЦИИ УЧАСТНИКОВ", {
+      align: AlignmentType.CENTER,
+      bold: true,
+      after: 0,
+    }),
+    p(`Конференции ${ORG_GENITIVE}`, { align: AlignmentType.CENTER, after: 0 }),
+    p(`(проводимой ${CONFERENCE_DATE} в дистанционной форме)`, {
+      align: AlignmentType.CENTER,
+      after: 240,
+    }),
+
+    table,
+    p("", { after: 240 }),
+
+    p("ИТОГИ РЕГИСТРАЦИИ:", { bold: true, after: 0 }),
+    // Число отделений в структуре и явку на самой Конференции система не знает —
+    // эти строки Мандатная комиссия заполняет от руки.
+    p("Всего в структуру Организации входит _____ региональных отделений.", { after: 0 }),
+    p(
+      `Избрано делегатов: ${rows.length} человек от ${rows.length} региональных отделений.`,
+      { after: 0 },
+    ),
+    p(
+      "Зарегистрировано и подключено к онлайн-конференции: _____ делегатов от _____ субъектов Российской Федерации.",
+      { after: 0 },
+    ),
+    p("Кворум имеется (составляет _____%). Конференция правомочна принимать решения.", {
+      after: 360,
+    }),
+
+    layoutTable([
+      new TableRow({
+        children: [
+          cell(p("Председатель Мандатной комиссии (Секретарь):", { after: 0 }), 50),
+          cell(p("_______________", { after: 0, align: AlignmentType.CENTER }), 20),
+          cell(p("/ ________________ /", { after: 0, align: AlignmentType.CENTER }), 30),
         ],
       }),
     ]),

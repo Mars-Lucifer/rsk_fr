@@ -77,6 +77,27 @@ export function regionInPrepositional(region) {
   return [...words.slice(0, -1).map(adjectiveInPrepositional), noun].join(" ");
 }
 
+const FEDERAL_CITIES = {
+  Москва: "г. Москве",
+  "Санкт-Петербург": "г. Санкт-Петербурге",
+  Севастополь: "г. Севастополе",
+};
+
+/**
+ * «Региональное отделение в г. Москве», «...в Московской области» — форма
+ * наименования отделения, принятая в реестре делегатов.
+ */
+export function regionBranchName(region) {
+  const value = String(region ?? "").trim();
+  const federal = value.replace("город федерального значения ", "");
+
+  if (FEDERAL_CITIES[federal]) {
+    return `Региональное отделение в ${FEDERAL_CITIES[federal]}`;
+  }
+
+  return `Региональное отделение в ${regionInPrepositional(value)}`;
+}
+
 /** 05.06.2026 — форма даты для реквизитов и реестра. */
 export function formatShortDate(value) {
   const parsed = parseIsoDate(value);

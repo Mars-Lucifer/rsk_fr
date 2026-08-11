@@ -115,10 +115,20 @@ export default function AdminPage({ authorized, hasError, notConfigured, submiss
               Найти
             </button>
             <a
-              href={`/api/conferencia/admin/export${region ? `?region=${encodeURIComponent(region)}` : ""}`}
-              className="file-link h-10 px-4 text-xs font-bold border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              href={`/api/conferencia/admin/registry${region ? `?region=${encodeURIComponent(region)}` : ""}`}
+              title="Бланк Оргкомитета: одна строка на отделение, для Мандатной комиссии"
+              style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+              className="file-link h-10 whitespace-nowrap px-4 text-xs font-bold border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
             >
-              Реестр в XLSX
+              Реестр DOCX
+            </a>
+            <a
+              href={`/api/conferencia/admin/export${region ? `?region=${encodeURIComponent(region)}` : ""}`}
+              title="Рабочая таблица: все поля заявок, включая статус документов"
+              style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+              className="file-link h-10 whitespace-nowrap px-4 text-xs font-bold border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            >
+              Таблица XLSX
             </a>
           </div>
         </form>

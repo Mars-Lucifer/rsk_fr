@@ -174,7 +174,7 @@ Main portal/user-facing areas observed in this repo:
 - `/conferencia/admin` Admin panel for received packages
 
 Conference package notes (code lives under `src/lib/rosdk-confrencia/`, despite the route being `/conferencia`):
-- `documents.js` builds the three DOCX blanks with the `docx` package — there is no template file to patch;
+- `documents.js` builds four DOCX documents with the `docx` package — there is no template file to patch. Three go to the branch (protocol, attendance list, delegate consent), the fourth is the delegate registry the Mandate Commission prints from the admin panel. The wording follows the Orgcomittee's `.doc` blanks verbatim; when a blank changes, change it here;
 - `slots.js` is the shared, dependency-free description of every generated and uploaded file, imported by both the form and the API;
 - `validation.js` owns the legal thresholds and the anti-nonsense rules: quorum is more than half of members on record, the delegate needs at least 2/3 of those present, one person cannot appear twice in the attendance list, and every contact is either an 11-digit phone or an e-mail;
 - `format.js` declines the subject name into the prepositional case for the blanks — the directory stores nominative, the protocol needs «в Псковской области»;
