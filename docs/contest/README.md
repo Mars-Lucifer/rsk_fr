@@ -38,6 +38,7 @@
 | [03-teams-and-orgs.md](03-teams-and-orgs.md) | Организации, команды, состав 3+1 |
 | [04-infrastructure.md](04-infrastructure.md) | Бэкенд, прод, локальный стенд, найденные мины |
 | [05-decisions.md](05-decisions.md) | Принятые решения и открытые вопросы |
+| [06-artifacts.md](06-artifacts.md) | **Витрина: какие экраны готовы и что на них видно — для показа** |
 | [CHANGELOG.md](CHANGELOG.md) | Что и когда сделано |
 
 ---
