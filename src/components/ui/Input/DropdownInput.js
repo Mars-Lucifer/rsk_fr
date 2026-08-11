@@ -6,7 +6,7 @@ const DropdownInput = forwardRef(function DropdownInput(
     ref
 ) {
     const dropdownRef = useRef(null);
-    const { inputValue, filtered, showDropdown, handleInput, handleSelect, setShowDropdown, handleEnter, handleBlur, commitPendingValue } =
+    const { inputValue, filtered, showDropdown, handleInput, handleSelect, setShowDropdown, handleEnter, handleBlur, commitPendingValue, openDropdown } =
         useDropdownFilter(controlledValue, onChange, src, name, options, onQueryChange);
 
     useImperativeHandle(ref, () => ({ commitPendingValue }), [commitPendingValue]);
@@ -33,7 +33,8 @@ const DropdownInput = forwardRef(function DropdownInput(
                 value={inputValue}
                 onChange={(e) => handleInput(e.target.value)}
                 onBlur={handleBlur}
-                onFocus={() => inputValue && setShowDropdown(true)}
+                onFocus={() => !props.disabled && openDropdown()}
+                onClick={() => !props.disabled && openDropdown()}
                 onKeyDown={handleKeyDown}
                 autoComplete="off"
                 name={name}

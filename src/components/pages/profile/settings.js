@@ -64,8 +64,11 @@ export default function SettingsPage({ goTo }) {
                     {profileName}
                     <span className="text-(--color-gray-black)">/</span> {SETTINGS_LABEL}
                 </Header.Heading>
-                <Button icon active onClick={() => goTo("profile")}>
-                    <Setts />
+                {/* Возврат к просмотру: раньше здесь была та же безымянная
+                    шестерёнка, что и на карточке профиля, и понять, куда она
+                    ведёт, было нельзя. */}
+                <Button inverted className={"w-fit! shadow-none!"} onClick={() => goTo("profile")}>
+                    Вернуться к профилю
                 </Button>
             </Header>
 

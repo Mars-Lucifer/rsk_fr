@@ -48,37 +48,21 @@ function Field({ label, children }) {
 
 // Тип профиля карточками, а не переключателем: у каждого варианта есть
 // пояснение, и промахнуться сложнее.
-function RoleCard({ value, current, onSelect, title, hint, Icon }) {
+function RoleCard({ value, current, onSelect, title, Icon }) {
     const isActive = current === value;
     return (
         <button
             type="button"
             onClick={() => onSelect(value)}
-            className="flex flex-col gap-[0.25rem] p-[0.875rem] rounded-[0.75rem] text-left transition"
+            className="flex items-center gap-[0.75rem] p-[1rem] rounded-[0.75rem] text-left transition"
             style={{
                 border: `1.5px solid ${isActive ? "var(--color-blue)" : "var(--color-gray-plus-50)"}`,
                 background: isActive ? "var(--color-blue-noise)" : "transparent",
             }}>
-            <span className="flex items-center justify-between gap-[0.5rem] w-full">
-                <span className="flex items-center gap-[0.5rem]">
-                    {Icon ? <Icon style={{ width: "1.25rem", height: "1.25rem", color: isActive ? "var(--color-blue)" : "var(--color-gray-white)" }} /> : null}
-                    {/* Цвет задаём явно: у неактивной карточки текст сливался с фоном. */}
-                    <span className="big" style={{ fontWeight: 600, color: "var(--color-black)" }}>
-                        {title}
-                    </span>
-                </span>
-                <span
-                    className="inline-block rounded-full"
-                    style={{
-                        width: "0.875rem",
-                        height: "0.875rem",
-                        border: `1.5px solid ${isActive ? "var(--color-blue)" : "var(--color-gray-white)"}`,
-                        background: isActive ? "var(--color-blue)" : "transparent",
-                    }}
-                />
-            </span>
-            <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                {hint}
+            {Icon ? <Icon style={{ width: "1.75rem", height: "1.75rem", flexShrink: 0, color: isActive ? "var(--color-blue)" : "var(--color-gray-white)" }} /> : null}
+            {/* Цвет задаём явно: у неактивной карточки текст сливался с фоном. */}
+            <span className="big" style={{ fontWeight: 600, color: "var(--color-black)" }}>
+                {title}
             </span>
         </button>
     );
@@ -362,14 +346,40 @@ export default function PortalProfileEditor({
                                 <Textarea inverted name="Description" placeholder="Краткое описание поможет другим участникам лучше вас узнать" value={formData.Description} onChange={(event) => updateField("Description", event.target.value)} />
                             </Field>
                         ) : null}
+
+                        {showRole ? (
+                            <div className="flex flex-col gap-[0.5rem]">
+                                <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                                    Тип профиля
+                                </span>
+                                <div className="grid grid-cols-2 gap-[0.75rem] max-[640px]:grid-cols-1">
+                                    <RoleCard value="student" current={role} onSelect={setRole} title="Студент" Icon={StudentIcon} />
+                                    <RoleCard value="teacher" current={role} onSelect={setRole} title="Сотрудник" Icon={StaffIcon} />
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <Field label="Организация">
+                            <DropdownInput
+                                ref={orgDropdownRef}
+                                id="Organization"
+                                name="Organization"
+                                placeholder={region ? "Начните вводить название" : "Сначала выберите регион справа"}
+                                value={formData.Organization}
+                                options={orgList}
+                                onChange={(event) => updateField("Organization", event.target.value)}
+                                onQueryChange={() => setOrgFieldTyped(true)}
+                                disabled={!region}
+                            />
+                        </Field>
                     </div>
 
-                    {/* Правая колонка — организация целиком: регион, выбор из списка
-                        и поиск по ИНН, если в списке её нет. Порядок сверху вниз
-                        совпадает с порядком действий. */}
+                    {/* Правая колонка — как найти организацию: сначала регион,
+                        он сужает список слева, потом поиск по ИНН для тех,
+                        кого в списке нет. */}
                     <div className="flex flex-col gap-[1.25rem]">
                         <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
-                            <h6>Организация</h6>
+                            <h6>Поиск организации</h6>
 
                             <Field label="Регион">
                                 <DropdownInput
@@ -390,20 +400,6 @@ export default function PortalProfileEditor({
                                 />
                             </Field>
 
-                            <Field label="Организация">
-                                <DropdownInput
-                                    ref={orgDropdownRef}
-                                    id="Organization"
-                                    name="Organization"
-                                    placeholder={region ? "Начните вводить название" : "Сначала выберите регион"}
-                                    value={formData.Organization}
-                                    options={orgList}
-                                    onChange={(event) => updateField("Organization", event.target.value)}
-                                    onQueryChange={() => setOrgFieldTyped(true)}
-                                    disabled={!region}
-                                />
-                            </Field>
-
                             <hr style={{ borderColor: "var(--color-gray-plus-50)" }} />
 
                             <Field label="Нет в списке? Найдите по ИНН">
@@ -420,16 +416,6 @@ export default function PortalProfileEditor({
                                 .
                             </p>
                         </div>
-
-                        {showRole ? (
-                            <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
-                                <h6>Тип профиля</h6>
-                                <div className="grid grid-cols-2 gap-[0.75rem] max-[640px]:grid-cols-1">
-                                    <RoleCard value="student" current={role} onSelect={setRole} title="Студент" hint="Учебная деятельность" Icon={StudentIcon} />
-                                    <RoleCard value="teacher" current={role} onSelect={setRole} title="Сотрудник" hint="Рабочая деятельность" Icon={StaffIcon} />
-                                </div>
-                            </div>
-                        ) : null}
                     </div>
                 </div>
 

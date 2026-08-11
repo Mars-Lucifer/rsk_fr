@@ -74,6 +74,18 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
         setShowDropdown(true);
     };
 
+    // Открыть список без ввода: пользователю нужно уметь пролистать варианты,
+    // а не угадывать первую букву. Раньше список появлялся только при наборе,
+    // и заполненное поле выглядело как тупик.
+    const openDropdown = () => {
+        const query = String(inputValue || "").trim().toLowerCase();
+        const matches = query ? items.filter((i) => String(i.label).toLowerCase().includes(query)) : items;
+        // Точное совпадение не должно схлопывать список до одной строки:
+        // иначе соседний вариант не выбрать, не стерев поле.
+        setFiltered(matches.length > 0 ? matches : items);
+        setShowDropdown(true);
+    };
+
     const handleBlur = () => {
         const trimmed = String(inputValue || "").trim();
         if (!trimmed) {
@@ -145,6 +157,7 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
     return {
         inputValue,
         filtered,
+        openDropdown,
         showDropdown,
         setShowDropdown,
         handleInput,

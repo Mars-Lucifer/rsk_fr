@@ -237,8 +237,11 @@ export default function ProfileIndexPage({ goTo }) {
                 <Button red className={"w-fit! shadow-none!"} onClick={handleLogout}>
                     {"\u0412\u044B\u0439\u0442\u0438"}
                 </Button>
-                <Button icon onClick={() => goTo("settings")}>
+                {/* Иконка-шестерёнка не объясняла, что произойдёт по нажатию.
+                    Подписанная кнопка — единственная точка входа в правку профиля. */}
+                <Button className={"w-fit! shadow-none!"} onClick={() => goTo("settings")}>
                     <Setts />
+                    Редактировать профиль
                 </Button>
             </Header>
 
