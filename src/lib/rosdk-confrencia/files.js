@@ -29,7 +29,11 @@ export function downloadName(submission, extension) {
   return `protocol-${safeRegion}-${safeDelegate}.${extension}`;
 }
 
-export async function sendFileResponse(res, filePath, contentType, name) {
+/**
+ * `inline` нужен превью в админке: с `attachment` браузер не рисует картинку
+ * в <img>, вместо миниатюры остаётся альт.
+ */
+export async function sendFileResponse(res, filePath, contentType, name, inline = false) {
   const buffer = await readFile(filePath);
 
   if (!buffer) {
@@ -37,7 +41,10 @@ export async function sendFileResponse(res, filePath, contentType, name) {
   }
 
   res.setHeader("Content-Type", contentType);
-  res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+  res.setHeader(
+    "Content-Disposition",
+    `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`,
+  );
   res.setHeader("Content-Length", String(buffer.byteLength));
   return res.status(200).send(buffer);
 }

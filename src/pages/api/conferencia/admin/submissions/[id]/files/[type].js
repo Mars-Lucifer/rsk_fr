@@ -49,5 +49,6 @@ export default async function handler(req, res) {
     filePath,
     contentTypeFor(filePath),
     `${parsed.name}-${submission.region}${extension}`,
+    req.query.inline === "1",
   );
 }

@@ -303,7 +303,7 @@ function SubmissionRow({
       <div className="flex justify-center items-center">
         {submission.files?.photo ? (
           <a
-            href={`/api/conferencia/admin/submissions/${submission.id}/files/photo`}
+            href={`/api/conferencia/admin/submissions/${submission.id}/files/photo?inline=1`}
             target="_blank"
             rel="noopener noreferrer"
             title="Открыть фото в новой вкладке"
@@ -311,7 +311,7 @@ function SubmissionRow({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`/api/conferencia/admin/submissions/${submission.id}/files/photo`}
+              src={`/api/conferencia/admin/submissions/${submission.id}/files/photo?inline=1`}
               alt="Конференция"
               className="w-full h-full object-cover transition duration-300 group-hover:scale-110"
             />

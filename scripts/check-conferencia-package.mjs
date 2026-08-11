@@ -15,6 +15,7 @@ import {
   sendGeneratedPackageResponse,
 } from "../src/lib/rosdk-confrencia/files.js";
 import {
+  CONFERENCE_DATE,
   STATUS_COMPLETE,
   STATUS_DOCX_GENERATED,
   STATUS_IN_PROGRESS,
@@ -272,7 +273,11 @@ assert.equal(
 const consentText = await documentText(buildConsentDocument(input));
 assert.match(consentText, /СОГЛАСИЕ/);
 assert.match(consentText, /152-ФЗ/);
-assert.match(consentText, /15 сентября 2026 года/);
+// Дата берётся из константы: перенос Конференции не должен ронять проверку.
+assert.ok(
+  consentText.includes(CONFERENCE_DATE),
+  `в согласии нет даты Конференции (${CONFERENCE_DATE})`,
+);
 assert.match(consentText, /Лебедев Андрей Александрович/);
 assert.match(consentText, /Делегат от: Регионального отделения в Республике Калмыкия/);
 
