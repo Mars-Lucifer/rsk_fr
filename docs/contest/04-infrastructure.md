@@ -101,17 +101,23 @@ docker compose -f docker-compose.override.yml -f docker-compose.local.yml up -d
 | Адрес | Что |
 |---|---|
 | `localhost:1234` | портал (`npm run dev`) |
-| `localhost:8080` | шлюз к бэкенду (замена Traefik) |
+| `localhost:8081` | шлюз к бэкенду (замена Traefik) |
 | `localhost:8025` | почта: письма никуда не уходят, видны здесь |
 
 Файлы стенда (не в гите, локальные): корневой `.env`, `.env` в шести
 сервисах, `docker-compose.local.yml`, `local-gateway.conf`.
 
+**Порт шлюза 8080 → 8081 (11.08.2026).** Порт 8080 занял MCP-сервер Figma
+(`C:\Disk D\Projectigma\mcp-server\server.js`), и контейнер шлюза
+перестал подниматься. Перенесли шлюз, а не гасили чужой процесс. Побочный
+эффект: ссылки подтверждения почты в письмах `auth_service` по-прежнему ведут
+на `:8080` — при локальной проверке порт в ссылке нужно поправить руками.
+
 Переключение фронта на стенд — две строки в `.env.local`:
 
 ```
-RSK_API_BASE=http://localhost:8080
-NEXT_PUBLIC_RSK_API_BASE=http://localhost:8080
+RSK_API_BASE=http://localhost:8081
+NEXT_PUBLIC_RSK_API_BASE=http://localhost:8081
 ```
 
 Убрать их — вернётся прод. По умолчанию (переменных нет) адрес прод-овый,
