@@ -123,10 +123,10 @@ export default function MayakokoPanel({ onClose, onPickFromCard, picked, marked 
             {/* Блок промпта стоит всегда, даже пустой: это часть формы, и появляющийся
                 из ниоткуда блок дёргает всю раскладку планшета. */}
             <div className="mk-result">
-                <p className="mk-group">Промпт</p>
+                <p className="mk-group">Ваш промпт</p>
                 <div className="mk-prompt">{prompt || <span className="mk-empty">Заполните семь полей — промпт соберётся здесь</span>}</div>
                 <button type="button" className="mk-copy" onClick={copy} disabled={!prompt}>
-                    {copied ? "Скопировано" : "Копировать промпт"}
+                    {copied ? "Скопировано" : "Создать запрос"}
                 </button>
             </div>
 

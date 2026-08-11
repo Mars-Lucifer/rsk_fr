@@ -134,7 +134,6 @@ export default function PromptLaptop3D({ position, active, screenOn = false, chi
     const deck = useMemo(() => deckTexture(), []);
 
     const hinge = useRef(null);
-    const glow = useRef(null);
     const opened = useRef(0);
 
     useFrame((_, delta) => {
@@ -147,12 +146,9 @@ export default function PromptLaptop3D({ position, active, screenOn = false, chi
         const node = hinge.current;
         if (node) node.rotation.x = Math.PI / 2 - OPEN_ANGLE * t;
 
-        // Экран чуть теплеет к концу раскрытия, но остаётся почти чёрным: поверх него
-        // ложится сама форма, и подсветка матрицы под ней не видна вовсе. Прежние 0.15
-        // давали ровный серый прямоугольник — на тёмной сцене он читался как включённый
-        // пустой монитор, а не как погашенный экран, ждущий формы.
-        const surface = glow.current;
-        if (surface) surface.color.setScalar(0.02 + t * 0.02);
+        // Яркость матрицы не трогаем вовсе: поверх неё сразу ложится форма, и любое
+        // разгорание видно только в щель между кадрами — ровно тем серым прямоугольником,
+        // который читался как включённый пустой монитор.
     });
 
     return (
@@ -176,13 +172,15 @@ export default function PromptLaptop3D({ position, active, screenOn = false, chi
                     <mesh geometry={lidGeometry}>
                         {/* Лицо крышки — экран: не освещаемый материал, иначе стол подмешивает
                             в него свой тёплый свет, и цвета формы расходятся с тренажёром. */}
-                        <meshBasicMaterial ref={glow} attach="material-0" color="#0d0b09" toneMapped={false} />
+                        <meshBasicMaterial attach="material-0" color="#0d0b09" toneMapped={false} />
                         <meshStandardMaterial attach="material-1" color="#1b1613" roughness={0.45} metalness={0.3} />
                         <meshStandardMaterial attach="material-2" color="#241d19" roughness={0.5} metalness={0.25} />
                     </mesh>
 
-                    {/* Форма включается только на раскрытой крышке: на полпути DOM едет
-                        вместе с ней и на кадр-другой показывает изнанку матрицы. */}
+                    {/* Форма живёт на крышке с первого кадра раскрытия и едет вместе с ней.
+                        Ждать, пока крышка встанет, нельзя: те три четверти секунды экран
+                        стоит пустым, и на тёмной сцене его матрица читается серым
+                        прямоугольником — включённым, но ничего не показывающим монитором. */}
                     {screenOn && children && (
                         <Html
                             transform

@@ -17,7 +17,7 @@ import TableDecks3D, { BOX_SPOTS } from "./TableDecks3D";
 import Meeples3D from "./Meeples3D";
 import Stars3D from "./Stars3D";
 import MayakokoPanel from "./MayakokoPanel";
-import PromptLaptop3D, { LAPTOP_SPOT, OPEN_SECONDS } from "./PromptLaptop3D";
+import PromptLaptop3D, { LAPTOP_SPOT } from "./PromptLaptop3D";
 import PromptCard3D from "./PromptCard3D";
 import CardStands3D, { PER_ROW, standPlace } from "./CardStands3D";
 import { CARD_IMG } from "./promptCard.mjs";
@@ -89,13 +89,13 @@ const PROMPT_AT = [-0.82, 0.004, -0.46];
 // вместе с номером задания и заголовком, то есть ровно тем, по чему её опознают.
 // Координаты абсолютные, а не считанные от ноутбука: ноутбук переехал к игроку, а карта
 // и подставки остались на своих местах.
-const PROMPT_CARD_AT = [-0.49, 0.13, -0.68];
+const PROMPT_CARD_AT = [-0.45, 0.13, -0.6];
 
 // Подставки стоят справа от ноутбука, тремя рядами по четыре — прямо в том же кадре,
 // что и экран. Промежуточной ступени с отдельным видом на ряд больше нет: подойдя к
 // ноутбуку, участник видит перед собой экран, а под правой рукой — разделы, из которых
 // берут задание. Ради этого ряд и переехал сюда с середины стола.
-const PROMPT_STANDS_AT = [-0.3, 0, -0.72];
+const PROMPT_STANDS_AT = [-0.33, 0, -0.78];
 
 // Двенадцать мест: шесть типов контента «Я» и шесть направлений «МЫ». «Старт» в подставки
 // не ставится — по МАЯК-ОКО его задания не разбирают.
@@ -132,7 +132,7 @@ const PROMPT_IMAGES = [CARD_IMG, ...PROMPT_SECTIONS.map((entry) => entry.face), 
 // один и тот же x. Экран от этого уезжает в левую часть кадра, оставаясь фронтальным, —
 // разворот на тот же сдвиг снова показал бы крышку под углом.
 const PROMPT_VIEW = {
-    eye: [-0.7, 0.325, -0.166],
+    eye: [-0.7, 0.375, -0.058],
     look: [-0.7, 0.115, -0.62],
 };
 
@@ -530,9 +530,6 @@ export default function MayakTable3D() {
     // поднимает новую, иначе одна карта телепортируется в другую.
     const [stowing, setStowing] = useState(false);
     const [pending, setPending] = useState(null);
-    // Крышка ноутбука встала: до конца раскрытия формы на экране нет. Это один предмет —
-    // сначала открывается сам ноутбук, и только потом на его матрице включается форма.
-    const [lidOpen, setLidOpen] = useState(false);
     // Раздел, чья карта стоит в разборе. По умолчанию — единственный размеченный «Текст».
     // Ни одна карта не поднята, пока её не выбрали: разбор начинается с пустого стола
     // и ряда подставок.
@@ -658,7 +655,6 @@ export default function MayakTable3D() {
     // движение не должно случаться само собой. Сброс мгновенный, без обратного полёта:
     // зона в этот момент уже вне кадра, и проигрывать там анимацию некому.
     const leavePrompt = useCallback(() => {
-        setLidOpen(false);
         setSection(null);
         setPending(null);
         setStowing(false);
@@ -737,18 +733,6 @@ export default function MayakTable3D() {
     // скрыты, а не размонтированы: у групп своё состояние и свой сценарий раскладки, и
     // снимать их со сцены ради смены ракурса значит терять партию.
     const inPrompt = focus === "prompt";
-
-    // Форма включается ровно тогда, когда крышка закончила раскрываться. Задержка берётся
-    // у самого раскрытия, а не подбирается числом: разойдутся — DOM подхватит движение с
-    // недооткрытой крышки и на кадр-другой покажет изнанку матрицы.
-    //
-    // Уходя из зоны, форму гасит сам признак фокуса (screenOn ниже), а не сброс состояния:
-    // живой DOM, едущий вниз вместе с закрывающейся крышкой, читается как застрявшее окно.
-    useEffect(() => {
-        if (!inPrompt) return undefined;
-        const timer = setTimeout(() => setLidOpen(true), OPEN_SECONDS * 1000);
-        return () => clearTimeout(timer);
-    }, [inPrompt]);
 
     // Какой раздел стоит в разборе. Карта-образец «Текст» размечена по полям, у остальных
     // разделов показывается лицо верхней карты без разбора.
@@ -909,7 +893,7 @@ export default function MayakTable3D() {
                 {/* Ноутбук места игрока стоит вне физики: его не берут в руки и не роняют,
                     он только держит угол и открывается, когда мастер подошёл. Форма живёт
                     на его экране настоящим DOM — в неё пишут прямо в сцене. */}
-                <PromptLaptop3D position={PROMPT_AT} active={inPrompt} screenOn={inPrompt && lidOpen}>
+                <PromptLaptop3D position={PROMPT_AT} active={inPrompt} screenOn={inPrompt}>
                     <MayakokoPanel embedded onClose={stepBack} onPickFromCard={setPicked} picked={picked} marked={cardMarked} />
                 </PromptLaptop3D>
 
