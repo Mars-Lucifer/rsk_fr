@@ -18,6 +18,7 @@ data/mayak-session-runtime.json
 data/mayak-session-links.json
 data/mayak-lesson-progress.json
 data/mayak-admin-rights.json
+data/mayak-access-ledger.json
 data/mayak-payments.json
 data/mayak-token-materials.json
 data/mayak-token-material-files/
@@ -100,8 +101,9 @@ data/mayak-content/
 
 # скриншоты и логи проверки браузером
 .playwright-mcp/
-check*.mjs
-# скриншоты, которые проверочные скрипты кидают в корень
+# одноразовые проверочные скрипты в корне и их скриншоты
+# (постоянные проверки живут в scripts/ и коммитятся)
+/check*.mjs
 /*.png
 
 # архивы переноса на прод: внутри .env.local и боевые колоды
@@ -115,3 +117,21 @@ docs/mayak-master-playbook/assets/
 
 # изолированные рабочие копии (git worktree)
 .worktrees/
+
+# рантайм МАЯКа и конференции: данные участников, а не исходники.
+# Локально не дублируются и на сервере не бэкапятся — потеря невосстановима.
+# Часть файлов исторически попала в индекс: игнор на отслеживаемые не действует,
+# снимать их нужно через `git rm --cached`, и только с оглядкой на прод —
+# там `git pull` удалит файл из рабочего каталога вместе с базой.
+data/uploads/
+data/rsk.sqlite
+data/rsk.sqlite-shm
+data/rsk.sqlite-wal
+data/mayak-session-files/
+data/mayak-profile-artifacts/
+data/mayak-user-artifacts/
+data/mayak-case-photos/
+data/mayak-service-templates/
+data/mayak-onboarding-files/
+data/local-profile-mock.json
+data/mayak-libreoffice.log
