@@ -1,6 +1,8 @@
 import path from "path";
 import { promises as fs } from "fs";
 
+import { withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
+
 const LOCAL_PROFILE_FILE = path.join(process.cwd(), "data", "local-profile-mock.json");
 export const LOCAL_PROFILE_MOCK_COOKIE = "mayak_local_profile_mock";
 
@@ -78,7 +80,9 @@ function buildDefaultProfiles() {
             patronymic: "Сергеевич",
             region: "Казань",
             description: "Второй локальный профиль для проверки выдачи прав нескольким пользователям.",
+            organizationId: "local-org-2",
             organizationName: "Тестовый контур МАЯК",
+            teamId: "local-team-2",
             teamName: "Команда проверок",
         }),
         buildProfileEntry({
@@ -90,7 +94,9 @@ function buildDefaultProfiles() {
             patronymic: "Павловна",
             region: "Санкт-Петербург",
             description: "Третий локальный профиль для полного прогона сценариев МАЯК.",
+            organizationId: "local-org-3",
             organizationName: "Лаборатория МАЯК",
+            teamId: "local-team-3",
             teamName: "Поток 3",
         }),
     ];
@@ -207,26 +213,50 @@ export function shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing = false
     return isLocalDevHost(req) && !hasPlatformAuthToken(req);
 }
 
+// Читатель ничего не чинит молча. Раньше здесь любая ошибка — включая чтение,
+// попавшее на момент чужой записи, — приводила к перезаписи файла дефолтом:
+// фикстура теряла настроенные организации и команды, а заметить это можно было
+// только по `git diff`. Теперь при битом JSON файл остаётся как есть, в лог
+// уходит предупреждение, а вызывающему возвращается дефолт на эту попытку.
 export async function readLocalProfileMockStore() {
     await ensureLocalProfileMockFile();
 
-    try {
-        const raw = await fs.readFile(LOCAL_PROFILE_FILE, "utf-8");
-        const parsed = JSON.parse(raw);
+    return withJsonFileLock(LOCAL_PROFILE_FILE, async () => {
+        let raw;
+        try {
+            raw = await fs.readFile(LOCAL_PROFILE_FILE, "utf-8");
+        } catch (error) {
+            console.warn(`[localProfileMock] файл не прочитан, отдаю дефолт: ${error?.message}`);
+            return buildDefaultLocalProfileMockStore();
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (error) {
+            console.warn(`[localProfileMock] битый JSON, файл оставлен без изменений: ${error?.message}`);
+            return buildDefaultLocalProfileMockStore();
+        }
+
         const normalized = normalizeStoreShape(parsed);
-        await fs.writeFile(LOCAL_PROFILE_FILE, JSON.stringify(normalized, null, 2), "utf-8");
+        const serialized = JSON.stringify(normalized, null, 2);
+
+        // Чтение не должно порождать запись. Пишем, только если нормализация
+        // действительно изменила содержимое, — иначе файл дёргался на каждом
+        // запросе и открывал окно для гонки.
+        if (serialized !== raw) {
+            await writeJsonFileAtomic(LOCAL_PROFILE_FILE, normalized);
+        }
+
         return normalized;
-    } catch {
-        const fallback = buildDefaultLocalProfileMockStore();
-        await fs.writeFile(LOCAL_PROFILE_FILE, JSON.stringify(fallback, null, 2), "utf-8");
-        return fallback;
-    }
+    });
 }
 
 export async function writeLocalProfileMockStore(store) {
     const normalized = normalizeStoreShape(store);
-    await fs.mkdir(path.dirname(LOCAL_PROFILE_FILE), { recursive: true });
-    await fs.writeFile(LOCAL_PROFILE_FILE, JSON.stringify(normalized, null, 2), "utf-8");
+    await withJsonFileLock(LOCAL_PROFILE_FILE, async () => {
+        await writeJsonFileAtomic(LOCAL_PROFILE_FILE, normalized);
+    });
     return normalized;
 }
 
