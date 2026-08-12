@@ -19,13 +19,45 @@ const NAV = [
     { id: "s4", n: "03", t: "Этап «МЫ»" },
 ];
 
+// Роль читается списком коротких строк, а не одной длинной фразой: на ленте
+// видно три карточки, и текст под каждой должен схватываться без вчитывания.
 const ROLES = [
-    { img: "role_kapitan.jpg", nm: "Капитан", vice: "формирует требовательность", ln: "Постоянно: внутренний гарант дисциплины и выполнения ролевых функций." },
-    { img: "role_mediator.jpg", nm: "Медиатор", vice: "противоядие от недоверия", ln: "Постоянно: создаёт безопасную атмосферу диалога, вовлекает «тихих»." },
-    { img: "role_inspector.jpg", nm: "Инспектор", vice: "борется с безответственностью", ln: "Активно: выносит вердикт с аргументацией. Молчание две минуты — задание принято." },
-    { img: "role_hranitel.jpg", nm: "Хранитель Маяка", vice: "противостоит боязни конфликта", ln: "Постоянно: держит темп и энергию, не даёт «огню» погаснуть." },
-    { img: "role_engineer.jpg", nm: "Инженер", vice: "убирает технический барьер", ln: "Постоянно: следит за доступностью инструментов, решает технические вопросы." },
-    { img: "role_letopisec.jpg", nm: "Летописец", vice: "лечит безразличие к результату", ln: "Постоянно: снимает фото и видео прорывов, эмоций, командной работы." },
+    {
+        img: "role_kapitan.jpg",
+        nm: "Капитан",
+        vice: "Формирует требовательность",
+        ln: ["Внутренний гарант дисциплины.", "Следит за выполнением ролевых функций."],
+    },
+    {
+        img: "role_mediator.jpg",
+        nm: "Медиатор",
+        vice: "Противоядие от недоверия",
+        ln: ["Создаёт безопасную атмосферу диалога.", "Вовлекает «тихих»."],
+    },
+    {
+        img: "role_inspector.jpg",
+        nm: "Инспектор",
+        vice: "Борется с безответственностью",
+        ln: ["Выносит вердикт с аргументацией.", "Молчание две минуты — задание принято."],
+    },
+    {
+        img: "role_hranitel.jpg",
+        nm: "Хранитель Маяка",
+        vice: "Противостоит боязни конфликта",
+        ln: ["Держит темп и энергию.", "Не даёт «огню» погаснуть."],
+    },
+    {
+        img: "role_engineer.jpg",
+        nm: "Инженер",
+        vice: "Убирает технический барьер",
+        ln: ["Следит за доступностью инструментов.", "Решает технические вопросы."],
+    },
+    {
+        img: "role_letopisec.jpg",
+        nm: "Летописец",
+        vice: "Лечит безразличие к результату",
+        ln: ["Снимает фото и видео прорывов.", "Фиксирует эмоции и командную работу."],
+    },
 ];
 
 
@@ -111,28 +143,11 @@ export default function MayakGuidePage() {
             <main>
                 {/* 01 — роли и карты */}
                 <section id="s2">
-                    <span className="eyebrow">Команда</span>
-                    <h2>Шесть ролей и устройство карты</h2>
+                    <h2 className="stagehead">Команда · Шесть ролей и устройство карты</h2>
                     <p className="lede">
                         Роль — не должность, а функция, без которой команда буксует. Каждая закрывает одну типовую болезнь: недоверие,
                         уход от спора, размытую ответственность, нетребовательность, безразличие к результату.
                     </p>
-                    <p className="hint spaced">
-                        Карты раздаются рубашкой вверх, каждый берёт одну. У роли два действия: постоянное — фон на весь день, активное —
-                        поступок в конкретный момент.
-                    </p>
-
-                    <div className="rolesbar">
-                        <span className="rolesnote">Шесть ролей команды — пролистайте ленту</span>
-                        <span className="arrows">
-                            <button type="button" onClick={() => slide(-1)} disabled={edge.start} aria-label="Предыдущие роли">
-                                ‹
-                            </button>
-                            <button type="button" onClick={() => slide(1)} disabled={edge.end} aria-label="Следующие роли">
-                                ›
-                            </button>
-                        </span>
-                    </div>
 
                     <div className="roles" ref={railRef} onScroll={syncEdges}>
                         {ROLES.map((role) => (
@@ -143,10 +158,25 @@ export default function MayakGuidePage() {
                                 <div className="b">
                                     <span className="nm">{role.nm}</span>
                                     <span className="vice">{role.vice}</span>
-                                    <span className="ln">{role.ln}</span>
+                                    <ul className="ln">
+                                        {role.ln.map((line) => (
+                                            <li key={line}>{line}</li>
+                                        ))}
+                                    </ul>
                                 </div>
                             </article>
                         ))}
+                    </div>
+
+                    {/* Стрелки стоят под лентой по центру — прямо под карточкой,
+                        которая в этот момент главная. */}
+                    <div className="rolesbar">
+                        <button type="button" onClick={() => slide(-1)} disabled={edge.start} aria-label="Предыдущие роли">
+                            ‹
+                        </button>
+                        <button type="button" onClick={() => slide(1)} disabled={edge.end} aria-label="Следующие роли">
+                            ›
+                        </button>
                     </div>
 
                     <div className="block spaced">
@@ -418,6 +448,11 @@ export default function MayakGuidePage() {
                     letter-spacing: -0.025em;
                     font-weight: 800;
                 }
+                /* Заголовок раздела одной строкой: «Команда · Шесть ролей…».
+                   Мельче обычного h2, чтобы лента ролей попадала в тот же экран. */
+                .stagehead {
+                    font-size: clamp(24px, 2.1vw, 30px);
+                }
                 h3 {
                     margin: 0 0 10px;
                     font-size: 17px;
@@ -489,19 +524,11 @@ export default function MayakGuidePage() {
                 .rolesbar {
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
-                    gap: 20px;
-                    margin-top: 30px;
+                    justify-content: center;
+                    gap: 10px;
+                    margin-top: 14px;
                 }
-                .rolesnote {
-                    font-size: 13.5px;
-                    color: var(--muted);
-                }
-                .arrows {
-                    display: flex;
-                    gap: 8px;
-                }
-                .arrows button {
+                .rolesbar button {
                     width: 38px;
                     height: 38px;
                     border-radius: 50%;
@@ -513,10 +540,10 @@ export default function MayakGuidePage() {
                     cursor: pointer;
                     transition: background 0.18s ease, opacity 0.18s ease;
                 }
-                .arrows button:hover:not(:disabled) {
+                .rolesbar button:hover:not(:disabled) {
                     background: var(--wash);
                 }
-                .arrows button:disabled {
+                .rolesbar button:disabled {
                     opacity: 0.35;
                     cursor: default;
                 }
@@ -578,7 +605,14 @@ export default function MayakGuidePage() {
                     letter-spacing: 0.04em;
                 }
                 .ln {
+                    list-style: none;
+                    margin: 4px 0 0;
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
                     font-size: 14px;
+                    line-height: 1.35;
                     color: #46565f;
                 }
                 .anatomy {
