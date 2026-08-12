@@ -35,6 +35,7 @@ export default function MayakMasterDashboardPage() {
             hideBack={!cameFromTrainer}
             onBack={() => router.back()}
             backLabel="← В тренажёр"
+            requireReadyDeck
         />
     );
 }

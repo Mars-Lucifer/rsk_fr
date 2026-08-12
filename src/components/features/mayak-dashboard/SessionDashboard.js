@@ -25,7 +25,19 @@ function formatDuration(totalSeconds) {
     return `${mm}:${ss}`;
 }
 
-export default function SessionDashboard({ sessionId, onAuthFail, dashboardUrl, participantsUrl, hideBack = false, onBack, backLabel }) {
+export default function SessionDashboard({
+    sessionId,
+    onAuthFail,
+    dashboardUrl,
+    participantsUrl,
+    hideBack = false,
+    onBack,
+    backLabel,
+    // Мастерский контур: с неразмеченной колодой дашборд не показывается вовсе.
+    // Админский оставляет баннер и остальные панели — там управление участниками
+    // нужно и без прогресса «Я»/«Мы».
+    requireReadyDeck = false,
+}) {
     const router = useRouter();
     // По умолчанию — admin-эндпоинты (обратная совместимость). Мастерский дашборд
     // передаёт свои URL с секретом в query.
@@ -334,6 +346,27 @@ export default function SessionDashboard({ sessionId, onAuthFail, dashboardUrl, 
                     <button type="button" className={styles.iconBtn} onClick={() => fetchData(true)}>
                         <RefreshIcon /> Повторить
                     </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Колода не размечена — показывать нечего: прогресс «Я»/«Мы» пуст, а экран
+    // уходит на проектор перед группой. Лучше честная заглушка, чем дашборд с
+    // нулями и красным баннером.
+    if (requireReadyDeck && data.deck && data.deck.dashboardReady === false) {
+        return (
+            <div className={styles.root}>
+                <div className={styles.center}>
+                    <div className={styles.errorBox}>
+                        Дашборд недоступен: колода сессии не размечена по стандарту.
+                        {(data.deck.issues || []).length ? ` ${data.deck.issues.join("; ")}.` : ""}
+                    </div>
+                    {!hideBack ? (
+                        <button type="button" className={styles.iconBtn} onClick={onBack}>
+                            <BackIcon /> {backLabel || "Назад"}
+                        </button>
+                    ) : null}
                 </div>
             </div>
         );

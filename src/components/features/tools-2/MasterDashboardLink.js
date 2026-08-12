@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/router";
 
 // Мастер входит в тренажёр по своей ссылке (?dash=<секрет дашборда>) и должен
@@ -36,7 +36,28 @@ export default function MasterDashboardLink() {
     );
 
     const dashSecret = fromQuery || storedSecret;
-    if (!dashSecret) return null;
+
+    // Кнопка ведёт на дашборд, а он с неразмеченной колодой ничего не покажет.
+    // Спрашиваем готовность у того же эндпоинта, что и сам дашборд: пока ответа
+    // нет — кнопки нет, чтобы она не мигала и не пропадала на глазах.
+    const [deckReady, setDeckReady] = useState(false);
+    useEffect(() => {
+        if (!dashSecret) return undefined;
+        let cancelled = false;
+        fetch(`/api/mayak/master/dashboard?secret=${encodeURIComponent(dashSecret)}`)
+            .then((response) => response.json())
+            .then((payload) => {
+                if (!cancelled) setDeckReady(payload?.data?.deck?.dashboardReady === true);
+            })
+            .catch(() => {
+                if (!cancelled) setDeckReady(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [dashSecret]);
+
+    if (!dashSecret || !deckReady) return null;
 
     return (
         <a
