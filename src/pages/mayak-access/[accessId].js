@@ -1302,7 +1302,9 @@ const linksGridStyle = {
 // Одна ссылка — одна строка: тип | адрес | действия. Описание — в подсказке «?».
 const linkRowStyle = {
     display: "grid",
-    gridTemplateColumns: "minmax(230px, 280px) minmax(0, 1fr) auto",
+    // Колонка описания шире оболочки на глаз: при 280px текст ссылки для
+    // участников ломался на четыре строки и карточка росла вверх.
+    gridTemplateColumns: "minmax(320px, 460px) minmax(0, 1fr) auto",
     alignItems: "center",
     gap: 14,
     border: "1px solid #e8edf1",
