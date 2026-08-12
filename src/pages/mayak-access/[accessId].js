@@ -54,16 +54,6 @@ function pluralizeTeams(count) {
     return "команд";
 }
 
-// Подсказка «?» с тултипом на hover/focus. Нативный title слишком блёклый и
-// появляется с задержкой — рисуем свой, стили в блоке <style jsx> ниже.
-function HintDot({ text }) {
-    return (
-        <span className="ma-hint" tabIndex={0} role="note" aria-label={text}>
-            ?<span className="ma-hint-bubble">{text}</span>
-        </span>
-    );
-}
-
 function formatFileSize(value) {
     const size = Number(value) || 0;
     if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} МБ`;
@@ -78,6 +68,9 @@ export default function MayakDelegatedAccessPage() {
     const [password, setPassword] = useState("");
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [loading, setLoading] = useState(false);
+    // true, пока не проверили sessionStorage: до этого момента неизвестно,
+    // показывать форму пароля или сразу кабинет.
+    const [restoring, setRestoring] = useState(true);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
@@ -138,13 +131,18 @@ export default function MayakDelegatedAccessPage() {
         [accessId, apiRequest, password]
     );
 
+    // Пароль лежит в sessionStorage, поэтому после F5 кабинет открывается сам.
+    // Пока идёт эта проверка, форму пароля не показываем: иначе она успевает
+    // мигнуть вместе с кнопкой «Проверяем...» и выглядит как разлогин.
     useEffect(() => {
         if (!router.isReady || !accessId || restoredAccessRef.current === accessId) return;
         restoredAccessRef.current = accessId;
         const savedPassword = window.sessionStorage.getItem(getStorageKey(accessId)) || "";
-        if (savedPassword) {
-            loadOverview(savedPassword);
+        if (!savedPassword) {
+            setRestoring(false);
+            return;
         }
+        loadOverview(savedPassword).finally(() => setRestoring(false));
     }, [accessId, loadOverview, router.isReady]);
 
     useEffect(() => {
@@ -294,36 +292,72 @@ export default function MayakDelegatedAccessPage() {
 
     const buildParticipantLink = buildTrainerLink;
 
-    const buildDashboardLink = (dashboardSecret) => {
-        if (!dashboardSecret || typeof window === "undefined") return "";
-        return `${window.location.origin}/mayak-dashboard/${String(dashboardSecret).trim()}`;
-    };
-
+    // Отдельной ссылки на дашборд в кабинете нет: мастер открывает его кнопкой
+    // внутри тренажёра. Сам `dashboardSecret` по-прежнему создаётся и уезжает
+    // в мастер-ссылку параметром `?dash=`.
     const buildMasterLink = (masterSecret) => {
         if (!masterSecret || typeof window === "undefined") return "";
         return `${window.location.origin}/mayak-master/${String(masterSecret).trim()}`;
     };
+
+    if (!isUnlocked && restoring) {
+        return (
+            <Layout style={layoutStyle}>
+                <section style={loginShellStyle}>
+                    <div style={{ ...loginBoxStyle, alignItems: "center", gap: 14 }}>
+                        <span style={loginMarkStyle} aria-hidden="true">
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="4" y="10" width="16" height="10" rx="2.5" />
+                                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                            </svg>
+                        </span>
+                        <span style={loginRestoreTextStyle}>Открываем кабинет...</span>
+                    </div>
+                </section>
+            </Layout>
+        );
+    }
 
     if (!isUnlocked) {
         return (
             <Layout style={layoutStyle}>
                 <section style={loginShellStyle}>
                     <form onSubmit={handleLogin} style={loginBoxStyle}>
-                        <h1 style={loginTitleStyle}>Введите пароль</h1>
+                        <span style={loginBrandStyle}>
+                            <span style={loginMarkStyle} aria-hidden="true">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="4" y="10" width="16" height="10" rx="2.5" />
+                                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                                    <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none" />
+                                </svg>
+                            </span>
+                            <span style={loginEyebrowStyle}>Кабинет мастера МАЯК</span>
+                        </span>
+                        <h1 style={loginTitleStyle}>Вход по паролю доступа</h1>
+                        <p style={loginHintStyle}>
+                            Пароль выдаётся вместе со ссылкой. Внутри — создание сессий, ссылки для участников и дашборд.
+                        </p>
                         <input
                             autoFocus
                             type="password"
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                             style={loginInputStyle}
+                            placeholder="Пароль доступа"
                             aria-label="Пароль доступа"
                         />
                         {error ? <div style={errorStyle}>{error}</div> : null}
-                        <button type="submit" style={primaryButtonStyle} disabled={loading || !password.trim()}>
+                        <button type="submit" className="ma-primary" style={loginButtonStyle} disabled={loading || !password.trim()}>
                             {loading ? "Проверяем..." : "Войти"}
                         </button>
+                        <span style={loginFootStyle}>Не помните пароль — попросите его у организатора доступа.</span>
                     </form>
                 </section>
+                <style jsx global>{`
+                    .ma-primary:not(:disabled):hover {
+                        filter: brightness(1.06);
+                    }
+                `}</style>
             </Layout>
         );
     }
@@ -393,6 +427,19 @@ export default function MayakDelegatedAccessPage() {
                     </div>
                 </form>
 
+                {/* Руководство стоит между созданием сессии и материалами: мастер
+                    читает его до игры, а материалы качает уже под конкретную. */}
+                <a href="/mayak-guide" target="_blank" rel="noreferrer" style={guideCardStyle}>
+                    <span style={guideCardTextStyle}>
+                        <span style={eyebrowStyle}>Руководство мастера</span>
+                        <span style={guideTitleStyle}>Как вести тренажёр</span>
+                        <span style={guideTextStyle}>
+                            Комплект, роли и карты, раскладка поля, ход этапов «Я» и «МЫ», условия победы.
+                        </span>
+                    </span>
+                    <span style={guideActionStyle}>Открыть →</span>
+                </a>
+
                 {materials.length ? (
                     <section style={materialsPanelStyle}>
                         <h2 style={panelTitleStyle}>Материалы</h2>
@@ -414,8 +461,8 @@ export default function MayakDelegatedAccessPage() {
                         <div style={emptyStyle}>
                             <strong style={emptyTitleStyle}>Активных сессий нет</strong>
                             <span>
-                                Создайте сессию — сразу получите четыре ссылки: две для участников (с инспектором и без),
-                                дашборд модератора и вашу личную ссылку мастера.
+                                Создайте сессию — сразу получите три ссылки: для участников на группу 18 человек,
+                                вашу персональную мастер-ссылку с дашбордом внутри и упрощённую ссылку для 1–5 человек.
                             </span>
                         </div>
                     ) : null}
@@ -427,35 +474,30 @@ export default function MayakDelegatedAccessPage() {
                         const linkRows = [
                             {
                                 key: "inspector",
-                                label: "С инспектором",
-                                short: "Отправьте участникам. Считается в лимит входов.",
-                                hint: "Отправьте участникам. Полный формат игры: роли, инспектор, проверка заданий. Каждый вход считается в лимит доступа.",
+                                label: "Ссылка для участников",
+                                short:
+                                    "Отправляется участникам обучения. Полный функционал тренажёра: столы, роли, " +
+                                    "инспектор и проверка заданий. Рассчитана на группу 18 человек — 3 команды по 6.",
                                 accent: "#152022",
                                 url: buildTrainerLink(token.value),
                             },
                             {
-                                key: "plain",
-                                label: "Без инспектора",
-                                short: "Участникам, упрощённый формат. Свой лимит.",
-                                hint: "Тоже для участников, но упрощённый формат: без ролей и инспектора, задания без проверки. Свой лимит, в общий не считается.",
-                                accent: "#2563eb",
-                                url: buildTrainerLink(links.plainToken),
-                            },
-                            {
-                                key: "dashboard",
-                                label: "Дашборд",
-                                short: "Экран модерации: столы, прогресс, таймер.",
-                                hint: "Экран модерации: столы, прогресс команд, звёзды, таймер. Можно вывести на проектор или открыть на втором устройстве.",
-                                accent: "#7c3aed",
-                                url: buildDashboardLink(links.dashboardSecret),
-                            },
-                            {
                                 key: "master",
-                                label: "Мастер",
-                                short: "Ваша ссылка: вход в игру без расхода входов.",
-                                hint: "Ваша персональная ссылка: открывает тренажёр демо-входом, который не расходует лимит. Дашборд доступен кнопкой внутри тренажёра. Участникам не отправляйте.",
+                                label: "Мастер-ссылка",
+                                short:
+                                    "Ваша персональная ссылка. Демо-тренажёр. Дашборд — экран модерации со столами, " +
+                                    "прогрессом и таймером — открывается кнопкой внутри.",
                                 accent: "#b45309",
                                 url: buildMasterLink(links.masterSecret),
+                            },
+                            {
+                                key: "plain",
+                                label: "Ссылка для участников, упрощённая",
+                                short:
+                                    "Без разделения на столы, без ролей и инспектора. " +
+                                    "Рассчитана на обучение от 1 до 5 человек.",
+                                accent: "#2563eb",
+                                url: buildTrainerLink(links.plainToken),
                             },
                         ].filter((row) => row.url);
 
@@ -494,7 +536,6 @@ export default function MayakDelegatedAccessPage() {
                                                     <span style={linkLabelLineStyle}>
                                                         <span style={{ ...linkDotStyle, background: row.accent }} />
                                                         <span style={linkLabelStyle}>{row.label}</span>
-                                                        <HintDot text={row.hint} />
                                                     </span>
                                                     <span style={linkShortStyle}>{row.short}</span>
                                                 </span>
@@ -523,18 +564,6 @@ export default function MayakDelegatedAccessPage() {
                     })}
                 </div>
                 </div>
-
-                <aside style={{ ...asideStyle, ...(isCompact ? compactAsideStyle : null) }}>
-                    <a href="/mayak-guide" target="_blank" rel="noreferrer" style={guideCardStyle}>
-                        <span style={eyebrowStyle}>Руководство мастера</span>
-                        <span style={guideTitleStyle}>Как вести тренажёр</span>
-                        <span style={guideTextStyle}>
-                            Комплект, роли и карты, раскладка поля, ход этапов «Я» и «МЫ», условия победы.
-                        </span>
-                        <span style={guideActionStyle}>Открыть →</span>
-                    </a>
-                    <LessonsPanel passedIds={passedLessons} onPassLesson={handlePassLesson} />
-                </aside>
 
                 <style jsx global>{`
                     /* Единая система кнопок: одна высота, один радиус, мягкий hover.
@@ -613,67 +642,6 @@ export default function MayakDelegatedAccessPage() {
                         box-shadow: 0 6px 18px rgba(16, 24, 32, 0.06);
                     }
 
-                    .ma-hint {
-                        position: relative;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                        flex: 0 0 auto;
-                        width: 16px;
-                        height: 16px;
-                        border-radius: 999px;
-                        background: #e3e9ee;
-                        color: #5b6b76;
-                        font-size: 11px;
-                        font-weight: 800;
-                        cursor: help;
-                        outline: none;
-                    }
-
-                    .ma-hint:hover,
-                    .ma-hint:focus-visible {
-                        background: #152022;
-                        color: #fff;
-                    }
-
-                    /* Якорь по левому краю значка, а не по центру: при центрировании
-                       пузырь вылезал за левую границу карточки. */
-                    .ma-hint-bubble {
-                        position: absolute;
-                        bottom: calc(100% + 8px);
-                        left: -8px;
-                        z-index: 20;
-                        width: 250px;
-                        transform: translateY(4px);
-                        border-radius: 10px;
-                        background: #152022;
-                        color: #fff;
-                        padding: 9px 11px;
-                        font-size: 12px;
-                        font-weight: 600;
-                        line-height: 1.4;
-                        text-align: left;
-                        opacity: 0;
-                        pointer-events: none;
-                        transition:
-                            opacity 0.15s ease,
-                            transform 0.15s ease;
-                    }
-
-                    .ma-hint-bubble::after {
-                        content: "";
-                        position: absolute;
-                        top: 100%;
-                        left: 13px;
-                        border: 5px solid transparent;
-                        border-top-color: #152022;
-                    }
-
-                    .ma-hint:hover .ma-hint-bubble,
-                    .ma-hint:focus-visible .ma-hint-bubble {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
                 `}</style>
             </section>
         </Layout>
@@ -878,7 +846,7 @@ const pageStyle = {
     margin: "0 auto",
     padding: "28px 22px 40px",
     display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) 360px",
+    gridTemplateColumns: "minmax(0, 1fr)",
     alignItems: "start",
     gap: 20,
 };
@@ -899,31 +867,98 @@ const loginShellStyle = {
     display: "grid",
     placeItems: "center",
     padding: 20,
+    // Мягкий свет за карточкой: экран пароля — первое, что видит мастер,
+    // и он не должен выглядеть служебной формой.
+    background: "radial-gradient(1100px 520px at 50% -10%, #e8f0ff 0%, #f5f7f8 55%, #f5f7f8 100%)",
 };
 
 const loginBoxStyle = {
-    width: "min(360px, 100%)",
+    width: "min(420px, 100%)",
     display: "flex",
     flexDirection: "column",
-    gap: 12,
-    border: "1px solid #d9e0e5",
-    borderRadius: 8,
+    gap: 10,
+    border: "1px solid #e6ecf1",
+    borderRadius: 18,
     background: "#fff",
-    padding: 20,
+    padding: "30px 28px 26px",
+    boxShadow: "0 18px 44px rgba(16, 24, 32, 0.10)",
+};
+
+// Иконка и подпись — одной строкой: подпись читается как логотип кабинета,
+// а не как оторванный надзаголовок под картинкой.
+const loginBrandStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 6,
+};
+
+const loginMarkStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 48,
+    height: 48,
+    flexShrink: 0,
+    borderRadius: 14,
+    background: "#eef4ff",
+    color: "#2563eb",
+};
+
+const loginEyebrowStyle = {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: "#8a97a4",
 };
 
 const loginTitleStyle = {
     margin: 0,
-    fontSize: 24,
-    lineHeight: 1.2,
+    fontSize: 22,
+    lineHeight: 1.25,
+    letterSpacing: "-0.01em",
+};
+
+const loginHintStyle = {
+    margin: "0 0 6px",
+    fontSize: 13,
+    lineHeight: 1.45,
+    color: "#65727f",
 };
 
 const loginInputStyle = {
-    minHeight: 46,
-    border: "1px solid #b9c4cc",
-    borderRadius: 8,
-    padding: "0 12px",
-    fontSize: 18,
+    minHeight: 50,
+    border: "1px solid #d5dde4",
+    borderRadius: 12,
+    padding: "0 14px",
+    fontSize: 17,
+    letterSpacing: "0.04em",
+    outlineColor: "#2563eb",
+};
+
+const loginButtonStyle = {
+    minHeight: 50,
+    border: "none",
+    borderRadius: 12,
+    background: "#2563eb",
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+};
+
+const loginRestoreTextStyle = {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#65727f",
+};
+
+const loginFootStyle = {
+    fontSize: 12,
+    color: "#8a97a4",
+    textAlign: "center",
+    marginTop: 2,
 };
 
 const headerStyle = {
@@ -1117,8 +1152,11 @@ const sessionsListStyle = {
 };
 
 const guideCardStyle = {
-    display: "grid",
-    gap: 6,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 16,
     border: "1px solid #e8edf1",
     borderRadius: 14,
     background: "#fff",
@@ -1126,6 +1164,12 @@ const guideCardStyle = {
     textDecoration: "none",
     color: "#152022",
     boxShadow: "0 2px 10px rgba(16, 24, 32, 0.04)",
+};
+
+const guideCardTextStyle = {
+    display: "grid",
+    gap: 6,
+    minWidth: 0,
 };
 
 const guideTitleStyle = {

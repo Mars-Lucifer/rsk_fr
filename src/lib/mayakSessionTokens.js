@@ -120,6 +120,14 @@ async function getDelegatedOwnerUsageState(ownerUserId, tokens = []) {
     };
 }
 
+// То же состояние лимита, но по accessId и без привязки к session-токену:
+// нужно ссылке «Без инспектора», которая живёт в legacy-модели, а входы
+// расходует из того же оплаченного лимита доступа.
+export async function getDelegatedAccessUsageState(accessId) {
+    const store = await readStore();
+    return getDelegatedOwnerUsageState(accessId, store.tokens);
+}
+
 function toTokenWithStats(token) {
     return {
         ...token,

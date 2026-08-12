@@ -115,6 +115,9 @@ function TablePanel({
                                             <tr>
                                                 <th>УЧАСТНИК</th>
                                                 <th>РОЛЬ</th>
+                                                {/* Распорка: забирает остаток ширины, чтобы роль
+                                                    стояла рядом с именем, а не у края панели. */}
+                                                <th aria-hidden="true" />
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -212,11 +215,13 @@ function TablePanel({
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
                                 </div>
+                                {/* Звёзды видно в самом индексе справа, дублировать их цифрой
+                                    не нужно: плитка считает выполненные задания. */}
                                 <div className={styles.statInfo} style={{ gap: "2px" }}>
                                     <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
                                     <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
                                         {mode === "we"
-                                            ? `${Math.min(table.totals.weApproved || 0, 36)} из 36`
+                                            ? (table.totals.weApproved || 0)
                                             : (table.totals.approvedTotal !== undefined ? table.totals.approvedTotal : "0")}
                                     </span>
                                 </div>

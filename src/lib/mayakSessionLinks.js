@@ -77,7 +77,16 @@ export async function createSessionLinks({ session, accessId } = {}) {
 
     // 1. Обычная ссылка — независимый legacy-токен на ту же колоду. Тренажёр
     //    поднимет его как tokenType "legacy" (без инспектора/ролей/ревью).
-    const legacyToken = createLegacyToken(`${baseName} — обычная`, plainUsageLimit, taskRange, null, sectionId);
+    //    Срок жизни — как у сессии: свип legacy-токены не трогает, без TTL
+    //    ссылка оставалась рабочей и после истечения сессии.
+    const legacyToken = createLegacyToken(
+        `${baseName} — обычная`,
+        plainUsageLimit,
+        taskRange,
+        null,
+        sectionId,
+        session.expiresAt || null
+    );
 
     // 2. Мастер-токен — session-токен той же сессии с тем же источником
     //    delegated-admin: функционал полный, как у инспекторской ссылки, и
@@ -107,6 +116,15 @@ export async function createSessionLinks({ session, accessId } = {}) {
     };
     await upsertRecord(record);
     return record;
+}
+
+// Запись реестра по значению обычной ссылки: legacy-токен сам не знает, какому
+// доступу принадлежит, а вход по нему списывается из лимита этого доступа.
+export async function getSessionLinksByPlainToken(plainToken) {
+    const normalized = normalizeString(plainToken);
+    if (!normalized) return null;
+    const store = await readStore();
+    return store.links.find((item) => item.plainToken === normalized) || null;
 }
 
 export async function getSessionLinksBySessionId(sessionId) {
