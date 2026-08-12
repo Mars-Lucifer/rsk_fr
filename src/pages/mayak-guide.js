@@ -231,7 +231,7 @@ export default function MayakGuidePage() {
                 {/* 02 — этап «Я» */}
                 <section id="s3">
                     <span className="eyebrow">Этап 1 · Я — цифровой эксперт</span>
-                    <h2>Как читается поле и что делает участник</h2>
+                    <h2 className="stagehead">Как читается поле и что делает участник</h2>
                     <p className="lede">
                         Цель этапа: каждый осваивает работу с ИИ через МАЯК-ОКО и углубляется в один тип контента, чтобы на командном
                         этапе не тратить силы на инструменты.
@@ -292,7 +292,7 @@ export default function MayakGuidePage() {
                 {/* 03 — этап «МЫ» */}
                 <section id="s4">
                     <span className="eyebrow">Этап 2 · МЫ — цифровая организация</span>
-                    <h2>Такт: от девяти жетонов до девяти звёзд</h2>
+                    <h2 className="stagehead">Такт: от девяти жетонов до девяти звёзд</h2>
                     <p className="lede">Цель этапа: закрыть трек индекса цифровой зрелости по всем шести направлениям «ЗВЕЗДЫ» раньше соперников.</p>
 
                     <div className="kit">
@@ -420,8 +420,13 @@ export default function MayakGuidePage() {
                     font-size: 14.5px;
                     font-weight: 600;
                 }
+                /* Отступы сжаты (было 64/76): этап должен читаться без прокрутки —
+                   поле и список шагов попадают в один экран. Верхнего отступа
+                   больше не хватает, чтобы заголовок не уехал под липкую шапку
+                   (85 px) при переходе по якорю — держим его scroll-margin-top. */
                 section {
-                    padding: 64px 40px 76px;
+                    padding: 34px 40px 40px;
+                    scroll-margin-top: 92px;
                     max-width: 1760px;
                     margin: 0 auto;
                     border-bottom: 1px solid var(--line);
@@ -467,10 +472,11 @@ export default function MayakGuidePage() {
                     margin: 0 0 12px;
                 }
                 .lede {
-                    margin-top: 20px;
-                    font-size: 18px;
+                    margin-top: 12px;
+                    margin-bottom: 0;
+                    font-size: 17px;
                     color: #3f5058;
-                    max-width: 62ch;
+                    max-width: 1280px;
                 }
                 .hint {
                     font-size: 13.5px;
