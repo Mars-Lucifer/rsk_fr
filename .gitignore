@@ -117,3 +117,21 @@ docs/mayak-master-playbook/assets/
 
 # изолированные рабочие копии (git worktree)
 .worktrees/
+
+# рантайм МАЯКа и конференции: данные участников, а не исходники.
+# Локально не дублируются и на сервере не бэкапятся — потеря невосстановима.
+# Часть файлов исторически попала в индекс: игнор на отслеживаемые не действует,
+# снимать их нужно через `git rm --cached`, и только с оглядкой на прод —
+# там `git pull` удалит файл из рабочего каталога вместе с базой.
+data/uploads/
+data/rsk.sqlite
+data/rsk.sqlite-shm
+data/rsk.sqlite-wal
+data/mayak-session-files/
+data/mayak-profile-artifacts/
+data/mayak-user-artifacts/
+data/mayak-case-photos/
+data/mayak-service-templates/
+data/mayak-onboarding-files/
+data/local-profile-mock.json
+data/mayak-libreoffice.log
