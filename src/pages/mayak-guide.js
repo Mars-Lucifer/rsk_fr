@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import FieldPlayerYa from "@/components/features/mayak-guide/FieldPlayerYa";
 import FieldPlayerMy from "@/components/features/mayak-guide/FieldPlayerMy";
 import CardAnatomy3D from "@/components/features/mayak-guide/CardAnatomy3D";
+import { PINS } from "@/components/features/mayak-guide/cardPins.mjs";
 
 // Руководство мастера: как вести тренажёр МАЯК.
 // Открывается из консоли доступа мастера (/mayak-access/[accessId]) в новой вкладке.
@@ -13,10 +14,9 @@ import CardAnatomy3D from "@/components/features/mayak-guide/CardAnatomy3D";
 const A = "/mayak-guide";
 
 const NAV = [
-    { id: "s1", n: "01", t: "Общее" },
-    { id: "s2", n: "02", t: "Роли и карты" },
-    { id: "s3", n: "03", t: "Этап «Я»" },
-    { id: "s4", n: "04", t: "Этап «МЫ»" },
+    { id: "s2", n: "01", t: "Роли и карты" },
+    { id: "s3", n: "02", t: "Этап «Я»" },
+    { id: "s4", n: "03", t: "Этап «МЫ»" },
 ];
 
 const ROLES = [
@@ -28,34 +28,6 @@ const ROLES = [
     { img: "role_letopisec.jpg", nm: "Летописец", vice: "лечит безразличие к результату", ln: "Постоянно: снимает фото и видео прорывов, эмоций, командной работы." },
 ];
 
-const PINS = {
-    back: [
-        { x: 14, y: 9, t: "Идентификатор этапа", d: "Метка «Я» или «МЫ» в овале." },
-        { x: 86, y: 9, t: "Номер", d: "Порядковый номер задания внутри раздела." },
-        { x: 50, y: 21, t: "Название раздела", d: "Тип контента на этапе «Я» или направление «ЗВЕЗДЫ» на этапе «МЫ»." },
-        { x: 50, y: 50, t: "Цветной гекс с иконкой", d: "По нему карта опознаётся, не переворачивая." },
-    ],
-    face: [
-        { x: 11, y: 6, t: "Знак вопроса", d: "Есть дополнительные материалы. Нет знака — задание выполняется без них." },
-        { x: 51, y: 6, t: "Раздел колоды", d: "К какому разделу относится задание." },
-        { x: 87, y: 6, t: "Номер карты", d: "Ключ к дополнительным материалам в тренажёре." },
-        { x: 50, y: 13, t: "Название задания", d: "Короткий заголовок-крючок." },
-        { x: 50, y: 24, t: "История", d: "Контекст-ситуация, в которую попадает участник." },
-        { x: 50, y: 91, t: "Задание", d: "Что конкретно нужно сделать и какой результат сдать." },
-    ],
-};
-
-const DIRS = [
-    { name: "Знания и навыки", color: "#e2a03f", face: "jeton_1.png", back: "jeton_2.png" },
-    { name: "Внешние взаимодействия", color: "#c9503f", face: "jeton_3.png", back: "jeton_4.png" },
-    { name: "Единое цифровое пространство", color: "#9fc9d9", face: "jeton_7.png", back: "jeton_8.png" },
-    { name: "Защита данных", color: "#8cc63f", face: "jeton_5.png", back: "jeton_6.png" },
-    { name: "Данные и аналитика", color: "#29abe2", face: "jeton_9.png", back: "jeton_10.png" },
-    { name: "Автоматизация", color: "#1b5486", face: "jeton_11.png", back: "jeton_12.png" },
-];
-
-// План такта: какие направления команда взяла в девять клеток.
-const PLAN = [0, 0, 1, 1, 2, 3, 4, 4, 5];
 
 const TACT_STEPS = [
     ["Планирование", "Команда выбирает до 9 задач такта из шести направлений «ЗВЕЗДЫ». Это общее решение, а не сумма личных предпочтений."],
@@ -76,25 +48,32 @@ const RULES = [
 ];
 
 export default function MayakGuidePage() {
-    const [flipped, setFlipped] = useState(false);
     const [side, setSide] = useState("back");
-    const [active, setActive] = useState("s1");
-    const [done, setDone] = useState(() => PLAN.map(() => false));
+    const [active, setActive] = useState("s2");
+    const [hint, setHint] = useState(null);
 
-    const stars = useMemo(() => {
-        const acc = DIRS.map(() => 0);
-        PLAN.forEach((dir, i) => {
-            if (done[i]) acc[dir] += 1;
-        });
-        return acc;
-    }, [done]);
+    // Лента ролей: прокрутка на одну карточку за нажатие, как в галерее кейсов.
+    const railRef = useRef(null);
+    const [edge, setEdge] = useState({ start: true, end: false });
 
-    const totalStars = stars.reduce((sum, value) => sum + value, 0);
-    const doneCount = done.filter(Boolean).length;
-
-    const toggleCell = useCallback((index) => {
-        setDone((current) => current.map((value, i) => (i === index ? !value : value)));
+    const syncEdges = useCallback(() => {
+        const node = railRef.current;
+        if (!node) return;
+        setEdge({ start: node.scrollLeft < 8, end: node.scrollLeft + node.clientWidth >= node.scrollWidth - 8 });
     }, []);
+
+    const slide = useCallback(
+        (direction) => {
+            const node = railRef.current;
+            if (!node) return;
+            const card = node.querySelector(".role");
+            const step = card ? card.getBoundingClientRect().width + 18 : node.clientWidth * 0.8;
+            node.scrollBy({ left: step * direction, behavior: "smooth" });
+        },
+        []
+    );
+
+    useEffect(syncEdges, [syncEdges]);
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -114,7 +93,7 @@ export default function MayakGuidePage() {
 
     return (
         <div className="guide">
-            <aside className="rail">
+            <header className="topbar">
                 <div className="brand">
                     <span className="wm">МАЯК</span>
                     <span className="sub">Руководство мастера</span>
@@ -127,90 +106,10 @@ export default function MayakGuidePage() {
                         </a>
                     ))}
                 </nav>
-                <div className="railfoot">
-                    <img src="/images/logo.png" alt="РСК" />
-                </div>
-            </aside>
+            </header>
 
             <main>
-                {/* 01 — общее */}
-                <section id="s1">
-                    <span className="eyebrow">Тренажёр МАЯК · для мастера</span>
-                    <h1>
-                        Один день,
-                        <br />
-                        два этапа,
-                        <br />
-                        одно поле.
-                    </h1>
-                    <p className="lede">
-                        МАЯК — командный тренажёр цифровой трансформации. Поле двухстороннее: сначала участники работают каждый за
-                        себя, потом переворачивают его и работают как организация.
-                    </p>
-
-                    <div className="facts">
-                        <span className="fact">
-                            <b>18</b> участников
-                        </span>
-                        <span className="fact">
-                            <b>3</b> команды по <b>6</b> человек
-                        </span>
-                        <span className="fact">
-                            <b>1</b> двухстороннее поле на команду
-                        </span>
-                        <span className="fact">
-                            <b>4</b> такта на этапе «МЫ»
-                        </span>
-                    </div>
-
-                    <div className="split">
-                        <div>
-                            <div className="flipwrap">
-                                <div className={`flip ${flipped ? "turned" : ""}`}>
-                                    <div className="face">
-                                        <img src={`${A}/pole_ya.png`} alt="Сторона поля «Я»" />
-                                        <span className="stamp">Сторона «Я»</span>
-                                    </div>
-                                    <div className="face back">
-                                        <img src={`${A}/pole_my.png`} alt="Сторона поля «МЫ»" />
-                                        <span className="stamp">Сторона «МЫ»</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flipbar">
-                                <button type="button" className="act" onClick={() => setFlipped((value) => !value)}>
-                                    Перевернуть поле
-                                </button>
-                                <span className="hint">Переворот поля — публичный момент перехода между этапами, а не техническая операция.</span>
-                            </div>
-                        </div>
-
-                        <div className="stack">
-                            <div className="block">
-                                <h3>Этап «Я» — цифровой эксперт</h3>
-                                <p>Каждый участник осваивает свой тип контента и инструменты ИИ через генератор МАЯК-ОКО.</p>
-                            </div>
-                            <div className="block">
-                                <h3>Этап «МЫ» — цифровая организация</h3>
-                                <p>Команда закрывает задачи по шести направлениям индекса цифровой зрелости «ЗВЕЗДА».</p>
-                            </div>
-                            <div className="block">
-                                <h3>В наборе команды</h3>
-                                <div className="kit">
-                                    {["Игровое поле", "6 карт ролей", "Миплы", "36 жетонов", "Звёзды", "Колода заданий", "Планшет игрока"].map((item) => (
-                                        <span key={item}>{item}</span>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="block">
-                                <h3>Колода сменная</h3>
-                                <p>Под вуз, бизнес, НКО или госуправление меняется содержание карт. Механика, роли и модель «ЗВЕЗДА» остаются теми же.</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                {/* 02 — роли и карты */}
+                {/* 01 — роли и карты */}
                 <section id="s2">
                     <span className="eyebrow">Команда</span>
                     <h2>Шесть ролей и устройство карты</h2>
@@ -223,7 +122,19 @@ export default function MayakGuidePage() {
                         поступок в конкретный момент.
                     </p>
 
-                    <div className="roles">
+                    <div className="rolesbar">
+                        <span className="rolesnote">Шесть ролей команды — пролистайте ленту</span>
+                        <span className="arrows">
+                            <button type="button" onClick={() => slide(-1)} disabled={edge.start} aria-label="Предыдущие роли">
+                                ‹
+                            </button>
+                            <button type="button" onClick={() => slide(1)} disabled={edge.end} aria-label="Следующие роли">
+                                ›
+                            </button>
+                        </span>
+                    </div>
+
+                    <div className="roles" ref={railRef} onScroll={syncEdges}>
                         {ROLES.map((role) => (
                             <article key={role.nm} className="role">
                                 <span className="shot">
@@ -247,40 +158,47 @@ export default function MayakGuidePage() {
                     <p className="hint">Все карты собраны одинаково. Мастер разбирает одну — дальше участники читают любую сами.</p>
 
                     <div className="anatomy">
-                        <div>
-                            <div className="switch">
-                                <button type="button" className={side === "back" ? "on" : ""} onClick={() => setSide("back")}>
-                                    Рубашка
-                                </button>
-                                <button type="button" className={side === "face" ? "on" : ""} onClick={() => setSide("face")}>
-                                    Лицо
-                                </button>
+                        <CardAnatomy3D side={side} onSide={setSide} pins={PINS} hint={hint} />
+
+                        <div className="legendcol">
+                            <div className="sidehead">
+                                <span className="t">{side === "back" ? "Рубашка" : "Лицо"}</span>
+                                <span className="c">{PINS[side].length} элементов</span>
                             </div>
-                            <CardAnatomy3D side={side} onSide={setSide} pins={PINS} />
-                        </div>
-                        <div className="legend">
-                            {PINS[side].map((pin, index) => (
-                                <div key={pin.t} className="row">
-                                    <span className="k">{String(index + 1).padStart(2, "0")}</span>
-                                    <span className="v">
-                                        <b>{pin.t}</b>
-                                        <span>{pin.d}</span>
-                                    </span>
-                                </div>
-                            ))}
+                            <div className="legend" onMouseLeave={() => setHint(null)}>
+                                {PINS[side].map((pin, index) => (
+                                    <div
+                                        key={pin.t}
+                                        className={`row ${hint === index ? "on" : ""}`}
+                                        onMouseEnter={() => setHint(index)}
+                                        onFocus={() => setHint(index)}
+                                        tabIndex={0}>
+                                        <span className="k">{String(index + 1).padStart(2, "0")}</span>
+                                        <span className="v">
+                                            <b>{pin.t}</b>
+                                            <span>{pin.d}</span>
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="hint spaced">
+                                Наведите на строку — на карте подсветится нужный элемент. Кнопка под картой переворачивает её, карту
+                                можно и просто крутить мышью.
+                            </p>
+
+                            <div className="block">
+                                <h3>Карты настроения</h3>
+                                <p>
+                                    В конце каждого раздела колоды лежит карта настроения — не задание, а короткое командное действие для
+                                    снятия напряжения. Звёзды за неё не начисляются. Инициирует Хранитель Маяка.
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="block spaced">
-                        <h3>Карты настроения</h3>
-                        <p>
-                            В конце каждого раздела колоды лежит карта настроения — не задание, а короткое командное действие для снятия
-                            напряжения. Звёзды за неё не начисляются. Инициирует Хранитель Маяка.
-                        </p>
-                    </div>
                 </section>
 
-                {/* 03 — этап «Я» */}
+                {/* 02 — этап «Я» */}
                 <section id="s3">
                     <span className="eyebrow">Этап 1 · Я — цифровой эксперт</span>
                     <h2>Как читается поле и что делает участник</h2>
@@ -341,7 +259,7 @@ export default function MayakGuidePage() {
                     </div>
                 </section>
 
-                {/* 04 — этап «МЫ» */}
+                {/* 03 — этап «МЫ» */}
                 <section id="s4">
                     <span className="eyebrow">Этап 2 · МЫ — цифровая организация</span>
                     <h2>Такт: от девяти жетонов до девяти звёзд</h2>
@@ -361,63 +279,6 @@ export default function MayakGuidePage() {
 
                     <div className="playerwrap">
                         <FieldPlayerMy />
-                    </div>
-
-                    <div className="sim">
-                        <div className="panel">
-                            <div className="cap">
-                                <span className="t">Такт 1 · поле такта</span>
-                                <span className="count">
-                                    <b>{doneCount}</b>/9 закрыто
-                                </span>
-                            </div>
-                            <div className="grid9">
-                                {PLAN.map((dir, index) => (
-                                    <button
-                                        key={`cell-${index}`}
-                                        type="button"
-                                        className={`cell ${done[index] ? "done" : ""}`}
-                                        title={DIRS[dir].name}
-                                        onClick={() => toggleCell(index)}>
-                                        <img src={`${A}/${done[index] ? DIRS[dir].face : DIRS[dir].back}`} alt={DIRS[dir].name} />
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="simbar">
-                                <button type="button" className="act ghost" onClick={() => setDone(PLAN.map(() => false))}>
-                                    Сбросить такт
-                                </button>
-                                <span className="hint">Нажмите на жетон — задание принято инспектором, жетон переворачивается цветной стороной.</span>
-                            </div>
-                        </div>
-
-                        <div className="panel">
-                            <div className="cap">
-                                <span className="t">Индекс цифровой зрелости</span>
-                                <span className="count">
-                                    <b>{totalStars}</b>/36 звёзд
-                                </span>
-                            </div>
-                            {DIRS.map((dir, index) => (
-                                <div key={dir.name} className="trow">
-                                    <span className="lbl">
-                                        <i style={{ background: dir.color }} />
-                                        {dir.name}
-                                    </span>
-                                    <span className="cells">
-                                        {Array.from({ length: 6 }, (_, cell) => (
-                                            <i key={`${dir.name}-${cell}`} className={`star ${cell < stars[index] ? "lit" : ""}`}>
-                                                ★
-                                            </i>
-                                        ))}
-                                    </span>
-                                </div>
-                            ))}
-                            <p className="hint">
-                                36 жетонов = 6 направлений × 6 = 4 такта × 9 задач = 36 клеток трека. Числа не сошлись — забыли перевернуть
-                                жетон или поставить звезду.
-                            </p>
-                        </div>
                     </div>
 
                     <h3 className="sub-h">Ход такта</h3>
@@ -456,7 +317,6 @@ export default function MayakGuidePage() {
                     --paper: #ffffff;
                     --wash: #f5f8fa;
                     --signal: #c9503f;
-                    --rail: 260px;
                     min-height: 100vh;
                     background: var(--paper);
                     color: var(--ink);
@@ -464,22 +324,24 @@ export default function MayakGuidePage() {
                     font-size: 16px;
                     line-height: 1.55;
                 }
-                .rail {
-                    position: fixed;
-                    inset: 0 auto 0 0;
-                    width: var(--rail);
-                    padding: 28px 22px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 26px;
-                    border-right: 1px solid var(--line);
-                    background: var(--paper);
+                /* Шапка вместо боковой колонки: разделы идут вправо, контент занимает всю ширину. */
+                .topbar {
+                    position: sticky;
+                    top: 0;
                     z-index: 5;
+                    display: flex;
+                    align-items: center;
+                    gap: 40px;
+                    padding: 14px 40px;
+                    background: rgba(255, 255, 255, 0.92);
+                    backdrop-filter: blur(10px);
+                    border-bottom: 1px solid var(--line);
                 }
                 .brand {
                     display: flex;
                     flex-direction: column;
-                    gap: 6px;
+                    gap: 2px;
+                    flex: 0 0 auto;
                 }
                 .wm {
                     font-size: 24px;
@@ -494,14 +356,15 @@ export default function MayakGuidePage() {
                 }
                 .nav {
                     display: flex;
-                    flex-direction: column;
-                    gap: 2px;
+                    gap: 4px;
+                    overflow-x: auto;
                 }
                 .nav a {
                     display: flex;
-                    gap: 12px;
+                    gap: 10px;
                     align-items: baseline;
-                    padding: 10px 12px;
+                    white-space: nowrap;
+                    padding: 9px 14px;
                     border-radius: 8px;
                     text-decoration: none;
                     color: var(--muted);
@@ -527,19 +390,10 @@ export default function MayakGuidePage() {
                     font-size: 14.5px;
                     font-weight: 600;
                 }
-                .railfoot {
-                    margin-top: auto;
-                }
-                .railfoot img {
-                    width: 108px;
-                    opacity: 0.75;
-                }
-                main {
-                    margin-left: var(--rail);
-                }
                 section {
-                    padding: 76px 56px 84px;
-                    max-width: 1560px;
+                    padding: 64px 40px 76px;
+                    max-width: 1760px;
+                    margin: 0 auto;
                     border-bottom: 1px solid var(--line);
                 }
                 .eyebrow {
@@ -590,44 +444,11 @@ export default function MayakGuidePage() {
                 .spaced {
                     margin-top: 26px;
                 }
-                .facts {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                    margin-top: 26px;
-                }
-                .fact {
-                    border: 1px solid var(--line);
-                    border-radius: 999px;
-                    padding: 8px 16px;
-                    font-size: 14px;
-                    color: #3f5058;
-                }
-                .fact b {
-                    color: var(--ink);
-                }
-                .split {
-                    display: grid;
-                    grid-template-columns: 1.05fr 0.95fr;
-                    gap: 48px;
-                    align-items: start;
-                    margin-top: 40px;
-                }
                 .playerwrap {
                     margin-top: 34px;
-                }
-                .legendgrid {
-                    margin-top: 40px;
-                }
-                .legendgrid .stack {
-                    display: grid;
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                    gap: 22px 40px;
-                }
-                .stack {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 22px;
+                    /* поле не должно перерастать экран: ограничиваем ширину плеера,
+                       чтобы сцена вместе с боковой колонкой помещалась по высоте */
+                    max-width: 1280px;
                 }
                 .block {
                     border-top: 1px solid var(--line);
@@ -637,18 +458,6 @@ export default function MayakGuidePage() {
                     font-size: 15.5px;
                     color: #46565f;
                     margin: 0;
-                }
-                .tag {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 22px;
-                    height: 22px;
-                    border-radius: 50%;
-                    background: var(--signal);
-                    color: #fff;
-                    font-size: 12px;
-                    margin-right: 8px;
                 }
                 .kit {
                     display: flex;
@@ -663,73 +472,11 @@ export default function MayakGuidePage() {
                     border-radius: 999px;
                     padding: 7px 14px;
                 }
-                .flipwrap {
-                    perspective: 1600px;
-                }
-                .flip {
-                    position: relative;
-                    width: 100%;
-                    aspect-ratio: 1 / 0.79;
-                    transform-style: preserve-3d;
-                    transition: transform 0.85s cubic-bezier(0.2, 0.7, 0.2, 1);
-                }
                 .flip.turned {
                     transform: rotateY(180deg);
                 }
-                .face {
-                    position: absolute;
-                    inset: 0;
-                    backface-visibility: hidden;
-                    border-radius: 18px;
-                    overflow: hidden;
-                    border: 1px solid var(--line);
-                    background: #000;
-                    box-shadow: 0 12px 34px rgba(16, 24, 32, 0.12);
-                }
                 .face.back {
                     transform: rotateY(180deg);
-                }
-                .face :global(img) {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                }
-                .stamp {
-                    position: absolute;
-                    left: 14px;
-                    bottom: 12px;
-                    font-size: 10.5px;
-                    letter-spacing: 0.16em;
-                    text-transform: uppercase;
-                    color: #fff;
-                    background: rgba(0, 0, 0, 0.55);
-                    padding: 5px 12px;
-                    border-radius: 999px;
-                }
-                .flipbar {
-                    display: flex;
-                    align-items: center;
-                    gap: 14px;
-                    margin-top: 16px;
-                    flex-wrap: wrap;
-                }
-                .act {
-                    font: inherit;
-                    flex: 0 0 auto;
-                    width: auto;
-                    align-self: flex-start;
-                    font-size: 14px;
-                    font-weight: 700;
-                    color: #fff;
-                    background: #152022;
-                    border: 1px solid #152022;
-                    border-radius: 10px;
-                    padding: 11px 20px;
-                    cursor: pointer;
-                    transition: transform 0.18s ease, background 0.18s ease;
-                }
-                .act:hover {
-                    transform: translateY(-1px);
                 }
                 .act.ghost {
                     background: #fff;
@@ -739,11 +486,57 @@ export default function MayakGuidePage() {
                 .act.ghost:hover {
                     background: var(--wash);
                 }
+                .rolesbar {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 20px;
+                    margin-top: 30px;
+                }
+                .rolesnote {
+                    font-size: 13.5px;
+                    color: var(--muted);
+                }
+                .arrows {
+                    display: flex;
+                    gap: 8px;
+                }
+                .arrows button {
+                    width: 38px;
+                    height: 38px;
+                    border-radius: 50%;
+                    border: 1px solid var(--line-strong);
+                    background: #fff;
+                    color: var(--ink);
+                    font-size: 18px;
+                    line-height: 1;
+                    cursor: pointer;
+                    transition: background 0.18s ease, opacity 0.18s ease;
+                }
+                .arrows button:hover:not(:disabled) {
+                    background: var(--wash);
+                }
+                .arrows button:disabled {
+                    opacity: 0.35;
+                    cursor: default;
+                }
+                /* лента ролей: видно три карточки, остальные листаются вбок */
                 .roles {
                     display: grid;
-                    grid-template-columns: repeat(3, 1fr);
+                    grid-auto-flow: column;
+                    grid-auto-columns: calc((100% - 36px) / 3);
                     gap: 18px;
-                    margin-top: 34px;
+                    margin-top: 14px;
+                    overflow-x: auto;
+                    scroll-snap-type: x mandatory;
+                    scrollbar-width: none;
+                    padding-bottom: 4px;
+                }
+                .roles::-webkit-scrollbar {
+                    display: none;
+                }
+                .role {
+                    scroll-snap-align: start;
                 }
                 .role {
                     border: 1px solid var(--line);
@@ -762,10 +555,10 @@ export default function MayakGuidePage() {
                     padding: 10px 10px 0;
                 }
                 .role :global(img) {
-                    /* карточка целиком, но не выше трети экрана: все шесть ролей влезают в один экран */
+                    /* карточка целиком; в ленте помещается три штуки, поэтому можно крупнее */
                     width: auto;
                     max-width: 100%;
-                    height: min(300px, 30vh);
+                    height: min(430px, 46vh);
                     object-fit: contain;
                     display: block;
                 }
@@ -790,10 +583,30 @@ export default function MayakGuidePage() {
                 }
                 .anatomy {
                     display: grid;
-                    grid-template-columns: minmax(220px, 320px) 1fr;
-                    gap: 40px;
+                    grid-template-columns: minmax(280px, 380px) 1fr;
+                    gap: 48px;
                     margin-top: 26px;
                     align-items: start;
+                }
+                .legendcol {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+                .sidehead {
+                    display: flex;
+                    align-items: baseline;
+                    gap: 12px;
+                    padding-bottom: 12px;
+                    border-bottom: 1px solid var(--line);
+                }
+                .sidehead .t {
+                    font-size: 19px;
+                    font-weight: 800;
+                }
+                .sidehead .c {
+                    font-size: 13px;
+                    color: var(--muted);
                 }
                 .switch {
                     display: flex;
@@ -816,44 +629,26 @@ export default function MayakGuidePage() {
                     border-color: #152022;
                     font-weight: 700;
                 }
-                .cardshot {
-                    position: relative;
-                    border-radius: 14px;
-                    overflow: hidden;
-                    border: 1px solid var(--line);
-                    background: #fff;
-                }
-                .cardshot :global(img) {
-                    width: 100%;
-                    display: block;
-                }
-                .pin {
-                    position: absolute;
-                    width: 25px;
-                    height: 25px;
-                    border-radius: 50%;
-                    background: var(--signal);
-                    color: #fff;
-                    font-size: 12px;
-                    font-weight: 700;
-                    display: grid;
-                    place-items: center;
-                    box-shadow: 0 2px 8px rgba(16, 24, 32, 0.25);
-                    transform: translate(-50%, -50%);
-                }
+                /* две колонки: правая часть больше не пустует */
                 .legend {
-                    display: flex;
-                    flex-direction: column;
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 6px 28px;
                 }
                 .legend .row {
                     display: grid;
                     grid-template-columns: 26px 1fr;
                     gap: 14px;
-                    padding: 12px 0;
-                    border-bottom: 1px solid var(--line);
+                    padding: 12px 12px 12px 10px;
+                    border-radius: 10px;
+                    border: 1px solid transparent;
+                    outline: none;
+                    cursor: default;
+                    transition: background 0.16s ease, border-color 0.16s ease;
                 }
-                .legend .row:last-child {
-                    border-bottom: 0;
+                .legend .row.on {
+                    background: #fdf1ef;
+                    border-color: #f0c7c0;
                 }
                 .legend .k {
                     font-size: 12px;
@@ -872,22 +667,6 @@ export default function MayakGuidePage() {
                 .legend .v span {
                     font-size: 14px;
                     color: #46565f;
-                }
-                .board {
-                    position: relative;
-                    border-radius: 16px;
-                    overflow: hidden;
-                    border: 1px solid var(--line);
-                }
-                .board :global(img) {
-                    width: 100%;
-                    display: block;
-                }
-                .board :global(svg) {
-                    position: absolute;
-                    inset: 0;
-                    width: 100%;
-                    height: 100%;
                 }
                 .steps {
                     list-style: none;
@@ -923,112 +702,16 @@ export default function MayakGuidePage() {
                     font-size: 15px;
                     color: #46565f;
                 }
-                .sim {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 32px;
-                    margin-top: 34px;
-                    align-items: start;
-                }
-                .panel {
-                    border: 1px solid var(--line);
-                    border-radius: 16px;
-                    background: var(--wash);
-                    padding: 22px;
-                }
-                .cap {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: baseline;
-                    gap: 16px;
-                    margin-bottom: 14px;
-                }
                 .cap .t {
                     font-size: 12.5px;
                     letter-spacing: 0.14em;
                     text-transform: uppercase;
                     color: var(--muted);
                 }
-                .count {
-                    font-size: 13px;
-                    color: var(--muted);
-                    font-variant-numeric: tabular-nums;
-                }
-                .count b {
-                    color: var(--ink);
-                }
-                .grid9 {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 10px;
-                }
-                .cell {
-                    aspect-ratio: 1;
-                    border-radius: 10px;
-                    border: 1px dashed var(--line-strong);
-                    background: #fff;
-                    padding: 8px;
-                    cursor: pointer;
-                    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-                }
-                .cell:hover {
-                    border-color: #152022;
-                }
                 .cell.done {
                     border-style: solid;
                     border-color: transparent;
                     box-shadow: 0 2px 10px rgba(16, 24, 32, 0.08);
-                }
-                .cell :global(img) {
-                    width: 100%;
-                    height: 100%;
-                    object-fit: contain;
-                    border-radius: 6px;
-                }
-                .simbar {
-                    display: flex;
-                    align-items: center;
-                    gap: 14px;
-                    margin-top: 16px;
-                    flex-wrap: wrap;
-                }
-                .trow {
-                    display: grid;
-                    grid-template-columns: 190px 1fr;
-                    align-items: center;
-                    gap: 14px;
-                    margin-bottom: 8px;
-                }
-                .lbl {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    font-size: 13px;
-                    color: #46565f;
-                    line-height: 1.25;
-                }
-                .lbl :global(i) {
-                    width: 10px;
-                    height: 10px;
-                    border-radius: 3px;
-                    flex: 0 0 auto;
-                }
-                .cells {
-                    display: grid;
-                    grid-template-columns: repeat(6, 1fr);
-                    gap: 6px;
-                }
-                .star {
-                    height: 22px;
-                    border-radius: 5px;
-                    background: #fff;
-                    border: 1px solid var(--line);
-                    display: grid;
-                    place-items: center;
-                    font-size: 12px;
-                    font-style: normal;
-                    color: transparent;
-                    transition: all 0.25s ease;
                 }
                 .star.lit {
                     background: #fdf1ef;
@@ -1067,35 +750,14 @@ export default function MayakGuidePage() {
                     color: var(--signal);
                 }
                 @media (max-width: 1080px) {
-                    .guide {
-                        --rail: 0px;
-                    }
-                    .rail {
-                        position: static;
-                        width: auto;
-                        flex-direction: row;
-                        align-items: center;
-                        gap: 16px;
-                        flex-wrap: wrap;
-                        border-right: 0;
-                        border-bottom: 1px solid var(--line);
-                    }
-                    .railfoot {
-                        display: none;
-                    }
-                    .nav {
-                        flex-direction: row;
-                        flex-wrap: wrap;
-                    }
-                    main {
-                        margin-left: 0;
+                    .topbar {
+                        padding: 12px 20px;
+                        gap: 20px;
                     }
                     section {
                         padding: 48px 20px 56px;
                     }
-                    .split,
                     .anatomy,
-                    .sim,
                     .rules,
                     .roles {
                         grid-template-columns: 1fr;
@@ -1103,10 +765,7 @@ export default function MayakGuidePage() {
                     }
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    .flip,
-                    .role,
-                    .act,
-                    .star {
+                    .role {
                         transition: none;
                     }
                 }
