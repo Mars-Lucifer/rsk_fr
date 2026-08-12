@@ -14,11 +14,15 @@ How to use this file:
 - use `Task Index` when you need the fastest path to the right files.
 
 Related files:
-- `docs/contest/README.md` is the entry point for all contest work — read it first if the task mentions the contest, lessons, or stages «Я» / «Мы».
 - `AGENTS.md` defines the required workflow for Codex work in this repo.
 - `CODEX_LEARNINGS.md` stores reusable pitfalls and prevention rules.
 - `docs/mayak-refactor-status.md` stores MAYAK refactor progress/status.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
+
+Визуальная проверка гайда: у `/mayak-guide` и `/mayak-guide-3d` числа камеры,
+раскрытия и раскладки калибровочные — правятся по кадру, а не по коду. Снимать
+через MCP `playwright` (свой headless-браузер), а не через preview-панель:
+свёрнутая панель не композитит кадры, и это выглядит как поломка страницы.
 
 ## Work Organization: One Workstream = One Branch
 
@@ -30,6 +34,7 @@ different agent sessions at the same time. Read this before your first commit.
 | Workstream | Branch prefix |
 |---|---|
 | Contest (конкурс РСК) | `feat/contest-*` |
+| Conference package (`/conferencia`) | `feat/conferencia-*` |
 | MAYAK guide / master playbook | `feat/mayak-guide-*`, `feat/mayak-master-*` |
 | MAYAK sessions and dashboard | `feat/mayak-session-*` |
 | Portal / BFF / backend contract | `feat/portal-*`, `chore/portal-*` |
@@ -48,156 +53,24 @@ own branch for as long as needed — never partially committed to `main`.
    uncommitted files.
 
 Parallel sessions are isolated with worktrees under `.worktrees/` (gitignored),
-one directory per workstream. Prefer the harness's native worktree tool over
-`git worktree add` when one is available.
+one directory per workstream. Each copy needs its own dev-server port, and its
+own `npm install` plus a copy of `.env.local` — both are gitignored and do not
+travel with the branch.
 
 ### Never Commit
 
 | What | Why |
 |---|---|
+| `data/rsk.sqlite*`, `data/uploads/` | conference submissions: personal data and passport scans. Already gitignored, but the database file is still tracked in history — ignoring does not apply to tracked files, they need `git rm --cached` |
 | `mayak_transfer.tar.gz` and any `*.tar.gz` | production transfer archive: contains `.env.local` and live task decks (~83 MB). `.gitignore` matches file names, not archive contents — a secret inside an archive slips through any `.env*` rule |
 | `_mayak_rospatent/` | patent-filing package; a generated snapshot of `src`/`data` |
-| `check*.mjs`, root-level `*.png` | one-off browser check scripts and their screenshots |
+| `check*.mjs` at repo root, root-level `*.png` | one-off browser check scripts and their screenshots |
 | `docs/mayak-master-playbook/assets/` | duplicates the tracked assets in `public/mayak-guide/`, which is what the code actually loads (`const A = "/mayak-guide"`) |
 | runtime files under `data/` | operator state, not sources — see the ignore list |
 
 If any of these ever reach the history, removing them requires rewriting
-history, and for the archive also rotating every key in `.env.local`.
-
-## Локальный запуск и визуальная проверка
-
-Дев-сервер поднимается только через preview-панель харнесса (`preview_start` по
-имени из `.claude/launch.json`), не через Bash. Порт закреплён за рабочей копией,
-чтобы параллельные сессии не выбивали друг друга:
-
-| Копия | Имя в launch.json | Порт |
-|---|---|---|
-| основная (`rsk_fr-main`) | `rsk-fr-dev` | 1234 |
-| `.worktrees/mayak-master` | `mayak-master-dev` | 1235 |
-| `.worktrees/mayak-guide` | `mayak-guide-dev` | 1236 |
-| `.worktrees/mayak-guide-live` | `mayak-guide-live-dev` | 1237 |
-| конференция | `conferencia-dev` | 1240 |
-
-Форма записи для worktree: `npm --prefix <каталог> run dev -- -p <порт>`.
-
-- `npm --prefix` делает каталог рабочим для скрипта — это единственная из
-  проверенных форм, которая переживает спавн из харнесса;
-- `-- -p <порт>` перебивает порт из `package.json` копии: Next берёт последний
-  флаг, в логе видно `Local: http://localhost:<порт>`;
-- **не писать** `cmd /c cd /d ... && npx next dev`: `cmd` завершается сразу после
-  спавна, харнесс теряет `serverId`, порт остаётся пустым, а `preview_logs` потом
-  отвечает «serverId not found»;
-- `npm exec --prefix` не годится: prefix не меняет cwd, и npm лезет ставить `node`
-  как пакет.
-
-Две копии одного worktree одновременно не поднять: `next dev` держит лок в
-`.next/dev/lock`. Симптом — `Unable to acquire lock`.
-
-### Визуальная проверка 3D-сцен
-
-Скриншот из preview-панели требует, чтобы **панель была открыта в окне
-приложения**. Свёрнутая панель даёт связку симптомов, которую легко принять за
-поломку страницы:
-
-- `screenshot` падает с «Browser pane is not displayed»;
-- в странице `document.hidden === true`, `visibilityState === "hidden"`;
-- `<main>` пустой, канваса нет — скрытая вкладка троттлится, и динамический чанк
-  сцены (`three` + wasm физики) не догружается;
-- при этом сервер отдаёт страницу с 200, ошибок в консоли нет.
-
-Проверять надо именно так, а не по коду: у `/mayak-guide-3d` все числа камеры,
-раскрытия и размеров калибровочные — они правятся по кадру.
-
-Независимый от панели контур — MCP-сервер playwright
-(`claude mcp add playwright -s user -- npx @playwright/mcp@latest`). Именно им
-снималась вся страница в 3D в прошлых сессиях: свой headless-браузер, скриншоты в
-фиксированном вьюпорте 1600 × 900. Если его в сессии нет, визуальная проверка
-упирается в открытую панель.
-
-## Production Server Access
-
-Продовый сервер: `root@91.228.225.182`. Вход по ключу `~/.ssh/id_rsa`, ключ уже
-в `authorized_keys`, пароль не нужен и спрашивать его нельзя. Команды идут
-через обычный Bash: `ssh root@91.228.225.182 '<команда>'`.
-
-Работа ведётся под `root` — это осознанное решение владельца. Значит,
-единственный ограничитель — правила ниже. Соблюдать их буквально.
-
-### Главное ограничение: бэкапов нет
-
-На сервере шесть отдельных баз PostgreSQL (`auth`, `profile`, `teams`, `orgs`,
-`projects`, `learning`) плюс рантайм в `data/`. Ничего из этого не хранится
-локально: `data/*.json`, `data/contest-answers/`, `.env.local` и содержимое БД
-перечислены в `.gitignore`. Локальная копия репозитория дублирует только
-исходный код — данные участников при потере не восстановить ничем.
-
-Отсюда: **удалённое на этом сервере потеряно навсегда.**
-
-### Что можно без спроса
-
-Только чтение, ничего не меняющее:
-
-- `docker ps`, `docker logs`, `docker stats`, `docker inspect`
-- `df -h`, `free -m`, `uptime`, `top -bn1`
-- `cat`, `head`, `tail`, `grep`, `ls` по логам и конфигам
-- `git log`, `git status`, `git diff` в каталоге деплоя
-- `SELECT` в базах — только на чтение
-
-### Что требует явного подтверждения пользователя
-
-Сначала показать точную команду, объяснить последствие, дождаться «да»:
-
-- любой `docker restart`, `stop`, `down`, `up`, `compose`
-- деплой, `git pull`, `git checkout`, пересборка образов
-- правка любого файла на сервере, включая `.env*` и конфиги
-- миграции БД, любой `INSERT` / `UPDATE` / `DELETE` / `DROP`
-- `systemctl`, изменение сети, портов, firewall
-
-### Запрещено всегда
-
-- `rm -rf`, `docker volume rm`, `docker system prune`, `DROP DATABASE`, `TRUNCATE`
-- вывод содержимого `.env*` в переписку — там боевые ключи
-- копирование дампов БД в репозиторий или в рабочий каталог
-
-### Карта сервиса
-
-| Сервис | Порт приложения | Порт БД |
-|---|---|---|
-| auth | 8002 | 5433 |
-| profile | 8003 | 5434 |
-| teams | 8004 | 5435 |
-| orgs | 8005 | 5436 |
-| projects | 8010 | 5437 |
-| learning | 8011 | 5445 |
-
-Инфраструктура: `traefik` (80/443), `rabbitmq` (5672/15672), `redis` (6379),
-`celery_worker` + `celery_beat`, мониторинг `grafana` (3001) / `prometheus` (9090).
-Контейнеры подняты около трёх месяцев назад, аптайм хоста больше года.
-
-Код на сервере разошёлся с репозиторием — не считать, что там то же самое,
-что локально. Подробности и известные мины: `docs/contest/04-infrastructure.md`.
-
-## Contest (конкурс РСК)
-
-The contest is an active, separately documented product line inside this repo.
-It reuses the MAYAK trainer instead of duplicating it, and it has its own
-knowledge base under `docs/contest/`:
-
-- `docs/contest/README.md` — entry point: what the contest is, document map, current focus
-- `docs/contest/01-stage-ya.md` — stage «Я»: 8 lessons + trainer tasks (built)
-- `docs/contest/02-stage-my.md` — stage «Мы»: not started, open questions
-- `docs/contest/03-teams-and-orgs.md` — organizations, teams, 3+1 composition
-- `docs/contest/04-infrastructure.md` — backend, prod state, local stack, known mines
-- `docs/contest/05-decisions.md` — decision log and open questions
-- `docs/contest/CHANGELOG.md` — what was done, newest first
-
-Rules when working on the contest:
-- read `docs/contest/README.md` before touching contest code;
-- keep these files current **in the same commit** as the change: update the
-  relevant stage file, add a line to `CHANGELOG.md`, move answered questions
-  into the decisions table with a date;
-- contest entry into the trainer is a separate access type (`tokenType: "contest"`
-  in `src/lib/mayakContestAccess.js`) — existing token/session paths must stay untouched.
+history: for the archive it also means rotating every key in `.env.local`, and
+for the conference database it means personal data was published.
 
 ## What Is Easy To Confuse First
 
@@ -781,14 +654,6 @@ When a task says:
 - start with the frontend proxy route under `src/pages/api/*`
 - map it to the owning service in `../back/RSK_back`
 - inspect backend route, schema, and any event-driven side effects before changing response handling
-
-`change contest behavior (уроки, этапы «Я»/«Мы», доступ в тренажёр)`
-- start with `docs/contest/README.md`
-- lessons list: `src/pages/cours/index.js`
-- contest access into the trainer: `src/lib/mayakContestAccess.js`
-- lesson → deck mapping and task texts: `src/lib/contestTrainerTasks.js`
-- contest screen inside the trainer: `src/components/features/tools-2/ContestLessonPanel.js`
-- update `docs/contest/*` in the same commit
 
 `change MAYAK trainer behavior`
 - start with `src/pages/tools/mayak-oko.js`
