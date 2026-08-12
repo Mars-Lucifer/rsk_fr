@@ -44,22 +44,39 @@ own branch for as long as needed — never partially committed to `main`.
 2. If the working copy contains changes belonging to another workstream — stop
    and report it. Do not commit around them, and never run `git add -A` /
    `git commit -a` in a mixed working copy: stage explicit paths only.
-3. If your task belongs to a different workstream than the current branch,
-   switch branches — do not edit files belonging to another workstream.
+3. If your task belongs to a different workstream than the current branch, open
+   the session in that workstream's directory. **Do not switch branches in a
+   directory you did not create** — the files change under whoever works there.
 
-**Живая карта направлений, веток и портов — в глобальном `~/.claude/CLAUDE.md`,
-раздел «rsk_fr: карта направлений».** Она намеренно не версионируется: файл
-внутри ветки расходится вместе с веткой, и карта перестаёт быть картой.
+Каждое направление живёт в своём каталоге, каждый каталог держит свою ветку.
+Ветка, выгруженная в один каталог, во второй не выгружается — git это
+запрещает, и переключаться больше не нужно: нужно открыть чат в нужной папке.
 
-**Одна рабочая копия, постоянные worktree не заводятся** (решение 12.08.2026).
-Переключение — обычным `git switch`. Worktree остаётся временным инструментом,
-когда действительно нужны две вещи одновременно, и снимается сразу после.
-Если он всё же нужен: каждой копии свой порт дев-сервера, свой `npm install`
-и копия `.env.local` — оба гитом не переносятся.
+Живая таблица «каталог → ветка → порт» — в глобальном `~/.claude/CLAUDE.md`,
+раздел «rsk_fr: карта направлений». Здесь её нет намеренно: файл версионируется
+и разошёлся бы по веткам.
 
-Причина отказа от постоянных копий: восемь worktree давали изоляцию, но не
-координацию. Четыре сессии независимо написали один и тот же экран гайда,
-а `data/` дублировался в каждой копии по 990 МБ.
+Новая копия заводится так:
+
+```
+git worktree add .worktrees/<имя> <ветка>
+mklink /J "<копия>\data" "<главная>\data"   # общий рантайм, не дубль
+cp .env.local <копия>/.env.local            # git не переносит
+npm --prefix <копия> install                # свой node_modules
+```
+
+`data` через junction обязателен: иначе каждая копия тащит свой рантайм
+(~990 МБ), загрузки участников расползаются по копиям, и уникальные файлы
+оказываются заперты в одной из них. На Windows junction прав не требует,
+симлинк (`ln -s`) падает с «Operation not permitted».
+
+Порт копии — в `.claude/launch.json`, запуск через `preview_start` по имени.
+Два сервера на одном каталоге не поднять даже на разных портах: `next dev`
+держит лок в `.next/dev/lock`.
+
+Изоляция каталогами не мешает дублировать работу — 12.08.2026 четыре сессии
+независимо написали один и тот же экран гайда. Против этого работает владение
+файлами, а не изоляция: у каждого файла одно направление-хозяин.
 
 ### Never Commit
 
