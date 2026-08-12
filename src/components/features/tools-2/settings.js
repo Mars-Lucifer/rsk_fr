@@ -78,7 +78,7 @@ async function validateTokenAPI(tokenValue) {
             tableCount: data.tableCount || 0,
         };
     } catch (error) {
-        console.error("РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё С‚РѕРєРµРЅР°:", error);
+        console.error("Ошибка проверки токена:", error);
         return {
             valid: false,
             isActive: false,
@@ -86,7 +86,7 @@ async function validateTokenAPI(tokenValue) {
             remainingAttempts: 0,
             usageLimit: 0,
             usedCount: 0,
-            error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°",
+            error: "Ошибка сервера",
             isBypass: false,
             tokenType: "legacy",
             sessionId: null,
@@ -111,8 +111,8 @@ async function consumeTokenAPI(tokenValue) {
             isBypass: data.isBypass || false,
         };
     } catch (error) {
-        console.error("РћС€РёР±РєР° РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ С‚РѕРєРµРЅР°:", error);
-        return { success: false, remainingAttempts: 0, error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°", isBypass: false };
+        console.error("Ошибка использования токена:", error);
+        return { success: false, remainingAttempts: 0, error: "Ошибка сервера", isBypass: false };
     }
 }
 
@@ -129,8 +129,8 @@ async function loginMayakAdmin(password) {
             error: data.error || null,
         };
     } catch (error) {
-        console.error("РћС€РёР±РєР° Р°РІС‚РѕСЂРёР·Р°С†РёРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°:", error);
-        return { success: false, error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°" };
+        console.error("Ошибка авторизации администратора:", error);
+        return { success: false, error: "Ошибка сервера" };
     }
 }
 
@@ -295,7 +295,7 @@ export default function SettingsPage({ goTo }) {
             syncRegisteredUserState(sessionInfoRef.current, payload, tokenRef.current);
             return payload;
         } catch (error) {
-            console.error("РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РїСЂРѕС„РёР»СЏ РїРѕСЂС‚Р°Р»Р°:", error);
+            console.error("Ошибка получения профиля портала:", error);
             setPortalProfilePayload(null);
             setIsPortalChecked(true);
             return null;
@@ -418,7 +418,7 @@ export default function SettingsPage({ goTo }) {
             if (isAccessible) {
                 setTokenError("");
             } else {
-                setTokenError(result.error || "РўРѕРєРµРЅ РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ");
+                setTokenError(result.error || "Токен недействителен");
             }
 
             if (portalProfilePayloadRef.current || isPortalCheckedRef.current) {
@@ -547,19 +547,19 @@ export default function SettingsPage({ goTo }) {
     const enterWithDevBypass = useCallback(async () => {
         setBypassPasswordError("");
         if (!bypassPassword) {
-            setBypassPasswordError("Р’РІРµРґРёС‚Рµ РїР°СЂРѕР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°");
+            setBypassPasswordError("Введите пароль администратора");
             return;
         }
 
         const authResult = await loginMayakAdmin(bypassPassword);
         if (!authResult.success) {
-            setBypassPasswordError(authResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґС‚РІРµСЂРґРёС‚СЊ Р»РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ");
+            setBypassPasswordError(authResult.error || "Не удалось подтвердить локальный вход");
             return;
         }
 
         const resolvedTableNumber = String(tableNumber || "").trim();
         if (sessionInfo.tokenType === "session" && !resolvedTableNumber) {
-            setBypassPasswordError("РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІР°С€ СЃС‚РѕР»");
+            setBypassPasswordError("Пожалуйста, выберите ваш стол");
             return;
         }
 
@@ -567,7 +567,7 @@ export default function SettingsPage({ goTo }) {
         const bypassProfile = bypassPayload ? normalizePortalProfile(bypassPayload) : null;
 
         const localUserId = String(bypassProfile?.id || "local-mayak-user").trim();
-        const localFullName = String(bypassProfile?.fullName || "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ").trim() || "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ";
+        const localFullName = String(bypassProfile?.fullName || "Локальный вход").trim() || "Локальный вход";
         const userRecord = {
             id: localUserId,
             portalUserId: localUserId,
@@ -598,7 +598,7 @@ export default function SettingsPage({ goTo }) {
         });
 
         if (!saveResponse.ok) {
-            throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ Р»РѕРєР°Р»СЊРЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РњРђРЇРљ");
+            throw new Error("Не удалось сохранить локального пользователя МАЯК");
         }
 
         if (sessionInfo.tokenType === "session" && sessionInfo.sessionId) {
@@ -616,13 +616,13 @@ export default function SettingsPage({ goTo }) {
 
             const participantPayload = await participantResponse.json().catch(() => ({}));
             if (!participantResponse.ok || !participantPayload.success) {
-                throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ Р»РѕРєР°Р»СЊРЅРѕРіРѕ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
+                throw new Error(participantPayload.error || "Не удалось зарегистрировать локального участника в сессии");
             }
         }
 
         await addKeyToCookies(token);
         setStoredToken(token);
-        await addUserToCookies("dev-bypass", "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ", {
+        await addUserToCookies("dev-bypass", "Локальный вход", {
             tokenType: "bypass",
         });
         setHasRegisteredUser(true);
@@ -631,7 +631,7 @@ export default function SettingsPage({ goTo }) {
 
     const activateGuestUser = useCallback(async () => {
         if (!isTokenValid) {
-            setGuestFormError("Р’РІРµРґРёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ С‚РѕРєРµРЅ.");
+            setGuestFormError("Введите корректный токен.");
             return;
         }
 
@@ -644,7 +644,7 @@ export default function SettingsPage({ goTo }) {
         const patronymic = String((autoProfile ? autoProfile.patronymic : guestForm.patronymic) || "").trim();
 
         if (!lastName || !firstName) {
-            setGuestFormError("Р”Р»СЏ РІС…РѕРґР° Р·Р°РїРѕР»РЅРёС‚Рµ С„Р°РјРёР»РёСЋ Рё РёРјСЏ.");
+            setGuestFormError("Для входа заполните фамилию и имя.");
             return;
         }
 
@@ -654,7 +654,7 @@ export default function SettingsPage({ goTo }) {
                 : String(tableNumber || "").trim();
 
         if (sessionInfo.tokenType === "session" && !resolvedTableNumber) {
-            setGuestFormError("РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІР°С€ СЃС‚РѕР».");
+            setGuestFormError("Пожалуйста, выберите ваш стол.");
             return;
         }
 
@@ -665,7 +665,7 @@ export default function SettingsPage({ goTo }) {
             if (!isStoredTokenActive) {
                 const consumeResult = await consumeTokenAPI(token);
                 if (!consumeResult.success) {
-                    throw new Error(consumeResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ С‚РѕРєРµРЅ.");
+                    throw new Error(consumeResult.error || "Не удалось активировать токен.");
                 }
                 setTokenRemainingAttempts(consumeResult.remainingAttempts || 0);
                 await addKeyToCookies(token);
@@ -706,7 +706,7 @@ export default function SettingsPage({ goTo }) {
             });
 
             if (!saveResponse.ok) {
-                throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РіРѕСЃС‚РµРІРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РњРђРЇРљ");
+                throw new Error("Не удалось сохранить гостевого пользователя МАЯК");
             }
 
             const savePayload = await saveResponse.json().catch(() => ({}));
@@ -727,7 +727,7 @@ export default function SettingsPage({ goTo }) {
 
                 const participantPayload = await participantResponse.json().catch(() => ({}));
                 if (!participantResponse.ok || !participantPayload.success) {
-                    throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ РіРѕСЃС‚РµРІРѕРіРѕ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
+                    throw new Error(participantPayload.error || "Не удалось зарегистрировать гостевого участника в сессии");
                 }
             }
 
@@ -914,7 +914,7 @@ export default function SettingsPage({ goTo }) {
 
                 const participantPayload = await participantResponse.json().catch(() => ({}));
                 if (!participantResponse.ok || !participantPayload.success) {
-                    throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
+                    throw new Error(participantPayload.error || "Не удалось зарегистрировать участника в сессии");
                 }
             }
 
