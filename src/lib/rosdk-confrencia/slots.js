@@ -4,6 +4,19 @@
 /** Дата Конференции. Правится здесь — попадает и в бланки, и в текст страницы. */
 export const CONFERENCE_DATE = "21 сентября 2026 года";
 
+/** До этого дня Оргкомитет ждёт пакет: позже отделение остаётся без делегата. */
+export const DEADLINE_DATE = "13 сентября 2026 года";
+
+/**
+ * Каналы Оргкомитета в MAX. Пустая строка означает «QR не рисуем, показываем
+ * заглушку»: неверная ссылка в коде хуже её отсутствия.
+ */
+export const MAX_LINKS = {
+  channel: "https://max.ru/join/qY8xxk4mk5bYtqJ4Lj4Znm1_mY5HA8WvohMMuU1_6jw",
+  chat: "https://max.ru/join/gCtbHvkvHXUfc48wPUEIShNIvuWkUE_S0n4CH9maaAs",
+  delegates: "https://max.ru/join/zZDlrAXKtBloocaWy_HBkCSYDSx2FgAkJpVzYjr-Ow8",
+};
+
 /** Три бланка, которые генерирует шаг 2 и печатает РО. */
 export const GENERATED_SLOTS = [
   {
@@ -26,7 +39,10 @@ export const GENERATED_SLOTS = [
   },
 ];
 
-const SCAN_ACCEPT = "application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png";
+// Скан приходит с чего угодно: телефон даёт JPG, МФУ — PDF, кто-то шлёт архив.
+// Отказывать из-за формата дороже, чем принять и разобрать руками.
+const SCAN_ACCEPT =
+  "application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png,image/heic,.heic,.zip,.rar,.7z";
 
 /** Пакет от РО по чек-листу Оргкомитета: четыре скана и фото собрания. */
 export const UPLOAD_SLOTS = [
@@ -53,25 +69,53 @@ export const UPLOAD_SLOTS = [
   },
   {
     slot: "passportScan",
-    short: "Паспорт",
-    label: "Копия паспорта делегата (главная страница + регистрация)",
+    short: "Паспорт: разворот",
+    label: "Паспорт делегата: страницы 2–3 — разворот с фотографией",
+    hint: "Фамилия, имя, отчество, дата и место рождения, кем и когда выдан, код подразделения.",
     accept: SCAN_ACCEPT,
-    archiveName: "4-паспорт-делегата",
+    archiveName: "4-паспорт-делегата-разворот",
+  },
+  {
+    slot: "passportRegistrationScan",
+    short: "Паспорт: прописка",
+    label: "Паспорт делегата: страница с регистрацией (страницы 5–12)",
+    hint: "Разворот со штампом «Зарегистрирован»: адрес и дата регистрации должны читаться.",
+    accept: SCAN_ACCEPT,
+    archiveName: "5-паспорт-делегата-регистрация",
   },
   {
     slot: "photo",
     short: "Фото",
     label: "Фото с собрания регионального отделения",
-    accept: "image/*",
-    archiveName: "5-фото-собрания",
+    hint: "Общий план: видно всех участников, их можно пересчитать по явочному листу.",
+    accept: "image/*,.zip,.rar,.7z",
+    archiveName: "6-фото-собрания",
   },
 ];
+
+/**
+ * Сканы паспорта живут в блоке «Делегат», рядом с его данными: их снимают с того
+ * же человека и в тот же момент. В последнем блоке остаётся только общее фото.
+ */
+export const DELEGATE_SCAN_SLOTS = ["passportScan", "passportRegistrationScan"];
+
+/**
+ * Номер протокола отделение не придумывает: он собирается из кода субъекта в
+ * справочнике и порядкового номера заявки этого субъекта — «17/1», «17/2».
+ * Так номера не повторяются между отделениями и не зависят от чужих заявок.
+ */
+export function buildProtocolNumber(regionIndex, alreadySent) {
+  return `${regionIndex + 1}/${alreadySent + 1}`;
+}
 
 /** Кукис с id последней заявки: только подсказка «продолжить», не авторизация. */
 export const SUBMISSION_COOKIE = "conferencia_submission";
 
-/** Сколько заявок допустимо от одного субъекта РФ: запас на исправление ошибок. */
-export const MAX_SUBMISSIONS_PER_REGION = 3;
+/**
+ * Одно отделение — одна заявка. Запас на «переделать» не нужен: заявка правится
+ * на месте, а несколько заявок от субъекта Мандатной комиссии не с чем сверять.
+ */
+export const MAX_SUBMISSIONS_PER_REGION = 1;
 
 export const STATUS_DRAFT = "draft";
 export const STATUS_DOCX_GENERATED = "docx_generated";

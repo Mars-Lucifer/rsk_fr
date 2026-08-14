@@ -5,11 +5,15 @@ const FIO_REGEX = /^[а-яё\-]+$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zа-яё]{2,}$/i;
 
 function validateFioServer(value) {
-  const trimmed = String(value ?? "").trim().replace(/\s+/g, " ");
+  const trimmed = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
   if (!trimmed) return "Заполните поле.";
   const parts = trimmed.split(" ");
-  if (parts.length !== 3) {
-    return "должно состоять ровно из 3 слов (Фамилия Имя Отчество).";
+  // Два слова тоже норма: отчества нет у изрядной части граждан, и требование
+  // ровно трёх слов не пускало таких людей ни в делегаты, ни в явочный лист.
+  if (parts.length < 2 || parts.length > 3) {
+    return "должно состоять из 2 или 3 слов (Фамилия Имя Отчество).";
   }
   for (const part of parts) {
     if (!FIO_REGEX.test(part)) {
@@ -27,6 +31,18 @@ export function requiredQuorum(totalMembers) {
 /** Решение по делегату принимается не менее чем 2/3 голосов присутствующих. */
 export function requiredVotesFor(presentMembers) {
   return Math.ceil((presentMembers * 2) / 3);
+}
+
+/**
+ * Голоса считались от прежней явки: в явочный лист дописали опоздавших уже после
+ * голосования. Протокол с такими числами недействителен — в нём «присутствовали 8»
+ * и «за 5, против 1», а порог 2/3 посчитан от шести.
+ */
+export function votesAreStale(submission, presentMembers) {
+  const total =
+    (submission.votesFor ?? 0) + (submission.votesAgainst ?? 0) + (submission.votesAbstain ?? 0);
+
+  return total > 0 && total !== presentMembers;
 }
 
 /** Серия — 4 цифры, номер — 6. Формат проверяется на сервере, чтобы его нельзя было обойти. */
@@ -47,21 +63,29 @@ export function normalizeFio(value) {
 }
 
 /**
- * Контакт участника — телефон (11 цифр) либо e-mail. Проверяется и в форме,
- * и на сервере: по этим контактам Мандатная комиссия сверяет явочный лист.
+ * Телефон участника — обязателен: по нему Мандатная комиссия сверяет явочный лист.
  */
+export function phoneError(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "укажите телефон.";
+
+  return digitsOnly(raw).length === 11 ? null : "телефон — 11 цифр.";
+}
+
+/** E-mail участника — по желанию, но если введён, то должен быть настоящим. */
+export function emailError(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  return EMAIL_REGEX.test(raw) ? null : "некорректный e-mail.";
+}
+
+/** Совместимость: старые заявки хранят один контакт строкой. */
 export function contactError(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return "укажите телефон или e-mail.";
-
-  if (raw.includes("@")) {
-    return EMAIL_REGEX.test(raw) ? null : "некорректный e-mail.";
-  }
-
-  const digits = digitsOnly(raw);
-  if (digits.length === 11) return null;
-
-  return "телефон — 11 цифр, либо укажите e-mail.";
+  if (raw.includes("@")) return EMAIL_REGEX.test(raw) ? null : "некорректный e-mail.";
+  return digitsOnly(raw).length === 11 ? null : "телефон — 11 цифр, либо укажите e-mail.";
 }
 
 /** «45 10 № 123456» — вид, в котором реквизиты печатаются в явочном листе. */
@@ -82,6 +106,8 @@ function parseAttendees(value) {
       passportNumber: digitsOnly(item?.passportNumber),
       // Заявки, созданные до разделения полей, приходят готовой строкой.
       documentRef: text(item?.documentRef),
+      phone: text(item?.phone),
+      email: text(item?.email),
       contact: text(item?.contact),
     }))
     .filter(
@@ -90,7 +116,9 @@ function parseAttendees(value) {
         item.passportSeries ||
         item.passportNumber ||
         item.documentRef ||
-        item.contact,
+        item.phone ||
+        item.email ||
+        item.contact
     );
 }
 
@@ -141,9 +169,10 @@ export function parseRegistrationInput(value) {
     region: text(data.region),
     city: text(data.city),
     meetingDate: text(data.meetingDate),
-    protocolNumber: text(data.protocolNumber) || "1",
+    protocolNumber: text(data.protocolNumber),
     presentMembers: attendees.length,
-    totalMembers: numberValue(data.totalMembers),
+    // Списочного состава у отделений нет — в протоколе печатается только явка.
+    totalMembers: attendees.length,
     chairName: text(data.chairName),
     secretaryName: text(data.secretaryName),
     attendees,
@@ -155,10 +184,6 @@ export function parseRegistrationInput(value) {
     }
   }
 
-  if (Number.isNaN(input.totalMembers) || input.totalMembers <= 0) {
-    throw new Error("Укажите, сколько членов состоит на учёте в отделении.");
-  }
-
   // Субъект РФ — только из справочника, иначе реестр по регионам не собрать.
   if (!regions.includes(input.region)) {
     throw new Error("Выберите субъект Российской Федерации из списка.");
@@ -166,22 +191,9 @@ export function parseRegistrationInput(value) {
 
   checkAttendees(attendees);
 
-  if (input.presentMembers > input.totalMembers) {
-    throw new Error(
-      "В явочном листе больше человек, чем всего членов, состоящих на учёте в отделении.",
-    );
-  }
-
   if (input.presentMembers < MIN_PRESENT_MEMBERS) {
     throw new Error(
-      `На собрании должно присутствовать не меньше ${MIN_PRESENT_MEMBERS} членов отделения, в явочном листе ${input.presentMembers}.`,
-    );
-  }
-
-  const quorum = requiredQuorum(input.totalMembers);
-  if (input.presentMembers < quorum) {
-    throw new Error(
-      `Собрание неправомочно: кворум — более половины членов отделения (минимум ${quorum}).`,
+      `На собрании должно присутствовать не меньше ${MIN_PRESENT_MEMBERS} участников, в явочном листе ${input.presentMembers}.`
     );
   }
 
@@ -231,8 +243,31 @@ export function parseDelegateInput(value) {
     throw new Error("Некорректный e-mail делегата.");
   }
 
+  // Паспорт и адрес уходят в бланки одной строкой. Отдельно храним и разобранные
+  // поля: без них форма не заполнится обратно, когда блок открывают на правку.
+  input.delegateFields = Object.fromEntries(
+    DELEGATE_RAW_FIELDS.map((field) => [field, text(data[field])])
+  );
+
   return input;
 }
+
+/** Поля формы делегата как есть: из них собраны passportData и delegateAddress. */
+const DELEGATE_RAW_FIELDS = [
+  "passportSeries",
+  "passportNumber",
+  "passportIssuedDate",
+  "passportIssuedBy",
+  "passportDepartmentCode",
+  "addressPostalCode",
+  "addressRegion",
+  "addressDistrict",
+  "addressSettlement",
+  "addressStreet",
+  "addressHouse",
+  "addressBuilding",
+  "addressFlat",
+];
 
 /** Шаг 3: голосование. Из него собирается протокол. */
 export function parseVotesInput(value, presentMembers) {
@@ -251,14 +286,14 @@ export function parseVotesInput(value, presentMembers) {
   const votesTotal = input.votesFor + input.votesAgainst + input.votesAbstain;
   if (votesTotal !== presentMembers) {
     throw new Error(
-      `Сумма голосов («За» + «Против» + «Воздержались») должна равняться числу присутствующих (${presentMembers}), получено ${votesTotal}.`,
+      `Сумма голосов («За» + «Против» + «Воздержались») должна равняться числу присутствующих (${presentMembers}), получено ${votesTotal}.`
     );
   }
 
   const minimumVotes = requiredVotesFor(presentMembers);
   if (input.votesFor < minimumVotes) {
     throw new Error(
-      `Делегат не избран: «За» должно быть не менее 2/3 от присутствующих (минимум ${minimumVotes}).`,
+      `Делегат не избран: «За» должно быть не менее 2/3 от присутствующих (минимум ${minimumVotes}).`
     );
   }
 
@@ -283,15 +318,23 @@ function requireObject(value) {
   return value;
 }
 
+/**
+ * Сутки допуска сверх сегодняшнего дня сервера: собрание в Петропавловске
+ * (UTC+12) идёт, когда сервер в UTC ещё во вчера, — и без запаса отклонялись
+ * заявки именно дальневосточных отделений, уже после заполнения явочного листа.
+ */
+export const MEETING_DATE_SLACK_DAYS = 1;
+
 function checkMeetingDate(meetingDate) {
   const parsed = new Date(`${meetingDate}T00:00:00`);
-  const today = new Date();
-  today.setHours(23, 59, 59, 999);
+  const latest = new Date();
+  latest.setHours(23, 59, 59, 999);
+  latest.setDate(latest.getDate() + MEETING_DATE_SLACK_DAYS);
 
   if (Number.isNaN(parsed.getTime())) {
     throw new Error("Некорректная дата проведения собрания.");
   }
-  if (parsed > today) {
+  if (parsed > latest) {
     throw new Error("Дата проведения собрания не может быть в будущем.");
   }
 }
@@ -315,7 +358,7 @@ function checkAttendees(attendees) {
     const nameKey = normalizeFio(attendee.fullName);
     if (seenNames.has(nameKey)) {
       throw new Error(
-        `Явочный лист: «${attendee.fullName}» встречается дважды — строки ${seenNames.get(nameKey) + 1} и ${index + 1}.`,
+        `Явочный лист: «${attendee.fullName}» встречается дважды — строки ${seenNames.get(nameKey) + 1} и ${index + 1}.`
       );
     }
     seenNames.set(nameKey, index);
@@ -323,7 +366,7 @@ function checkAttendees(attendees) {
     const passportKey = `${attendee.passportSeries}${attendee.passportNumber}`;
     if (passportKey.length > 0 && seenPassports.has(passportKey)) {
       throw new Error(
-        `Явочный лист: один и тот же паспорт в строках ${seenPassports.get(passportKey) + 1} и ${index + 1}.`,
+        `Явочный лист: один и тот же паспорт в строках ${seenPassports.get(passportKey) + 1} и ${index + 1}.`
       );
     }
     if (passportKey) {
@@ -333,20 +376,35 @@ function checkAttendees(attendees) {
     if (attendee.passportSeries || attendee.passportNumber || !attendee.documentRef) {
       if (attendee.passportSeries.length !== PASSPORT_SERIES_LENGTH) {
         throw new Error(
-          `Явочный лист, строка ${index + 1}: серия паспорта — ${PASSPORT_SERIES_LENGTH} цифры.`,
+          `Явочный лист, строка ${index + 1}: серия паспорта — ${PASSPORT_SERIES_LENGTH} цифры.`
         );
       }
       if (attendee.passportNumber.length !== PASSPORT_NUMBER_LENGTH) {
         throw new Error(
-          `Явочный лист, строка ${index + 1}: номер паспорта — ${PASSPORT_NUMBER_LENGTH} цифр.`,
+          `Явочный лист, строка ${index + 1}: номер паспорта — ${PASSPORT_NUMBER_LENGTH} цифр.`
         );
       }
       attendee.documentRef = formatPassportRef(attendee.passportSeries, attendee.passportNumber);
     }
 
-    const contactProblem = contactError(attendee.contact);
-    if (contactProblem) {
-      throw new Error(`Явочный лист, строка ${index + 1}: ${contactProblem}`);
+    // Старые заявки хранят один контакт строкой, новые — телефон и почту отдельно.
+    if (attendee.phone || attendee.email || !attendee.contact) {
+      const phoneProblem = phoneError(attendee.phone);
+      if (phoneProblem) {
+        throw new Error(`Явочный лист, строка ${index + 1}: ${phoneProblem}`);
+      }
+
+      const emailProblem = emailError(attendee.email);
+      if (emailProblem) {
+        throw new Error(`Явочный лист, строка ${index + 1}: ${emailProblem}`);
+      }
+
+      attendee.contact = [attendee.phone, attendee.email].filter(Boolean).join(", ");
+    } else {
+      const contactProblem = contactError(attendee.contact);
+      if (contactProblem) {
+        throw new Error(`Явочный лист, строка ${index + 1}: ${contactProblem}`);
+      }
     }
   });
 }

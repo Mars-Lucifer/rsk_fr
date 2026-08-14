@@ -5,6 +5,10 @@ import { regions } from "@/lib/rosdk-confrencia/regions";
 // уже заполнено: отделение не могло увидеть список и исправить опечатку.
 // Здесь список открывается по клику в любой момент, ищет по подстроке и
 // управляется с клавиатуры.
+//
+// Важная поправка: если в поле стоит точное значение из справочника, список
+// показывается ЦЕЛИКОМ. Раньше фильтр оставлял одну строку — выбранную, и
+// сменить субъект без стирания текста было невозможно.
 
 const MAX_VISIBLE = 8;
 
@@ -14,27 +18,30 @@ function matches(option, query) {
   return option.toLowerCase().includes(needle);
 }
 
-export function RegionCombobox({
+export function Combobox({
   name,
   value,
   onChange,
   placeholder,
   invalid = false,
   inputClassName,
-  options = regions,
+  options,
+  readOnlyInput = false,
 }) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
   const listRef = useRef(null);
   const listId = useId();
 
+  const exact = options.includes(value);
+
   const filtered = useMemo(() => {
+    if (exact) return options;
     const found = options.filter((option) => matches(option, value ?? ""));
-    // Точное совпадение — список всё равно показываем целиком, чтобы можно
-    // было переключиться на соседний субъект, не стирая поле.
     return found.length > 0 ? found : options;
-  }, [options, value]);
+  }, [options, value, exact]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -60,6 +67,8 @@ export function RegionCombobox({
     const current = filtered.findIndex((option) => option === value);
     setHighlight(current >= 0 ? current : 0);
     setOpen(true);
+    // Текст выделяем: следующая же набранная буква заменит прежний выбор.
+    if (exact) inputRef.current?.select();
   };
 
   const choose = (option) => {
@@ -100,12 +109,14 @@ export function RegionCombobox({
   return (
     <div ref={wrapperRef} className="relative">
       <input
+        ref={inputRef}
         name={name}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
         autoComplete="off"
+        readOnly={readOnlyInput}
         placeholder={placeholder}
         value={value}
         onChange={(event) => {
@@ -116,14 +127,14 @@ export function RegionCombobox({
         onFocus={openList}
         onClick={openList}
         onKeyDown={onKeyDown}
-        className={`${inputClassName} pr-9`}
+        className={`${inputClassName} ${readOnlyInput ? "cursor-pointer" : ""} pr-9`}
       />
       <button
         type="button"
         tabIndex={-1}
-        aria-label={open ? "Скрыть список субъектов" : "Показать список субъектов"}
+        aria-label={open ? "Скрыть список" : "Показать список"}
         onClick={() => (open ? setOpen(false) : openList())}
-        className="absolute right-0 top-0 flex h-10 w-9 items-center justify-center bg-transparent! p-0! text-slate-400! hover:text-slate-600! cursor-pointer"
+        className="absolute right-0 top-0 flex h-10 !w-9 items-center !justify-center bg-transparent! p-0! text-slate-500! hover:text-slate-600! cursor-pointer"
       >
         <svg
           viewBox="0 0 20 20"
@@ -146,7 +157,7 @@ export function RegionCombobox({
           id={listId}
           ref={listRef}
           role="listbox"
-          className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl shadow-slate-900/10"
+          className="absolute left-0 right-0 z-30 mt-1 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 text-left shadow-xl shadow-slate-900/10"
           style={{ maxHeight: `${MAX_VISIBLE * 2.5}rem` }}
         >
           {filtered.map((option, index) => (
@@ -159,8 +170,10 @@ export function RegionCombobox({
                 onMouseEnter={() => setHighlight(index)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(option)}
-                className={`block w-full rounded-none! border-0! px-3 py-2 text-left! text-sm cursor-pointer ${
-                  index === highlight ? "bg-indigo-50! text-indigo-900!" : "bg-white! text-slate-700!"
+                className={`block w-full rounded-none! border-0! px-3 py-2 text-left! text-sm cursor-pointer !justify-start ${
+                  index === highlight
+                    ? "bg-indigo-50! text-indigo-900!"
+                    : "bg-white! text-slate-700!"
                 } ${option === value ? "font-semibold" : ""}`}
               >
                 {option}
@@ -172,9 +185,14 @@ export function RegionCombobox({
 
       {invalid && (
         <span className="sr-only" role="alert">
-          Субъект не найден в справочнике.
+          Значение не найдено в списке.
         </span>
       )}
     </div>
   );
+}
+
+/** Комбобокс субъектов РФ: тот же список, что и в справочнике заявки. */
+export function RegionCombobox(props) {
+  return <Combobox {...props} options={props.options ?? regions} />;
 }

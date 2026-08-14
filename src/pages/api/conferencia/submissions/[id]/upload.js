@@ -17,8 +17,20 @@ export const config = {
   },
 };
 
-const DOCUMENT_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png"];
-const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
+// Формат скана не важен: важно, чтобы файл дошёл. Отсекаем только явно чужое —
+// исполняемые файлы и документы Word, которые присылают вместо скана по ошибке.
+const ALLOWED_EXTENSIONS = [
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ".heif",
+  ".zip",
+  ".rar",
+  ".7z",
+];
 
 function parseForm(req) {
   return new Promise((resolve, reject) => {
@@ -43,18 +55,24 @@ function getSingleFile(fileField) {
   return Array.isArray(fileField) ? fileField[0] : fileField;
 }
 
-function isAllowed(file, extensions) {
+// Снимок прямо с камеры телефона приходит без внятного имени — для него
+// расширение берём из mime. Обратный ход запрещён: с `image/png` приезжал
+// `паспорт.html` и ложился в архив Оргкомитету под именем скана паспорта.
+const MIME_EXTENSIONS = {
+  "application/pdf": ".pdf",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+  "image/heic": ".heic",
+  "image/heif": ".heif",
+};
+
+/** Расширение, под которым файл ляжет на диск, либо null — такое не принимаем. */
+function safeExtension(file) {
   const name = (file.originalFilename || file.name || "").toLowerCase();
-  const mime = file.mimetype || "";
+  const byName = ALLOWED_EXTENSIONS.find((extension) => name.endsWith(extension));
 
-  if (mime === "application/pdf" && extensions.includes(".pdf")) {
-    return true;
-  }
-  if (mime.startsWith("image/")) {
-    return true;
-  }
-
-  return extensions.some((extension) => name.endsWith(extension));
+  return byName ?? MIME_EXTENSIONS[file.mimetype] ?? null;
 }
 
 export default async function handler(req, res) {
@@ -85,17 +103,15 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const isPhoto = slot === "photo";
-      const extensions = isPhoto ? IMAGE_EXTENSIONS : DOCUMENT_EXTENSIONS;
+      const extension = safeExtension(file);
 
-      if (!isAllowed(file, extensions)) {
+      if (!extension) {
         return res.status(400).json({
-          error: isPhoto
-            ? `«${label}»: допустимы только изображения (PNG, JPG, JPEG, WEBP).`
-            : `«${label}»: допустимы только PDF или изображения (JPG, JPEG, PNG).`,
+          error: `«${label}»: подойдёт фотография, PDF или архив (JPG, PNG, HEIC, PDF, ZIP).`,
         });
       }
 
+      file.safeExtension = extension;
       uploads[slot] = file;
     }
 

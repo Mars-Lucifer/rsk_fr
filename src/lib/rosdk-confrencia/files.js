@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import JSZip from "jszip";
 import { GENERATED_SLOTS, UPLOAD_SLOTS } from "./slots.js";
+import { buildSubmissionWorkbook } from "./registry.js";
 
 export { GENERATED_SLOTS, UPLOAD_SLOTS };
 
@@ -43,7 +44,7 @@ export async function sendFileResponse(res, filePath, contentType, name, inline 
   res.setHeader("Content-Type", contentType);
   res.setHeader(
     "Content-Disposition",
-    `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`,
+    `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`
   );
   res.setHeader("Content-Length", String(buffer.byteLength));
   return res.status(200).send(buffer);
@@ -101,7 +102,8 @@ export async function sendArchiveResponse(res, submission) {
     return res.status(404).json({ error: "Файлы заявки не найдены." });
   }
 
-  zip.file("submission.json", JSON.stringify(submission, null, 2));
+  // Таблица вместо сырого JSON: Оргкомитет открывает архив в Excel, не в редакторе.
+  zip.file("0-заявка.xlsx", buildSubmissionWorkbook(submission));
 
   return sendZip(res, zip, downloadName(submission, "zip"));
 }

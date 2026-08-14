@@ -1,15 +1,17 @@
 import { getStoredSubmission } from "@/lib/rosdk-confrencia/storage";
 import {
   GENERATED_SLOTS,
-  UPLOAD_SLOTS,
   contentTypeFor,
   sendFileResponse,
   sendGeneratedPackageResponse,
 } from "@/lib/rosdk-confrencia/files";
 import path from "node:path";
 
-// По ссылке заявки отделение забирает и бланки, и собственные загруженные сканы.
-const SLOTS = [...GENERATED_SLOTS, ...UPLOAD_SLOTS];
+// Только бланки. Загруженные сканы отсюда не отдаются: эндпоинт открыт без
+// авторизации — достаточно знать id заявки из адресной строки, а среди сканов
+// лежат развороты паспорта делегата. Отделению они и не нужны: оригиналы у него
+// на руках, а интерфейс кнопки скачивания скана никогда не показывал.
+const SLOTS = GENERATED_SLOTS;
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {

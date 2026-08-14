@@ -1,6 +1,6 @@
 // Проверка комплекта документов РО: `node scripts/check-conferencia-package.mjs`.
 //
-// Ловит три вещи, которые ломаются молча: пороги кворума и голосов расходятся
+// Ловит три вещи, которые ломаются молча: порог голосов расходится
 // с чек-листом Оргкомитета, явочный лист принимает мусорные строки, либо
 // генерация DOCX падает/теряет подставленные данные.
 
@@ -38,6 +38,7 @@ import {
   parseVotesInput,
   requiredQuorum,
   requiredVotesFor,
+  votesAreStale,
 } from "../src/lib/rosdk-confrencia/validation.js";
 import { regionInPrepositional } from "../src/lib/rosdk-confrencia/format.js";
 import { regions } from "../src/lib/rosdk-confrencia/regions.js";
@@ -68,7 +69,8 @@ function attendees(count) {
     fullName: `${SURNAMES[index % SURNAMES.length]} Иван Иванович`,
     passportSeries: "4510",
     passportNumber: `12345${index}`,
-    contact: `+7 (999) 000-00-0${index}`,
+    phone: `+7 (999) 000-00-0${index}`,
+    email: index % 2 === 0 ? `member${index}@college.ru` : "",
   }));
 }
 
@@ -90,7 +92,6 @@ function payload(overrides = {}) {
     city: "Элиста",
     meetingDate: "2026-08-01",
     protocolNumber: "7",
-    totalMembers: 9,
     votesFor: 5,
     votesAgainst: 1,
     votesAbstain: 0,
@@ -110,9 +111,7 @@ function payload(overrides = {}) {
   };
 }
 
-// --- Пороги ровно те, что в чек-листе: кворум «более 50%», решение «не менее 2/3».
-assert.equal(requiredQuorum(9), 5, "из 9 членов кворум — 5 человек");
-assert.equal(requiredQuorum(10), 6, "ровно половина кворума не даёт");
+// --- Порог решения ровно тот, что в чек-листе: «не менее 2/3» от присутствующих.
 assert.equal(requiredVotesFor(6), 4);
 assert.equal(requiredVotesFor(9), 6);
 
@@ -127,22 +126,12 @@ function rejects(overrides, pattern, message) {
   assert.throws(() => parseSubmissionInput(payload(overrides)), pattern, message);
 }
 
-// --- Минимум пять человек на собрании, сколько бы ни было на учёте.
+// --- Минимум пять участников на собрании.
 rejects(
   { attendees: attendees(4), votesFor: 4, votesAgainst: 0 },
-  /не меньше 5 членов/i,
+  /не меньше 5 участников/i,
   "четверо — меньше требуемого минимума",
 );
-
-// --- Кворум поверх минимума: 6 присутствующих из 20 на учёте — меньше половины.
-rejects(
-  { attendees: attendees(6), totalMembers: 20, votesFor: 6, votesAgainst: 0 },
-  /кворум/i,
-  "6 из 20 не кворум",
-);
-
-// --- Явочный лист не может быть длиннее списка членов отделения.
-rejects({ totalMembers: 5 }, /больше человек, чем всего членов/i);
 
 // --- Сумма голосов должна сходиться с числом присутствующих.
 rejects({ votesFor: 6, votesAgainst: 3, votesAbstain: 0 }, /Сумма голосов/i);
@@ -171,7 +160,7 @@ assert.equal(
 const notDeclined = regions.filter((region) => regionInPrepositional(region) === region);
 assert.deepEqual(notDeclined, [], `не склоняются: ${notDeclined.join("; ")}`);
 
-// --- Один человек дважды: иначе кворум и 2/3 считаются от завышенного числа.
+// --- Один человек дважды: иначе 2/3 считаются от завышенного числа.
 const withDuplicate = attendees(6);
 withDuplicate[4] = { ...withDuplicate[1], passportNumber: "999999" };
 rejects({ attendees: withDuplicate }, /встречается дважды/i);
@@ -181,21 +170,28 @@ const withSamePassport = attendees(6);
 withSamePassport[3] = { ...withSamePassport[3], passportNumber: withSamePassport[0].passportNumber };
 rejects({ attendees: withSamePassport }, /один и тот же паспорт/i);
 
-// --- Контакт участника: либо 11 цифр телефона, либо e-mail.
-const badContact = attendees(6);
-badContact[2] = { ...badContact[2], contact: "позвонить в колледж" };
-rejects({ attendees: badContact }, /телефон — 11 цифр/i);
-
+// --- Телефон обязателен и ровно 11 цифр, e-mail — по желанию, но настоящий.
 const shortPhone = attendees(6);
-shortPhone[0] = { ...shortPhone[0], contact: "+7 999 12-34" };
+shortPhone[0] = { ...shortPhone[0], phone: "+7 999 12-34" };
 rejects({ attendees: shortPhone }, /телефон — 11 цифр/i);
 
-const emailContact = attendees(6);
-emailContact[0] = { ...emailContact[0], contact: "member@college.ru" };
+const noPhone = attendees(6);
+noPhone[2] = { ...noPhone[2], phone: "" };
+rejects({ attendees: noPhone }, /укажите телефон/i);
+
+const badEmail = attendees(6);
+badEmail[1] = { ...badEmail[1], email: "почта-без-собаки" };
+rejects({ attendees: badEmail }, /e-mail/i);
+
+// Старые заявки хранили один контакт строкой — они должны читаться по-прежнему.
+const legacyContact = attendees(6).map(({ phone, email, ...rest }) => ({
+  ...rest,
+  contact: "member@college.ru",
+}));
 assert.equal(
-  parseSubmissionInput(payload({ attendees: emailContact })).attendees[0].contact,
+  parseSubmissionInput(payload({ attendees: legacyContact })).attendees[0].contact,
   "member@college.ru",
-  "e-mail вместо телефона допустим",
+  "заявка со старым полем contact принимается",
 );
 
 // --- Реквизиты паспорта в явочном листе собираются на сервере из серии и номера.
@@ -259,6 +255,43 @@ rejects({ delegateAddress: "" }, /обязательные поля/i);
 const future = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
 rejects({ meetingDate: future }, /в будущем/i);
 
+// Но завтрашний день принимается: собрание на Камчатке (UTC+12) идёт, когда
+// сервер в UTC ещё во вчера, и без запаса отклонялись дальневосточные отделения.
+const tomorrow = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10);
+assert.equal(
+  parseSubmissionInput(payload({ meetingDate: tomorrow })).meetingDate,
+  tomorrow,
+  "сутки запаса на часовые пояса",
+);
+
+// --- Ф.И.О. без отчества: у изрядной части граждан его нет.
+assert.equal(
+  parseSubmissionInput(payload({ chairName: "Ким Виктор" })).chairName,
+  "Ким Виктор",
+  "два слова в Ф.И.О. принимаются",
+);
+rejects({ chairName: "Иванов" }, /2 или 3 слов/i);
+rejects({ chairName: "Иванов Иван Иванович Иванов" }, /2 или 3 слов/i);
+
+const twoWordAttendees = attendees(6);
+twoWordAttendees[2] = { ...twoWordAttendees[2], fullName: "Ким Виктор" };
+assert.equal(
+  parseSubmissionInput(payload({ attendees: twoWordAttendees })).attendees[2].fullName,
+  "Ким Виктор",
+  "то же правило в явочном листе",
+);
+
+// --- Явку правят после голосования: протокол с прежними числами недействителен.
+const voted = { votesFor: 5, votesAgainst: 1, votesAbstain: 0 };
+assert.equal(votesAreStale(voted, 6), false, "явка не менялась — протокол в силе");
+assert.equal(votesAreStale(voted, 8), true, "дописали двоих — голоса больше не сходятся");
+assert.equal(votesAreStale(voted, 5), true, "вычеркнули одного — тоже");
+assert.equal(
+  votesAreStale({ votesFor: 0, votesAgainst: 0, votesAbstain: 0 }, 8),
+  false,
+  "ещё не голосовали — отзывать нечего",
+);
+
 // --- Генерация: три файла открываются как DOCX и содержат подставленные данные.
 async function documentText(document) {
   const buffer = await Packer.toBuffer(document);
@@ -272,8 +305,8 @@ assert.match(protocolText, /ПРОТОКОЛ № 7/);
 // Субъект в шапке — в предложном падеже: «...отделения в Республике Калмыкия».
 assert.match(protocolText, /в Республике Калмыкия/);
 assert.match(protocolText, /«01» августа 2026 г\./);
-assert.match(protocolText, /в количестве 6 человек из 9 членов/);
-assert.match(protocolText, /Кворум имеется \(составляет 67%\)/);
+assert.match(protocolText, /в количестве 6 человек/);
+assert.match(protocolText, /Общее собрание правомочно принимать решения/);
 assert.match(protocolText, /«За» — 5, «Против» — 1, «Воздержались» — 0/);
 assert.match(protocolText, /Лебедев Андрей Александрович/);
 assert.match(protocolText, /delegate@example\.ru/);
@@ -282,7 +315,7 @@ assert.match(protocolText, /ул\. Ленина, д\. 1, кв\. 2/);
 const attendanceText = await documentText(buildAttendanceDocument(input));
 assert.match(attendanceText, /Приложение № 1/);
 assert.match(attendanceText, /к Протоколу Общего собрания № 7/);
-assert.match(attendanceText, /Приняли личное участие в Общем собрании: 6 членов/);
+assert.match(attendanceText, /Приняли личное участие в Общем собрании: 6 участников/);
 assert.equal(
   (attendanceText.match(/Паспорт: 45 10 №/g) ?? []).length,
   6,
@@ -397,7 +430,7 @@ await assert.rejects(
 // Образец бланка: вместо значений — те самые метки.
 const sampleText = await documentText(buildTemplateSample("attendance"));
 assert.match(sampleText, /\{\{attendees\.fullName\}\}/);
-assert.match(sampleText, /\{\{quorumPercent\}\}/, "процент кворума в образце тоже метка");
+assert.match(sampleText, /\{\{presentMembers\}\}/, "число участников в образце — метка");
 
 // --- Архив комплекта: имена внутри ZIP не зависят от расширений загруженных сканов.
 const tempDir = await mkdtemp(path.join(tmpdir(), "conferencia-check-"));
@@ -451,9 +484,14 @@ await sendArchiveResponse(archiveRes, storedSubmission);
 assert.equal(archiveRes.statusCode, 200);
 const archiveNames = Object.keys((await JSZip.loadAsync(archiveRes.body)).files);
 assert.ok(archiveNames.includes("1-протокол-подписанный.jpg"), "скан протокола сохраняет .jpg");
-assert.ok(archiveNames.includes("4-паспорт-делегата.pdf"), "копия паспорта сохраняет .pdf");
-assert.ok(archiveNames.includes("5-фото-собрания.png"));
-assert.ok(archiveNames.includes("submission.json"));
+assert.ok(
+  archiveNames.includes("4-паспорт-делегата-разворот.pdf"),
+  "разворот паспорта сохраняет .pdf",
+);
+assert.ok(archiveNames.includes("6-фото-собрания.png"));
+// Оргкомитет открывает архив в Excel: вместо сырого JSON внутри лежит таблица
+// заявки — те же колонки, что и в общей выгрузке по всем отделениям.
+assert.ok(archiveNames.includes("0-заявка.xlsx"));
 assert.ok(
   !archiveNames.includes("2-явочный-лист-подписанный"),
   "отсутствующий скан не попадает в архив пустышкой",
@@ -464,9 +502,16 @@ assert.deepEqual(
   { ...uploadProgress({}), missing: uploadProgress({}).missing.map((item) => item.slot) },
   {
     done: 0,
-    total: 5,
+    total: 6,
     isComplete: false,
-    missing: ["protocolScan", "attendanceScan", "consentScan", "passportScan", "photo"],
+    missing: [
+      "protocolScan",
+      "attendanceScan",
+      "consentScan",
+      "passportScan",
+      "passportRegistrationScan",
+      "photo",
+    ],
   },
 );
 // Пока протокола нет, собрание считается идущим: заявка заполняется по шагам.
@@ -475,14 +520,15 @@ assert.equal(statusFor({ attendanceDocx: "/a.docx" }), STATUS_DRAFT, "один �
 assert.equal(statusFor({ protocolDocx: "/p.docx" }), STATUS_DOCX_GENERATED);
 assert.equal(statusFor({ passportScan: "/x.pdf" }), STATUS_IN_PROGRESS);
 assert.equal(uploadProgress({ passportScan: "/x.pdf", photo: "/y.png" }).done, 2);
-assert.equal(statusFor(storedSubmission.files), STATUS_IN_PROGRESS, "3 из 5 — ещё не пакет");
+assert.equal(statusFor(storedSubmission.files), STATUS_IN_PROGRESS, "3 из 6 — ещё не пакет");
 assert.equal(
   statusFor({
     protocolScan: "a",
     attendanceScan: "b",
     consentScan: "c",
     passportScan: "d",
-    photo: "e",
+    passportRegistrationScan: "e",
+    photo: "f",
   }),
   STATUS_COMPLETE,
 );
@@ -549,6 +595,41 @@ assert.ok(!isAdminConfigured(), "без переменной окружения 
 assert.ok(!isPasswordValid(""), "пароля по умолчанию нет");
 assert.ok(!isSessionTokenValid(token), "без пароля любые токены недействительны");
 
+// --- Персональные ссылки отделений: субъект восстанавливается из токена и только из него.
+// Секрет задаём переменной окружения до первого вызова: тогда проверка не трогает базу.
+process.env.CONFERENCIA_LINK_SECRET = "соль-для-проверки";
+const { regionByToken, regionLinkUrl, regionToken } = await import(
+  "../src/lib/rosdk-confrencia/regionLinks.js"
+);
+
+const tokens = regions.map((region) => regionToken(region));
+
+assert.equal(new Set(tokens).size, regions.length, "у каждого субъекта свой токен");
+assert.equal(regionToken(regions[0]), tokens[0], "токен не меняется от вызова к вызову");
+assert.ok(
+  tokens.every((item) => /^[A-Za-z0-9_-]{12}$/.test(item)),
+  "токен безопасен для адресной строки",
+);
+
+for (const region of [regions[0], regions.at(-1), "Псковская область"]) {
+  assert.equal(regionByToken(regionToken(region)), region, `${region}: токен разбирается обратно`);
+}
+
+assert.equal(regionByToken(""), null);
+assert.equal(regionByToken(null), null);
+assert.equal(regionByToken("aaaaaaaaaaaa"), null, "подобранный токен не проходит");
+assert.equal(regionByToken(regions[0]), null, "название субъекта — не токен");
+assert.equal(
+  regionByToken(regionToken(regions[0]).slice(0, 11)),
+  null,
+  "обрезанный токен не проходит",
+);
+assert.equal(
+  regionLinkUrl("https://rosdk.ru", regions[0]),
+  `https://rosdk.ru/conferencia?k=${tokens[0]}`,
+  "адрес ссылки собран верно",
+);
+
 console.log(
-  "OK: пороги, явочный лист, три бланка, архив, справочник регионов, лимит частоты и сессия админки проверены",
+  "OK: пороги, явочный лист, три бланка, архив, справочник регионов, лимит частоты, сессия админки и ссылки отделений проверены",
 );

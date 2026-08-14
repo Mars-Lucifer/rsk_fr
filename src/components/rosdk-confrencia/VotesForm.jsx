@@ -1,25 +1,39 @@
 import { useState } from "react";
 import { CONFERENCE_DATE } from "@/lib/rosdk-confrencia/slots";
-import { digitsOnly, requiredVotesFor } from "@/lib/rosdk-confrencia/validation";
+import { requiredVotesFor } from "@/lib/rosdk-confrencia/validation";
+import { Combobox } from "./Combobox";
 import { inputClassWithError, labelClass } from "./formFields";
 
-/** Блок 3 собрания: как проголосовали. Из него собирается протокол. */
-export function VotesForm({ submission, onSaved }) {
-  const present = submission.presentMembers;
+/**
+ * Блок 3 собрания: как проголосовали. Из него собирается протокол.
+ * Пока заявки нет, число присутствующих неизвестно — проверяем только на сервере,
+ * когда голоса уйдут вместе с регистрацией.
+ */
+export function VotesForm({ submission, readOnly = false, onSaved, onCancel, onDraft }) {
+  const present = submission?.presentMembers ?? null;
+  // Протокол печатает данные делегата: пока их нет, голоса сервер не примет —
+  // держим их черновиком на странице и дошлём, когда делегат появится.
+  const canSend = Boolean(submission?.delegateName);
 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [votesFor, setVotesFor] = useState(present);
-  const [votesAgainst, setVotesAgainst] = useState(0);
-  const [votesAbstain, setVotesAbstain] = useState(0);
+  // Сохранённые голоса возвращаются в поля: блок остаётся тем же бланком.
+  const stored = Boolean(submission?.files?.protocolDocx);
+  const [votesFor, setVotesFor] = useState(stored ? submission.votesFor : (present ?? ""));
+  const [votesAgainst, setVotesAgainst] = useState(stored ? submission.votesAgainst : 0);
+  const [votesAbstain, setVotesAbstain] = useState(stored ? submission.votesAbstain : 0);
 
-  const minimum = requiredVotesFor(present);
+  const minimum = present === null ? null : requiredVotesFor(present);
   const total = (votesFor || 0) + (votesAgainst || 0) + (votesAbstain || 0);
-  const sumWrong = total !== present;
-  const notElected = !sumWrong && (votesFor || 0) < minimum;
+  const sumWrong = present !== null && total !== present;
+  const notElected = present !== null && !sumWrong && (votesFor || 0) < minimum;
 
-  const numeric = (setter) => (event) => {
-    const digits = digitsOnly(event.target.value).replace(/^0+(?=\d)/, "");
+  // Голосов не может быть больше, чем пришло людей: список ограничен явкой.
+  // Пока регистрации нет, потолок неизвестен — даём разумный запас.
+  const choices = Array.from({ length: (present ?? 30) + 1 }, (_, index) => String(index));
+
+  const pick = (setter) => (raw) => {
+    const digits = String(raw).replace(/\D/g, "");
     setter(digits === "" ? "" : Number(digits));
   };
 
@@ -34,10 +48,18 @@ export function VotesForm({ submission, onSaved }) {
     };
 
     if (sumWrong) {
-      return fail(`Сумма голосов должна равняться числу присутствующих (${present}), сейчас ${total}.`);
+      return fail(
+        `Сумма голосов должна равняться числу присутствующих (${present}), сейчас ${total}.`
+      );
     }
     if (notElected) {
       return fail(`Делегат не избран: «За» должно быть не менее ${minimum} — это две трети.`);
+    }
+
+    if (!canSend) {
+      onDraft({ step: "votes", votesFor, votesAgainst, votesAbstain });
+      setBusy(false);
+      return;
     }
 
     try {
@@ -64,57 +86,77 @@ export function VotesForm({ submission, onSaved }) {
           «Избрать делегатом на Конференцию Общероссийской общественной организации, назначенную на{" "}
           {CONFERENCE_DATE}, —{" "}
           <span className="font-semibold text-slate-900">
-            {submission.delegateName || "Ф. И. О. делегата"}
+            {submission?.delegateName || "Ф. И. О. делегата"}
           </span>
           ».
         </p>
       </div>
 
-      <p className="text-sm text-slate-500">
-        Три числа в сумме должны дать число присутствующих ({present}). Делегат избран при{" "}
-        {minimum} голосах «за» и больше.
-      </p>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <label>
-          <span className={labelClass}>«За»</span>
-          <input
-            required
-            inputMode="numeric"
-            value={votesFor}
-            onChange={numeric(setVotesFor)}
-            className={inputClassWithError(sumWrong || notElected)}
-          />
-        </label>
-        <label>
-          <span className={labelClass}>«Против»</span>
-          <input
-            required
-            inputMode="numeric"
-            value={votesAgainst}
-            onChange={numeric(setVotesAgainst)}
-            className={inputClassWithError(sumWrong)}
-          />
-        </label>
-        <label>
-          <span className={labelClass}>«Воздержались»</span>
-          <input
-            required
-            inputMode="numeric"
-            value={votesAbstain}
-            onChange={numeric(setVotesAbstain)}
-            className={inputClassWithError(sumWrong)}
-          />
-        </label>
-      </div>
-
-      {(sumWrong || notElected) && (
-        <p className="text-xs font-semibold text-rose-600">
-          {sumWrong
-            ? `Сумма голосов ${total}, а присутствует ${present}.`
-            : `Нужно минимум ${minimum} голосов «За»: не менее двух третей от присутствующих.`}
+      {present === null ? (
+        <p className="text-sm text-slate-500">
+          Сумма трёх чисел должна равняться числу присутствующих, а «за» — не менее двух третей от
+          них. Явка подтянется из блока «Регистрация», тогда и сверим.
         </p>
+      ) : (
+        // Колонки фиксированы: при пересчёте строка не переносится и блок не прыгает.
+        <div className="grid gap-x-6 gap-y-1 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 sm:grid-cols-3">
+          <span>
+            Присутствует по явочному листу: <b>{present}</b>
+          </span>
+          <span>
+            Для избрания нужно «за»: <b>{minimum}</b> и больше
+          </span>
+          <span className={sumWrong ? "font-bold text-rose-700" : "text-indigo-700"}>
+            Распределено: {total} из {present}
+          </span>
+        </div>
       )}
+
+      <fieldset disabled={readOnly} className="grid gap-4 md:grid-cols-3">
+        <div>
+          <span className={labelClass}>«За»</span>
+          <Combobox
+            name="votesFor"
+            options={choices}
+            value={String(votesFor)}
+            onChange={pick(setVotesFor)}
+            readOnlyInput
+            inputClassName={inputClassWithError(sumWrong || notElected)}
+          />
+        </div>
+        <div>
+          <span className={labelClass}>«Против»</span>
+          <Combobox
+            name="votesAgainst"
+            options={choices}
+            value={String(votesAgainst)}
+            onChange={pick(setVotesAgainst)}
+            readOnlyInput
+            inputClassName={inputClassWithError(sumWrong)}
+          />
+        </div>
+        <div>
+          <span className={labelClass}>«Воздержались»</span>
+          <Combobox
+            name="votesAbstain"
+            options={choices}
+            value={String(votesAbstain)}
+            onChange={pick(setVotesAbstain)}
+            readOnlyInput
+            inputClassName={inputClassWithError(sumWrong)}
+          />
+        </div>
+      </fieldset>
+
+      {/* Строка под полями всегда на месте: иначе при каждом пересчёте форма
+          подпрыгивала на её высоту. */}
+      <p className="min-h-4 text-xs font-semibold text-rose-600">
+        {sumWrong
+          ? `Сумма голосов ${total}, а присутствует ${present}.`
+          : notElected
+            ? `Нужно минимум ${minimum} голосов «За»: не менее двух третей от присутствующих.`
+            : ""}
+      </p>
 
       {error && (
         <div
@@ -125,14 +167,22 @@ export function VotesForm({ submission, onSaved }) {
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={busy}
-        style={{ width: "auto" }}
-        className="btn-primary inline-flex h-10 cursor-pointer items-center justify-center rounded-lg px-6 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {busy ? "Сохраняем…" : "Сохранить и получить протокол"}
-      </button>
+      {!readOnly && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={busy}
+            style={{ width: "auto" }}
+            className="btn-primary inline-flex h-10 cursor-pointer items-center justify-center rounded-lg px-6 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy
+              ? "Сохраняем…"
+              : canSend
+                ? "Сохранить и получить протокол"
+                : "Сохранить результаты голосования"}
+          </button>
+        </div>
+      )}
     </form>
   );
 }
