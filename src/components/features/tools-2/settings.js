@@ -29,6 +29,7 @@ import {
     parseMayakGuestToken,
     buildMayakGuestUserId,
 } from "./mayakGuestToken";
+import { syncTrainerLocalIdentity } from "./utils/mayakTrainerLocalState.mjs";
 
 const EMPTY_SESSION_INFO = {
     tokenType: "legacy",
@@ -731,6 +732,11 @@ export default function SettingsPage({ goTo }) {
                 }
             }
 
+            // Личность сменилась — состояние прошлого прогона в браузере больше
+            // не наше: у участника userId случайный, сервер отдаст чистые задачи,
+            // а localStorage иначе покажет «пройдено» из прошлой игры.
+            syncTrainerLocalIdentity({ userId, sessionId: sessionInfo.sessionId, token: baseToken });
+
             await addUserToCookies(userId, fullName, {
                 firstName,
                 lastName,
@@ -917,6 +923,10 @@ export default function SettingsPage({ goTo }) {
                     throw new Error(participantPayload.error || "Не удалось зарегистрировать участника в сессии");
                 }
             }
+
+            // Портальный участник входит под своим постоянным id, поэтому новую
+            // игру здесь опознаёт не он, а сессия и токен.
+            syncTrainerLocalIdentity({ userId: nextProfile.id, sessionId: sessionInfo.sessionId, token });
 
             await addUserToCookies(nextCookiePayload.id, nextCookiePayload.name, nextCookiePayload);
             setHasRegisteredUser(true);
@@ -1174,6 +1184,14 @@ export default function SettingsPage({ goTo }) {
             </div>
         );
     };
+
+    // Мастер по своей ссылке идёт в тренажёр напрямую: экран настроек с полем
+    // токена и счётчиком входов ему показывать нечего, а мелькал он ровно до
+    // конца автологина. Пока ошибки нет — не рисуем ничего; сломавшийся токен
+    // роняет условие, и мастер видит обычный экран с причиной.
+    if (isMasterEntry && !tokenError) {
+        return null;
+    }
 
     return (
         <>
