@@ -27,6 +27,7 @@ function primeStores(extra = {}) {
         trainer_v2_sessionStartTime: "1755000000000",
         trainer_v2_buffer: '{"m":["текст"]}',
         trainer_v2_history: '[{"date":"2026-08-01"}]',
+        mayak_session_debug_override: '{"phase":"CONTENT_TYPES","progress":0}',
         portal_profile_cache: "keep-me",
         ...extra,
     });
@@ -48,6 +49,10 @@ test("новая личность сбрасывает прогон, архив 
     assert.equal(globalThis.sessionStorage.has("trainer_v2_currentTaskIndex"), false);
     assert.equal(globalThis.sessionStorage.has("trainer_v2_taskTimer"), false);
 
+    // Отладочный override фазы лежит вне префикса, но к новому прогону
+    // отношения не имеет — иначе рисует чужую фазу поверх честного нуля.
+    assert.equal(globalThis.localStorage.has("mayak_session_debug_override"), false);
+
     assert.equal(globalThis.localStorage.getItem("trainer_v2_history"), '[{"date":"2026-08-01"}]');
     assert.equal(globalThis.localStorage.getItem("portal_profile_cache"), "keep-me");
     assert.equal(globalThis.localStorage.getItem("trainer_v2_prev_session_tasks_log"), '[{"number":"7"}]');
@@ -61,6 +66,8 @@ test("тот же вход состояние не трогает", () => {
     assert.equal(didReset, false);
     assert.equal(globalThis.localStorage.getItem("trainer_v2_completedTasks"), '{"guest-1":{}}');
     assert.equal(globalThis.sessionStorage.getItem("trainer_v2_currentTaskIndex"), "12");
+    // Тот же вход — админ продолжает разбор со своим override, не сбрасываем.
+    assert.equal(globalThis.localStorage.has("mayak_session_debug_override"), true);
 });
 
 // Упрощённая ссылка — legacy-токен без sessionId: отличать входы приходится

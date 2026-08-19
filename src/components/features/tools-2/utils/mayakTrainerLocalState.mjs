@@ -18,6 +18,11 @@ const LOG_KEY = `${TRAINER_PREFIX}_session_tasks_log`;
 // прогон не был завершён штатно, тексты не пропадут совсем.
 const PREV_LOG_KEY = `${TRAINER_PREFIX}_prev_session_tasks_log`;
 const SESSION_KEYS = [`${TRAINER_PREFIX}_currentTaskIndex`, `${TRAINER_PREFIX}_taskTimer`];
+// Отладочный override фазы «Я» для админа в сессии живёт вне префикса и не
+// привязан ни к сессии, ни к участнику: выставил CONTENT_TYPES на разборе —
+// и он рисуется на следующем входе в этом браузере поверх честного нуля.
+// Сносится вместе с прогоном, панель отладки выставит заново при надобности.
+const FOREIGN_KEYS = ["mayak_session_debug_override"];
 
 function getStores() {
     return {
@@ -46,6 +51,7 @@ export function resetTrainerLocalState() {
         if (local) {
             const previousLog = local.getItem(LOG_KEY);
             collectTrainerKeys(local).forEach((key) => local.removeItem(key));
+            FOREIGN_KEYS.forEach((key) => local.removeItem(key));
             if (previousLog) {
                 local.setItem(PREV_LOG_KEY, previousLog);
             }
