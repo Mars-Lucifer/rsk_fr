@@ -4,6 +4,8 @@ import crypto from "crypto";
 import JSZip from "jszip";
 import sharp from "sharp";
 
+import { resolveFormatKey } from "@/lib/mayakProgressModel";
+
 const REGISTRY_FILE = path.join(process.cwd(), "data", "mayak-service-templates.json");
 const TEMPLATES_DIR = path.join(process.cwd(), "data", "mayak-service-templates");
 
@@ -112,7 +114,14 @@ export function resolveFormat(service, formatKey, contentTypeKey) {
         if (found) return found;
     }
     if (contentTypeKey) {
-        const byType = service.formats.find((f) => f.formatKey === contentTypeKey);
+        // Сравниваем канонические ключи, а не строки: формат оператор называет
+        // как ему удобно — «Фото», «Статика», «Динамика», — и при строгом
+        // равенстве такой формат не находился, а молча подставлялся первый
+        // шаблон сервиса. Так шесть заданий с картинками в колоде 401-500
+        // получали текстовый шаблон Qwen вместо «Qwen фото».
+        const byType = service.formats.find(
+            (f) => f.formatKey === contentTypeKey || resolveFormatKey(f.formatKey) === contentTypeKey
+        );
         if (byType) return byType;
     }
     return service.formats[0];
