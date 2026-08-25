@@ -1,5 +1,5 @@
 import { isAdminSession } from "@/lib/rosdk-confrencia/admin";
-import { listStoredSignedSubmissionsByRegion } from "@/lib/rosdk-confrencia/storage";
+import { listStoredSubmissionsByRegion } from "@/lib/rosdk-confrencia/storage";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   }
 
   const region = req.query.region || "";
-  const submissions = await listStoredSignedSubmissionsByRegion(region);
+  const submissions = await listStoredSubmissionsByRegion(region);
 
   return res.status(200).json({ submissions });
 }

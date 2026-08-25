@@ -217,7 +217,6 @@ export default function OverviewPanel({
             return sum + Math.min(tableWe, WE_TABLE_MAX);
         }, 0);
     }, [tables]);
-    const totalWeMax = tables.length * WE_TABLE_MAX;
 
     return (
         <section className={`${styles.panel} ${styles.overviewPanel} ${expanded ? styles.panelExpanded : ""} ${compactWide ? styles.overviewWide : ""}`}>
@@ -344,7 +343,7 @@ export default function OverviewPanel({
                                 <div className={styles.statInfo} style={{ gap: "2px" }}>
                                     <span className={styles.statLabel} style={{ fontSize: "11px" }}>Выполнено</span>
                                     <span className={`${styles.statValue} ${styles.statValuePurple}`} style={{ fontSize: "18px" }}>
-                                        {mode === "we" ? `${totalWeTasks} из ${totalWeMax}` : totalTasks}
+                                        {mode === "we" ? totalWeTasks : totalTasks}
                                     </span>
                                 </div>
                             </div>

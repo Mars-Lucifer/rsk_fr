@@ -328,7 +328,7 @@ export default function ProfileIndexPage({ goTo }) {
                                                 onClick={() => handleArtifactDownload(file.downloadUrl)}
                                                 title={
                                                     file.byteSize
-                                                        ? `${MAYAK_FILE_LABELS[file.kind] || file.fileName} В· ${formatFileSize(file.byteSize)}`
+                                                        ? `${MAYAK_FILE_LABELS[file.kind] || file.fileName} · ${formatFileSize(file.byteSize)}`
                                                         : MAYAK_FILE_LABELS[file.kind] || file.fileName
                                                 }
                                             >

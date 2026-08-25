@@ -139,7 +139,7 @@ async function resolveMayakCertificateNumber(userData) {
 
         return normalizeMayakCertificateNumber(payload?.certificateNumber);
     } catch (error) {
-        console.error("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РЅРѕРјРµСЂ СЃРµСЂС‚РёС„РёРєР°С‚Р°:", error);
+        console.error("Не удалось получить номер сертификата:", error);
         return "";
     }
 }

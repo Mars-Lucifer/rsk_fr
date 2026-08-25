@@ -29,6 +29,7 @@ import {
     parseMayakGuestToken,
     buildMayakGuestUserId,
 } from "./mayakGuestToken";
+import { syncTrainerLocalIdentity } from "./utils/mayakTrainerLocalState.mjs";
 
 const EMPTY_SESSION_INFO = {
     tokenType: "legacy",
@@ -40,6 +41,13 @@ const EMPTY_SESSION_INFO = {
 const TEMP_GUEST_PROFILE = {
     firstName: "МАЯК",
     lastName: "Участник",
+    patronymic: "",
+};
+// Мастер заходит по своей ссылке (?dash=...) — ФИО у него не спрашиваем,
+// подставляем служебный профиль и пускаем сразу, как временного гостя.
+const MASTER_DEMO_PROFILE = {
+    firstName: "демо",
+    lastName: "Мастер",
     patronymic: "",
 };
 const EMPTY_GUEST_FORM = {
@@ -71,7 +79,7 @@ async function validateTokenAPI(tokenValue) {
             tableCount: data.tableCount || 0,
         };
     } catch (error) {
-        console.error("РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё С‚РѕРєРµРЅР°:", error);
+        console.error("Ошибка проверки токена:", error);
         return {
             valid: false,
             isActive: false,
@@ -79,7 +87,7 @@ async function validateTokenAPI(tokenValue) {
             remainingAttempts: 0,
             usageLimit: 0,
             usedCount: 0,
-            error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°",
+            error: "Ошибка сервера",
             isBypass: false,
             tokenType: "legacy",
             sessionId: null,
@@ -104,8 +112,8 @@ async function consumeTokenAPI(tokenValue) {
             isBypass: data.isBypass || false,
         };
     } catch (error) {
-        console.error("РћС€РёР±РєР° РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ С‚РѕРєРµРЅР°:", error);
-        return { success: false, remainingAttempts: 0, error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°", isBypass: false };
+        console.error("Ошибка использования токена:", error);
+        return { success: false, remainingAttempts: 0, error: "Ошибка сервера", isBypass: false };
     }
 }
 
@@ -122,13 +130,16 @@ async function loginMayakAdmin(password) {
             error: data.error || null,
         };
     } catch (error) {
-        console.error("РћС€РёР±РєР° Р°РІС‚РѕСЂРёР·Р°С†РёРё Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°:", error);
-        return { success: false, error: "РћС€РёР±РєР° СЃРµСЂРІРµСЂР°" };
+        console.error("Ошибка авторизации администратора:", error);
+        return { success: false, error: "Ошибка сервера" };
     }
 }
 
 export default function SettingsPage({ goTo }) {
     const router = useRouter();
+    // Мастерский вход опознаём по секрету дашборда в ссылке — он есть только у
+    // мастера. Такой вход не спрашивает ФИО и не выбирает стол.
+    const isMasterEntry = router.isReady && Boolean(String(router.query.dash || "").trim());
     const skipNextTokenEffectRef = useRef(false);
     const portalProfilePayloadRef = useRef(getCachedPortalProfilePayload());
     const isPortalCheckedRef = useRef(hasResolvedPortalProfileCache());
@@ -285,7 +296,7 @@ export default function SettingsPage({ goTo }) {
             syncRegisteredUserState(sessionInfoRef.current, payload, tokenRef.current);
             return payload;
         } catch (error) {
-            console.error("РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РїСЂРѕС„РёР»СЏ РїРѕСЂС‚Р°Р»Р°:", error);
+            console.error("Ошибка получения профиля портала:", error);
             setPortalProfilePayload(null);
             setIsPortalChecked(true);
             return null;
@@ -408,7 +419,7 @@ export default function SettingsPage({ goTo }) {
             if (isAccessible) {
                 setTokenError("");
             } else {
-                setTokenError(result.error || "РўРѕРєРµРЅ РЅРµРґРµР№СЃС‚РІРёС‚РµР»РµРЅ");
+                setTokenError(result.error || "Токен недействителен");
             }
 
             if (portalProfilePayloadRef.current || isPortalCheckedRef.current) {
@@ -537,19 +548,19 @@ export default function SettingsPage({ goTo }) {
     const enterWithDevBypass = useCallback(async () => {
         setBypassPasswordError("");
         if (!bypassPassword) {
-            setBypassPasswordError("Р’РІРµРґРёС‚Рµ РїР°СЂРѕР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°");
+            setBypassPasswordError("Введите пароль администратора");
             return;
         }
 
         const authResult = await loginMayakAdmin(bypassPassword);
         if (!authResult.success) {
-            setBypassPasswordError(authResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґС‚РІРµСЂРґРёС‚СЊ Р»РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ");
+            setBypassPasswordError(authResult.error || "Не удалось подтвердить локальный вход");
             return;
         }
 
         const resolvedTableNumber = String(tableNumber || "").trim();
         if (sessionInfo.tokenType === "session" && !resolvedTableNumber) {
-            setBypassPasswordError("РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІР°С€ СЃС‚РѕР»");
+            setBypassPasswordError("Пожалуйста, выберите ваш стол");
             return;
         }
 
@@ -557,7 +568,7 @@ export default function SettingsPage({ goTo }) {
         const bypassProfile = bypassPayload ? normalizePortalProfile(bypassPayload) : null;
 
         const localUserId = String(bypassProfile?.id || "local-mayak-user").trim();
-        const localFullName = String(bypassProfile?.fullName || "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ").trim() || "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ";
+        const localFullName = String(bypassProfile?.fullName || "Локальный вход").trim() || "Локальный вход";
         const userRecord = {
             id: localUserId,
             portalUserId: localUserId,
@@ -588,7 +599,7 @@ export default function SettingsPage({ goTo }) {
         });
 
         if (!saveResponse.ok) {
-            throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ Р»РѕРєР°Р»СЊРЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РњРђРЇРљ");
+            throw new Error("Не удалось сохранить локального пользователя МАЯК");
         }
 
         if (sessionInfo.tokenType === "session" && sessionInfo.sessionId) {
@@ -606,13 +617,13 @@ export default function SettingsPage({ goTo }) {
 
             const participantPayload = await participantResponse.json().catch(() => ({}));
             if (!participantResponse.ok || !participantPayload.success) {
-                throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ Р»РѕРєР°Р»СЊРЅРѕРіРѕ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
+                throw new Error(participantPayload.error || "Не удалось зарегистрировать локального участника в сессии");
             }
         }
 
         await addKeyToCookies(token);
         setStoredToken(token);
-        await addUserToCookies("dev-bypass", "Р›РѕРєР°Р»СЊРЅС‹Р№ РІС…РѕРґ", {
+        await addUserToCookies("dev-bypass", "Локальный вход", {
             tokenType: "bypass",
         });
         setHasRegisteredUser(true);
@@ -621,25 +632,30 @@ export default function SettingsPage({ goTo }) {
 
     const activateGuestUser = useCallback(async () => {
         if (!isTokenValid) {
-            setGuestFormError("Р’РІРµРґРёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ С‚РѕРєРµРЅ.");
+            setGuestFormError("Введите корректный токен.");
             return;
         }
 
         const tokenMeta = parseMayakGuestToken(token);
-        const firstName = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.firstName : guestForm.firstName) || "").trim();
-        const lastName = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.lastName : guestForm.lastName) || "").trim();
-        const patronymic = String((tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE.patronymic : guestForm.patronymic) || "").trim();
+        // Профиль берём: у мастера — служебный, у временного гостя — гостевой,
+        // у обычного участника — из формы ФИО.
+        const autoProfile = isMasterEntry ? MASTER_DEMO_PROFILE : tokenMeta.isTemporaryGuestToken ? TEMP_GUEST_PROFILE : null;
+        const firstName = String((autoProfile ? autoProfile.firstName : guestForm.firstName) || "").trim();
+        const lastName = String((autoProfile ? autoProfile.lastName : guestForm.lastName) || "").trim();
+        const patronymic = String((autoProfile ? autoProfile.patronymic : guestForm.patronymic) || "").trim();
 
         if (!lastName || !firstName) {
-            setGuestFormError("Р”Р»СЏ РІС…РѕРґР° Р·Р°РїРѕР»РЅРёС‚Рµ С„Р°РјРёР»РёСЋ Рё РёРјСЏ.");
+            setGuestFormError("Для входа заполните фамилию и имя.");
             return;
         }
 
         const resolvedTableNumber =
-            sessionInfo.tokenType === "session" && !String(tableNumber || "").trim() && Number(sessionInfo.tableCount) === 1 ? "1" : String(tableNumber || "").trim();
+            sessionInfo.tokenType === "session" && !String(tableNumber || "").trim() && (Number(sessionInfo.tableCount) === 1 || isMasterEntry)
+                ? "1"
+                : String(tableNumber || "").trim();
 
         if (sessionInfo.tokenType === "session" && !resolvedTableNumber) {
-            setGuestFormError("РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РІС‹Р±РµСЂРёС‚Рµ РІР°С€ СЃС‚РѕР».");
+            setGuestFormError("Пожалуйста, выберите ваш стол.");
             return;
         }
 
@@ -650,7 +666,7 @@ export default function SettingsPage({ goTo }) {
             if (!isStoredTokenActive) {
                 const consumeResult = await consumeTokenAPI(token);
                 if (!consumeResult.success) {
-                    throw new Error(consumeResult.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р°РєС‚РёРІРёСЂРѕРІР°С‚СЊ С‚РѕРєРµРЅ.");
+                    throw new Error(consumeResult.error || "Не удалось активировать токен.");
                 }
                 setTokenRemainingAttempts(consumeResult.remainingAttempts || 0);
                 await addKeyToCookies(token);
@@ -658,7 +674,12 @@ export default function SettingsPage({ goTo }) {
             }
 
             const baseToken = tokenMeta.baseToken || String(token || "").trim();
-            const userId = buildMayakGuestUserId(sessionInfo);
+            // У мастера id стабильный: иначе каждый его вход плодил бы нового
+            // участника в рантайме сессии. Префикс master-demo- отсекается в
+            // дашборде, чтобы демо-вход не попадал в метрики столов.
+            const userId = isMasterEntry
+                ? `master-demo-${String(sessionInfo.sessionId || "session").replace(/[^a-zA-Z0-9_-]+/g, "-")}`
+                : buildMayakGuestUserId(sessionInfo);
             const fullName = [lastName, firstName, patronymic].filter(Boolean).join(" ").trim();
 
             const saveResponse = await fetch("/api/mayak/save", {
@@ -686,7 +707,7 @@ export default function SettingsPage({ goTo }) {
             });
 
             if (!saveResponse.ok) {
-                throw new Error("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РіРѕСЃС‚РµРІРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РњРђРЇРљ");
+                throw new Error("Не удалось сохранить гостевого пользователя МАЯК");
             }
 
             const savePayload = await saveResponse.json().catch(() => ({}));
@@ -707,9 +728,14 @@ export default function SettingsPage({ goTo }) {
 
                 const participantPayload = await participantResponse.json().catch(() => ({}));
                 if (!participantResponse.ok || !participantPayload.success) {
-                    throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ РіРѕСЃС‚РµРІРѕРіРѕ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
+                    throw new Error(participantPayload.error || "Не удалось зарегистрировать гостевого участника в сессии");
                 }
             }
+
+            // Личность сменилась — состояние прошлого прогона в браузере больше
+            // не наше: у участника userId случайный, сервер отдаст чистые задачи,
+            // а localStorage иначе покажет «пройдено» из прошлой игры.
+            syncTrainerLocalIdentity({ userId, sessionId: sessionInfo.sessionId, token: baseToken });
 
             await addUserToCookies(userId, fullName, {
                 firstName,
@@ -735,7 +761,7 @@ export default function SettingsPage({ goTo }) {
         } finally {
             setIsLoading(false);
         }
-    }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isStoredTokenActive, isTokenValid, sessionInfo, tableNumber, token]);
+    }, [goTo, guestForm.firstName, guestForm.lastName, guestForm.patronymic, isMasterEntry, isStoredTokenActive, isTokenValid, sessionInfo, tableNumber, token]);
 
     useEffect(() => {
         if (!showNotification || !isTokenValid || !isGuestMode || !isTemporaryGuestToken || hasRegisteredUser || isLoading || isValidating) {
@@ -744,6 +770,21 @@ export default function SettingsPage({ goTo }) {
 
         activateGuestUser();
     }, [activateGuestUser, hasRegisteredUser, isGuestMode, isLoading, isTemporaryGuestToken, isTokenValid, isValidating, showNotification]);
+
+    // Мастер приходит по своей ссылке (?dash=...): ФИО у него не спрашиваем и
+    // стол не выбираем — если он уже зарегистрирован, ведём внутрь, иначе
+    // регистрируем служебным профилем. Участников это не касается: у них в
+    // ссылке нет dash.
+    useEffect(() => {
+        if (!isMasterEntry || !isTokenValid || isLoading || isValidating) return;
+        if (hasRegisteredUser) {
+            goTo("trainer");
+            return;
+        }
+        if (isGuestMode) {
+            activateGuestUser();
+        }
+    }, [isMasterEntry, isTokenValid, hasRegisteredUser, isGuestMode, isLoading, isValidating, activateGuestUser, goTo]);
 
     const savePortalIdentity = useCallback(async () => {
         const firstName = String(portalIdentityForm.firstName || "").trim();
@@ -879,9 +920,13 @@ export default function SettingsPage({ goTo }) {
 
                 const participantPayload = await participantResponse.json().catch(() => ({}));
                 if (!participantResponse.ok || !participantPayload.success) {
-                    throw new Error(participantPayload.error || "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ СѓС‡Р°СЃС‚РЅРёРєР° РІ СЃРµСЃСЃРёРё");
+                    throw new Error(participantPayload.error || "Не удалось зарегистрировать участника в сессии");
                 }
             }
+
+            // Портальный участник входит под своим постоянным id, поэтому новую
+            // игру здесь опознаёт не он, а сессия и токен.
+            syncTrainerLocalIdentity({ userId: nextProfile.id, sessionId: sessionInfo.sessionId, token });
 
             await addUserToCookies(nextCookiePayload.id, nextCookiePayload.name, nextCookiePayload);
             setHasRegisteredUser(true);
@@ -915,6 +960,16 @@ export default function SettingsPage({ goTo }) {
     const renderPortalGate = () => {
         if (!showNotification || isDevBypass) {
             return null;
+        }
+
+        // Мастер входит без формы ФИО и без выбора стола: пока идёт регистрация,
+        // показываем спокойный лоадер, а не мелькающую форму участника.
+        if (isMasterEntry) {
+            return (
+                <div className="flex flex-col gap-[1rem] items-center">
+                    <span className="big p-3 bg-green-100 text-green-700 rounded-md">Открываем сессию…</span>
+                </div>
+            );
         }
 
         if (isGuestMode) {
@@ -1129,6 +1184,14 @@ export default function SettingsPage({ goTo }) {
             </div>
         );
     };
+
+    // Мастер по своей ссылке идёт в тренажёр напрямую: экран настроек с полем
+    // токена и счётчиком входов ему показывать нечего, а мелькал он ровно до
+    // конца автологина. Пока ошибки нет — не рисуем ничего; сломавшийся токен
+    // роняет условие, и мастер видит обычный экран с причиной.
+    if (isMasterEntry && !tokenError) {
+        return null;
+    }
 
     return (
         <>

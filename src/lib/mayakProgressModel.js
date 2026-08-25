@@ -28,8 +28,10 @@ export function normalizeContentType(value) {
 export const YA_FORMAT_TYPES = [
     { key: "текст", label: "Текст", match: ["текст"] },
     { key: "аудио", label: "Аудио", match: ["аудио"] },
-    // Статика == Изображение (СПО-колоды используют «Статика»)
-    { key: "изображение", label: "Изображение", match: ["изображение", "статика", "изобр"] },
+    // Статика == Изображение (СПО-колоды используют «Статика»).
+    // «Фото» — так назван формат Qwen в реестре шаблонов сервисов; без синонима
+    // шаблон не находился по типу задания «Изображение».
+    { key: "изображение", label: "Изображение", match: ["изображение", "статика", "изобр", "фото"] },
     { key: "интерактив", label: "Интерактив", match: ["интерактив"] },
     // Динамика == Видео (СПО-колоды используют «Динамика»)
     { key: "видео", label: "Видео", match: ["видео", "динамика"] },
@@ -279,6 +281,35 @@ export function validateDeckStandard(tasks) {
 //        (taskStates[], sectionId, yaDirection).
 //   tasks           — колода секции (массив объектов с contentType), 0-based.
 //   fallbackSectionId — sectionId токена, если у участника не задан.
+// --- Раскладки колод ------------------------------------------------------
+// Колоды разложены двумя способами, обе живут на проде:
+//   СПО     — 6 вводных карт, форматы «Я» с 7-й по 47-ю  (1-100, 201-300)
+//   базовая — 9 вводных карт, форматы «Я» с 10-й по 50-ю (401-500, 901-1000,
+//             601-700, 6001-6100, 7001-7100, 8001-8100)
+// Дальше в обеих идёт часть «Мы» — она начинается сразу за форматами.
+//
+// Раньше границы были зашиты числами базовой раскладки (1..10 и 10..50). На
+// СПО это отрезало три первые карты формата и, наоборот, засчитывало четыре
+// текстовые карты как вводные.
+export const DECK_LAYOUTS = {
+    spo: { key: "spo", startCards: 6, formatFrom: 7, formatTo: 47 },
+    base: { key: "base", startCards: 9, formatFrom: 10, formatTo: 50 },
+};
+
+// Раскладку определяем по самой колоде, а не по списку номеров: номер о ней
+// ничего не говорит (201-300 — СПО, 401-500 — базовая, обе «не с единицы»),
+// и такой список пришлось бы дописывать при каждой новой колоде.
+// Признак — что лежит на 7-й карте: у СПО там уже формат, у базовой ещё вводная.
+export function detectDeckLayout(cardByNumber, rangeStart) {
+    const probe = cardByNumber.get(String(rangeStart + DECK_LAYOUTS.spo.formatFrom - 1));
+    const rawType = probe?.contentType || "";
+    const mood = classifyMoodCard(rawType);
+    const isYaFormat = mood.isMood ? mood.standard && mood.section === "ya" : Boolean(resolveFormatKey(rawType));
+    // Неразмеченная колода до сюда доходит с пустым типом — остаётся базовая,
+    // то есть поведение как было.
+    return isYaFormat ? DECK_LAYOUTS.spo : DECK_LAYOUTS.base;
+}
+
 export function computeTrainerYaProgress({
     manualSource = null,
     participant = null,
@@ -335,19 +366,44 @@ export function computeTrainerYaProgress({
     const activeSectionId = participant.sectionId || fallbackSectionId || "";
     const match = String(activeSectionId).match(/^(\d+)-/);
     const rangeStart = match ? parseInt(match[1], 10) : 1;
-    const startPos = rangeStart - 1;
+
+    // Карту ищем по номеру задания, а не по позиции в массиве. Тренажёр
+    // раскладывает колоду по ГЛОБАЛЬНЫМ индексам (у 401-500 первые 400 ячеек —
+    // заглушки), и любой отсчёт от начала массива промахивался в пустоту: тип
+    // читался как пустой, форматы не засчитывались, прогресс залипал на «0 из 6»
+    // у всех колод, кроме 1-100. Номер же от раскладки массива не зависит.
+    const cardByNumber = new Map();
+    (tasks || []).forEach((card) => {
+        const num = String(card?.number ?? "").trim();
+        if (num) cardByNumber.set(num, card);
+    });
+
+    const layout = detectDeckLayout(cardByNumber, rangeStart);
+
+    // Номер задания → позиция внутри колоды (1..100). taskIndex глобальный и
+    // равен номеру минус один — он и остаётся запасным вариантом для старых
+    // записей рантайма без taskNumber.
+    const baseNumberOf = (source) => {
+        const num = Number(source?.taskNumber ?? source?.number);
+        const resolved = Number.isFinite(num) ? num : Number(source?.taskIndex) + 1;
+        return Number.isFinite(resolved) ? resolved - rangeStart + 1 : null;
+    };
+    const cardOf = (ts) => {
+        const num = Number(ts?.taskNumber);
+        if (Number.isFinite(num)) return cardByNumber.get(String(num)) || null;
+        const fallback = Number(ts?.taskIndex) + 1;
+        return Number.isFinite(fallback) ? cardByNumber.get(String(fallback)) || null : null;
+    };
 
     const completedTasks = participant.taskStates.filter(
         (ts) => ts.status === "approved" || ts.status === "expired" || ts.status === "rework_expired"
     );
 
-    // 1. Считаем выполненные задачи в диапазоне Старт (base 1..10)
+    // 1. Вводные карты. Их шесть или девять — смотри detectDeckLayout.
     let startApprovedCount = 0;
     completedTasks.forEach((ts) => {
-        const taskIndex = Number(ts.taskIndex);
-        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
-        const baseNumber = indexInSection + 1;
-        if (baseNumber >= 1 && baseNumber <= 10) {
+        const baseNumber = baseNumberOf(ts);
+        if (baseNumber !== null && baseNumber >= 1 && baseNumber <= layout.startCards) {
             startApprovedCount += 1;
         }
     });
@@ -364,34 +420,27 @@ export function computeTrainerYaProgress({
         };
     }
 
-    // 2. Считаем освоенные форматы части «Я» (base 10..50) через общий
-    // словарь (Статика→изображение, Динамика→видео). Карта настроения
-    // засчитывается только если названа «<Формат> - Карта настроения».
+    // 2. Считаем освоенные форматы части «Я» через общий словарь
+    // (Статика→изображение, Динамика→видео). Карта настроения засчитывается
+    // только если названа «<Формат> - Карта настроения».
     const completedContentTypes = new Set();
     completedTasks.forEach((ts) => {
-        const taskIndex = Number(ts.taskIndex);
-        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
-        const baseNumber = indexInSection + 1;
+        const baseNumber = baseNumberOf(ts);
+        if (baseNumber === null || baseNumber < layout.formatFrom || baseNumber > layout.formatTo) {
+            return;
+        }
 
-        if (baseNumber >= 10 && baseNumber <= 50) {
-            // tasks — колода секции (0-based). indexInSection = baseNumber-1
-            // и есть правильный относительный индекс. Раньше тут брался
-            // globalTaskIndex (startPos+...), что для секций не с 1 давало
-            // выход за границы массива → формат не зачитывался и прогресс
-            // залипал в фазе «Типы контента».
-            const taskObj = tasks[indexInSection];
-            const rawType = taskObj?.contentType || "";
-            const mood = classifyMoodCard(rawType);
-            if (mood.isMood) {
-                if (mood.standard && mood.section === "ya" && mood.key) {
-                    completedContentTypes.add(mood.key);
-                }
-                return;
+        const rawType = cardOf(ts)?.contentType || "";
+        const mood = classifyMoodCard(rawType);
+        if (mood.isMood) {
+            if (mood.standard && mood.section === "ya" && mood.key) {
+                completedContentTypes.add(mood.key);
             }
-            const fmtKey = resolveFormatKey(rawType);
-            if (fmtKey) {
-                completedContentTypes.add(fmtKey);
-            }
+            return;
+        }
+        const fmtKey = resolveFormatKey(rawType);
+        if (fmtKey) {
+            completedContentTypes.add(fmtKey);
         }
     });
 
@@ -426,20 +475,18 @@ export function computeTrainerYaProgress({
     // yaDirection — canonical-ключ формата; сравниваем нормализованные ключи.
     const targetFormatKey = resolveFormatKey(yaDirection);
     completedTasks.forEach((ts) => {
-        const taskIndex = Number(ts.taskIndex);
-        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
-        const baseNumber = indexInSection + 1;
+        const baseNumber = baseNumberOf(ts);
+        if (baseNumber === null || baseNumber < layout.formatFrom || baseNumber > layout.formatTo) {
+            return;
+        }
 
-        if (baseNumber >= 10 && baseNumber <= 50) {
-            const taskObj = tasks[indexInSection];
-            const rawType = taskObj?.contentType || "";
-            const mood = classifyMoodCard(rawType);
-            const fmtKey = mood.isMood
-                ? (mood.standard && mood.section === "ya" ? mood.key : null)
-                : resolveFormatKey(rawType);
-            if (fmtKey && targetFormatKey && fmtKey === targetFormatKey) {
-                specTasks.push(ts);
-            }
+        const rawType = cardOf(ts)?.contentType || "";
+        const mood = classifyMoodCard(rawType);
+        const fmtKey = mood.isMood
+            ? (mood.standard && mood.section === "ya" ? mood.key : null)
+            : resolveFormatKey(rawType);
+        if (fmtKey && targetFormatKey && fmtKey === targetFormatKey) {
+            specTasks.push(ts);
         }
     });
 
@@ -475,9 +522,9 @@ export function computeTrainerYaProgress({
     }
 
     // 4. Часть «Я» завершена → «Индекс цифровой зрелости» части «Мы»: сколько
-    // заданий распознанных направлений (base 51..99) выполнено из всех таких
-    // в колоде. Карта настроения засчитывается направлению только по стандарту.
-    const WE_FROM = 51;
+    // заданий распознанных направлений выполнено из всех таких в колоде.
+    // Карта настроения засчитывается направлению только по стандарту.
+    const WE_FROM = layout.formatTo + 1;
     const WE_TO = 99;
     const recognizeDirection = (rawType) => {
         const mood = classifyMoodCard(rawType);
@@ -487,21 +534,18 @@ export function computeTrainerYaProgress({
     };
 
     let weTotal = 0;
-    (tasks || []).forEach((taskObj, idx) => {
-        const base = idx + 1;
-        if (base >= WE_FROM && base <= WE_TO && recognizeDirection(taskObj?.contentType || "")) {
+    (tasks || []).forEach((card) => {
+        const base = baseNumberOf(card);
+        if (base !== null && base >= WE_FROM && base <= WE_TO && recognizeDirection(card?.contentType || "")) {
             weTotal += 1;
         }
     });
 
     let weDone = 0;
     completedTasks.forEach((ts) => {
-        const taskIndex = Number(ts.taskIndex);
-        const indexInSection = taskIndex < startPos ? taskIndex : taskIndex - startPos;
-        const baseNumber = indexInSection + 1;
-        if (baseNumber >= WE_FROM && baseNumber <= WE_TO) {
-            const taskObj = tasks[indexInSection];
-            if (recognizeDirection(taskObj?.contentType || "")) {
+        const baseNumber = baseNumberOf(ts);
+        if (baseNumber !== null && baseNumber >= WE_FROM && baseNumber <= WE_TO) {
+            if (recognizeDirection(cardOf(ts)?.contentType || "")) {
                 weDone += 1;
             }
         }

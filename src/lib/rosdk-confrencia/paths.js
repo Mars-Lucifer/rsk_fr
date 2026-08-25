@@ -1,15 +1,10 @@
 import path from "node:path";
 
+// Заявки и сканы должны переживать перезапуск, поэтому только постоянный диск.
+// Ветки на эфемерный /tmp здесь быть не должно: на serverless заявки исчезали бы
+// между запросами. Для другого расположения — CONFERENCIA_DATA_DIR.
 export const DATA_DIR =
-  process.env.VERCEL === "1"
-    ? path.join("/tmp", "rsk-protocol-mvp")
-    : path.join(process.cwd(), "data");
+  process.env.CONFERENCIA_DATA_DIR || path.join(process.cwd(), "data");
 
 export const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 export const DB_PATH = path.join(DATA_DIR, "rsk.sqlite");
-export const TEMPLATE_PATH = path.join(
-  process.cwd(),
-  "public",
-  "templates",
-  "protocol-template.docx",
-);
