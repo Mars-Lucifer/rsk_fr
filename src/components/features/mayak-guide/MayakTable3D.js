@@ -7,14 +7,18 @@ import * as THREE from "three";
 
 import { BOARD_MM } from "./fieldLayout.mjs";
 import { CARD_MM, CLOTH_SURFACE, DECK_BOX, JETON_BOX, MEEPLE_TRAY, READ_ROW, ROLES_AT, STAR_TRAY, TABLE } from "./tableSpots.mjs";
-import { MY_PHASES, VOICE_SRC, YA_PHASES, buildMy, buildYa } from "./tableScript.mjs";
+import { MY_PHASES, VOICE_SRC, YA_PHASES, buildMy, buildYa, readSlots } from "./tableScript.mjs";
+import { MY_PLANS, TYPE_IDS, allowedCells, phaseOf, sideFinished, taktLabel } from "./guideRules.mjs";
 import { ClothFieldGroup } from "./FieldCloth3D";
 import { JetonsGroup } from "./Jetons3D";
 import { CARD_NORMAL, CARD_OPEN, CardPinsGroup, pinWorld } from "./CardPins3D";
 import { PINS } from "./cardPins.mjs";
 import { ROLE_FOCUS, RoleCardsGroup } from "./RoleCards3D";
-import TableDecks3D, { BOX_SPOTS } from "./TableDecks3D";
-import Meeples3D from "./Meeples3D";
+import TableDecks3D, { BOX_SPOTS, DECK_ID } from "./TableDecks3D";
+import { YA_DECKS } from "./fieldLayoutYa.mjs";
+import Meeples3D, { meepleTray } from "./Meeples3D";
+import { CELLS, MEEPLE_COLORS, TYPES, cellOutline, cellToMeters, outward as outwardYa, pxToMeters as pxToMetersYa } from "./fieldLayoutYa.mjs";
+import useGuideRoom from "./useGuideRoom";
 import Stars3D from "./Stars3D";
 import MayakokoPanel from "./MayakokoPanel";
 import PromptLaptop3D, { LAPTOP_SPOT } from "./PromptLaptop3D";
@@ -359,6 +363,161 @@ function DeckPick({ spot, chosen, onPick }) {
     );
 }
 
+// Ячейка поля в живом режиме: подсветка ровно по печатному контуру клетки — гекс у
+// лучей и СТАРТа, сектор кольца у обоих кругов. Круглым пятном это делать нельзя: игрок
+// целится в круг, а фишка встаёт в гекс, и на соседних клетках пятна перекрываются.
+//
+// Появляется, только когда участник взял свою фишку: двадцать девять горящих клеток
+// превращают поле в панель управления, а оно прежде всего игровое поле.
+//
+// Геометрия строится один раз на клетку и живёт в кэше: контуры одинаковых форм
+// отличаются только положением, а материал у каждой свой — у них разная прозрачность.
+const CELL_GEOMETRY = new Map();
+
+// Ширина рамки в единицах растра поля: 9 из 1984 на ширину 700 мм — это чуть больше
+// трёх миллиметров, как рисованный кант на самом поле.
+const CELL_INSET = 9;
+
+function cellGeometry(id) {
+    if (CELL_GEOMETRY.has(id)) return CELL_GEOMETRY.get(id);
+    const outline = cellOutline(id);
+    const inner = cellOutline(id, CELL_INSET);
+    const inner2 = cellOutline(id, CELL_INSET * 2);
+    if (!outline || !inner || !inner2) return null;
+
+    // Форма строится в плоскости XY и кладётся на стол поворотом группы на −90° по X.
+    // Этот поворот переводит Y фигуры в −Z сцены, поэтому Z контура берётся со знаком
+    // минус — иначе поле подсвечивается зеркально, ближним краем за дальний.
+    const flat = (points) => points.map((p) => new THREE.Vector2(p.x, -p.z));
+    const shape = new THREE.Shape(flat(outline));
+    const fill = new THREE.ShapeGeometry(shape);
+
+    // Рамка — кольцо между внешним контуром и ужатым: линия WebGL всегда в один пиксель
+    // и на общем плане пропадает, а кольцу можно задать настоящую толщину.
+    const ring = new THREE.Shape(flat(outline));
+    ring.holes.push(new THREE.Path(flat(inner)));
+    const edge = new THREE.ShapeGeometry(ring);
+
+    // Второй кант, светлый, изнутри тёмного. Нужен из-за самого поля: тёмная рамка
+    // пропадает на синих секторах внутреннего круга, светлая — на белых лучах. Вместе
+    // они читаются на любом фоне, и это тот же приём, что у дорожной разметки.
+    const glowRing = new THREE.Shape(flat(inner));
+    glowRing.holes.push(new THREE.Path(flat(inner2)));
+    const glow = new THREE.ShapeGeometry(glowRing);
+
+    const made = { fill, edge, glow };
+    CELL_GEOMETRY.set(id, made);
+    return made;
+}
+
+// Спокойная клетка обозначена рамкой и едва тронута заливкой, под курсором — загорается
+// и чуть приподнимается. Рамка тёмная, а не светлая: поле почти сплошь белое, и светлый
+// кант на нём пропадает, тогда как тёмный читается и на белом, и на цветных секторах.
+// В покое клетка обозначена только кантом, без заливки: двадцать девять залитых клеток
+// и мутят рисунок поля, и стоят заметного числа кадров — прозрачные поверхности во весь
+// экран дороги. Заливка приходит там, где она что-то значит: под курсором и под фишкой.
+const CELL_REST = { fill: 0, edge: 0.34, glow: 0.22, lift: 0 };
+const CELL_HOVER = { fill: 0.42, edge: 0.92, glow: 0.85, lift: 0.0022 };
+const CELL_HERE = { fill: 0.2, edge: 0.6, glow: 0.45, lift: 0 };
+
+// Ниже этого порога слой не рисуется вовсе: невидимая прозрачная поверхность стоит
+// столько же, сколько видимая.
+const CELL_MIN = 0.015;
+
+// Высота подсветки над сукном. Здесь два требования тянут в разные стороны: ниже 5 мм
+// подсветка тонет в полотне (ткань симулируется и лежит выше отметки CLOTH_SURFACE на
+// свою толщину и провис), а выше — начинает заметно расходиться с рисунком поля, потому
+// что камера смотрит на стол под углом и всякий зазор даёт параллакс. На 12 мм рамки
+// уезжали с печатных клеток на треть гекса; 6 мм держат и то, и другое.
+const CELL_Y = CLOTH_SURFACE + 0.006;
+
+const noPick = () => null;
+
+function CellPick({ cell, here, mineColor, delay, onPick, onHover }) {
+    // Клетка, где фишка стоит сейчас, обведена её собственным цветом; остальные — тёмным
+    // кантом, который одинаково читается на белом поле и на цветных секторах.
+    const edgeColor = here ? mineColor : "#2a221b";
+    const group = useRef(null);
+    const fillRef = useRef(null);
+    const edgeRef = useRef(null);
+    const glowRef = useRef(null);
+    const hover = useRef(false);
+    const born = useRef(0);
+    const geometry = useMemo(() => cellGeometry(cell.id), [cell.id]);
+
+    // Клетки зажигаются волной от центра поля, а не все разом: волна показывает, что
+    // открылось поле целиком, и глаз успевает прочесть раскладку. При системном запрете
+    // анимации волны нет — клетки просто появляются.
+    const calm = useMemo(
+        () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+        []
+    );
+
+    useFrame((_, dt) => {
+        if (!group.current || !fillRef.current || !edgeRef.current || !glowRef.current) return;
+        born.current += dt;
+        const wave = calm ? 1 : Math.min(1, Math.max(0, (born.current - delay) / 0.26));
+        const target = hover.current ? CELL_HOVER : here ? CELL_HERE : CELL_REST;
+        // Схождение к цели за кадр-независимое время — тот же приём, что у пятен предметов.
+        const k = 1 - Math.pow(0.0009, dt);
+        for (const [node, want] of [
+            [fillRef.current, target.fill],
+            [edgeRef.current, target.edge],
+            [glowRef.current, target.glow],
+        ]) {
+            const next = node.material.opacity + (want * wave - node.material.opacity) * k;
+            node.material.opacity = next;
+            // Ловушка курсора живёт на заливке, поэтому её меш гасится не visible, а
+            // прозрачностью: невидимый visible=false перестал бы ловить клик.
+            if (node !== fillRef.current) node.visible = next > CELL_MIN;
+        }
+        group.current.position.y += (CELL_Y + target.lift - group.current.position.y) * k;
+        const scale = calm ? 1 : 0.94 + 0.06 * wave;
+        group.current.scale.setScalar(scale);
+    });
+
+    if (!geometry) return null;
+
+    return (
+        <group ref={group} position={[0, CELL_Y, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh
+                ref={fillRef}
+                geometry={geometry.fill}
+                onPointerOver={(event) => {
+                    event.stopPropagation();
+                    hover.current = true;
+                    onHover(cell);
+                    document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                    hover.current = false;
+                    onHover(null);
+                    document.body.style.cursor = "";
+                }}
+                onClick={(event) => {
+                    event.stopPropagation();
+                    hover.current = false;
+                    onHover(null);
+                    document.body.style.cursor = "";
+                    onPick(cell.id);
+                }}>
+                <meshBasicMaterial color="#f4d9a2" transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+            </mesh>
+
+            {/* Рамка — главный сигнал «сюда можно»; заливка лишь придерживает клетку,
+                чтобы кант не читался как царапина на поле. Своя клетка обведена цветом
+                своей фишки: так видно, откуда фишка пойдёт. */}
+            <mesh ref={edgeRef} geometry={geometry.edge} raycast={noPick} position={[0, 0, 0.0002]}>
+                <meshBasicMaterial color={edgeColor} transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+            </mesh>
+
+            <mesh ref={glowRef} geometry={geometry.glow} raycast={noPick} position={[0, 0, 0.0003]}>
+                <meshBasicMaterial color="#fff4dc" transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+            </mesh>
+        </group>
+    );
+}
+
 function Table() {
     return (
         <RigidBody type="fixed" colliders={false}>
@@ -571,6 +730,234 @@ export default function MayakTable3D() {
     const script = useMemo(() => (side === "ya" ? buildYa() : buildMy()), [side]);
     const phases = side === "ya" ? YA_PHASES : MY_PHASES;
     const step = script[Math.min(index, script.length - 1)];
+
+    // Два режима одной сцены. «Демонстрация» — сценарная партия, как была: стол
+    // разыгрывает себя сам. «Обучение» — живой стол: шесть мест, у каждого свой мипл,
+    // позиции лежат на сервере, и участники ходят одновременно.
+    //
+    // Прототип. Своё маленькое хранилище комнаты вместо сессионного рантайма МАЯКа взято
+    // сознательно: там вход через админскую сессию со столами и ролями, а здесь нужен
+    // один стол и ссылка, которую мастер шлёт участнику.
+    const [mode, setMode] = useState("demo");
+    const live = mode === "live";
+    // Токен из ссылки-приглашения читается один раз при монтировании и передаётся в хук:
+    // он должен побеждать токен, сохранённый в этом браузере с прошлого занятия.
+    const invite = useMemo(() => {
+        if (typeof window === "undefined") return "";
+        return new URLSearchParams(window.location.search).get("join") || "";
+    }, []);
+    // Ключ мастера тоже может прийти ссылкой — так роль возвращается после очистки
+    // кэша или переезда за другой ноутбук.
+    const inviteMaster = useMemo(() => {
+        if (typeof window === "undefined") return "";
+        return new URLSearchParams(window.location.search).get("master") || "";
+    }, []);
+    const room = useGuideRoom({ active: live, invite, inviteMaster });
+    // Взял ли участник свою фишку в руку. Пока не взял, ячейки поля курсор не ловят.
+    const [holding, setHolding] = useState(false);
+    // Клетка под курсором — её название показывается в подписи внизу кадра. Без имени
+    // подсветка говорит «сюда можно», но не говорит куда именно: лучи всех шести типов
+    // выглядят одинаково, и с высоты камеры их не различить.
+    const [hoveredCell, setHoveredCell] = useState(null);
+    const [joinToken, setJoinToken] = useState("");
+    const [joinName, setJoinName] = useState("");
+    const [copied, setCopied] = useState("");
+
+    // Ссылка приглашения открывается сразу в живом режиме с подставленным токеном:
+    // участник получил её в мессенджере, и первый экран у него — «сесть за стол»,
+    // а не демонстрация, из которой ещё надо переключиться.
+    useEffect(() => {
+        if (!invite) return;
+        setJoinToken(invite);
+        setMode("live");
+    }, [invite]);
+
+    const seats = room.room?.seats || [];
+    const mySeat = room.seatIndex;
+    const mySeatState = mySeat === null ? null : seats[mySeat] || null;
+    const myCell = mySeatState?.cell || null;
+
+    // Клетки, открытые этому месту прямо сейчас. Считает тот же модуль, по которому
+    // сервер проверяет ход, поэтому «подсвечено, но не принято» невозможно.
+    const openCells = useMemo(() => {
+        if (!live || !room.room || !mySeatState) return [];
+        return allowedCells(room.room, mySeatState);
+    }, [live, room.room, mySeatState]);
+
+
+    // Живой стол ведёт сервер, а сценарий двигает те же шесть фишек. Вместе они дерутся
+    // за миплы, поэтому при входе в режим партия останавливается и стол расчищается.
+    const switchMode = useCallback(
+        (next) => {
+            if (next === mode) return;
+            setPlay((current) => ({ ...current, playing: false, started: false, index: 0 }));
+            setHolding(false);
+            decksRef.current?.returnAll();
+            starsRef.current?.returnAll();
+            jetonsRef.current?.pack();
+            meeplesRef.current?.home();
+            setMode(next);
+            // Живой стол смотрят с поля: на общем плане фишка размером с ноготь, и
+            // попасть по ячейке нельзя.
+            setFocus(next === "live" ? "field" : null);
+        },
+        [mode]
+    );
+
+    // Раскладка живого стола: каждое место едет на свою ячейку, пустое — в лоток.
+    // Ячейку в точку переводит сцена по fieldLayoutYa — сервер хранит только ярлык.
+    //
+    // Команда идёт по общим фазам одной клеткой на всех, поэтому фишки на ней надо
+    // разводить: место в кластере считается не по номеру места, а по порядку среди тех,
+    // кто на этой клетке стоит. Иначе одинокая фишка встаёт не в центр клетки, а в угол,
+    // где было бы её место в шестёрке.
+    const cellsKey = seats.map((seat) => seat.cell ?? "-").join("|");
+    useEffect(() => {
+        if (!live || !meeplesRef.current || !seats.length) return;
+        const crowd = new Map();
+        for (const seat of seats) {
+            if (!seat.cell) continue;
+            crowd.set(seat.cell, (crowd.get(seat.cell) || 0) + 1);
+        }
+        const seen = new Map();
+        meeplesRef.current.moveTo(
+            seats.map((seat) => {
+                if (!seat.cell) return meepleTray(seat.index);
+                const order = seen.get(seat.cell) || 0;
+                seen.set(seat.cell, order + 1);
+                const total = crowd.get(seat.cell) || 1;
+                // Одна фишка — ровно в центр клетки; несколько — сеткой, как в демо.
+                return total < 2 ? cellToMeters(seat.cell, 0, 0) : cellToMeters(seat.cell, order);
+            })
+        );
+        // Зависимость по ярлыкам, а не по массиву seats: он новый после каждого опроса,
+        // и раскладка перезапускала бы шаг фишки сорок раз в минуту — на чужих экранах
+        // это выглядело как дёрганье.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [live, cellsKey]);
+
+    // Карты появляются у всех одинаково, потому что порядок раздачи диктует сервер:
+    // в журнале стола лежат события «убрать со стола» и «выдать карту из стопки», и
+    // клиент проигрывает те, что новее уже применённых. Сама колода снимает верхнюю
+    // карту, поэтому при одинаковом порядке событий у шестерых совпадают и лица карт.
+    const appliedEvent = useRef(0);
+    const events = room.room?.events;
+    useEffect(() => {
+        if (!live || !decksRef.current || !decksReady || !events?.length) return;
+        const deck = decksRef.current;
+        for (const event of events) {
+            if (event.n <= appliedEvent.current) continue;
+            appliedEvent.current = event.n;
+
+            if (event.kind === "reset") {
+                deck.returnAll();
+                starsRef.current?.returnAll();
+                jetonsRef.current?.pack();
+                meeplesRef.current?.home();
+                deck.layout();
+                continue;
+            }
+            // Полотно переворачивают на сторону «МЫ»: сперва стол расчищают, и только
+            // потом берутся за ткань — иначе половина набора исчезает на глазах.
+            if (event.kind === "flip") {
+                deck.returnAll();
+                starsRef.current?.returnAll();
+                jetonsRef.current?.pack();
+                meeplesRef.current?.home();
+                fieldRef.current?.run("flip");
+                window.setTimeout(() => decksRef.current?.layout(), CLEAR_MS + FLIP_MS);
+                continue;
+            }
+            if (event.kind === "park") {
+                deck.parkDealt();
+                continue;
+            }
+            // Такт «МЫ»: девять жетонов рубашкой вверх — это зафиксированный план, и
+            // только под них уходят карты заданий.
+            if (event.kind === "jetons-lay") {
+                jetonsRef.current?.setTakt(event.takt);
+                jetonsRef.current?.layTakt(event.takt);
+                continue;
+            }
+            if (event.kind === "jetons-flip") {
+                jetonsRef.current?.flipTakt(event.takt);
+                continue;
+            }
+            // Принятая задача — звезда на трек индекса зрелости. Очередь по клетке:
+            // девять звёзд одним кадром читаются как вспышка, а не как взятые предметы.
+            if (event.kind === "star") {
+                starsRef.current?.place(event.dir, event.cell * 0.09);
+                continue;
+            }
+            if (event.kind === "jokers") {
+                starsRef.current?.jokers();
+                continue;
+            }
+            // Итог «Я»: красная звезда ложится рядом с фишкой того, кто закрыл луч.
+            // Трека на этой стороне нет, поэтому звезда лежит на поле, а не на нём.
+            if (event.kind === "joker-ya") {
+                const type = TYPES.find((entry) => entry.id === event.typeId);
+                if (type) starsRef.current?.joker(pxToMetersYa(outwardYa(type.ray[2], 78)), event.seatIndex * 0.12);
+                continue;
+            }
+            if (event.kind !== "deal") continue;
+            // Общая карта такта ложится по центру ряда разбора, карта специализации — в
+            // своё место ряда из шести, а девять карт такта «МЫ» — в ряд по числу задач.
+            const to =
+                event.slot === "seat"
+                    ? readSlots(MEEPLE_COLORS.length)[event.seatIndex]
+                    : event.slot === "row"
+                    ? readSlots(event.of || MY_PLANS[0].length)[event.cell]
+                    : readSlots(1)[0];
+            deck.deal(event.stack, to);
+        }
+    }, [live, decksReady, events]);
+
+    // Вход в живой режим: стопки выходят из коробки на поле, как перед партией. Без
+    // этого карты остались бы в коробке и раздавать было бы нечего.
+    useEffect(() => {
+        if (!live || !decksRef.current || !decksReady) return;
+        decksRef.current.layout();
+    }, [live, decksReady]);
+
+    // Сел за стол — камера сразу на поле: с общего плана мипл размером с ноготь, по
+    // ячейке им не попасть, и первое, что делает участник, это ищет своё поле руками.
+    const joinSeat = useCallback(
+        async (token, name) => {
+            const done = await room.join(token, name);
+            if (done) setFocus("field");
+        },
+        [room]
+    );
+
+    // Смена набора заданий: другой адрес и перезагрузка. Колода собирается на загрузке
+    // модуля, поэтому менять её на месте нечем — да и на столе одну колоду сначала
+    // убирают, а потом выкладывают другую.
+    const switchDeck = useCallback((next) => {
+        if (typeof window === "undefined" || next === DECK_ID) return;
+        const url = new URL(window.location.href);
+        if (next === "vuz") url.searchParams.delete("deck");
+        else url.searchParams.set("deck", next);
+        window.location.href = url.toString();
+    }, []);
+
+    // Две разные ссылки: приглашение для участников и ссылка мастера с ключом. Вторая
+    // равна паролю от стола — её не рассылают, ею мастер возвращает себе роль.
+    const copyLink = useCallback(
+        (withMaster) => {
+            if (typeof window === "undefined" || !room.token) return;
+            const base = `${window.location.origin}${window.location.pathname}?join=${room.token}`;
+            const link = withMaster ? `${base}&master=${room.masterKey}` : base;
+            navigator.clipboard?.writeText(link).then(
+                () => {
+                    setCopied(withMaster ? "master" : "invite");
+                    window.setTimeout(() => setCopied(""), 2000);
+                },
+                () => setCopied("")
+            );
+        },
+        [room.token, room.masterKey]
+    );
 
     const api = useCallback(
         () => ({
@@ -880,7 +1267,36 @@ export default function MayakTable3D() {
                                 onHint={(hint) => setAnatomy((current) => ({ ...current, hint }))}
                             />
                         </Suspense>
-                        <Meeples3D ref={meeplesRef} position={[0, CLOTH_SURFACE, 0]} />
+                        <Meeples3D
+                            ref={meeplesRef}
+                            position={[0, CLOTH_SURFACE, 0]}
+                            mine={live ? mySeat : null}
+                            selected={holding}
+                            onPick={live && mySeat !== null ? () => setHolding((current) => !current) : null}
+                        />
+
+                        {/* Открыта клетка текущего такта, и только она: партия идёт
+                            последовательно, прыгать через такт и уходить на чужой луч
+                            нельзя. Подсветка появляется, когда своя фишка в руке. */}
+                        {live && holding && mySeat !== null && (
+                            <group>
+                                {CELLS.filter((cell) => openCells.includes(cell.id)).map((cell) => (
+                                    <CellPick
+                                        key={cell.id}
+                                        cell={cell}
+                                        here={cell.id === myCell}
+                                        mineColor={MEEPLE_COLORS[mySeat]}
+                                        delay={0}
+                                        onHover={setHoveredCell}
+                                        onPick={(id) => {
+                                            room.move(id);
+                                            setHolding(false);
+                                            setHoveredCell(null);
+                                        }}
+                                    />
+                                ))}
+                            </group>
+                        )}
                         <Stars3D ref={starsRef} position={[0, CLOTH_SURFACE, 0]} />
                         <RoleCardsGroup ref={rolesRef} position={ROLES_AT} active={spot?.id === "roles"} onFocusRole={setRole} />
                         </group>
@@ -941,7 +1357,14 @@ export default function MayakTable3D() {
                     <Hotspot
                         key={item.id}
                         spot={item}
-                        dimmed={Boolean(spot)}
+                        // Пятна предметов лежат выше самих предметов и первыми ловят луч.
+                        // В демонстрации это и нужно: по фишке в 24 мм не попасть. Но у
+                        // сидящего за столом фишка — предмет в руке, и пятно кучки её
+                        // накрывает: клик по своему миплу уводил камеру к жетонам вместо
+                        // того, чтобы взять фишку. Погашенное пятно луч не останавливает
+                        // (обработчик выходит без stopPropagation), и клик доходит до того,
+                        // что под ним: до мипла, а с фишкой в руке — до ячейки поля.
+                        dimmed={Boolean(spot) || (live && mySeat !== null && (holding || item.id === "kit"))}
                         onPick={(id) => {
                             leavePrompt();
                             setFocus(id);
@@ -1004,11 +1427,184 @@ export default function MayakTable3D() {
                 </button>
             )}
 
+            {/* Переключатель режимов — сверху по центру, над сценой. Демонстрация
+                остаётся тем, чем была; живой стол включается рядом, а не вместо неё. */}
+            <div className="modes">
+                <button type="button" className={mode === "demo" ? "on" : ""} onClick={() => switchMode("demo")}>
+                    Демонстрация
+                </button>
+                <button type="button" className={live ? "on" : ""} onClick={() => switchMode("live")}>
+                    Обучение
+                </button>
+
+                {/* Набор заданий — тот же переключатель, но про реквизит: поле и фишки
+                    у колод общие, разные только лица карт. */}
+                <span className="sep" />
+                {Object.values(YA_DECKS).map((deck) => (
+                    <button
+                        key={deck.id}
+                        type="button"
+                        className={DECK_ID === deck.id ? "on" : ""}
+                        title={`Колода заданий «${deck.name}»`}
+                        onClick={() => switchDeck(deck.id)}>
+                        {deck.name}
+                    </button>
+                ))}
+            </div>
+
+            {live && (
+                <div className="room">
+                    {!room.token ? (
+                        <>
+                            <strong>Живой стол</strong>
+                            <p>Создайте стол и пришлите ссылку участникам — сядут за него сами, до шести человек.</p>
+                            <button type="button" className="act" disabled={room.busy} onClick={room.create}>
+                                Создать стол
+                            </button>
+                            <div className="or">или войдите по коду</div>
+                            <input
+                                value={joinToken}
+                                onChange={(event) => setJoinToken(event.target.value)}
+                                placeholder="Код стола"
+                                aria-label="Код стола"
+                            />
+                            <input
+                                value={joinName}
+                                onChange={(event) => setJoinName(event.target.value)}
+                                placeholder="Ваше имя"
+                                aria-label="Ваше имя"
+                            />
+                            <button type="button" className="act" disabled={room.busy} onClick={() => joinSeat(joinToken, joinName)}>
+                                Сесть за стол
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <strong>Стол {room.token}</strong>
+                            <button type="button" className="act" onClick={() => copyLink(false)}>
+                                {copied === "invite" ? "Ссылка скопирована" : "Ссылка для участников"}
+                            </button>
+                            {room.isMaster && room.masterKey ? (
+                                <button type="button" className="ghost" title="Открывает стол с правами мастера — не рассылать участникам" onClick={() => copyLink(true)}>
+                                    {copied === "master" ? "Скопирована ссылка мастера" : "Ссылка мастера (только себе)"}
+                                </button>
+                            ) : null}
+
+                            {/* Такт — главное, что нужно знать за столом: где партия и
+                                кого ждут. Считается из состояния комнаты тем же модулем
+                                правил, что и подсветка клетки. */}
+                            {room.room && <div className="takt">{taktLabel(room.room)}</div>}
+
+                            {mySeat === null ? (
+                                <>
+                                    <input
+                                        value={joinName}
+                                        onChange={(event) => setJoinName(event.target.value)}
+                                        placeholder="Ваше имя"
+                                        aria-label="Ваше имя"
+                                    />
+                                    <button type="button" className="act" disabled={room.busy} onClick={() => joinSeat(room.token, joinName)}>
+                                        Занять место
+                                    </button>
+                                </>
+                            ) : (
+                                <p className="hint">
+                                    {room.room?.side === "my"
+                                        ? "Сторона «МЫ»: фишки не ходят. Решайте задания такта, такт закрывает мастер."
+                                        : openCells.length === 0 && myCell
+                                        ? "Ход сделан — ждём остальных."
+                                        : openCells.length === 0
+                                        ? "Ходить некуда: выберите направление или дождитесь такта."
+                                        : holding
+                                        ? "Фишка в руке — открытая клетка подсвечена."
+                                        : "Нажмите на свой мипл, чтобы взять его."}
+                                </p>
+                            )}
+
+                            {/* Направление специализации участник выбирает сам, до того
+                                как команда разойдётся по лучам. От него зависят и
+                                открытый луч, и стопка, из которой придут его карты. */}
+                            {mySeat !== null && !mySeatState?.typeId && room.room?.phase >= 2 && (
+                                <div className="types">
+                                    <span className="or">выберите направление</span>
+                                    <div className="row wrap">
+                                        {TYPE_IDS.map((id) => (
+                                            <button key={id} type="button" className="ghost" onClick={() => room.chooseType(id)}>
+                                                {TYPES.find((type) => type.id === id)?.name || id}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <ul className="seats">
+                                {seats.map((seat) => (
+                                    <li key={seat.index} className={seat.index === mySeat ? "me" : ""}>
+                                        <i style={{ background: MEEPLE_COLORS[seat.index] }} />
+                                        <span className={seat.taken && !seat.online ? "away" : ""}>
+                                            {seat.taken ? seat.name : "свободно"}
+                                            {seat.taken && !seat.online ? " · нет связи" : ""}
+                                        </span>
+                                        {seat.typeId ? <em>{TYPES.find((type) => type.id === seat.typeId)?.name}</em> : null}
+                                        {room.isMaster && seat.taken ? (
+                                            <button type="button" className="free" title="Освободить место" onClick={() => room.freeSeat(seat.index)}>
+                                                ✕
+                                            </button>
+                                        ) : null}
+                                    </li>
+                                ))}
+                            </ul>
+
+                            {/* Панель мастера. Такт закрывает он: инспектора соседнего
+                                стола в прототипе нет, а без приёмки партия не двигается. */}
+                            {room.isMaster && (
+                                <div className="master">
+                                    {room.room?.blocker ? <p className="wait">{room.room.blocker}</p> : null}
+
+                                    {/* Сторона «Я» пройдена — полотно переворачивают на
+                                        «МЫ». Дальше фишки не ходят: там играют жетоны,
+                                        карты направлений и трек индекса зрелости. */}
+                                    {room.room && sideFinished(room.room) && room.room.side === "ya" ? (
+                                        <button type="button" className="act" disabled={room.busy} onClick={room.flipSide}>
+                                            Перевернуть на «МЫ»
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="act"
+                                            disabled={room.busy || (room.room ? sideFinished(room.room) : false)}
+                                            onClick={() => room.accept(Boolean(room.room?.blocker))}>
+                                            {room.room?.side === "my" && room.room?.phase === 1
+                                                ? "Такт закрыт"
+                                                : room.room?.blocker
+                                                ? "Принять такт всё равно"
+                                                : "Задание принято"}
+                                        </button>
+                                    )}
+                                    <button type="button" className="ghost" onClick={room.restart}>
+                                        Партию сначала
+                                    </button>
+                                </div>
+                            )}
+
+                            <button type="button" className="ghost" onClick={room.leave}>
+                                Выйти со стола
+                            </button>
+                        </>
+                    )}
+
+                    {room.error ? <p className="err">{room.error}</p> : null}
+                </div>
+            )}
+
             <div className="hud">
                 <div className="side">
                     {/* Только то, где мы сейчас. Сторону полотна видно на самом полотне,
                         и дублировать её строкой над названием предмета незачем. */}
-                    <strong>{hovered ? hovered.nm : spot ? spot.nm : "Стол мастера"}</strong>
+                    {/* Клетка под курсором вытесняет название предмета: в этот момент
+                        участник целится ходом, и знать надо именно клетку. */}
+                    <strong>{hoveredCell ? hoveredCell.label : hovered ? hovered.nm : spot ? spot.nm : "Стол мастера"}</strong>
+                    {hoveredCell && myCell === hoveredCell.id ? <div className="role">фишка уже здесь</div> : null}
                     {/* Только название роли: всё остальное написано на самой карте, а она
                         в этот момент стоит перед камерой во весь кадр. */}
                     {role && (
@@ -1082,7 +1678,7 @@ export default function MayakTable3D() {
                 предметом, нечестно. Поэтому панель живёт только в фокусе поля.
                 Div, а не aside: глобальные стили портала делают из aside колонку во всю
                 высоту с position: sticky, и накладка уезжает к левому краю. */}
-            {spot?.id === "field" && (
+            {spot?.id === "field" && !live && (
             <div className="panel">
                 {/* Номер шага из подписи убран: шаг виден по подсвеченной фазе и полосе
                     внизу панели, а числом «7 из 14» не пользуются. На его месте — возврат
@@ -1170,6 +1766,172 @@ export default function MayakTable3D() {
             )}
 
             <style jsx>{`
+                /* Переключатель режимов и панель стола — те же материалы, что у остальных
+                   накладок сцены: тёмная подложка с размытием, чтобы читаться и над
+                   белым полотном, и над тёмным столом. */
+                .modes {
+                    position: absolute;
+                    top: 24px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    display: flex;
+                    gap: 4px;
+                    padding: 4px;
+                    border-radius: 999px;
+                    background: rgba(20, 16, 13, 0.72);
+                    backdrop-filter: blur(6px);
+                    z-index: 3;
+                }
+                .modes button {
+                    border: 0;
+                    border-radius: 999px;
+                    padding: 8px 18px;
+                    font-size: 13px;
+                    color: #d8cfbe;
+                    background: transparent;
+                    cursor: pointer;
+                }
+                .modes button.on {
+                    background: #f4efe6;
+                    color: #15110e;
+                }
+                .modes .sep {
+                    width: 1px;
+                    align-self: stretch;
+                    margin: 4px 4px;
+                    background: rgba(244, 239, 230, 0.18);
+                }
+                .room {
+                    position: absolute;
+                    top: 24px;
+                    right: 24px;
+                    width: 268px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    padding: 16px;
+                    border-radius: 14px;
+                    background: rgba(20, 16, 13, 0.82);
+                    backdrop-filter: blur(6px);
+                    color: #f4efe6;
+                    font-size: 13px;
+                    z-index: 3;
+                }
+                .room p {
+                    margin: 0;
+                    color: #b9b0a2;
+                    line-height: 1.45;
+                }
+                .room .hint {
+                    color: #f4d9a2;
+                }
+                .room .err {
+                    color: #e08a7a;
+                }
+                .room .or {
+                    color: #8d857a;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                }
+                .room input {
+                    border: 1px solid rgba(244, 239, 230, 0.18);
+                    border-radius: 8px;
+                    padding: 8px 10px;
+                    background: rgba(244, 239, 230, 0.06);
+                    color: #f4efe6;
+                    font-size: 13px;
+                }
+                .room .act,
+                .room .ghost {
+                    border: 0;
+                    border-radius: 8px;
+                    padding: 9px 12px;
+                    font-size: 13px;
+                    cursor: pointer;
+                }
+                .room .act {
+                    background: #f4efe6;
+                    color: #15110e;
+                }
+                .room .ghost {
+                    background: transparent;
+                    color: #b9b0a2;
+                    border: 1px solid rgba(244, 239, 230, 0.18);
+                }
+                .room .seats {
+                    list-style: none;
+                    margin: 0;
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                }
+                .room .seats li {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    color: #b9b0a2;
+                }
+                .room .seats li.me {
+                    color: #f4efe6;
+                }
+                .room .seats i {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 3px;
+                    flex: 0 0 auto;
+                }
+                .room .seats em {
+                    font-style: normal;
+                    font-size: 11px;
+                    color: #8d857a;
+                    margin-left: auto;
+                }
+                .room .seats .free {
+                    border: 0;
+                    background: none;
+                    color: #8d857a;
+                    cursor: pointer;
+                    padding: 0 2px;
+                    font-size: 12px;
+                }
+                .room .takt {
+                    padding: 7px 10px;
+                    border-radius: 8px;
+                    background: rgba(244, 217, 162, 0.14);
+                    color: #f4d9a2;
+                    font-size: 12px;
+                }
+                .room .row.wrap {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 4px;
+                }
+                .room .row.wrap .ghost {
+                    flex: 1 1 auto;
+                    font-size: 12px;
+                    padding: 6px 8px;
+                }
+                .room .master {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    padding-top: 8px;
+                    border-top: 1px solid rgba(244, 239, 230, 0.14);
+                }
+                .room .master .wait {
+                    color: #f4d9a2;
+                    font-size: 12px;
+                }
+                .room .seats .away {
+                    color: #8d857a;
+                }
+
+                /* На телефоне панель уезжает вниз узкой полосой: на 390 px она накрывала
+                   поле целиком, и играть было нечем — доска видна полосками по краям.
+                   Внизу же она перекрывает только ближнюю кромку стола, где ничего,
+                   кроме ряда разбора, не лежит. */
                 .table3d {
                     position: relative;
                     width: 100%;
@@ -1546,6 +2308,61 @@ export default function MayakTable3D() {
                 @media (prefers-reduced-motion: reduce) {
                     .fill {
                         transition: none;
+                    }
+                }
+
+                /* Мобильные правила идут последними: styled-jsx не поднимает
+                   специфичность медиазапроса, и стоя выше базовых блоков они молча
+                   проигрывали им — панель уезжала вниз, а подписи оставались внахлёст. */
+                @media (max-width: 760px) {
+                    .modes {
+                        top: 10px;
+                        gap: 2px;
+                        padding: 3px;
+                    }
+                    .modes button {
+                        padding: 6px 10px;
+                        font-size: 12px;
+                    }
+                    .room {
+                        top: auto;
+                        right: 8px;
+                        left: 8px;
+                        bottom: 8px;
+                        width: auto;
+                        max-height: 46vh;
+                        overflow-y: auto;
+                        padding: 12px;
+                    }
+                    .room .seats {
+                        flex-direction: row;
+                        flex-wrap: wrap;
+                        gap: 4px 10px;
+                    }
+                    .room .seats li {
+                        font-size: 12px;
+                    }
+                    .room .seats em {
+                        margin-left: 4px;
+                    }
+                    /* Вверху узкого экрана сходятся три накладки: переключатель режимов,
+                       кнопка возврата и подпись места. Разводим по этажам, иначе они
+                       ложатся друг на друга и не читается ни одна. */
+                    .back {
+                        top: 52px;
+                        left: 8px;
+                        font-size: 12px;
+                        padding: 7px 12px;
+                    }
+                    .hud {
+                        bottom: auto;
+                        top: 52px;
+                        left: auto;
+                        right: 8px;
+                        padding: 7px 12px;
+                    }
+                    .hud .side strong {
+                        font-size: 13px;
                     }
                 }
             `}</style>
