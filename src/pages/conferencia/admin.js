@@ -1,14 +1,20 @@
+import { useState } from "react";
+import Head from "next/head";
 import Image from "next/image";
+import { AdminTemplates } from "@/components/rosdk-confrencia/AdminTemplates";
+import { RegionLinks } from "@/components/rosdk-confrencia/RegionLinks";
+import { ClipboardIcon, DocIcon, SearchIcon } from "@/components/rosdk-confrencia/icons";
+import { UPLOAD_SLOTS, uploadProgress } from "@/lib/rosdk-confrencia/slots";
 
 export async function getServerSideProps(context) {
-  const { isAdminSession } = require("@/lib/rosdk-confrencia/admin");
-  const { listStoredSignedSubmissionsByRegion } = require("@/lib/rosdk-confrencia/storage");
+  const { isAdminConfigured, isAdminSession } = require("@/lib/rosdk-confrencia/admin");
+  const {
+    listStoredRegionLinks,
+    listStoredSubmissionsByRegion,
+  } = require("@/lib/rosdk-confrencia/storage");
 
   const req = context.req;
-  const query = context.query;
-  const region = query.region || "";
-  const error = query.error || "";
-
+  const error = context.query.error || "";
   const authorized = isAdminSession(req);
 
   if (!authorized) {
@@ -16,127 +22,240 @@ export async function getServerSideProps(context) {
       props: {
         authorized: false,
         hasError: error === "1",
+        notConfigured: error === "config" || !isAdminConfigured(),
       },
     };
   }
 
-  const submissions = await listStoredSignedSubmissionsByRegion(region);
+  const { listTemplates } = require("@/lib/rosdk-confrencia/templates");
+  const { originFromRequest, regionLinkUrl } = require("@/lib/rosdk-confrencia/regionLinks");
+  const { regions } = require("@/lib/rosdk-confrencia/regions");
+
+  // Всё грузим целиком: 89 субъектов и заявки по ним — это сотни строк,
+  // а поиск и вкладки работают на странице без перезагрузок.
+  const submissions = await listStoredSubmissionsByRegion("");
+  const saved = await listStoredRegionLinks();
+  const origin = originFromRequest(req);
+
+  // Одна строка на субъект: ссылка, ответственный и пакет этого отделения рядом.
+  // Заявка от отделения одна, поэтому её и берём — списком тут смотреть нечего.
+  const links = regions.map((region) => {
+    const own = submissions.find((submission) => submission.region === region) ?? null;
+    const progress = own ? uploadProgress(own.files) : null;
+
+    return {
+      region,
+      url: regionLinkUrl(origin, region),
+      sentAt: saved[region]?.sentAt ?? null,
+      responsibleName: saved[region]?.responsibleName ?? "",
+      responsiblePhone: saved[region]?.responsiblePhone ?? "",
+      responsibleMax: saved[region]?.responsibleMax ?? "",
+      started: Boolean(own),
+      complete: Boolean(progress?.isComplete),
+      submission: own ? JSON.parse(JSON.stringify(own)) : null,
+      scansDone: progress?.done ?? 0,
+      scansTotal: progress?.total ?? UPLOAD_SLOTS.length,
+    };
+  });
 
   return {
     props: {
       authorized: true,
       submissions: JSON.parse(JSON.stringify(submissions)),
-      region,
+      templates: await listTemplates(),
+      links,
     },
   };
 }
 
-export default function AdminPage({ authorized, hasError, submissions, region }) {
+// Ссылки и пакеты — одна таблица: раньше сотрудник искал субъект дважды, в двух
+// вкладках, и сверял глазами, кому отправлено и что от него пришло.
+const TABS = [
+  {
+    key: "links",
+    title: "Отделения",
+    text: "Ссылки, ответственные, пакеты и выгрузки",
+    Icon: ClipboardIcon,
+  },
+  {
+    key: "templates",
+    title: "Бланки документов",
+    text: "Заменить бланк или вернуть встроенный",
+    Icon: DocIcon,
+  },
+];
+
+export default function AdminPage({
+  authorized,
+  hasError,
+  notConfigured,
+  submissions,
+  templates,
+  links,
+}) {
+  const [active, setActive] = useState("links");
+  const [query, setQuery] = useState("");
+
   if (!authorized) {
-    return <LoginPage hasError={hasError} />;
+    return <LoginPage hasError={hasError} notConfigured={notConfigured} />;
   }
 
-  const totalRegions = submissions.length;
-  const totalMembers = submissions.reduce((sum, s) => sum + s.totalMembers, 0);
-  const totalPresent = submissions.reduce((sum, s) => sum + s.presentMembers, 0);
+  const sent = links.filter((item) => item.sentAt).length;
+  const complete = submissions.filter((item) => uploadProgress(item.files).isComplete).length;
+  const scansUploaded = submissions.reduce((sum, item) => sum + uploadProgress(item.files).done, 0);
 
   return (
-    <main className="min-h-screen pb-12 text-slate-800 bg-[#f4f6fa]">
-      <header className="border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4 sm:px-8">
-          <div className="flex items-center gap-4">
-            <Image
-              src="/rsk-logo.png"
-              alt="Российское содружество колледжей"
-              width={240}
-              height={98}
-              className="h-auto w-32 shrink-0 sm:w-40"
-              priority
-            />
-            <div className="h-6 w-px bg-slate-200" />
-            <div>
-              <h1 className="text-lg font-extrabold tracking-tight text-slate-900">Панель управления</h1>
-            </div>
+    <main className="min-h-screen bg-[#f4f6fa] pb-16 text-slate-800">
+      <Head>
+        <title>Панель управления — Конференция РСК</title>
+        {/* Вкладка «Бланки» короче остальных: без этого исчезала полоса прокрутки
+            и вся страница прыгала вбок на её ширину. */}
+        <style>{`html{scrollbar-gutter:stable}`}</style>
+      </Head>
+
+      {/* Шапка обычная, не прилипающая: панель листают длинными таблицами. */}
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-6 px-5 py-5 sm:px-8">
+          <Image
+            src="/rsk-logo.png"
+            alt="Российское содружество колледжей"
+            width={240}
+            height={98}
+            priority
+            className="h-auto w-32 shrink-0 sm:w-40"
+          />
+          <div className="h-8 w-px bg-slate-200" />
+          <div>
+            <p className="!text-sm !font-bold tracking-tight text-slate-900 sm:!text-lg">
+              Панель управления
+            </p>
+            <p className="text-xs text-slate-500 sm:text-sm">
+              Конференция РСК · приём документов от региональных отделений
+            </p>
           </div>
-          <form action="/api/conferencia/admin/logout" method="post">
-            <button className="h-9 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer">
+          <form action="/api/conferencia/admin/logout" method="post" className="ml-auto">
+            <button className="h-9 cursor-pointer rounded-lg border border-slate-200 !bg-white !px-4 !text-sm !font-semibold !text-slate-700 transition hover:!bg-slate-50 !w-auto">
               Выйти
             </button>
           </form>
         </div>
-      </header>
-
-      <section className="mx-auto max-w-7xl px-5 py-6 sm:px-8 space-y-6">
-        {/* Statistics Cards */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="glass-card rounded-xl p-5 bg-white border border-slate-200">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Всего отделений</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-950">{totalRegions}</p>
-          </div>
-          <div className="glass-card rounded-xl p-5 bg-white border border-slate-200">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Всего членов содружества</p>
-            <p className="mt-2 text-3xl font-extrabold text-indigo-600">{totalMembers}</p>
-          </div>
-          <div className="glass-card rounded-xl p-5 bg-white border border-slate-200">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Присутствовало на выборах</p>
-            <p className="mt-2 text-3xl font-extrabold text-emerald-600">
-              {totalPresent} <span className="text-xs text-slate-400 font-normal">({totalMembers > 0 ? Math.round((totalPresent / totalMembers) * 100) : 0}%)</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Filter form */}
-        <form className="grid gap-3 p-1.5 rounded-xl bg-white border border-slate-200 sm:grid-cols-[1fr_auto] shadow-sm">
-          <input
-            name="region"
-            defaultValue={region}
-            placeholder="Поиск по субъекту РФ или городу..."
-            className="h-10 rounded-lg bg-slate-50 border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:border-indigo-500 transition"
-          />
-          <button className="btn-primary h-10 rounded-lg px-6 text-sm font-semibold text-white cursor-pointer">
-            Найти
-          </button>
-        </form>
-
-        {/* Submissions Container */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid grid-cols-[56px_1.5fr_1.8fr_1.2fr_60px_220px] gap-4 border-b border-slate-200 bg-slate-50/50 px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-slate-500 max-lg:hidden items-center">
-            <span>№</span>
-            <span>Регион / Город / Дата</span>
-            <span>Делегат (Контакты & Паспорт)</span>
-            <span>Собрание / Голоса</span>
-            <span className="text-center">Фото</span>
-            <span>Действия / Скачать</span>
-          </div>
-          
-          {submissions.length === 0 ? (
-            <div className="px-6 py-12 text-center text-sm text-slate-400">
-              Загруженных протоколов пока нет.
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {submissions.map((submission, index) => (
-                <SubmissionRow
-                  key={submission.id}
-                  index={index + 1}
-                  submission={submission}
-                />
-              ))}
-            </div>
-          )}
-        </div>
       </section>
+
+      <div className="mx-auto max-w-[1600px] space-y-6 px-5 py-8 sm:px-8">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card label="Ссылок отправлено" value={`${sent} из ${links.length}`} />
+          <Card label="Отделений заполняют" value={submissions.length} tone="text-indigo-600" />
+          <Card label="Пакетов собрано" value={complete} tone="text-emerald-600" />
+          <Card
+            label="Сканов загружено"
+            value={`${scansUploaded} из ${submissions.length * UPLOAD_SLOTS.length}`}
+          />
+        </div>
+
+        <section className="glass-card rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
+          <ol className="grid gap-3 lg:grid-cols-2">
+            {TABS.map((tab, index) => {
+              const current = active === tab.key;
+
+              return (
+                <li key={tab.key}>
+                  <button
+                    type="button"
+                    onClick={() => setActive(tab.key)}
+                    aria-current={current ? "page" : undefined}
+                    className={`h-full w-full flex-col rounded-2xl border p-4 text-left !items-start !justify-start !gap-0 transition ${
+                      current
+                        ? "border-indigo-600 !bg-indigo-50 ring-1 ring-indigo-600"
+                        : "border-slate-200 !bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="flex w-full items-center gap-2.5">
+                      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">
+                        {tab.title}
+                      </span>
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                        <tab.Icon />
+                      </span>
+                    </span>
+                    <span className="mt-2.5 line-clamp-2 block min-h-8 text-xs leading-relaxed text-slate-500">
+                      {tab.text}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+
+        <section className="glass-card space-y-5 rounded-2xl border border-slate-200 bg-white p-6 sm:p-8">
+          {/* Поиск стоит на обеих вкладках: пока он появлялся и исчезал, блок под
+              вкладками менял высоту, и при переключении всё уезжало. На бланках он
+              фильтрует их названия — четыре строки, но место занимает то же. */}
+          <SearchField
+            label={active === "templates" ? "Поиск по названию бланка" : "Поиск по субъекту РФ"}
+            placeholder={active === "templates" ? "Например, протокол" : "Например, ярославская"}
+            value={query}
+            onChange={setQuery}
+          />
+
+          {active === "links" && <RegionLinks links={links} query={query} />}
+          {active === "templates" && <AdminTemplates templates={templates} query={query} />}
+        </section>
+      </div>
     </main>
   );
 }
 
-function LoginPage({ hasError }) {
+/**
+ * Фильтр живой: без кнопки и без перезагрузки. Подпись, лупа и рамка нужны, чтобы
+ * поле читалось как поле — раньше оно сливалось с карточкой. Сброс висит внутри
+ * поля: снаружи он менял высоту блока и дёргал таблицу.
+ */
+function SearchField({ label, placeholder, value, onChange }) {
   return (
-    <main className="grid min-h-screen place-items-center px-5 text-slate-800 bg-[#f4f6fa]">
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-semibold text-slate-700">{label}</span>
+      <span className="relative block">
+        <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className="h-11 w-full rounded-lg border-2 border-slate-300 bg-white pl-10 pr-24 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="absolute right-2 top-1/2 h-8 -translate-y-1/2 rounded-md border border-slate-200 !bg-white !px-3 !text-xs !font-semibold !text-slate-600 hover:!bg-slate-50 !w-auto cursor-pointer"
+          >
+            Сбросить
+          </button>
+        )}
+      </span>
+    </label>
+  );
+}
+
+function Card({ label, value, tone = "text-slate-950" }) {
+  return (
+    <div className="glass-card rounded-xl border border-slate-200 bg-white p-5">
+      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
+      <p className={`mt-2 text-3xl font-extrabold ${tone}`}>{value}</p>
+    </div>
+  );
+}
+
+function LoginPage({ hasError, notConfigured }) {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#f4f6fa] px-5 text-slate-800">
       <form
         action="/api/conferencia/admin/login"
         method="post"
-        className="w-full max-w-md rounded-2xl glass-card p-8 bg-white border border-slate-200 space-y-6"
+        className="glass-card w-full max-w-md space-y-6 rounded-2xl border border-slate-200 bg-white p-8"
       >
         <div className="flex flex-col items-center">
           <Image
@@ -147,7 +266,9 @@ function LoginPage({ hasError }) {
             className="mb-6 h-auto w-44"
             priority
           />
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 text-center">Вход для администратора</h1>
+          <h1 className="text-center !text-2xl !font-bold tracking-tight text-slate-900">
+            Вход для администратора
+          </h1>
         </div>
 
         <label className="block">
@@ -156,7 +277,7 @@ function LoginPage({ hasError }) {
             name="password"
             type="password"
             required
-            className="h-11 w-full rounded-lg modern-input px-3 text-sm"
+            className="modern-input h-11 w-full rounded-lg px-3 text-sm"
           />
         </label>
 
@@ -166,97 +287,20 @@ function LoginPage({ hasError }) {
           </div>
         )}
 
-        <button type="submit" className="btn-primary h-11 w-full rounded-lg text-sm font-semibold text-white cursor-pointer">
+        {notConfigured && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Вход отключён: на сервере не задана переменная <code>ADMIN_PASSWORD</code>. Пароля по
+            умолчанию нет — задайте переменную и перезапустите приложение.
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className="btn-primary h-11 w-full cursor-pointer rounded-lg text-sm font-semibold text-white"
+        >
           Войти
         </button>
       </form>
     </main>
-  );
-}
-
-function SubmissionRow({
-  index,
-  submission,
-}) {
-  return (
-    <article className="grid gap-4 px-6 py-4 text-sm lg:grid-cols-[56px_1.5fr_1.8fr_1.2fr_60px_220px] lg:items-center hover:bg-slate-50/50 transition">
-      {/* Index */}
-      <div className="font-bold text-slate-400 max-lg:hidden">{index}</div>
-      
-      {/* Region & Info */}
-      <div className="space-y-1">
-        <div className="font-extrabold text-slate-900 text-base lg:text-sm">{submission.region}</div>
-        <div className="text-xs text-slate-500 font-medium">{submission.city}</div>
-        <div className="text-xs text-slate-400 font-medium">Дата: {new Date(submission.meetingDate).toLocaleDateString("ru-RU")}</div>
-      </div>
-      
-      {/* Delegate details */}
-      <div className="space-y-1">
-        <div className="font-bold text-slate-800">{submission.delegateName}</div>
-        <div className="text-xs font-semibold">
-          <a className="text-indigo-600 hover:text-indigo-700 transition" href={`tel:${submission.delegatePhone}`}>
-            {submission.delegatePhone}
-          </a>
-        </div>
-        <div className="text-xs text-slate-500 leading-relaxed font-mono select-all bg-slate-50 border border-slate-100 p-1.5 rounded">
-          {submission.passportData}
-        </div>
-      </div>
-      
-      {/* Vote & Attendance stats */}
-      <div className="space-y-1 text-xs text-slate-600">
-        <div>Присутствовало: <span className="font-bold text-slate-900">{submission.presentMembers}</span> из <span className="font-semibold text-slate-500">{submission.totalMembers}</span></div>
-        <div>Голосов за делегата: <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">{submission.votesFor}</span></div>
-      </div>
-
-      {/* Conference Photo Preview */}
-      <div className="flex justify-center items-center">
-        {submission.photoPath ? (
-          <a
-            href={`/api/conferencia/admin/submissions/${submission.id}/files/photo`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Открыть фото в новой вкладке"
-            className="group relative block overflow-hidden rounded-md border border-slate-200 w-11 h-11 bg-slate-100"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/conferencia/admin/submissions/${submission.id}/files/photo`}
-              alt="Конференция"
-              className="w-full h-full object-cover transition duration-300 group-hover:scale-110"
-            />
-            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-          </a>
-        ) : (
-          <span className="text-xs text-slate-300">—</span>
-        )}
-      </div>
-
-      {/* Action links */}
-      <div className="flex flex-wrap gap-2 lg:justify-start">
-        <a 
-          className="file-link h-8 px-2.5 text-xs border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold hover:text-amber-800" 
-          href={`/api/conferencia/admin/submissions/${submission.id}/files/docx`}
-        >
-          DOCX
-        </a>
-        <a 
-          className="file-link h-8 px-2.5 text-xs border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold hover:text-amber-800" 
-          href={`/api/conferencia/admin/submissions/${submission.id}/files/pdf`}
-        >
-          PDF
-        </a>
-        <a 
-          className="file-link h-8 px-2.5 text-xs border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold hover:text-amber-800" 
-          href={`/api/conferencia/admin/submissions/${submission.id}/archive`}
-        >
-          ZIP
-        </a>
-      </div>
-    </article>
   );
 }

@@ -124,6 +124,7 @@ docs/mayak-master-playbook/assets/
 # снимать их нужно через `git rm --cached`, и только с оглядкой на прод —
 # там `git pull` удалит файл из рабочего каталога вместе с базой.
 data/uploads/
+data/templates/
 data/rsk.sqlite
 data/rsk.sqlite-shm
 data/rsk.sqlite-wal
