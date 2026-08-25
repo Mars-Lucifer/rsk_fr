@@ -1,3 +1,5 @@
+import { adaptPortalSetCookie, PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function OAuthCallbackHandler(req, res) {
     if (req.method !== "POST") {
         return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -12,7 +14,7 @@ export default async function OAuthCallbackHandler(req, res) {
 
         // TODO: Заменить на реальный endpoint когда будет готов бэк
         // Временно возвращаем заглушку
-        const backendUrl = "https://api.rosdk.ru/auth/oauth/callback/";
+        const backendUrl = `${PORTAL_API_BASE}/auth/oauth/callback/`;
 
         const response = await fetch(backendUrl, {
             method: "POST",
@@ -31,7 +33,7 @@ export default async function OAuthCallbackHandler(req, res) {
         const setCookie = response.headers.get("set-cookie");
 
         if (setCookie) {
-            res.setHeader("Set-Cookie", setCookie);
+            res.setHeader("Set-Cookie", adaptPortalSetCookie(setCookie));
         }
 
         const data = await response.json();

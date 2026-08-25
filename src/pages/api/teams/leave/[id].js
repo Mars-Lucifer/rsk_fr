@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function LeaveTeam(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -5,7 +7,7 @@ export default async function LeaveTeam(req, res) {
             return res.status(401).json({ success: false, error: "No token provided" });
         }
 
-        const response_info = await fetch(`https://api.rosdk.ru/teams/teams/leave_team/${req.query.id}`, {
+        const response_info = await fetch(`${PORTAL_API_BASE}/teams/teams/leave_team/${req.query.id}`, {
             method: "DELETE",
             headers: {
                 Accept: "application/json",

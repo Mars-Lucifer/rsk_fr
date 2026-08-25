@@ -10,8 +10,9 @@ import { saveUserData } from "@/utils/auth";
 import { buildPortalAuthCookieSnapshot } from "@/lib/portalProfile";
 import { clearPortalAuthReturnPath, setPortalAuthReturnPath } from "@/lib/portalAuthReturn";
 import { fetchPortalProfileClient, isMissingPortalProfilePayload, primePortalProfileCache } from "@/lib/portalProfileClient";
+import { PUBLIC_PORTAL_API_BASE } from "@/lib/portalApiBase";
 
-const YANDEX_LOGIN_URL = "https://api.rosdk.ru/auth/users_interaction/auth/yandex/login";
+const YANDEX_LOGIN_URL = `${PUBLIC_PORTAL_API_BASE}/auth/users_interaction/auth/yandex/login`;
 
 function mapLoginError(response, payload) {
     if (payload?.errorCode === "EMAIL_NOT_CONFIRMED" || response.status === 403) {
@@ -106,7 +107,10 @@ export default function PortalAuthFlow({
                 return;
             }
 
-            router.replace(isMissingPortalProfilePayload(profilePayload) ? "/profile?tab=settings" : "/profile");
+            // Участник пришёл на конкурс, а не заполнять анкету: после входа ведём
+            // сразу в обучение. Исключение — незаполненный профиль: без ФИО и
+            // организации дальше этапа «Я» всё равно не пройти.
+            router.replace(isMissingPortalProfilePayload(profilePayload) ? "/profile?tab=settings" : "/cours");
         },
         [onAuthenticated, router]
     );

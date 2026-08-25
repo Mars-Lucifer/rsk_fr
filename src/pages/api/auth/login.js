@@ -1,6 +1,8 @@
+import { adaptPortalSetCookie, PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function RegHandler(req, res) {
     try {
-        const response = await fetch("https://api.rosdk.ru/auth/users_interaction/login/", {
+        const response = await fetch(`${PORTAL_API_BASE}/auth/users_interaction/login/`, {
             method: "POST",
             headers: { "Content-Type": "application/json", accept: "application/json" },
             body: JSON.stringify({
@@ -14,7 +16,7 @@ export default async function RegHandler(req, res) {
         const setCookie = response.headers.get("set-cookie");
 
         if (setCookie) {
-            res.setHeader("Set-Cookie", setCookie);
+            res.setHeader("Set-Cookie", adaptPortalSetCookie(setCookie));
         }
 
         const data = await response.json();

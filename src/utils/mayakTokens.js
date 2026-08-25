@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
+import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
+
 const TOKENS_FILE_PATH = path.join(process.cwd(), "data", "mayakTokens.json");
 
 // Чтение всех токенов
@@ -19,14 +21,21 @@ export function readTokens() {
     }
 }
 
-// Сохранение токенов
+// Сохранение токенов.
+//
+// Пишем во временный файл и переименовываем: читатели (validateToken, центр
+// токенов) лок не берут, и при обычной перезаписи ловили файл недописанным —
+// в логах это выглядело как `SyntaxError: Unexpected end of JSON input` и 500.
+// Rename атомарен, читатель видит либо старую версию целиком, либо новую.
 export function saveTokens(tokens) {
     try {
         const dir = path.dirname(TOKENS_FILE_PATH);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFileSync(TOKENS_FILE_PATH, JSON.stringify({ tokens }, null, 2));
+        const tempFile = `${TOKENS_FILE_PATH}.${process.pid}.${Date.now()}.tmp`;
+        fs.writeFileSync(tempFile, JSON.stringify({ tokens }, null, 2), "utf-8");
+        fs.renameSync(tempFile, TOKENS_FILE_PATH);
         return true;
     } catch (error) {
         console.error("Error saving tokens:", error);
@@ -44,8 +53,16 @@ export function generateId() {
     return crypto.randomUUID();
 }
 
+// Срок жизни токена. Поле необязательное: у токенов, созданных из админки,
+// его нет — они бессрочные, как и раньше. Ставится только там, где токен
+// привязан к сессии и должен умереть вместе с ней.
+export function isTokenExpired(token, now = Date.now()) {
+    const expiresTs = Date.parse(String(token?.expiresAt || "").trim());
+    return Number.isFinite(expiresTs) && expiresTs <= now;
+}
+
 // Создание нового токена
-export function createToken(name, usageLimit, taskRange = null, customToken = null, sectionId = null) {
+export function createToken(name, usageLimit, taskRange = null, customToken = null, sectionId = null, expiresAt = null) {
     const tokens = readTokens();
     const now = new Date().toISOString();
 
@@ -65,6 +82,7 @@ export function createToken(name, usageLimit, taskRange = null, customToken = nu
         taskRange: taskRange, // Диапазон заданий (например, "101-200")
         createdAt: now,
         updatedAt: now,
+        expiresAt: expiresAt || null,
         isActive: true,
     };
 
@@ -136,35 +154,51 @@ export function deleteToken(id) {
     return deletedToken;
 }
 
-// Использование токена (увеличение счетчика)
-export function useToken(tokenValue) {
-    const tokens = readTokens();
-    const index = tokens.findIndex((t) => t.token === tokenValue);
+// Использование токена (увеличение счетчика).
+//
+// Весь read-modify-write идёт внутри одного файлового лока — как в
+// mayakSessionTokens. Без лока одновременный вход группы по одной ссылке терял
+// инкременты: все читают один usedCount и пишут одно и то же значение, часть
+// входов проходит бесплатно. С тех пор как ссылка «Без инспектора» расходует
+// оплаченный лимит доступа, это стоит денег.
+export async function useToken(tokenValue) {
+    return withJsonFileLock(TOKENS_FILE_PATH, async () => {
+        const store = await readJsonFile(TOKENS_FILE_PATH, { tokens: [] });
+        const tokens = Array.isArray(store?.tokens) ? store.tokens : [];
+        const index = tokens.findIndex((t) => t.token === tokenValue);
 
-    if (index === -1) {
-        return { success: false, error: "Токен не найден" };
-    }
+        if (index === -1) {
+            return { success: false, error: "Токен не найден" };
+        }
 
-    const token = tokens[index];
+        const token = tokens[index];
 
-    if (!token.isActive) {
-        return { success: false, error: "Токен деактивирован" };
-    }
+        if (!token.isActive) {
+            return { success: false, error: "Токен деактивирован" };
+        }
 
-    if (token.usedCount >= token.usageLimit) {
-        return { success: false, error: "Лимит использований исчерпан" };
-    }
+        if (isTokenExpired(token)) {
+            return { success: false, error: "Срок действия ссылки истёк" };
+        }
 
-    tokens[index].usedCount += 1;
-    tokens[index].updatedAt = new Date().toISOString();
+        if (token.usedCount >= token.usageLimit) {
+            return { success: false, error: "Лимит использований исчерпан" };
+        }
 
-    saveTokens(tokens);
+        tokens[index] = {
+            ...token,
+            usedCount: token.usedCount + 1,
+            updatedAt: new Date().toISOString(),
+        };
 
-    return {
-        success: true,
-        token: tokens[index],
-        remainingAttempts: tokens[index].usageLimit - tokens[index].usedCount
-    };
+        await writeJsonFileAtomic(TOKENS_FILE_PATH, { tokens });
+
+        return {
+            success: true,
+            token: tokens[index],
+            remainingAttempts: tokens[index].usageLimit - tokens[index].usedCount,
+        };
+    });
 }
 
 // Проверка валидности токена (без использования)
@@ -177,6 +211,10 @@ export function validateToken(tokenValue) {
 
     if (!token.isActive) {
         return { valid: false, error: "Токен деактивирован" };
+    }
+
+    if (isTokenExpired(token)) {
+        return { valid: false, error: "Срок действия ссылки истёк", token, remainingAttempts: 0 };
     }
 
     if (token.usedCount >= token.usageLimit) {
@@ -202,5 +240,6 @@ export function getAllTokensWithStats() {
         ...t,
         remainingAttempts: t.usageLimit - t.usedCount,
         isExhausted: t.usedCount >= t.usageLimit,
+        isExpired: isTokenExpired(t),
     }));
 }

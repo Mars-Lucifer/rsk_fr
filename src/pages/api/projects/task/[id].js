@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function getProjectTask(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -5,7 +7,7 @@ export default async function getProjectTask(req, res) {
             return res.status(401).json({ success: false, error: "No token provided" });
         }
 
-        const response_info = await fetch(`https://api.rosdk.ru/projects/zvezda/tasks?project_id=${req.query.id}`, {
+        const response_info = await fetch(`${PORTAL_API_BASE}/projects/zvezda/tasks?project_id=${req.query.id}`, {
             method: "GET",
             headers: {
                 Accept: "application/json",

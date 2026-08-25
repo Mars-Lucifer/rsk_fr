@@ -1,7 +1,14 @@
 import { validateToken, useToken as consumeLegacyToken } from "@/utils/mayakTokens";
-import { useMayakSessionToken as consumeMayakSessionToken, validateMayakSessionToken } from "@/lib/mayakSessionTokens";
+import {
+    getDelegatedAccessUsageState,
+    useMayakSessionToken as consumeMayakSessionToken,
+    validateMayakSessionToken,
+} from "@/lib/mayakSessionTokens";
+import { getSessionLinksByPlainToken } from "@/lib/mayakSessionLinks";
+import { recordAccessLedgerEntry } from "@/lib/mayakAccessLedger";
 import { findActiveMayakSessionByTokenId, getOrCreateMayakDebugSession } from "@/lib/mayakSessions";
 import { readManifest } from "@/lib/mayakContentStorage";
+import { buildContestValidationResponse, hasPortalSession, parseContestToken } from "@/lib/mayakContestAccess";
 
 const DEV_BYPASS_TOKEN = "fffff";
 const MAYAK_GUEST_SUFFIX = "aaaaa";
@@ -218,6 +225,16 @@ function buildGuestValidationResponse() {
     };
 }
 
+// Ссылка «Без инспектора» — legacy-токен, но привязана к доступу через реестр
+// ссылок. Входы по ней расходуются из того же оплаченного лимита, что и
+// инспекторская с мастерской, поэтому и счётчик показываем общий по доступу.
+async function resolvePlainLinkAccess(tokenValue) {
+    const record = await getSessionLinksByPlainToken(tokenValue);
+    if (!record?.accessId) return null;
+    const usage = await getDelegatedAccessUsageState(record.accessId);
+    return usage ? { record, usage } : null;
+}
+
 async function buildValidationResponse(result, tokenType = "legacy") {
     const session =
         tokenType === "session" && result.token?.id
@@ -276,6 +293,22 @@ export default async function handler(req, res) {
                 });
             }
 
+            // Конкурсный вход: ключ не выдаётся и не расходуется, право на вход
+            // даёт авторизация участника на портале. Проверяем до байпасов, но
+            // ветка срабатывает только на префикс `contest-` — остальные типы
+            // входа идут прежними путями.
+            const contestToken = parseContestToken(token);
+            if (contestToken) {
+                if (!hasPortalSession(req)) {
+                    return res.status(401).json({
+                        success: false,
+                        valid: false,
+                        error: "Нужно войти на портал",
+                    });
+                }
+                return res.status(200).json(buildContestValidationResponse(contestToken.lessonNumber));
+            }
+
             if (detectAdminBypass(req, token)) {
                 // 1. `<реальный_токен>fffff` — админ в уже созданной сессии.
                 const sessionData = await resolveAdminBypassSession(req, token);
@@ -301,6 +334,20 @@ export default async function handler(req, res) {
             }
 
             const legacyResult = validateToken(token);
+            const plainAccess = legacyResult.token ? await resolvePlainLinkAccess(token) : null;
+            if (plainAccess) {
+                const { usage } = plainAccess;
+                const exhausted = usage.remainingAttempts < 1;
+                return res.status(200).json({
+                    ...(await buildValidationResponse(legacyResult, "legacy")),
+                    valid: legacyResult.valid && !exhausted,
+                    error: exhausted ? "Лимит входов по доступу исчерпан" : legacyResult.error || null,
+                    usageLimit: usage.totalLimit,
+                    usedCount: usage.usedCount,
+                    remainingAttempts: usage.remainingAttempts,
+                    isExhausted: exhausted,
+                });
+            }
             return res.status(200).json(await buildValidationResponse(legacyResult, "legacy"));
         } catch (error) {
             console.error("Error validating token:", error);
@@ -373,12 +420,40 @@ export default async function handler(req, res) {
                 });
             }
 
-            const legacyResult = consumeLegacyToken(token);
+            const plainAccess = await resolvePlainLinkAccess(token);
+            if (plainAccess && plainAccess.usage.remainingAttempts < 1) {
+                return res.status(403).json({
+                    success: false,
+                    error: "Лимит входов по доступу исчерпан",
+                    remainingAttempts: 0,
+                });
+            }
+
+            const legacyResult = await consumeLegacyToken(token);
             if (legacyResult.success) {
+                if (plainAccess) {
+                    try {
+                        await recordAccessLedgerEntry({
+                            accessId: plainAccess.record.accessId,
+                            tokenId: legacyResult.token?.id || "",
+                            sessionId: plainAccess.record.sessionId || "",
+                        });
+                    } catch (ledgerError) {
+                        // Вход уже засчитан инкрементом usedCount самого токена;
+                        // ронять ответ из-за журнала нельзя.
+                        console.error("Не удалось записать списание входа по обычной ссылке:", ledgerError);
+                    }
+                }
+
+                // Остаток перечитываем после списания, а не считаем от значения,
+                // прочитанного до лока: при одновременном входе группы все
+                // запросы иначе вернут один и тот же остаток.
+                const usageAfter = plainAccess ? await getDelegatedAccessUsageState(plainAccess.record.accessId) : null;
+
                 return res.status(200).json({
                     success: true,
                     message: "Токен использован",
-                    remainingAttempts: legacyResult.remainingAttempts,
+                    remainingAttempts: usageAfter ? usageAfter.remainingAttempts : legacyResult.remainingAttempts,
                     isBypass: false,
                     tokenType: "legacy",
                 });

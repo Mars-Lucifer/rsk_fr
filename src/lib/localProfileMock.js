@@ -183,6 +183,14 @@ function isLocalProfileMockDisabled(req) {
     return cookieValue === "off" || cookieValue === "0" || cookieValue === "false";
 }
 
+// Работаем против локального стенда бэкенда (docker-compose.local.yml), а не
+// против api.rosdk.ru. Тогда подменять профиль моком нельзя: неавторизованный
+// пользователь получал бы «валидный» профиль, и выйти из аккаунта становилось
+// невозможно — /auth видел мок, считал вход выполненным и возвращал внутрь.
+function hasLocalBackendConfigured() {
+    return Boolean(String(process.env.RSK_API_BASE || "").trim());
+}
+
 export function shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing = false } = {}) {
     if (isLocalProfileMockDisabled(req)) {
         return false;
@@ -192,7 +200,7 @@ export function shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing = false
         return true;
     }
 
-    if (!fallbackWhenAuthMissing || process.env.NODE_ENV === "production") {
+    if (!fallbackWhenAuthMissing || process.env.NODE_ENV === "production" || hasLocalBackendConfigured()) {
         return false;
     }
 

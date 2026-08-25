@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function getOrganizations(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -8,7 +10,7 @@ export default async function getOrganizations(req, res) {
         const params = new URLSearchParams();
         if (region) params.append("region", region);
 
-        const response = await fetch(`https://api.rosdk.ru/orgs/organizations/all?${params.toString()}`, {
+        const response = await fetch(`${PORTAL_API_BASE}/orgs/organizations/all?${params.toString()}`, {
             headers: {
                 Accept: "application/json",
                 Cookie: req.headers.cookie || "",

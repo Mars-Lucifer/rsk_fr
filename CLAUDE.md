@@ -17,6 +17,9 @@ Related files:
 - `AGENTS.md` defines the required workflow for Codex work in this repo.
 - `CODEX_LEARNINGS.md` stores reusable pitfalls and prevention rules.
 - `docs/mayak-refactor-status.md` stores MAYAK refactor progress/status.
+- `docs/mayak-access-contour.md` describes the external-access contour: delegated
+  access rights, session links (inspector / plain / master / dashboard), entry
+  accounting, and the master link — read it first for any token/entry work.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
 
 ## Work Organization: One Workstream = One Branch

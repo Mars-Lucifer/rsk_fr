@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function orgAll(req, res) {
     try {
         const token = req.cookies.users_access_token || req.headers.authorization?.replace('Bearer ', '');
@@ -38,7 +40,7 @@ export default async function orgAll(req, res) {
             params.append('name', name);
         }   
 
-        const response_info = await fetch(`https://api.rosdk.ru/orgs/organizations/all?${params.toString()}`, {
+        const response_info = await fetch(`${PORTAL_API_BASE}/orgs/organizations/all?${params.toString()}`, {
             headers: {
                 Accept: "application/json",
                 Cookie: req.headers.cookie || "",

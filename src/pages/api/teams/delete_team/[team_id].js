@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function handler(req, res) {
     if (req.method !== "DELETE") {
         return res.status(405).json({ success: false, error: "Method Not Allowed" });
@@ -7,7 +9,7 @@ export default async function handler(req, res) {
         const { team_id } = req.query;
         console.log("API Route: Received DELETE request for team_id:", team_id);
 
-        const externalApiUrl = `https://api.rosdk.ru/teams/teams/delete_team/${team_id}`;
+        const externalApiUrl = `${PORTAL_API_BASE}/teams/teams/delete_team/${team_id}`;
         console.log("API Route: Calling external API URL:", externalApiUrl);
 
         const response = await fetch(externalApiUrl, {

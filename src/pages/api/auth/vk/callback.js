@@ -1,3 +1,5 @@
+import { adaptPortalSetCookie, PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function VKCallbackProxy(req, res) {
     if (req.method !== "POST") {
         return res.status(405).json({ success: false, error: "Method not allowed" });
@@ -5,7 +7,7 @@ export default async function VKCallbackProxy(req, res) {
 
     try {
         // Проксируем запрос на реальный бэкенд
-        const response = await fetch("https://api.rosdk.ru/auth/users_interaction/auth/vk/callback", {
+        const response = await fetch(`${PORTAL_API_BASE}/auth/users_interaction/auth/vk/callback`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -21,7 +23,7 @@ export default async function VKCallbackProxy(req, res) {
 
         // Пробрасываем их клиенту
         if (setCookie) {
-            res.setHeader("Set-Cookie", setCookie);
+            res.setHeader("Set-Cookie", adaptPortalSetCookie(setCookie));
         }
 
         const data = await response.json();

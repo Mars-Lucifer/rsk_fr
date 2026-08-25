@@ -530,8 +530,10 @@ export async function getMayakSessionDashboardData(sessionId) {
     // Администратор-отладка (userId "dev-bypass") заходит в сессию для проверки
     // инспектора/отладки и НЕ должен попадать в дашборд и учитываться в
     // столах/счётчиках/средних — отсекаем его на уровне источника данных.
+    // Демо-вход мастера (master-demo-*) — как и dev-bypass, служебный: мастер
+    // заходит показать игру, его прогресс не должен искажать столы и средние.
     const allRuntimeRaw = (await readSessionRuntimeParticipants(sessionId)).filter(
-        (participant) => participant.userId !== "dev-bypass"
+        (participant) => participant.userId !== "dev-bypass" && !String(participant.userId || "").startsWith("master-demo-")
     );
 
     // Скрытые участники (флаг hidden, ставит админ через редактор) не участвуют

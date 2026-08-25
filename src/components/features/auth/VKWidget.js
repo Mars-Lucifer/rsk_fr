@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import VK from "@/assets/general/vk.svg";
+import { PUBLIC_PORTAL_API_BASE } from "@/lib/portalApiBase";
 
 export default function VKWidget() {
   const initialized = useRef(false);
@@ -19,7 +20,7 @@ export default function VKWidget() {
       try {
         window.VKIDSDK.Config.init({
           app: 54409000,
-          redirectUrl: "https://api.rosdk.ru/auth/users_interaction/auth/vk/callback",
+          redirectUrl: `${PUBLIC_PORTAL_API_BASE}/auth/users_interaction/auth/vk/callback`,
           responseMode: window.VKIDSDK.ConfigResponseMode.Redirect,
           source: window.VKIDSDK.ConfigSource.LOWCODE,
           scope: "email",

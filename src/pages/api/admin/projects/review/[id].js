@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function ProfileUpdateHandler(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -18,7 +20,7 @@ export default async function ProfileUpdateHandler(req, res) {
             });
         }
 
-        const response = await fetch(`https://api.rosdk.ru/projects/zvezda/moderator/${id}/review`, {
+        const response = await fetch(`${PORTAL_API_BASE}/projects/zvezda/moderator/${id}/review`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

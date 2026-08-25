@@ -1,6 +1,7 @@
 import { validateToken } from "@/utils/mayakTokens";
 import { validateMayakSessionToken } from "@/lib/mayakSessionTokens";
 import { findActiveMayakSessionByTokenId } from "@/lib/mayakSessions";
+import { buildContestAccessContext, parseContestToken } from "@/lib/mayakContestAccess";
 
 const DEV_BYPASS_TOKEN = "fffff";
 const MAYAK_GUEST_SUFFIX = "aaaaa";
@@ -53,6 +54,17 @@ export async function resolveMayakTokenContext(tokenValue) {
             taskRange: null,
             tableCount: 0,
         };
+    }
+
+    // Конкурсный вход (см. mayakContestAccess): ни легаси-токена, ни сессии за
+    // ним нет — контекст собирается из номера урока.
+    const contestToken = parseContestToken(normalizedToken);
+    if (contestToken) {
+        const contestContext = buildContestAccessContext(contestToken.lessonNumber);
+        if (contestContext) {
+            return { success: true, valid: true, isBypass: false, ...contestContext };
+        }
+        return { success: false, valid: false, error: "Задание к этому уроку не настроено" };
     }
 
     const sessionResult = await validateMayakSessionToken(normalizedToken);

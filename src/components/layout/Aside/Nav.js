@@ -10,6 +10,9 @@ const DownIcon = dynamic(() => import("@/assets/general/down.svg"));
 
 const BASE_NAV_LINKS = [
     { label: "Главная", disable: false, login: false, learn: false, href: "/", icon: dynamic(() => import("@/assets/nav/home.svg")) },
+    // Конкурс — главный раздел участника, поэтому идёт сразу после «Главной».
+    // Это тот же /cours: отдельного раздела под конкурс не заводим.
+    { label: "Конкурс", disable: false, login: true, learn: false, href: "/cours", icon: dynamic(() => import("@/assets/nav/cours.svg")) },
     {
         label: "Команды",
         disable: false,
@@ -24,7 +27,6 @@ const BASE_NAV_LINKS = [
     },
     { label: "Организации", disable: false, login: true, learn: false, href: "/organizations", icon: dynamic(() => import("@/assets/nav/organ.svg")) },
     { label: "Проекты", disable: false, login: true, learn: true, href: "/projects", icon: dynamic(() => import("@/assets/nav/projects.svg")) },
-    { label: "Обучение", disable: false, login: true, learn: false, href: "/cours", icon: dynamic(() => import("@/assets/nav/cours.svg")) },
     { label: "Маяк Око", href: "/tools/mayak-oko", login: false, learn: false, icon: dynamic(() => import("@/assets/nav/inst.svg")) },
     { label: "Тренажер МАЯК", href: "/tools/mayak-trainer#overview", login: false, learn: false, icon: dynamic(() => import("@/assets/nav/mayak-trainer.svg")) },
     {

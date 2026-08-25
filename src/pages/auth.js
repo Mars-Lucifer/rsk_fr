@@ -52,7 +52,9 @@ export default function AuthPage() {
                 }
 
                 const nextPath = consumePortalAuthReturnPath();
-                const fallbackPath = isMissingPortalProfilePayload(payload) ? "/profile?tab=settings" : "/profile";
+                // Как и в PortalAuthFlow: уже авторизованного участника ведём в
+                // обучение, а не на анкету. Незаполненный профиль — исключение.
+                const fallbackPath = isMissingPortalProfilePayload(payload) ? "/profile?tab=settings" : "/cours";
                 if (!isCancelled) {
                     router.replace(nextPath || fallbackPath);
                 }

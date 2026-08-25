@@ -1,3 +1,5 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 export default async function endProjectTask(req, res) {
     try {
         const token = req.cookies.users_access_token;
@@ -6,7 +8,7 @@ export default async function endProjectTask(req, res) {
         }
         const bodyData = req.body;
 
-        const response_info = await fetch(`https://api.rosdk.ru/projects/zvezda/tasks/${req.query.id}/submit`, {
+        const response_info = await fetch(`${PORTAL_API_BASE}/projects/zvezda/tasks/${req.query.id}/submit`, {
             method: "POST",
             headers: {
                 Accept: "application/json",

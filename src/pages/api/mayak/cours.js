@@ -1,7 +1,9 @@
+import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+
 // pages/api/learning.js
 export default async function getLessons(req, res) {
     try {
-        const response = await fetch("https://api.rosdk.ru/learning/", {
+        const response = await fetch(`${PORTAL_API_BASE}/learning/`, {
             method: "GET",
             headers: {
                 Accept: "application/json",

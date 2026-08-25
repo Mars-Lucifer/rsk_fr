@@ -5,6 +5,8 @@ import { promises as fs } from "fs";
 import { sweepExpiredDelegatedMayakSessions } from "@/lib/mayakDelegatedSessionCleanup";
 import { createMayakSession, deleteMayakSession, listMayakSessions } from "@/lib/mayakSessions";
 import { listMayakSessionTokens } from "@/lib/mayakSessionTokens";
+import { createSessionLinks, getSessionLinksBySessionId } from "@/lib/mayakSessionLinks";
+import { readAccessLedgerCounts, syncAccessLedgerBaseline } from "@/lib/mayakAccessLedger";
 
 const RIGHTS_FILE = path.join(process.cwd(), "data", "mayak-admin-rights.json");
 const DEFAULT_TOTAL_QUOTA = 1000000;
@@ -75,7 +77,7 @@ function isActiveTokenForUsage(token = {}) {
     return !Number.isFinite(expiresTs) || expiresTs > Date.now();
 }
 
-function getActualUsedParticipantLimit(right = {}, tokens = []) {
+function getLiveUsedParticipantLimit(right = {}, tokens = []) {
     const ownerKeys = new Set([normalizeString(right.accessId), normalizeString(right.userId)].filter(Boolean));
     if (ownerKeys.size === 0) return 0;
 
@@ -86,12 +88,37 @@ function getActualUsedParticipantLimit(right = {}, tokens = []) {
         .reduce((sum, token) => sum + normalizeNonNegativeInteger(token.usedCount, 0), 0);
 }
 
-function toPublicRight(right = {}, tokens = []) {
+// Расход = журнал списаний, живые токены — только нижняя граница (см.
+// mayakAccessLedger.js). Считать по одним токенам нельзя: они живут сутки, и
+// вместе с ними обнулялся израсходованный лимит.
+function getActualUsedParticipantLimit(right = {}, tokens = [], ledgerCounts = null) {
+    const liveUsed = getLiveUsedParticipantLimit(right, tokens);
+    if (!ledgerCounts) return liveUsed;
+
+    const ownerKeys = [normalizeString(right.accessId), normalizeString(right.userId)].filter(Boolean);
+    const ledgerUsed = ownerKeys.reduce((sum, key) => sum + (ledgerCounts.get(key) || 0), 0);
+    return Math.max(ledgerUsed, liveUsed);
+}
+
+function toPublicRight(right = {}, tokens = [], ledgerCounts = null) {
     const stored = toStoredRight({
         ...right,
-        usedParticipantLimit: getActualUsedParticipantLimit(right, tokens),
+        usedParticipantLimit: getActualUsedParticipantLimit(right, tokens, ledgerCounts),
     });
     return stored;
+}
+
+// Досыпает в журнал уже потраченное, что пока видно только по живым токенам:
+// журнал появился позже доступов. Разовая операция на каждый доступ, дальше
+// разницы нет и запись не происходит.
+async function backfillLedgerBaseline(rights = [], tokens = []) {
+    const targets = rights
+        .map((right) => ({ key: getRightOwnerKey(right), liveUsed: getLiveUsedParticipantLimit(right, tokens) }))
+        .filter((item) => item.key && item.liveUsed > 0);
+
+    for (const { key, liveUsed } of targets) {
+        await syncAccessLedgerBaseline(key, liveUsed).catch(() => {});
+    }
 }
 
 function assertValidRightPayload(payload = {}) {
@@ -151,7 +178,7 @@ async function readStore() {
     }
 }
 
-function sortRights(rights = [], tokens = []) {
+function sortRights(rights = [], tokens = [], ledgerCounts = null) {
     return rights
         .slice()
         .sort((left, right) => {
@@ -160,7 +187,7 @@ function sortRights(rights = [], tokens = []) {
             if (leftActive !== rightActive) return leftActive - rightActive;
             return String(right.updatedAt || right.grantedAt || "").localeCompare(String(left.updatedAt || left.grantedAt || ""));
         })
-        .map((right) => toPublicRight(right, tokens));
+        .map((right) => toPublicRight(right, tokens, ledgerCounts));
 }
 
 function getRightOwnerKey(right = {}) {
@@ -172,22 +199,31 @@ async function collectDelegatedSessionsForRight(right) {
     const tokenMap = new Map(tokens.map((token) => [token.id, token]));
     const ownerKeys = new Set([normalizeString(right.accessId), normalizeString(right.userId)].filter(Boolean));
 
-    return sessions
+    const activeSessions = sessions
         .filter((session) => String(session.source || "") === "delegated-admin")
         .filter((session) => ownerKeys.has(normalizeString(session.ownerUserId)))
-        .filter((session) => String(session.status || "") === "active")
-        .map((session) => {
+        .filter((session) => String(session.status || "") === "active");
+
+    const items = await Promise.all(
+        activeSessions.map(async (session) => {
             const primaryToken =
                 (Array.isArray(session?.tokenIds) ? session.tokenIds : []).map((tokenId) => tokenMap.get(tokenId)).find(Boolean) || null;
-            return { session, token: primaryToken };
+            const links = await getSessionLinksBySessionId(session.id).catch(() => null);
+            return { session, token: primaryToken, links };
         })
-        .sort((left, rightItem) => String(rightItem.session?.createdAt || "").localeCompare(String(left.session?.createdAt || "")));
+    );
+
+    return items.sort((left, rightItem) =>
+        String(rightItem.session?.createdAt || "").localeCompare(String(left.session?.createdAt || ""))
+    );
 }
 
 export async function listMayakAdminRights() {
     await sweepExpiredDelegatedMayakSessions();
     const [store, tokens] = await Promise.all([readStore(), listMayakSessionTokens()]);
-    return sortRights(store.rights, tokens);
+    await backfillLedgerBaseline(store.rights, tokens);
+    const ledgerCounts = await readAccessLedgerCounts();
+    return sortRights(store.rights, tokens, ledgerCounts);
 }
 
 export async function getMayakAdminRightByUserId(userId, { includeInactive = false } = {}) {
@@ -198,7 +234,10 @@ export async function getMayakAdminRightByUserId(userId, { includeInactive = fal
     const right =
         store.rights.find((item) => normalizeString(item.userId) === normalizedUserId && (includeInactive || String(item.status || "") === "active")) ||
         null;
-    return right ? toPublicRight(right, tokens) : null;
+    if (!right) return null;
+
+    await backfillLedgerBaseline([right], tokens);
+    return toPublicRight(right, tokens, await readAccessLedgerCounts());
 }
 
 export async function getMayakAdminRightByAccessId(accessId) {
@@ -207,7 +246,10 @@ export async function getMayakAdminRightByAccessId(accessId) {
 
     const [store, tokens] = await Promise.all([readStore(), listMayakSessionTokens()]);
     const right = store.rights.find((item) => normalizeString(item.accessId) === normalizedAccessId) || null;
-    return right ? toPublicRight(right, tokens) : null;
+    if (!right) return null;
+
+    await backfillLedgerBaseline([right], tokens);
+    return toPublicRight(right, tokens, await readAccessLedgerCounts());
 }
 
 export async function getMayakAdminRightById(rightId) {
@@ -216,7 +258,10 @@ export async function getMayakAdminRightById(rightId) {
 
     const [store, tokens] = await Promise.all([readStore(), listMayakSessionTokens()]);
     const right = store.rights.find((item) => normalizeString(item.id) === normalizedId) || null;
-    return right ? toPublicRight(right, tokens) : null;
+    if (!right) return null;
+
+    await backfillLedgerBaseline([right], tokens);
+    return toPublicRight(right, tokens, await readAccessLedgerCounts());
 }
 
 export function validateDelegatedAccessPassword(right, password) {
@@ -359,15 +404,27 @@ async function createDelegatedMayakSessionForRightIndex(store, index, { sessionN
         store.rights[index] = nextRight;
         await writeStore(store);
 
+        // Помимо базовой инспекторской ссылки заводим комплект доп. ссылок
+        // (обычная без инспектора, мастер, дашборд). Не критично для создания
+        // сессии: при сбое сессия остаётся валидной, ссылки досоздать нельзя
+        // только автоматически — поэтому ошибку логируем, но не роняем поток.
+        let links = null;
+        try {
+            links = await createSessionLinks({ session: createdSession, accessId: getRightOwnerKey(currentRight) });
+        } catch (linksError) {
+            console.error("Не удалось создать доп. ссылки сессии:", linksError);
+        }
+
         const tokens = await listMayakSessionTokens();
         const tokenMap = new Map(tokens.map((token) => [token.id, token]));
         const primaryToken =
             (Array.isArray(createdSession?.tokenIds) ? createdSession.tokenIds : []).map((tokenId) => tokenMap.get(tokenId)).find(Boolean) || null;
 
         return {
-            right: toPublicRight(nextRight, tokens),
+            right: toPublicRight(nextRight, tokens, await readAccessLedgerCounts()),
             session: createdSession,
             token: primaryToken,
+            links,
         };
     } catch (error) {
         if (createdSession?.id) {

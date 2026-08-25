@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>МАЯК — руководство мастера по проведению</title>
+<style>
+  :root{
+    --ink:#10181c; --muted:#5d6f78; --line:#d8e2e7; --bg:#fff;
+    --navy:#0d2b33; --accent:#c9503f;
+  }
+  @page{ size:297mm 210mm; margin:0; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:"Manrope","Segoe UI",Arial,sans-serif;
+    color:var(--ink); background:#8d9aa2; -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .page{
+    position:relative; width:297mm; height:210mm; background:var(--bg);
+    padding:12mm 14mm 12mm; margin:0 auto 6mm; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  @media print{ body{background:#fff;} .page{ margin:0; page-break-after:always; } }
+
+  .kicker{ font-size:8.5pt; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  h1.big{ font-size:44pt; line-height:.95; margin:2mm 0 0; font-weight:900; letter-spacing:-.02em; }
+  h2{ font-size:19pt; margin:0 0 1mm; font-weight:900; letter-spacing:-.01em; }
+  h3{ font-size:11pt; margin:0 0 1.5mm; font-weight:800; }
+  p{ margin:0 0 2mm; font-size:9.5pt; line-height:1.42; }
+  .lead{ font-size:11pt; color:var(--muted); line-height:1.4; }
+  .rule{ height:3px; background:var(--navy); width:26mm; margin:2.5mm 0 4mm; }
+  .pnum{ position:absolute; right:14mm; bottom:7mm; font-size:8pt; color:var(--muted); font-weight:700; }
+  .foot-logo{ position:absolute; left:14mm; bottom:6mm; height:7mm; opacity:.75; }
+
+  .cols{ display:grid; gap:8mm; flex:1; min-height:0; }
+  .c-40-60{ grid-template-columns:38% 1fr; }
+  .c-50-50{ grid-template-columns:1fr 1fr; }
+  .c-55-45{ grid-template-columns:54% 1fr; }
+  .c-60-40{ grid-template-columns:60% 1fr; }
+  .stack{ display:flex; flex-direction:column; min-height:0; }
+
+  img.fit{ width:100%; height:100%; object-fit:contain; }
+  .frame{ border:1px solid var(--line); border-radius:4mm; padding:3mm; background:#fbfcfd; min-height:0; display:flex; }
+
+  ol.steps{ list-style:none; counter-reset:s; margin:0; padding:0; }
+  ol.steps li{ counter-increment:s; position:relative; padding:0 0 0 10mm; margin-bottom:3.2mm; font-size:9.5pt; line-height:1.35; }
+  ol.steps li::before{
+    content:counter(s); position:absolute; left:0; top:-0.4mm;
+    width:6.5mm; height:6.5mm; border-radius:50%; background:var(--navy); color:#fff;
+    font-size:9pt; font-weight:800; display:flex; align-items:center; justify-content:center;
+  }
+  ol.steps b{ font-weight:800; }
+  .note{ font-size:8.5pt; color:var(--muted); line-height:1.35; }
+
+  .callout{ border-left:3px solid var(--accent); background:#fdf3f1; padding:3mm 4mm; border-radius:0 3mm 3mm 0; }
+  .callout.ok{ border-color:#2e9e5b; background:#f0faf3; }
+  .callout.info{ border-color:#1b5486; background:#eff5fb; }
+  .callout h3{ margin-bottom:1mm; }
+  .callout p{ margin:0; font-size:9pt; }
+
+  .maprow{ display:flex; align-items:stretch; }
+  .maprow .node{ flex:1; border:1px solid var(--line); border-radius:3mm; padding:3.5mm; background:#fff; }
+  .maprow .node .t{ font-weight:900; font-size:11pt; margin-bottom:1mm; }
+  .maprow .node .s{ font-size:8.5pt; color:var(--muted); line-height:1.3; }
+  .maprow .arrow{ display:flex; align-items:center; justify-content:center; width:9mm; color:var(--navy); font-size:15pt; font-weight:900; }
+
+  /* комплект */
+  .kit{ display:grid; grid-template-columns:repeat(4,1fr); gap:4mm; align-items:start; }
+  .kit .item{ border:1px solid var(--line); border-radius:3mm; overflow:hidden; display:flex; flex-direction:column; background:#fff; }
+  .kit .pic{ height:26mm; background:#f4f7f9; display:flex; align-items:center; justify-content:center; padding:2mm; }
+  .kit .pic img{ max-width:100%; max-height:100%; object-fit:contain; }
+  .kit .txt{ padding:2.5mm 3mm 3mm; }
+  .kit .qty{ font-size:8pt; font-weight:800; color:var(--accent); letter-spacing:.05em; text-transform:uppercase; }
+  .kit .nm{ font-size:10pt; font-weight:900; margin:.6mm 0 1mm; }
+  .kit .ds{ font-size:8.2pt; color:var(--muted); line-height:1.3; }
+
+  /* поле со стрелками */
+  .board{ position:relative; width:100%; }
+  .board img{ width:100%; display:block; border-radius:3mm; }
+  .board svg{ position:absolute; inset:0; width:100%; height:100%; }
+  .bd-num{ font:800 46px "Segoe UI",Arial,sans-serif; fill:#fff; }
+  .bd-lab{ font:800 30px "Segoe UI",Arial,sans-serif; fill:#10181c; }
+
+  .cycle{ display:grid; grid-template-columns:repeat(3,1fr); gap:3mm; }
+  .cyc{ border:1px solid var(--line); border-radius:3mm; padding:3mm; background:#fff; position:relative; }
+  .cyc .n{ width:6mm; height:6mm; border-radius:50%; background:var(--navy); color:#fff; font-size:8.5pt; font-weight:800; display:flex; align-items:center; justify-content:center; margin-bottom:1.5mm; }
+  .cyc .t{ font-weight:800; font-size:9pt; margin-bottom:.8mm; }
+  .cyc .d{ font-size:8.2pt; color:var(--muted); line-height:1.3; }
+  .cyc::after{ content:"→"; position:absolute; right:-3.4mm; top:50%; transform:translateY(-50%); font-size:12pt; font-weight:900; color:var(--navy); }
+  .cyc.last::after{ content:""; }
+  .cyc.wrap::after{ content:"↓"; right:auto; left:50%; top:auto; bottom:-4.6mm; transform:translateX(-50%); }
+
+  .tokens{ display:flex; gap:2mm; flex-wrap:wrap; align-items:center; }
+  .tok{ width:13mm; height:13mm; border-radius:2mm; overflow:hidden; border:1px solid var(--line); }
+  .tok img{ width:100%; height:100%; object-fit:cover; }
+
+  table.k{ width:100%; border-collapse:collapse; font-size:8.7pt; }
+  table.k th{ text-align:left; font-size:7.5pt; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:0 2mm 1.5mm 0; border-bottom:1px solid var(--line); }
+  table.k td{ padding:2mm 2mm 2mm 0; border-bottom:1px solid #eef3f5; vertical-align:top; line-height:1.3; }
+  table.k tr:last-child td{ border-bottom:none; }
+
+  .roles{ display:grid; grid-template-columns:repeat(6,1fr); gap:3mm; }
+  .role{ display:flex; flex-direction:column; border:1px solid var(--line); border-radius:3mm; overflow:hidden; background:#fff; }
+  .role img{ width:100%; height:36mm; object-fit:cover; object-position:top; }
+  .role .body{ padding:2.5mm; display:flex; flex-direction:column; gap:1.2mm; }
+  .role .nm{ font-weight:900; font-size:9.5pt; letter-spacing:-.01em; }
+  .role .vice{ font-size:7.5pt; color:#fff; background:var(--accent); border-radius:1.5mm; padding:.8mm 1.6mm; align-self:flex-start; font-weight:700; }
+  .role .ln{ font-size:7.6pt; line-height:1.25; color:var(--muted); }
+  .role .ln b{ color:var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- 1. ОБЛОЖКА -->
+<section class="page">
+  <img src="assets/rsk-logo.png" style="position:absolute; right:14mm; top:11mm; height:13mm;">
+  <div class="cols c-55-45" style="gap:10mm;">
+    <div class="stack" style="justify-content:center;">
+      <div class="kicker">Тренажёр МАЯК · документ для мастера</div>
+      <h1 class="big">КАК ВЕСТИ<br>ТРЕНАЖЁР</h1>
+      <div class="rule"></div>
+      <p class="lead">Порядок ходов, комплект, раскладка, жетоны, звёзды, роли. Один день, две стороны поля, четыре такта.</p>
+      <div style="height:6mm"></div>
+      <div class="callout info">
+        <h3>Формат</h3>
+        <p>18 участников · 3 команды по 6 человек · одно двухстороннее поле на команду · ~8 часов</p>
+      </div>
+    </div>
+    <div class="stack" style="justify-content:center; gap:2mm;">
+      <div class="frame" style="height:56mm;"><img class="fit" src="assets/pole_ya.png" alt="Поле Я"></div>
+      <div style="text-align:center; font-size:16pt; font-weight:900; color:var(--navy); line-height:1;">↓<span style="font-size:9pt; letter-spacing:.08em; margin-left:2mm;">ПЕРЕВОРОТ ПОЛЯ</span></div>
+      <div class="frame" style="height:56mm;"><img class="fit" src="assets/pole_my.png" alt="Поле МЫ"></div>
+    </div>
+  </div>
+  <img class="foot-logo" src="assets/rsk-logo.png" style="display:none;">
+  <div class="pnum">1</div>
+</section>
+
+<!-- 2. КАРТА ДНЯ -->
+<section class="page">
+  <div class="kicker">Навигация</div>
+  <h2>Маршрут дня и где что искать</h2>
+  <div class="rule"></div>
+
+  <div class="maprow" style="margin-bottom:5mm;">
+    <div class="node"><div class="t">Подготовка</div><div class="s">Комплект по столам, раскладка, ссылки участников</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="t">Этап «Я»</div><div class="s">Роли · миплы · 6 типов контента · задания по лучу</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="t">Рефлексия №1</div><div class="s">Пауза, «Дневник специалиста»</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="t">Этап «МЫ»</div><div class="s">Переворот поля · 4 такта по 9 задач · трек ИЦЗ</div></div>
+  </div>
+
+  <div class="cols c-60-40" style="flex:1;">
+    <div class="stack">
+      <h3>Что мастер держит в голове постоянно</h3>
+      <ol class="steps">
+        <li><b>Поле одно на команду и оно двухстороннее.</b> Сторона «Я» — первый этап, сторона «МЫ» — второй. Переворот поля — публичный ритуал перехода, не техническая операция.</li>
+        <li><b>Такты идут строго по порядку.</b> Такт 2 не начинается, пока не закрыты все 9 задач такта 1. Отстал один — ждёт вся команда. Это и есть главный источник командной динамики.</li>
+        <li><b>Инспектор — не судья, а бесплатный наставник соседней команды.</b> Молчание 2 минуты = задание принято.</li>
+        <li><b>Тренажёр завершается</b>, когда первая команда проходит все 4 такта и закрывает трек Индекса цифровой зрелости.</li>
+      </ol>
+    </div>
+    <div class="stack" style="gap:3mm;">
+      <div class="callout ok">
+        <h3>Ваша роль</h3>
+        <p>Не учитель, а хранитель среды. Вы держите правила и темп, участники сами добывают выводы.</p>
+      </div>
+      <div class="callout">
+        <h3>Чего не делать</h3>
+        <p>Не решать задачи за команду. Не отменять вердикт инспектора. Не пускать команду в следующий такт «в долг».</p>
+      </div>
+    </div>
+  </div>
+  <img class="foot-logo" src="assets/rsk-logo.png">
+  <div class="pnum">2</div>
+</section>
+
+<!-- 3. КОМПЛЕКТ -->
+<section class="page">
+  <div class="kicker">Комплект тренажёра</div>
+  <h2>Что входит в набор одной команды</h2>
+  <div class="rule"></div>
+
+  <div class="kit" style="margin-bottom:4mm;">
+    <div class="item">
+      <div class="pic"><img src="assets/pole_ya.png" alt=""></div>
+      <div class="txt"><div class="qty">1 шт · двухстороннее</div><div class="nm">Игровое поле</div>
+        <div class="ds">Сторона «Я» — 6 типов контента и лучи заданий. Сторона «МЫ» — 4 такта, направления «ЗВЕЗДЫ», трек ИЦЗ.</div></div>
+    </div>
+    <div class="item">
+      <div class="pic"><img src="assets/role_kapitan.jpg" alt=""></div>
+      <div class="txt"><div class="qty">6 шт</div><div class="nm">Карты ролей</div>
+        <div class="ds">Капитан, Медиатор, Инспектор, Хранитель Маяка, Инженер, Летописец. На каждой два QR: тайная миссия и МАЯК-ОКО.</div></div>
+    </div>
+    <div class="item">
+      <div class="pic"><img src="assets/jetons_sheet.png" alt=""></div>
+      <div class="txt"><div class="qty">36 шт · 6 × 6</div><div class="nm">Жетоны направлений</div>
+        <div class="ds">По 6 жетонов на каждое направление «ЗВЕЗДЫ». Две стороны: белая рубашка и цвет направления.</div></div>
+    </div>
+    <div class="item">
+      <div class="pic" style="font-size:9pt; color:var(--muted); text-align:center;">фото звёзд</div>
+      <div class="txt"><div class="qty">2 типа</div><div class="nm">Звёзды</div>
+        <div class="ds">Обычная — за выполненное задание, ставится на трек ИЦЗ. Красная Звезда-Джокер — закрывает задание без выполнения, максимум 6 на команду.</div></div>
+    </div>
+  </div>
+
+  <div class="kit" style="flex:1;">
+    <div class="item">
+      <div class="pic" style="font-size:9pt; color:var(--muted); text-align:center;">фото миплов</div>
+      <div class="txt"><div class="qty">по 1 на участника</div><div class="nm">Миплы</div>
+        <div class="ds">Фишка хода на этапе «Я». Раздаются случайно, цвет ничего не значит: мипл показывает, на каком задании луча участник сейчас.</div></div>
+    </div>
+    <div class="item">
+      <div class="pic" style="font-size:9pt; color:var(--muted); text-align:center;">колода «Я»</div>
+      <div class="txt"><div class="qty">~40 карт</div><div class="nm">Колода заданий «Я»</div>
+        <div class="ds">Разделена по 6 типам контента. Контекст сверху, задание снизу. Значок QR — есть доп. материалы и инструкция.</div></div>
+    </div>
+    <div class="item">
+      <div class="pic" style="font-size:9pt; color:var(--muted); text-align:center;">колода «МЫ»</div>
+      <div class="txt"><div class="qty">~40 карт</div><div class="nm">Колода заданий «МЫ»</div>
+        <div class="ds">Сгруппирована по 6 направлениям «ЗВЕЗДЫ». Задания системные, на команду целиком.</div></div>
+    </div>
+    <div class="item">
+      <div class="pic" style="font-size:9pt; color:var(--muted); text-align:center;">планшет игрока</div>
+      <div class="txt"><div class="qty">1 шт</div><div class="nm">Планшет игрока</div>
+        <div class="ds">Правила обоих этапов на одном листе. Лежит на столе так, чтобы дотянулся любой участник.</div></div>
+    </div>
+  </div>
+  <img class="foot-logo" src="assets/rsk-logo.png">
+  <div class="pnum">3</div>
+</section>
+
+<!-- 4. ЧЕК-ЛИСТ ПО СТОЛАМ -->
+<section class="page">
+  <div class="kicker">Шаг 1 · до прихода участников</div>
+  <h2>Чек-лист: разложить по столам</h2>
+  <div class="rule"></div>
+
+  <div class="cols c-50-50" style="flex:1;">
+    <div class="stack">
+      <h3>На каждый стол команды</h3>
+      <ol class="steps">
+        <li><b>Поле — стороной «Я» вверх</b>, в центр стола. Сторона «МЫ» до второго этапа не показывается.</li>
+        <li><b>Планшет игрока</b> — рядом с полем, доступен любому участнику.</li>
+        <li><b>6 карт ролей</b> — стопкой рубашкой вверх.</li>
+        <li><b>Миплы</b> — по одному на участника, цвета вперемешку.</li>
+        <li><b>36 жетонов</b> — общим пулом, белой рубашкой вверх. По направлениям заранее не раскладывать.</li>
+        <li><b>Звёзды</b> — обычные и красные Джокеры отдельными стопками.</li>
+        <li><b>Колода «Я»</b> — на стол. <b>Колода «МЫ»</b> — убрана, до второго этапа не выкладывается.</li>
+      </ol>
+    </div>
+
+    <div class="stack" style="gap:4mm;">
+      <div>
+        <h3>У мастера с собой</h3>
+        <ol class="steps">
+          <li><b>Ссылки участников</b> из кабинета мастера — получены и готовы к раздаче.</li>
+          <li><b>Дашборд</b> открыт на своём экране.</li>
+          <li><b>Шпаргалка наблюдателя</b> — распечатана по одной на команду.</li>
+        </ol>
+      </div>
+      <div class="callout">
+        <h3>Частые ошибки раскладки</h3>
+        <p>Жетоны разложены по направлениям заранее — тогда команда теряет решение о стратегии такта. Колода «МЫ» лежит на виду на первом этапе — участники начинают читать вперёд. Поле лежит стороной «МЫ» вверх — пропадает эффект переворота.</p>
+      </div>
+    </div>
+  </div>
+  <img class="foot-logo" src="assets/rsk-logo.png">
+  <div class="pnum">4</div>
+</section>
+
+<!-- 5. ЛЕГЕНДА СТОРОНЫ «Я» -->
+<section class="page">
+  <div class="kicker">Этап «Я» · сторона поля</div>
+  <h2>Как читается сторона «Я — цифровой эксперт»</h2>
+  <div class="rule"></div>
+
+  <div class="cols c-55-45" style="flex:1;">
+    <div class="stack" style="justify-content:center;">
+      <div class="board">
+        <img src="assets/pole_ya_board.png" alt="Поле Я">
+        <svg viewBox="0 0 1100 1101" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 z" fill="#c9503f"></path>
+            </marker>
+          </defs>
+          <!-- 1 СТАРТ -->
+          <path d="M215,690 C330,690 430,610 500,560" fill="none" stroke="#c9503f" stroke-width="7" marker-end="url(#ah)"></path>
+          <circle cx="180" cy="690" r="42" fill="#c9503f"></circle>
+          <text class="bd-num" x="180" y="706" text-anchor="middle">1</text>
+          <!-- 2 сектор -->
+          <path d="M215,455 C320,430 420,395 500,378" fill="none" stroke="#c9503f" stroke-width="7" marker-end="url(#ah)"></path>
+          <circle cx="180" cy="455" r="42" fill="#c9503f"></circle>
+          <text class="bd-num" x="180" y="471" text-anchor="middle">2</text>
+          <!-- 3 луч -->
+          <path d="M905,225 C760,180 640,175 590,178" fill="none" stroke="#c9503f" stroke-width="7" marker-end="url(#ah)"></path>
+          <circle cx="945" cy="228" r="42" fill="#c9503f"></circle>
+          <text class="bd-num" x="945" y="244" text-anchor="middle">3</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="stack" style="gap:3mm; justify-content:center;">
+      <div>
+        <h3>Три слоя поля</h3>
+        <ol class="steps" style="margin-bottom:1mm;">
+          <li><b>Центр «СТАРТ».</b> Сюда участники ставят свои миплы в начале этапа.</li>
+          <li><b>Внутреннее кольцо — 6 секторов.</b> Шесть типов контента. Участник выбирает один — это его специализация.</li>
+          <li><b>Лучи из гексов.</b> Задания выбранного типа. Мипл идёт по лучу от сектора наружу: одно задание — один шаг.</li>
+        </ol>
+      </div>
+
+      <div>
+        <h3>Легенда цветов</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:2mm 4mm;">
+          <div style="display:flex; gap:2.5mm; font-size:8.7pt; line-height:1.25;"><span style="width:5mm;height:5mm;border-radius:1.2mm;background:#29abe2;flex:0 0 auto;"></span><span><b>Текст</b> — статья, инструкция, код</span></div>
+          <div style="display:flex; gap:2.5mm; font-size:8.7pt; line-height:1.25;"><span style="width:5mm;height:5mm;border-radius:1.2mm;background:#c9503f;flex:0 0 auto;"></span><span><b>Аудио</b> — музыка, речь, запись</span></div>
+          <div style="display:flex; gap:2.5mm; font-size:8.7pt; line-height:1.25;"><span style="width:5mm;height:5mm;border-radius:1.2mm;background:#1b5486;flex:0 0 auto;"></span><span><b>Изображение</b> — фото, схема</span></div>
+          <div style="display:flex; gap:2.5mm; font-size:8.7pt; line-height:1.25;"><span style="width:5mm;height:5mm;border-radius:1.2mm;background:#9fc9d9;flex:0 0 auto;"></span><span><b>Интерактив</b> — квиз, чат-бот</span></div>
+          <div style="display:flex; gap:2.5mm; font-size:8.7pt; line-height:1.25;"><span style="width:5mm;height:5mm;border-radius:1.2mm;background:#8cc63f;flex:0 0 auto;"></span><span><b>Данные</b> — таблица, база, опрос</span></div>
+          <div style="display:flex; gap:2.5mm; font-size:8.7pt; line-height:1.25;"><span style="width:5mm;height:5mm;border-radius:1.2mm;background:#e2a03f;flex:0 0 auto;"></span><span><b>Видео</b> — ролик, анимация</span></div>
+        </div>
+      </div>
+
+      <div class="callout ok">
+        <h3>Награда этапа</h3>
+        <p>4 выполненных задания по своей специализации → <b>красная Звезда-Джокер</b>. Если время вышло на трёх — обычная звезда в направление «Знания и навыки».</p>
+      </div>
+    </div>
+  </div>
+  <img class="foot-logo" src="assets/rsk-logo.png">
+  <div class="pnum">5</div>
+</section>
+
+<!-- 6. ХОД ТАКТА «МЫ» -->
+<section class="page">
+  <div class="kicker">Этап «МЫ» · порядок ходов</div>
+  <h2>Один такт: от девяти жетонов до девяти звёзд</h2>
+  <div class="rule"></div>
+
+  <div class="cycle" style="margin-bottom:4.5mm;">
+    <div class="cyc"><div class="n">1</div><div class="t">Планирование</div><div class="d">Команда выбирает до 9 задач такта из 6 направлений «ЗВЕЗДЫ». Это общее решение, не сумма личных хотелок.</div></div>
+    <div class="cyc"><div class="n">2</div><div class="t">Выкладка</div><div class="d">9 жетонов выбранных направлений кладутся на поле такта <b>белой рубашкой вверх</b>. Поле такта заполнено — план зафиксирован.</div></div>
+    <div class="cyc last wrap"><div class="n">3</div><div class="t">Разбор задач</div><div class="d">Участники сами берут жетон и соответствующую карту задания. Роли работают: Капитан держит фокус, Хранитель — темп.</div></div>
+    <div class="cyc"><div class="n">4</div><div class="t">Выполнение</div><div class="d">Задача решается через МАЯК-ОКО и ИИ-сервисы, результат отправляется на проверку.</div></div>
+    <div class="cyc"><div class="n">5</div><div class="t">Вердикт инспектора</div><div class="d">Инспектор соседней команды принимает или отклоняет с аргументом. Молчание 2 минуты = принято.</div></div>
+    <div class="cyc last"><div class="n">6</div><div class="t">Переворот</div><div class="d">Принято → жетон переворачивается <b>цветной стороной вверх</b>, на трек ИЦЗ ставится звезда в это направление.</div></div>
+  </div>
+
+  <div class="cols c-40-60" style="flex:1;">
+    <div class="stack" style="gap:2.5mm;">
+      <h3>Жетон: две стороны</h3>
+      <div class="tokens">
+        <div class="tok"><img src="assets/jeton_2.png" alt=""></div>
+        <div class="tok"><img src="assets/jeton_4.png" alt=""></div>
+        <div class="tok"><img src="assets/jeton_6.png" alt=""></div>
+        <div style="font-size:13pt; font-weight:900; color:var(--navy); padding:0 1mm;">→</div>
+        <div class="tok"><img src="assets/jeton_1.png" alt=""></div>
+        <div class="tok"><img src="assets/jeton_3.png" alt=""></div>
+        <div class="tok"><img src="assets/jeton_5.png" alt=""></div>
+      </div>
+      <div class="note">Слева — рубашка: задача взята, но не закрыта. Справа — цвет направления: задача принята инспектором.</div>
+      <div class="callout info" style="margin-top:1mm;">
+        <h3>Арифметика, которая должна сойтись</h3>
+        <p><b>36 жетонов = 6 направлений × 6 = 4 такта × 9 задач = 36 клеток трека ИЦЗ.</b> Если в конце такта числа не сходятся — где-то забыли перевернуть жетон или поставить звезду.</p>
+      </div>
+    </div>
+
+    <div class="stack">
+      <h3>Правила такта, которые мастер держит жёстко</h3>
+      <table class="k">
+        <tr><th style="width:34%">Ситуация</th><th>Что происходит</th></tr>
+        <tr><td><b>Все 9 задач закрыты</b></td><td>Такт завершён. Команда переходит к следующему и повторяет цикл — механика такта не меняется.</td></tr>
+        <tr><td><b>Один участник не успевает</b></td><td>Команда ждёт и помогает. Переход к следующему такту закрыт, пока такт не закрыт целиком.</td></tr>
+        <tr><td><b>Задача осталась невыполненной</b></td><td>Штраф: −1 звезда ИЦЗ по этому направлению, но не ниже нуля.</td></tr>
+        <tr><td><b>Есть красная Звезда-Джокер</b></td><td>Закрывает любую задачу без выполнения, в любой момент. У команды их максимум 6 — стратегический резерв, а не спасательный круг.</td></tr>
+        <tr><td><b>Первая команда закрыла 4-й такт</b></td><td>Тренажёр завершается. Дальше — подведение итогов и финальная рефлексия.</td></tr>
+      </table>
+    </div>
+  </div>
+  <img class="foot-logo" src="assets/rsk-logo.png">
+  <div class="pnum">6</div>
+</section>
+
+<!-- 7. РОЛИ -->
+<section class="page">
+  <div class="kicker">Инструментарий</div>
+  <h2>Шесть ролей: кто за что отвечает</h2>
+  <div class="rule"></div>
+
+  <div class="roles">
+    <div class="role">
+      <img src="assets/role_kapitan.jpg" alt="">
+      <div class="body">
+        <div class="nm">КАПИТАН</div><div class="vice">Требовательность</div>
+        <div class="ln"><b>Постоянно:</b> гарант дисциплины и выполнения ролевых функций.</div>
+        <div class="ln"><b>Активно:</b> в конце проверяет финальный чек-лист ролевых достижений.</div>
+      </div>
+    </div>
+    <div class="role">
+      <img src="assets/role_mediator.jpg" alt="">
+      <div class="body">
+        <div class="nm">МЕДИАТОР</div><div class="vice">Недоверие</div>
+        <div class="ln"><b>Постоянно:</b> вовлекает «тихих», держит безопасную атмосферу диалога.</div>
+        <div class="ln"><b>Активно:</b> проводит рефлексии после этапов «Я» и «МЫ».</div>
+      </div>
+    </div>
+    <div class="role">
+      <img src="assets/role_inspector.jpg" alt="">
+      <div class="body">
+        <div class="nm">ИНСПЕКТОР</div><div class="vice">Безответственность</div>
+        <div class="ln"><b>Постоянно:</b> отслеживает работу соседней команды.</div>
+        <div class="ln"><b>Активно:</b> выносит вердикт с аргументацией. Молчание 2 мин = принято.</div>
+      </div>
+    </div>
+    <div class="role">
+      <img src="assets/role_hranitel.jpg" alt="">
+      <div class="body">
+        <div class="nm">ХРАНИТЕЛЬ МАЯКА</div><div class="vice">Боязнь конфликта</div>
+        <div class="ln"><b>Постоянно:</b> держит темп и энергию, не даёт «огню» погаснуть.</div>
+        <div class="ln"><b>Активно:</b> проводит собственный ритуал на каждом этапе.</div>
+      </div>
+    </div>
+    <div class="role">
+      <img src="assets/role_engineer.jpg" alt="">
+      <div class="body">
+        <div class="nm">ИНЖЕНЕР</div><div class="vice">Недоверие</div>
+        <div class="ln"><b>Постоянно:</b> следит за доступностью инструментов, решает техвопросы.</div>
+        <div class="ln"><b>Активно:</b> доводит технику команды до полной готовности к концу «Я».</div>
+      </div>
+    </div>
+    <div class="role">
+      <img src="assets/role_letopisec.jpg" alt="">
+      <div class="body">
+        <div class="nm">ЛЕТОПИСЕЦ</div><div class="vice">Безразличие к результату</div>
+        <div class="ln"><b>Постоянно:</b> снимает фото и видео прорывов и эмоций.</div>
+        <div class="ln"><b>Активно:</b> собирает и представляет итоговый ролик до 1 минуты.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cols c-55-45" style="flex:0 0 auto; margin-top:5mm;">
+    <div class="callout info">
+      <h3>Как раздать</h3>
+      <p>Карты рубашкой вверх, каждый берёт одну. Роль не про должность, а про функцию в команде. На каждой карте два QR: «Тайная миссия» — секретное поведенческое задание, и «МАЯК-ОКО» — вход в генератор промптов.</p>
+    </div>
+    <div class="callout">
+      <h3>Если людей меньше шести</h3>
+      <p>Первыми сохраняются Инспектор и Капитан — без них ломается механика проверки и темпа. Летописец и Хранитель могут совмещаться.</p>
+    </div>
+  </div>
+  <img class="foot-logo" src="assets/rsk-logo.png">
+  <div class="pnum">7</div>
+</section>
+
+</body>
+</html>

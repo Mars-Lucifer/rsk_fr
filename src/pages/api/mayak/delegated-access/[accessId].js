@@ -7,6 +7,8 @@ import {
 } from "@/lib/mayakAdminRights";
 import { getMayakSessionById } from "@/lib/mayakSessions";
 import { listMayakTokenMaterials } from "@/lib/mayakTokenMaterials";
+import { deleteSessionLinks } from "@/lib/mayakSessionLinks";
+import { getLessonProgress, markLessonPassed } from "@/lib/mayakLessonProgress";
 
 function serializeOverviewItem(item = {}) {
     const session = item.session || {};
@@ -36,6 +38,13 @@ function serializeOverviewItem(item = {}) {
                   isExhausted: Boolean(token.isExhausted),
               }
             : null,
+        links: item.links
+            ? {
+                  plainToken: item.links.plainToken || "",
+                  masterSecret: item.links.masterSecret || "",
+                  dashboardSecret: item.links.dashboardSecret || "",
+              }
+            : null,
     };
 }
 
@@ -44,6 +53,7 @@ function serializeOverview(overview = {}) {
         right: overview.right,
         sessions: Array.isArray(overview.sessions) ? overview.sessions.map(serializeOverviewItem) : [],
         materials: Array.isArray(overview.materials) ? overview.materials : [],
+        passedLessons: Array.isArray(overview.passedLessons) ? overview.passedLessons : [],
     };
 }
 
@@ -59,8 +69,19 @@ export default async function handler(req, res) {
     try {
         if (action === "login" || action === "overview") {
             const overview = await getMayakDelegatedAccessOverviewByAccess({ accessId, password });
-            const materials = await listMayakTokenMaterials();
-            return res.status(200).json({ success: true, data: serializeOverview({ ...overview, materials }) });
+            const [materials, passedLessons] = await Promise.all([listMayakTokenMaterials(), getLessonProgress(accessId)]);
+            return res.status(200).json({ success: true, data: serializeOverview({ ...overview, materials, passedLessons }) });
+        }
+
+        // Отметка пройденного видеоурока. Прогресс живёт на стороне доступа,
+        // поэтому мастер видит его с любого устройства.
+        if (action === "pass_lesson") {
+            const right = await getMayakAdminRightByAccessId(accessId);
+            if (!right || !validateDelegatedAccessPassword(right, password)) {
+                return res.status(403).json({ success: false, error: "Неверный пароль" });
+            }
+            const passedLessons = await markLessonPassed(accessId, req.body?.lessonId);
+            return res.status(200).json({ success: true, data: { passedLessons } });
         }
 
         if (action === "create_session") {
@@ -72,15 +93,16 @@ export default async function handler(req, res) {
                 participantLimit: req.body?.participantLimit,
             });
 
-            const [overview, materials] = await Promise.all([
+            const [overview, materials, passedLessons] = await Promise.all([
                 getMayakDelegatedAccessOverviewByAccess({ accessId, password }),
                 listMayakTokenMaterials(),
+                getLessonProgress(accessId),
             ]);
             return res.status(200).json({
                 success: true,
                 data: {
-                    ...serializeOverview({ ...overview, materials }),
-                    createdSession: serializeOverviewItem({ session: created.session, token: created.token }),
+                    ...serializeOverview({ ...overview, materials, passedLessons }),
+                    createdSession: serializeOverviewItem({ session: created.session, token: created.token, links: created.links }),
                 },
             });
         }
@@ -102,11 +124,13 @@ export default async function handler(req, res) {
             }
 
             await completeMayakSessionWithRuntimeCleanup(sessionId);
-            const [overview, materials] = await Promise.all([
+            await deleteSessionLinks(sessionId).catch(() => {});
+            const [overview, materials, passedLessons] = await Promise.all([
                 getMayakDelegatedAccessOverviewByAccess({ accessId, password }),
                 listMayakTokenMaterials(),
+                getLessonProgress(accessId),
             ]);
-            return res.status(200).json({ success: true, data: serializeOverview({ ...overview, materials }) });
+            return res.status(200).json({ success: true, data: serializeOverview({ ...overview, materials, passedLessons }) });
         }
 
         return res.status(400).json({ success: false, error: "Неизвестное действие" });
