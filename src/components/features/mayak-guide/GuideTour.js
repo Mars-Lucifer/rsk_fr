@@ -27,15 +27,58 @@ const GAP = 14; // отступ карточки от выреза
 const CARD_W = 340;
 const POLL_MS = 250;
 
-function rectOf(sel) {
+// Документ, в котором ищется цель. Шаг с frame целится внутрь встроенной страницы:
+// демонстрация тренажёра открывается в консоли через iframe, и подсветить кнопку внутри
+// иначе нельзя. Работает потому, что тренажёр лежит на том же домене — у чужого сайта
+// contentDocument закрыт браузером, и шаг просто останется в ожидании.
+function docOf(frameSel) {
+    if (typeof document === "undefined") return null;
+    if (!frameSel) return document;
+    const frame = document.querySelector(frameSel);
+    try {
+        return frame?.contentDocument || null;
+    } catch {
+        return null;
+    }
+}
+
+// Смещение встроенной страницы в окне: координаты внутри iframe считаются от его левого
+// верхнего угла, а карточка и вырез живут в координатах окна.
+function frameOffset(frameSel) {
+    if (!frameSel) return { x: 0, y: 0 };
+    const frame = document.querySelector(frameSel);
+    if (!frame) return { x: 0, y: 0 };
+    const box = frame.getBoundingClientRect();
+    return { x: box.left, y: box.top };
+}
+
+// N-я подходящая цель. Нужна там, где селектора на одну штуку не существует: в тренажёре
+// ряд кнопок сервисов размечен теми же классами, что ряд «Начать задание», и отличаются
+// они только порядком. Городить ради этого атрибуты в чужой странице — дороже.
+function pick(scope, sel, nth = 0) {
+    if (!scope || !sel) return null;
+    if (!nth) return scope.querySelector(sel);
+    return scope.querySelectorAll(sel)[nth] || null;
+}
+
+function rectOf(sel, frameSel, nth) {
     if (!sel) return null;
-    const node = typeof document === "undefined" ? null : document.querySelector(sel);
+    const scope = docOf(frameSel);
+    const node = pick(scope, sel, nth);
     if (!node) return null;
     const box = node.getBoundingClientRect();
     // Скрытый элемент даёт нулевую рамку в левом верхнем углу. Подсветить её значит
     // вырезать дырку в пустом месте — для шага это то же самое, что цели ещё нет.
     if (box.width < 1 && box.height < 1) return null;
-    return box;
+    const shift = frameOffset(frameSel);
+    return {
+        left: box.left + shift.x,
+        top: box.top + shift.y,
+        right: box.right + shift.x,
+        bottom: box.bottom + shift.y,
+        width: box.width,
+        height: box.height,
+    };
 }
 
 // Куда положить карточку. Снизу, если внизу есть место, иначе сверху; когда цель
@@ -75,7 +118,11 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     const [ready, setReady] = useState(false);
     const step = steps[Math.min(index, steps.length - 1)] || null;
     const selRef = useRef("");
+    const frameRef = useRef("");
+    const nthRef = useRef(0);
     selRef.current = step?.sel || "";
+    frameRef.current = step?.frame || "";
+    nthRef.current = step?.nth || 0;
 
     const finish = useCallback(() => {
         onFinish?.();
@@ -101,7 +148,7 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     useEffect(() => {
         if (!open) return undefined;
         const measure = () => {
-            const next = rectOf(selRef.current);
+            const next = rectOf(selRef.current, frameRef.current, nthRef.current);
             setBox(next);
             setReady(!selRef.current || Boolean(next));
         };
@@ -120,9 +167,9 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     // хуже отсутствия инструкции.
     useEffect(() => {
         if (!open || !step?.sel) return;
-        const node = document.querySelector(step.sel);
-        node?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }, [open, index, step?.sel]);
+        const scope = docOf(step.frame);
+        pick(scope, step.sel, step.nth)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, [open, index, step?.sel, step?.frame, step?.nth]);
 
     // Ожидание клика по цели. Слушаем на всплытии в document, а не на самом узле: узел
     // может смениться между рендерами (список перерисовался), и подписка на старый
@@ -131,12 +178,16 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
         if (!open || !step) return undefined;
         const wait = step.wait ?? (step.sel ? "click" : "next");
         if (wait !== "click") return undefined;
+        // Слушаем в том документе, где живёт цель: клик внутри встроенной страницы
+        // наружу не всплывает, и подписка на своё окно его не увидит.
+        const scope = docOf(step.frame);
+        if (!scope) return undefined;
         const onClick = (event) => {
-            const node = document.querySelector(step.sel);
+            const node = pick(scope, step.sel, step.nth);
             if (node && (node === event.target || node.contains(event.target))) window.setTimeout(advance, 350);
         };
-        document.addEventListener("click", onClick, true);
-        return () => document.removeEventListener("click", onClick, true);
+        scope.addEventListener("click", onClick, true);
+        return () => scope.removeEventListener("click", onClick, true);
     }, [open, step, advance]);
 
     // Ожидание условия: строка появилась, счётчик вырос, ссылка скопирована.
