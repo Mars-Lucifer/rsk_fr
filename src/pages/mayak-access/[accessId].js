@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@/components/layout/Layout";
+import GuideTour from "@/components/features/mayak-guide/GuideTour";
+import { ACCESS_TOUR } from "@/components/features/mayak-guide/accessTour.mjs";
 
 const MAYAK_GUEST_SUFFIX = "aaaaa";
 
@@ -83,6 +85,7 @@ export default function MayakDelegatedAccessPage() {
         sessionName: "",
         tableCount: "1",
     });
+    const [tourOpen, setTourOpen] = useState(false);
 
     const tableOptions = useMemo(() => buildTableOptions(), []);
     const right = overview.right || null;
@@ -370,12 +373,18 @@ export default function MayakDelegatedAccessPage() {
                     <div style={headerTitleBoxStyle}>
                         <div style={eyebrowStyle}>Доступ МАЯК</div>
                         <h1 style={titleStyle}>{right?.title || right?.fullName || "Сессии"}</h1>
+                        {/* Инструкция идёт по этому же экрану стрелками, а не уводит на
+                            отдельную страницу: мастер нажимает те самые кнопки, и шаг
+                            закрывается фактом — сессия создана, ссылка скопирована. */}
+                        <button type="button" style={tourButtonStyle} onClick={() => setTourOpen(true)}>
+                            <span aria-hidden="true">↳</span> Провести меня по консоли
+                        </button>
                         <div style={metaLineStyle}>
                             <span>{right?.taskRange || right?.sectionId || "Колода"}</span>
                             {right?.sectionId && right.sectionId !== right.taskRange ? <span>{right.sectionId}</span> : null}
                         </div>
                     </div>
-                    <div style={{ ...metricBoxStyle, ...(isCompact ? compactMetricBoxStyle : null) }}>
+                    <div data-tour="limit" style={{ ...metricBoxStyle, ...(isCompact ? compactMetricBoxStyle : null) }}>
                         <div style={metricTextStyle}>
                             <span style={metricValueStyle}>{`${right?.remainingParticipantLimit ?? 0}/${right?.totalParticipantLimit ?? 0}`}</span>
                             <span style={metricLabelStyle}>входов осталось</span>
@@ -390,7 +399,7 @@ export default function MayakDelegatedAccessPage() {
                 {message ? <div style={noticeSuccessStyle}>{message}</div> : null}
 
                 <form onSubmit={handleCreate} style={{ ...createPanelStyle, ...(isCompact ? compactCreatePanelStyle : null) }}>
-                    <label style={fieldStyle}>
+                    <label data-tour="name" style={fieldStyle}>
                         <span style={labelStyle}>Название сессии</span>
                         <input
                             value={form.sessionName}
@@ -401,7 +410,7 @@ export default function MayakDelegatedAccessPage() {
                         />
                     </label>
 
-                    <label style={fieldStyle}>
+                    <label data-tour="tables" style={fieldStyle}>
                         <span style={labelStyle}>Столы (команды)</span>
                         <select
                             value={form.tableCount}
@@ -418,6 +427,7 @@ export default function MayakDelegatedAccessPage() {
                     <div style={createActionStyle}>
                         <button
                             type="submit"
+                            data-tour="create"
                             className="ma-primary"
                             style={primaryButtonStyle}
                             disabled={creating}>
@@ -429,7 +439,7 @@ export default function MayakDelegatedAccessPage() {
 
                 {/* Руководство стоит между созданием сессии и материалами: мастер
                     читает его до игры, а материалы качает уже под конкретную. */}
-                <a href="/mayak-guide" target="_blank" rel="noreferrer" style={guideCardStyle}>
+                <a data-tour="guide" href="/mayak-guide" target="_blank" rel="noreferrer" style={guideCardStyle}>
                     <span style={guideCardTextStyle}>
                         <span style={eyebrowStyle}>Руководство мастера</span>
                         <span style={guideTitleStyle}>Как вести тренажёр</span>
@@ -502,7 +512,7 @@ export default function MayakDelegatedAccessPage() {
                         ].filter((row) => row.url);
 
                         return (
-                            <article key={item.sessionId} style={sessionRowStyle}>
+                            <article key={item.sessionId} data-tour="session" style={sessionRowStyle}>
                                 <div style={{ ...sessionHeaderStyle, ...(isCompact ? compactSessionHeaderStyle : null) }}>
                                     <div>
                                         <h2 style={sessionTitleStyle}>{item.sessionName || "Сессия"}</h2>
@@ -518,7 +528,11 @@ export default function MayakDelegatedAccessPage() {
                                             <span>{`Входы: ${token.usedCount || 0}/${token.usageLimit || item.participantLimit || 0}`}</span>
                                         </div>
                                     </div>
-                                    <button type="button" style={secondaryButtonStyle} onClick={() => handleComplete(item.sessionId, item.sessionName)}>
+                                    <button
+                                        type="button"
+                                        data-tour="finish"
+                                        style={secondaryButtonStyle}
+                                        onClick={() => handleComplete(item.sessionId, item.sessionName)}>
                                         Завершить
                                     </button>
                                 </div>
@@ -530,6 +544,7 @@ export default function MayakDelegatedAccessPage() {
                                         return (
                                             <div
                                                 key={row.key}
+                                                data-tour={`link-${row.key}`}
                                                 className="ma-link-row"
                                                 style={{ ...linkRowStyle, ...(isCompact ? compactLinkRowStyle : null), borderLeftColor: row.accent }}>
                                                 <span style={linkLabelBoxStyle}>
@@ -643,6 +658,13 @@ export default function MayakDelegatedAccessPage() {
                     }
 
                 `}</style>
+
+                <GuideTour
+                    steps={ACCESS_TOUR}
+                    open={tourOpen}
+                    onClose={() => setTourOpen(false)}
+                    title="Как вести занятие"
+                />
             </section>
         </Layout>
     );
@@ -983,6 +1005,24 @@ const headerTitleBoxStyle = {
     flexDirection: "column",
     gap: 6,
     minWidth: 0,
+};
+
+// Кнопка инструкции стоит под заголовком и намеренно узкая: alignSelf держит её по
+// ширине текста — в колонке заголовка она иначе растянулась бы во всю строку и читалась
+// бы как главное действие экрана, а главное здесь — создать сессию.
+const tourButtonStyle = {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    minHeight: 34,
+    width: "auto",
+    border: "1px dashed #b45309",
+    borderRadius: 9,
+    background: "#fff8ef",
+    color: "#8a4708",
+    padding: "0 12px",
+    fontSize: 13,
+    fontWeight: 800,
+    cursor: "pointer",
 };
 
 const eyebrowStyle = {
