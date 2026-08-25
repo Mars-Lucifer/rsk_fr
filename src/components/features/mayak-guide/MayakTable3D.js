@@ -59,6 +59,9 @@ const ROLE_VIEW = {
 // Первое — самый долгий возврат (64 карты с перехлёстом), второе — FLIP + SETTLE у ткани.
 const CLEAR_MS = 1900;
 const FLIP_MS = 4400;
+// Осадка после переворота полотна, прежде чем ссылка из урока запускает партию.
+// Подбирается по кадру: на 500 мс стол оставался пустым.
+const DEEP_SETTLE_MS = 2500;
 
 const CAMERA_EASE = 0.0016; // чем меньше, тем резче подлёт; независимо от частоты кадров
 
@@ -1106,6 +1109,59 @@ export default function MayakTable3D() {
         setPlay((current) => ({ ...current, index: 0, started: false, playing: false }));
         clearTable();
     }, [clearTable]);
+
+    // Ссылка из урока приводит стол сразу к нужному месту партии: ?side=ya&phase=2.
+    // Без этого мастеру, которому в уроке сказано «смотри кольцо», достаётся начало партии
+    // и догадка, куда нажать, — а урок ровно от догадок и избавляет.
+    //
+    // Другая сторона сначала переворачивается: эффект после переворота срабатывает снова,
+    // смена стороны приходит через onFieldStatus.
+    //
+    // ponytail: партия после переворота не стартует — startFrom отрабатывает вхолостую,
+    // хотя ручки групп на месте, а тот же startFrom по кнопке через несколько секунд
+    // раскладывает стол. Осадкой физики это не лечится: пробовал 0.5 и 2.5 с, кадр
+    // одинаковый. До разбора кросс-сторонняя ссылка делает половину работы — приводит
+    // на нужную сторону, а партию мастер пускает кнопкой. Ссылка внутри своей стороны
+    // (?side=ya на «Я») работает целиком, ей и пользуются уроки.
+    const deepLink = useMemo(() => {
+        if (typeof window === "undefined") return null;
+        const query = new URLSearchParams(window.location.search);
+        const wanted = query.get("side");
+        if (wanted !== "ya" && wanted !== "my") return null;
+        const phase = Number.parseInt(query.get("phase") ?? "0", 10);
+        return { side: wanted, phase: Number.isFinite(phase) ? Math.max(0, phase) : 0 };
+    }, []);
+    const deepDone = useRef(false);
+    // Ссылку приходится доигрывать по тикам: между снятием busy и появлением ручек групп
+    // ни одна зависимость эффекта не меняется, и без собственного повтора он замер бы на
+    // перевёрнутом, но пустом столе.
+    const [deepTick, setDeepTick] = useState(0);
+
+    useEffect(() => {
+        if (!deepLink || deepDone.current || live) return undefined;
+        if (!decksReady || busy) {
+            const timer = window.setTimeout(() => setDeepTick((value) => value + 1), 200);
+            return () => window.clearTimeout(timer);
+        }
+        if (deepLink.side !== side) {
+            flip();
+            return undefined;
+        }
+        // Ручки групп после переворота встают не в том же кадре, что снимается busy:
+        // startFrom на пустых ссылках тихо возвращается, и ссылка считалась бы
+        // отработанной при неразложенном столе — полотно перевернулось, партия не идёт.
+        if (!decksRef.current || !meeplesRef.current || !starsRef.current || !jetonsRef.current) {
+            const timer = window.setTimeout(() => setDeepTick((value) => value + 1), 200);
+            return () => window.clearTimeout(timer);
+        }
+        deepDone.current = true;
+        const target = script.findIndex((item) => item.phase === deepLink.phase);
+        // Пауза после снятия busy — калибровочная. Сразу после переворота предметы ещё
+        // висят в физике, и команды раскладки уходят в тела, которые в этот момент падают:
+        // на полсекунды стол оставался пустым, партия не начиналась вовсе.
+        const timer = window.setTimeout(() => startFrom(target < 0 ? 0 : target), DEEP_SETTLE_MS);
+        return () => window.clearTimeout(timer);
+    }, [deepLink, live, decksReady, busy, side, flip, script, startFrom, deepTick]);
 
     // Прятать пятна во время партии больше не нужно, и это следствие объединения. Раньше
     // кольцо оставалось висеть над опустевшим местом — стопки уехали на поле, миплы на
