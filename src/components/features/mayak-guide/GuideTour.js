@@ -285,13 +285,28 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
                     color: #627178;
                     white-space: nowrap;
                 }
+                /* Размеры заданы явно, включая width и box-shadow: тур живёт поверх чужих
+                   страниц, а у портала глобальный стиль тега button тянет кнопку во всю
+                   строку и подкладывает белую плашку. Крестик от этого превращался
+                   в широкую пилюлю поперёк карточки. */
                 .close {
+                    flex: none;
+                    width: 28px;
+                    height: 28px;
+                    min-height: 0;
+                    padding: 0;
                     border: 0;
-                    background: none;
-                    color: #627178;
+                    border-radius: 8px;
+                    background: transparent;
+                    box-shadow: none;
+                    color: #8a969c;
                     font-size: 15px;
+                    line-height: 1;
                     cursor: pointer;
-                    padding: 2px 4px;
+                }
+                .close:hover {
+                    background: #f1f4f6;
+                    color: #33424a;
                 }
                 h3 {
                     margin: 6px 0 4px;
@@ -317,10 +332,12 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
                     margin-top: 12px;
                 }
                 .go {
+                    width: auto;
                     min-height: 36px;
                     border: 1px solid #152022;
                     border-radius: 8px;
                     background: #152022;
+                    box-shadow: none;
                     color: #fff;
                     padding: 0 14px;
                     font-weight: 800;
@@ -332,9 +349,14 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
                     color: #b06d00;
                 }
                 .back {
+                    width: auto;
+                    min-height: 0;
                     margin-left: auto;
+                    padding: 0 4px;
                     border: 0;
-                    background: none;
+                    border-radius: 8px;
+                    background: transparent;
+                    box-shadow: none;
                     color: #627178;
                     font-size: 13px;
                     cursor: pointer;

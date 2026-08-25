@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@/components/layout/Layout";
 import GuideTour from "@/components/features/mayak-guide/GuideTour";
-import { ACCESS_TOUR } from "@/components/features/mayak-guide/accessTour.mjs";
+import { TOUR_HANDOFF_KEY, buildAccessTour } from "@/components/features/mayak-guide/accessTour.mjs";
 
 const MAYAK_GUEST_SUFFIX = "aaaaa";
 
@@ -86,12 +86,28 @@ export default function MayakDelegatedAccessPage() {
         tableCount: "1",
     });
     const [tourOpen, setTourOpen] = useState(false);
+    // Шаги строятся в момент запуска: шагу создания нужно число сессий ДО инструкции,
+    // иначе у мастера с прошлыми занятиями он засчитается сразу и главное действие
+    // инструкции — создать свою тестовую сессию — окажется пропущено.
+    const [tourSteps, setTourSteps] = useState([]);
 
     const tableOptions = useMemo(() => buildTableOptions(), []);
     const right = overview.right || null;
     const sessions = Array.isArray(overview.sessions) ? overview.sessions : [];
     const materials = Array.isArray(overview.materials) ? overview.materials : [];
     const passedLessons = Array.isArray(overview.passedLessons) ? overview.passedLessons : [];
+
+    const startTour = useCallback(() => {
+        setTourSteps(buildAccessTour(sessions.length));
+        // Метка для дашборда: он открывается по мастер-ссылке в новой вкладке и
+        // подхватывает инструкцию с того места, где консоль закончила.
+        try {
+            window.localStorage.setItem(TOUR_HANDOFF_KEY, "1");
+        } catch {
+            // Приватный режим — дашборд просто не продолжит сам, кнопка там своя.
+        }
+        setTourOpen(true);
+    }, [sessions.length]);
 
     const apiRequest = useCallback(
         async (body, passwordOverride) => {
@@ -376,7 +392,7 @@ export default function MayakDelegatedAccessPage() {
                         {/* Инструкция идёт по этому же экрану стрелками, а не уводит на
                             отдельную страницу: мастер нажимает те самые кнопки, и шаг
                             закрывается фактом — сессия создана, ссылка скопирована. */}
-                        <button type="button" style={tourButtonStyle} onClick={() => setTourOpen(true)}>
+                        <button type="button" style={tourButtonStyle} onClick={startTour}>
                             <span aria-hidden="true">↳</span> Провести меня по консоли
                         </button>
                         <div style={metaLineStyle}>
@@ -660,8 +676,8 @@ export default function MayakDelegatedAccessPage() {
                 `}</style>
 
                 <GuideTour
-                    steps={ACCESS_TOUR}
-                    open={tourOpen}
+                    steps={tourSteps}
+                    open={tourOpen && tourSteps.length > 0}
                     onClose={() => setTourOpen(false)}
                     title="Как вести занятие"
                 />
