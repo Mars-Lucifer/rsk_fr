@@ -135,3 +135,6 @@ data/mayak-service-templates/
 data/mayak-onboarding-files/
 data/local-profile-mock.json
 data/mayak-libreoffice.log
+
+# живой стол гайда (прототип режима «Обучение»)
+data/mayak-guide-rooms.json
