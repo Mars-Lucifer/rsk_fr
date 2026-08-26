@@ -5,6 +5,7 @@ import TransitionWrapper from "@/components/layout/TransitionWrapper";
 import { CONTEST_MODE_KEY, parseContestToken } from "@/lib/mayakContestAccess";
 
 import Layout from "@/components/layout/Layout";
+import HowTo from "@/components/features/mayak-guide/HowTo";
 import IndexPage from "@/components/features/tools-2";
 import TrainerPage from "@/components/features/tools-2/trainer";
 import HistoryPage from "@/components/features/tools-2/history";
@@ -115,6 +116,11 @@ export default function Home() {
                 {effectivePageKey === "settings" && <SettingsPage goTo={goTo} />}
                 {effectivePageKey === "history" && <HistoryPage goTo={goTo} />}
             </TransitionWrapper>
+
+            {/* «Как это работает» — на главной МАЯК-ОКО и на экране задания. На вводе
+                токена и в истории её нет: там объяснять нечего, а кнопка поверх формы
+                входа выглядит как часть входа. */}
+            {(effectivePageKey === "mayakOko" || effectivePageKey === "trainer") && <HowTo />}
         </Layout>
     );
 }

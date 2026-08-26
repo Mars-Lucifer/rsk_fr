@@ -225,23 +225,55 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     const advanceRef = useRef(advance);
     advanceRef.current = advance;
 
+    // Куда листают. Пропуск идёт в ту же сторону: иначе шаг, которого на этом экране нет,
+    // при движении назад отбрасывал бы обратно вперёд — и до первого шага не добраться.
+    const dirRef = useRef(1);
+
     useEffect(() => {
         if (!open || !step?.optional) return undefined;
         const { sel, frame, nth, match } = step;
         const timer = window.setTimeout(() => {
-            if (!rectOf(sel, frame, nth, match)) advanceRef.current();
+            if (rectOf(sel, frame, nth, match)) return;
+            if (dirRef.current < 0) setIndex((current) => Math.max(0, current - 1));
+            else advanceRef.current();
         }, OPTIONAL_MS);
         return () => window.clearTimeout(timer);
     }, [open, index, step]);
 
+    // Клавиатура: стрелки листают, Esc закрывает.
+    //
+    // Вперёд пускаем только там, где шаг ничего не требует. Шаг, который ждёт действия
+    // — создать сессию, скопировать ссылку, — стрелкой не проматывается: иначе инструкция
+    // снова превращается в слайды, а весь её смысл в том, что мастер делает, а не смотрит.
+    // Назад пускаем всегда: перечитать уже пройденное ничему не мешает.
     useEffect(() => {
         if (!open) return undefined;
         const onKey = (event) => {
-            if (event.key === "Escape") onClose?.();
+            if (event.key === "Escape") {
+                onClose?.();
+                return;
+            }
+            // В поле ввода стрелки двигают курсор — забирать их у пользователя нельзя.
+            const tag = event.target?.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA" || event.target?.isContentEditable) return;
+
+            if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                dirRef.current = -1;
+                setIndex((current) => Math.max(0, current - 1));
+                return;
+            }
+            if (event.key === "ArrowRight") {
+                const blocking = step && (step.wait ?? (step.sel ? "click" : "next")) !== "next";
+                if (blocking) return;
+                event.preventDefault();
+                dirRef.current = 1;
+                advance();
+            }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [open, onClose]);
+    }, [open, onClose, step, advance]);
 
     useEffect(() => {
         if (open) setIndex(0);
@@ -288,18 +320,31 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
 
                 <div className="foot">
                     {waiting === "next" ? (
-                        <button type="button" className="go" onClick={advance}>
+                        <button
+                            type="button"
+                            className="go"
+                            onClick={() => {
+                                dirRef.current = 1;
+                                advance();
+                            }}>
                             {index + 1 >= steps.length ? "Готово" : "Дальше"}
                         </button>
                     ) : (
                         <span className="await">{waiting === "click" ? "Нажмите подсвеченное" : "Сделайте это на странице"}</span>
                     )}
                     {index > 0 ? (
-                        <button type="button" className="back" onClick={() => setIndex((c) => Math.max(0, c - 1))}>
+                        <button
+                            type="button"
+                            className="back"
+                            onClick={() => {
+                                dirRef.current = -1;
+                                setIndex((c) => Math.max(0, c - 1));
+                            }}>
                             Назад
                         </button>
                     ) : null}
                 </div>
+                <span className="keys">← → листать, Esc закрыть</span>
             </div>
 
             <style jsx>{`
@@ -433,6 +478,12 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
                     font-size: 13px;
                     font-weight: 700;
                     color: #b06d00;
+                }
+                .keys {
+                    display: block;
+                    margin-top: 8px;
+                    font-size: 11px;
+                    color: #a3adb3;
                 }
                 .back {
                     width: auto;

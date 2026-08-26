@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@/components/layout/Layout";
 import GuideTour from "@/components/features/mayak-guide/GuideTour";
-import { TOUR_HANDOFF_KEY, TRAINER_TOUR, buildAccessTour } from "@/components/features/mayak-guide/accessTour.mjs";
+import { TOUR_HANDOFF_KEY, buildAccessTour } from "@/components/features/mayak-guide/accessTour.mjs";
 
 const MAYAK_GUEST_SUFFIX = "aaaaa";
 
@@ -97,7 +97,6 @@ export default function MayakDelegatedAccessPage() {
     // иначе у мастера с прошлыми занятиями он засчитается сразу и главное действие
     // инструкции — создать свою тестовую сессию — окажется пропущено.
     const [tourSteps, setTourSteps] = useState([]);
-    const [demoOpen, setDemoOpen] = useState(false);
 
     const tableOptions = useMemo(() => buildTableOptions(), []);
     const right = overview.right || null;
@@ -492,16 +491,17 @@ export default function MayakDelegatedAccessPage() {
                     устроено, не теряя консоль и не тратя входы участников. Инструкция
                     целится внутрь этого окна — страница своя, документ доступен. */}
                 {demoUrl ? (
-                    <button type="button" data-tour="demo-open" style={demoCardStyle} onClick={() => setDemoOpen(true)}>
+                    <a data-tour="demo-open" href={demoUrl} target="_blank" rel="noreferrer" style={guideCardStyle}>
                         <span style={guideCardTextStyle}>
                             <span style={eyebrowStyle}>Демонстрация</span>
                             <span style={guideTitleStyle}>Тренажёр МАЯК с колодой</span>
                             <span style={guideTextStyle}>
-                                Открывается здесь же: типы контента, номер задания с бумажной карты, поля промта и отправка в сервис.
+                                Откроется ваш демо-тренажёр. Там внизу справа кнопка «Как это работает» — она разберёт экран по шагам
+                                на вашем же задании. Такая кнопка есть у каждого, кто зашёл по ссылке.
                             </span>
                         </span>
-                        <span style={guideActionStyle}>Показать →</span>
-                    </button>
+                        <span style={guideActionStyle}>Открыть →</span>
+                    </a>
                 ) : null}
 
                 {materials.length ? (
@@ -712,34 +712,6 @@ export default function MayakDelegatedAccessPage() {
                     }
 
                 `}</style>
-
-                {demoOpen && demoUrl ? (
-                    <div style={demoOverlayStyle} role="dialog" aria-modal="true" aria-label="Демонстрация тренажёра">
-                        <div style={demoBoxStyle}>
-                            <div style={demoHeadStyle}>
-                                <span style={demoTitleStyle}>Тренажёр МАЯК · демонстрация</span>
-                                <span style={demoHeadActionsStyle}>
-                                    {/* Запуск подсказок изнутри окна: открытая демонстрация перекрывает
-                                        консоль целиком, и кнопка инструкции под заголовком становится
-                                        недостижимой — мастер оказывался в тренажёре без провожатого. */}
-                                    <button
-                                        type="button"
-                                        style={demoTourButtonStyle}
-                                        onClick={() => {
-                                            setTourSteps(TRAINER_TOUR);
-                                            setTourOpen(true);
-                                        }}>
-                                        <span aria-hidden="true">↳</span> Провести по тренажёру
-                                    </button>
-                                    <button type="button" className="ma-icon" aria-label="Закрыть" onClick={() => setDemoOpen(false)}>
-                                        ✕
-                                    </button>
-                                </span>
-                            </div>
-                            <iframe id="tour-demo" title="Демонстрация тренажёра" src={demoUrl} style={demoFrameStyle} />
-                        </div>
-                    </div>
-                ) : null}
 
                 <GuideTour
                     steps={tourSteps}
@@ -1087,88 +1059,6 @@ const headerTitleBoxStyle = {
     flexDirection: "column",
     gap: 6,
     minWidth: 0,
-};
-
-// Карточка демонстрации повторяет карточку руководства, но это кнопка, а не ссылка:
-// тренажёр открывается здесь же окном, никуда не уводя.
-const demoCardStyle = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
-    width: "100%",
-    border: "1px solid #d9e0e5",
-    borderRadius: 12,
-    background: "#fff",
-    padding: 16,
-    textAlign: "left",
-    // Цвет задан явно: карточка — кнопка, а глобальный стиль портала красит текст кнопки
-    // в белый. Заголовок «Тренажёр МАЯК с колодой» из-за этого пропадал на белом фоне,
-    // оставляя в карточке пустую строку. У соседней карточки-ссылки такого нет.
-    color: "#101820",
-    cursor: "pointer",
-};
-
-const demoOverlayStyle = {
-    position: "fixed",
-    inset: 0,
-    zIndex: 8000,
-    display: "grid",
-    placeItems: "center",
-    padding: 24,
-    background: "rgba(10, 14, 18, 0.55)",
-};
-
-// Окно почти во весь экран: тренажёр — двухколоночный, в узком окне его правая колонка
-// с промтом уезжает под сгиб, и демонстрация показывает половину экрана вместо целого.
-const demoBoxStyle = {
-    display: "flex",
-    flexDirection: "column",
-    width: "min(1440px, 96vw)",
-    height: "min(900px, 92vh)",
-    borderRadius: 14,
-    background: "#fff",
-    overflow: "hidden",
-    boxShadow: "0 24px 70px rgba(8, 12, 16, 0.4)",
-};
-
-const demoHeadStyle = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    padding: "10px 14px",
-    borderBottom: "1px solid #e6ebef",
-};
-
-const demoTitleStyle = {
-    fontSize: 14,
-    fontWeight: 800,
-};
-
-const demoHeadActionsStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-};
-
-const demoTourButtonStyle = {
-    width: "auto",
-    minHeight: 34,
-    border: "1px dashed #b45309",
-    borderRadius: 9,
-    background: "#fff8ef",
-    color: "#8a4708",
-    padding: "0 12px",
-    fontSize: 13,
-    fontWeight: 800,
-    cursor: "pointer",
-};
-
-const demoFrameStyle = {
-    flex: 1,
-    width: "100%",
-    border: 0,
 };
 
 // Кнопка инструкции стоит под заголовком и намеренно узкая: alignSelf держит её по
