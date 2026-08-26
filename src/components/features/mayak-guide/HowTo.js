@@ -33,7 +33,7 @@ async function findSample() {
     }
 }
 
-export default function HowTo({ screen = "index", label = "Как это работает" }) {
+export default function HowTo({ screen = "index", label = "Как это работает", hint = "Разбор экрана по шагам" }) {
     const [open, setOpen] = useState(false);
     const [steps, setSteps] = useState([]);
 
@@ -49,48 +49,41 @@ export default function HowTo({ screen = "index", label = "Как это раб�
 
     return (
         <>
-            <button type="button" className="howto" onClick={start}>
-                <span aria-hidden="true">?</span>
-                <span className="howto-text">{label}</span>
+            <button type="button" className="howto" onClick={start} title={hint} aria-label={label}>
+                ?
             </button>
 
             <GuideTour steps={steps} open={open && steps.length > 0} onClose={() => setOpen(false)} title={label} />
 
             <style jsx>{`
-                /* Высота и радиус — как у соседних кнопок шапки: разбор должен читаться
-                   как часть панели инструментов, а не как баннер поверх неё. */
+                /* Знак вопроса в квадрате и ничего больше. Подпись «Как это работает»
+                   тянула на себя внимание сильнее, чем задания и завершение сессии, —
+                   а это подсказка, а не главное действие экрана. Что за кнопка,
+                   объясняет всплывающая подпись при наведении.
+                   Размер и радиус — как у соседних иконок шапки. */
                 .howto {
                     display: inline-flex;
                     align-items: center;
-                    gap: 6px;
-                    width: auto;
+                    justify-content: center;
+                    width: 36px;
                     height: 36px;
-                    padding: 0 14px;
-                    border: 1px solid #b45309;
-                    border-radius: 999px;
-                    background: #fff8ef;
+                    padding: 0;
+                    border: 1px solid #dbe3e9;
+                    border-radius: 10px;
+                    background: #fff;
                     box-shadow: none;
-                    color: #8a4708;
-                    font-size: 13px;
+                    color: #8a969c;
+                    font-size: 15px;
                     font-weight: 800;
-                    white-space: nowrap;
+                    line-height: 1;
                     cursor: pointer;
+                    transition:
+                        border-color 0.15s ease,
+                        color 0.15s ease;
                 }
                 .howto:hover {
-                    background: #fff2e0;
-                }
-                /* На узком экране остаётся знак вопроса: шапка тесная, и подпись выдавливала
-                   бы из неё номер стола и роль. */
-                @media (max-width: 900px) {
-                    .howto {
-                        width: 36px;
-                        padding: 0;
-                        justify-content: center;
-                        font-size: 16px;
-                    }
-                    .howto-text {
-                        display: none;
-                    }
+                    border-color: #b9c4cc;
+                    color: #33424a;
                 }
             `}</style>
         </>
