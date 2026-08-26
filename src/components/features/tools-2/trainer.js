@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import Header from "@/components/layout/Header";
+import HowTo from "@/components/features/mayak-guide/HowTo";
 import Buffer from "./addons/popup";
 import RankingTestPopup from "./addons/RankingTestPopup";
 import MayakServicesPanel from "./MayakServicesPanel";
@@ -2041,6 +2042,7 @@ export default function TrainerPage({ goTo }) {
         <ContestLessonsProvider>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
+                <HowTo screen="trainer" />
                 {isContestMode && <ContestLessonStepper />}
                 {effectiveTableNumber ? (
                     <div className="inline-flex items-center justify-center !rounded-full border border-slate-200 bg-white !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">

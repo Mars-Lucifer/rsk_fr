@@ -5,6 +5,7 @@ import { getKeyFromCookies } from "./actions";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import HowTo from "@/components/features/mayak-guide/HowTo";
 import LinkIcon from "@/assets/general/link.svg";
 import TimeIcon from "@/assets/general/time.svg";
 import ResetIcon from "@/assets/general/ResetIcon.svg";
@@ -379,6 +380,7 @@ export default function IndexPage({ goTo }) {
         <>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
+                <HowTo screen="index" />
                 <Button icon active onClick={() => goTo("trainer")}>
                     <CourseIcon />
                 </Button>

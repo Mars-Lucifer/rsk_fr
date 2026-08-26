@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // Подсказки поверх живого экрана: подсветить элемент, сказать что с ним делать, дождаться
 // действия. Мастер учится на своей странице, а не на скриншоте.
@@ -279,7 +280,7 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
         if (open) setIndex(0);
     }, [open]);
 
-    if (!open || !step) return null;
+    if (!open || !step || typeof document === "undefined") return null;
 
     const card = placeCard(box, step.place);
     const waiting = step.wait ?? (step.sel ? "click" : "next");
@@ -292,7 +293,11 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
           }
         : null;
 
-    return (
+    // Подсказка рендерится порталом в body, а не там, где стоит кнопка. Кнопка живёт
+    // в шапке, и без портала карточка оказывалась потомком <header>: её собственные
+    // кнопки попадали в селекторы вида «вторая кнопка шапки», а шаги начинали целиться
+    // сами в себя. Заодно карточку перестают резать overflow и z-index шапки.
+    return createPortal(
         <div className="tour" role="dialog" aria-label={title}>
             {/* Затемнение с дыркой. Дырка — не вырез в маске, а элемент с гигантской
                 тенью наружу: так подсветка не перехватывает клик по цели, а именно
@@ -504,6 +509,7 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
                     }
                 }
             `}</style>
-        </div>
+        </div>,
+        document.body
     );
 }
