@@ -30,6 +30,13 @@ function formatRemainingTime(expiresAt, nowTs) {
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+// Название по умолчанию — сегодняшняя дата. В списке у мастера копятся сессии за разные
+// дни, и «1231» рядом с «Проба» не говорит ни о чём; дата говорит сразу. Мастер может
+// переписать — поле обычное.
+function defaultSessionName() {
+    return `Занятие ${new Date().toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+}
+
 function getStorageKey(accessId) {
     return `mayak_delegated_access_${accessId}`;
 }
@@ -97,6 +104,14 @@ export default function MayakDelegatedAccessPage() {
     const sessions = Array.isArray(overview.sessions) ? overview.sessions : [];
     const materials = Array.isArray(overview.materials) ? overview.materials : [];
     const passedLessons = Array.isArray(overview.passedLessons) ? overview.passedLessons : [];
+
+    // Дату подставляем на клиенте, а не в начальном состоянии: значение на сервере и в
+    // браузере разошлось бы на границе суток, и React ругался бы на несовпадение разметки.
+    // Срабатывает и после создания сессии — форма очищает поле, а следующей нужна та же дата.
+    useEffect(() => {
+        if (!isUnlocked) return;
+        setForm((current) => (current.sessionName.trim() ? current : { ...current, sessionName: defaultSessionName() }));
+    }, [isUnlocked, sessions.length]);
 
     const startTour = useCallback(() => {
         setTourSteps(buildAccessTour(sessions.length));
@@ -399,7 +414,7 @@ export default function MayakDelegatedAccessPage() {
                             отдельную страницу: мастер нажимает те самые кнопки, и шаг
                             закрывается фактом — сессия создана, ссылка скопирована. */}
                         <button type="button" style={tourButtonStyle} onClick={startTour}>
-                            <span aria-hidden="true">↳</span> Провести меня по консоли
+                            <span aria-hidden="true">↳</span> Показать по шагам
                         </button>
                         <div style={metaLineStyle}>
                             <span>{right?.taskRange || right?.sectionId || "Колода"}</span>
@@ -490,7 +505,7 @@ export default function MayakDelegatedAccessPage() {
                 ) : null}
 
                 {materials.length ? (
-                    <section style={materialsPanelStyle}>
+                    <section data-tour="materials" style={materialsPanelStyle}>
                         <h2 style={panelTitleStyle}>Материалы</h2>
                         <div style={materialsGridStyle}>
                             {materials.map((material) => (
@@ -1087,6 +1102,10 @@ const demoCardStyle = {
     background: "#fff",
     padding: 16,
     textAlign: "left",
+    // Цвет задан явно: карточка — кнопка, а глобальный стиль портала красит текст кнопки
+    // в белый. Заголовок «Тренажёр МАЯК с колодой» из-за этого пропадал на белом фоне,
+    // оставляя в карточке пустую строку. У соседней карточки-ссылки такого нет.
+    color: "#101820",
     cursor: "pointer",
 };
 

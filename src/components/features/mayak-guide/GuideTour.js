@@ -26,6 +26,11 @@ const PAD = 8; // зазор между вырезом и краем цели
 const GAP = 14; // отступ карточки от выреза
 const CARD_W = 340;
 const POLL_MS = 250;
+// Сколько ждать необязательную цель, прежде чем перешагнуть. Такие шаги описывают то,
+// что есть не у каждой карты: инструкция, доп.материал, источник. Без пропуска мастер
+// упирался бы в подсказку про кнопку, которой на его задании нет, — и инструкция
+// заканчивалась бы тупиком вместо разбора.
+const OPTIONAL_MS = 6000;
 
 // Документ, в котором ищется цель. Шаг с frame целится внутрь встроенной страницы:
 // демонстрация тренажёра открывается в консоли через iframe, и подсветить кнопку внутри
@@ -55,16 +60,26 @@ function frameOffset(frameSel) {
 // N-я подходящая цель. Нужна там, где селектора на одну штуку не существует: в тренажёре
 // ряд кнопок сервисов размечен теми же классами, что ряд «Начать задание», и отличаются
 // они только порядком. Городить ради этого атрибуты в чужой странице — дороже.
-function pick(scope, sel, nth = 0) {
+function pick(scope, sel, nth = 0, match = "") {
     if (!scope || !sel) return null;
+    // Поиск по надписи. В тренажёре кнопки задания различаются только текстом: классы у
+    // «Инструкции», «Доп.материала» и «Начать задание» общие, а имена классов ещё и
+    // собраны Tailwind'ом из утилит. Текст на кнопке — то же, что видит мастер, и меняется
+    // он вместе со смыслом кнопки, а не при перевёрстке.
+    if (match) {
+        const wanted = match.toLowerCase();
+        const all = [...scope.querySelectorAll(sel)];
+        const hit = all.filter((node) => node.textContent.trim().toLowerCase().includes(wanted));
+        return hit[nth] || null;
+    }
     if (!nth) return scope.querySelector(sel);
     return scope.querySelectorAll(sel)[nth] || null;
 }
 
-function rectOf(sel, frameSel, nth) {
+function rectOf(sel, frameSel, nth, match) {
     if (!sel) return null;
     const scope = docOf(frameSel);
-    const node = pick(scope, sel, nth);
+    const node = pick(scope, sel, nth, match);
     if (!node) return null;
     const box = node.getBoundingClientRect();
     // Скрытый элемент даёт нулевую рамку в левом верхнем углу. Подсветить её значит
@@ -120,9 +135,11 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     const selRef = useRef("");
     const frameRef = useRef("");
     const nthRef = useRef(0);
+    const matchRef = useRef("");
     selRef.current = step?.sel || "";
     frameRef.current = step?.frame || "";
     nthRef.current = step?.nth || 0;
+    matchRef.current = step?.match || "";
 
     const finish = useCallback(() => {
         onFinish?.();
@@ -148,7 +165,7 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     useEffect(() => {
         if (!open) return undefined;
         const measure = () => {
-            const next = rectOf(selRef.current, frameRef.current, nthRef.current);
+            const next = rectOf(selRef.current, frameRef.current, nthRef.current, matchRef.current);
             setBox(next);
             setReady(!selRef.current || Boolean(next));
         };
@@ -168,8 +185,8 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     useEffect(() => {
         if (!open || !step?.sel) return;
         const scope = docOf(step.frame);
-        pick(scope, step.sel, step.nth)?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }, [open, index, step?.sel, step?.frame, step?.nth]);
+        pick(scope, step.sel, step.nth, step.match)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, [open, index, step?.sel, step?.frame, step?.nth, step?.match]);
 
     // Ожидание клика по цели. Слушаем на всплытии в document, а не на самом узле: узел
     // может смениться между рендерами (список перерисовался), и подписка на старый
@@ -183,7 +200,7 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
         const scope = docOf(step.frame);
         if (!scope) return undefined;
         const onClick = (event) => {
-            const node = pick(scope, step.sel, step.nth);
+            const node = pick(scope, step.sel, step.nth, step.match);
             if (node && (node === event.target || node.contains(event.target))) window.setTimeout(advance, 350);
         };
         scope.addEventListener("click", onClick, true);
@@ -198,6 +215,24 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
         }, POLL_MS);
         return () => window.clearInterval(timer);
     }, [open, step, advance]);
+
+    // Необязательный шаг сам уступает дорогу, если его цели на экране нет.
+    //
+    // Переход берётся из ref, а не из зависимостей: страница под туром живая — в консоли
+    // раз в секунду тикает таймер сессии, — и onClose приходит новой функцией на каждом
+    // рендере. Через зависимости таймаут пересоздавался бы ежесекундно и не доживал бы
+    // до срабатывания: шаг про кнопку, которой на карте нет, висел бы вечно.
+    const advanceRef = useRef(advance);
+    advanceRef.current = advance;
+
+    useEffect(() => {
+        if (!open || !step?.optional) return undefined;
+        const { sel, frame, nth, match } = step;
+        const timer = window.setTimeout(() => {
+            if (!rectOf(sel, frame, nth, match)) advanceRef.current();
+        }, OPTIONAL_MS);
+        return () => window.clearTimeout(timer);
+    }, [open, index, step]);
 
     useEffect(() => {
         if (!open) return undefined;
