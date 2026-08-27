@@ -25,9 +25,7 @@ export default async function orgAll(req, res) {
         // Валидация параметров
         const validSortBy = ['name', 'members'].includes(sort_by) ? sort_by : 'name';
         const validOrder = ['asc', 'desc'].includes(order) ? order : 'asc';
-        // Потолок поднят с 200: в справочнике 4163 колледжа, и в Москве их 206 —
-        // на прежнем пределе список организаций региона обрывался молча.
-        const validLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 1000);
+        const validLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 200);
         const validOffset = Math.max(parseInt(offset) || 0, 0);
 
         // Формируем URL с параметрами
