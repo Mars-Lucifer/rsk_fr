@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Команда цифрового прорыва — концепция годового цикла</title>
+<style>
+:root{
+  --deep:#0E2A38;      /* глубина — основной текст, линии схем */
+  --paper:#FCFCFA;     /* бумага */
+  --fog:#E8EDF0;       /* туман — заливка блоков */
+  --beam:#E0A22B;      /* луч маяка — акцент, только на отметках */
+  --signal:#1C6E7E;    /* сигнал — второй цвет схем */
+  --graphite:#55636C;  /* приглушённый текст */
+  --rule:#C9D4DA;      /* линейки */
+  --serif:Georgia,"Cambria","Times New Roman",serif;
+  --sans:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:Consolas,"SFMono-Regular","Liberation Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--deep);
+  font-family:var(--sans); font-size:16px; line-height:1.62;
+}
+.page{max-width:1080px; margin:0 auto; padding:0 32px 96px}
+
+/* ——— типографика ——— */
+h1,h2,h3{font-family:var(--serif); font-weight:400; letter-spacing:-.01em}
+h1{font-size:44px; line-height:1.12; margin:0 0 16px}
+h2{font-size:27px; line-height:1.22; margin:0 0 14px}
+h3{font-size:19px; line-height:1.3; margin:26px 0 8px}
+p{margin:0 0 14px; max-width:74ch}
+ul{margin:0 0 14px; padding-left:20px; max-width:74ch}
+li{margin:0 0 7px}
+strong{font-weight:600}
+.lead{font-size:19px; line-height:1.55; color:var(--deep)}
+.muted{color:var(--graphite)}
+.eyebrow{
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--signal); margin:0 0 10px
+}
+
+/* ——— шапка ——— */
+.masthead{border-bottom:2px solid var(--deep); padding:40px 0 26px; margin-bottom:44px}
+.masthead-grid{display:grid; grid-template-columns:1fr 460px; gap:40px; align-items:start}
+.stamp{
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--graphite); display:flex; gap:18px; flex-wrap:wrap; margin-bottom:22px
+}
+.stamp b{color:var(--deep); font-weight:600}
+.summary{list-style:none; padding:0; margin:22px 0 0; max-width:74ch}
+.summary li{
+  padding:9px 0 9px 30px; border-top:1px solid var(--rule); position:relative;
+}
+.summary li:last-child{border-bottom:1px solid var(--rule)}
+.summary li::before{
+  content:attr(data-n); position:absolute; left:0; top:9px;
+  font-family:var(--mono); font-size:12px; color:var(--beam)
+}
+
+/* ——— блоки с полем отметок ——— */
+.block{
+  display:grid; grid-template-columns:64px 1fr; gap:0 28px;
+  padding:34px 0; border-top:1px solid var(--rule);
+}
+.block:first-of-type{border-top:2px solid var(--deep)}
+.marker{
+  font-family:var(--mono); font-size:13px; color:var(--signal);
+  padding-top:6px; letter-spacing:.04em;
+}
+.marker span{display:block; font-size:10px; color:var(--graphite); letter-spacing:.14em; margin-top:4px}
+.body{min-width:0}
+
+/* ——— карточки фактов ——— */
+.facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); margin:18px 0 20px}
+.fact{background:var(--paper); padding:16px 18px}
+.fact .n{font-family:var(--mono); font-size:26px; color:var(--deep); display:block; line-height:1.1}
+.fact .t{font-size:13px; color:var(--graphite); display:block; margin-top:6px; line-height:1.4}
+
+/* ——— таблицы ——— */
+table{border-collapse:collapse; width:100%; margin:16px 0 20px; font-size:14.5px}
+th,td{text-align:left; vertical-align:top; padding:9px 12px 9px 0; border-bottom:1px solid var(--rule)}
+th{
+  font-family:var(--mono); font-weight:400; font-size:11px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--signal); border-bottom:1px solid var(--deep)
+}
+td:first-child{padding-right:18px}
+tbody tr:last-child td{border-bottom:1px solid var(--deep)}
+.tight td,.tight th{padding-right:14px}
+
+/* ——— выноски ——— */
+.note{
+  background:var(--fog); border-left:3px solid var(--beam);
+  padding:14px 18px; margin:18px 0; font-size:15px
+}
+.note p:last-child{margin-bottom:0}
+.note .eyebrow{color:var(--deep)}
+.warn{border-left-color:var(--signal)}
+
+/* ——— формула ——— */
+.formula{
+  font-family:var(--mono); font-size:14px; line-height:1.9; background:var(--fog);
+  padding:16px 18px; margin:16px 0; overflow-x:auto; white-space:pre;
+}
+
+/* ——— календарь года ——— */
+.year{display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--rule); border:1px solid var(--rule); margin:18px 0}
+.mon{background:var(--paper); padding:13px 14px 15px; min-height:104px}
+.mon .when{font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--graphite)}
+.mon .what{font-family:var(--serif); font-size:16px; margin:7px 0 4px; line-height:1.25}
+.mon .sub{font-size:12.5px; color:var(--graphite); line-height:1.45}
+.mon.key{background:var(--fog)}
+.mon.key .what{color:var(--deep)}
+.mon.key .when{color:var(--signal)}
+
+/* ——— фазы ——— */
+.phase{display:grid; grid-template-columns:118px 1fr; gap:0 22px; padding:16px 0; border-top:1px solid var(--rule)}
+.phase:last-of-type{border-bottom:1px solid var(--deep)}
+.phase-id{font-family:var(--mono); font-size:12px; color:var(--signal); letter-spacing:.08em}
+.phase-id b{display:block; font-family:var(--serif); font-size:20px; color:var(--deep); font-weight:400; letter-spacing:0; margin-top:3px}
+.phase h3{margin:0 0 6px}
+.gate{font-size:13.5px; color:var(--graphite); margin-top:8px}
+.gate b{font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--signal); font-weight:400; display:block; margin-bottom:2px}
+
+/* ——— решения ——— */
+.decide{counter-reset:d; list-style:none; padding:0; margin:16px 0 0}
+.decide li{
+  border-top:1px solid var(--rule); padding:14px 0 14px 44px; position:relative; max-width:76ch
+}
+.decide li:last-child{border-bottom:1px solid var(--deep)}
+.decide li::before{
+  counter-increment:d; content:counter(d);
+  position:absolute; left:0; top:14px; width:26px; height:26px; line-height:26px; text-align:center;
+  font-family:var(--mono); font-size:12px; color:var(--paper); background:var(--deep); border-radius:50%
+}
+.decide h3{margin:0 0 4px; font-size:17px}
+.decide p{margin:0; font-size:14.5px; color:var(--graphite)}
+
+/* ——— звезда ——— */
+.starwrap{position:sticky; top:24px}
+.star-cap{font-size:12.5px; color:var(--graphite); line-height:1.5; margin-top:10px; max-width:44ch}
+.star-cap b{color:var(--deep); font-weight:600}
+svg .grid{stroke:var(--rule); fill:none}
+svg .arm{stroke:var(--deep); stroke-width:1}
+svg .tick{stroke:var(--deep); stroke-width:1}
+svg .prof{fill:rgba(224,162,43,.16); stroke:var(--beam); stroke-width:1.5}
+svg .dot{fill:var(--beam)}
+svg .lt{font-family:var(--mono); font-size:13px; fill:var(--deep)}
+svg .ln{font-family:var(--sans); font-size:11px; fill:var(--graphite)}
+svg .lv{font-family:var(--mono); font-size:9px; fill:var(--graphite)}
+
+/* ——— шкала уровней ——— */
+.levels{display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:var(--rule); border:1px solid var(--rule); margin:18px 0}
+.lvl{background:var(--paper); padding:12px 12px 14px}
+.lvl .num{font-family:var(--mono); font-size:11px; color:var(--beam); letter-spacing:.1em}
+.lvl .nm{font-family:var(--serif); font-size:15px; margin:5px 0 5px; line-height:1.2}
+.lvl .ds{font-size:12px; color:var(--graphite); line-height:1.45}
+
+footer{border-top:2px solid var(--deep); margin-top:52px; padding-top:22px; font-size:13.5px; color:var(--graphite)}
+footer a{color:var(--signal)}
+a:focus-visible,li:focus-visible{outline:2px solid var(--beam); outline-offset:3px}
+
+@media (max-width:900px){
+  .masthead-grid{grid-template-columns:1fr}
+  .starwrap{position:static}
+  .year{grid-template-columns:repeat(2,1fr)}
+  .levels{grid-template-columns:repeat(2,1fr)}
+  .block{grid-template-columns:1fr; gap:8px}
+  .marker{padding-top:0}
+  .marker span{display:inline; margin-left:10px}
+  h1{font-size:34px}
+  .page{padding:0 20px 64px}
+}
+@media print{
+  body{font-size:11.5pt; line-height:1.45}
+  .page{max-width:none; padding:0}
+  .block{break-inside:avoid; padding:18px 0}
+  .phase,.note,.facts,.year,.levels,table{break-inside:avoid}
+  .starwrap{position:static}
+  h2{break-after:avoid}
+  a{text-decoration:none; color:inherit}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <div class="stamp">
+    <span>Концепция к обсуждению</span>
+    <span><b>17.08.2026</b></span>
+    <span>Российское Содружество Колледжей</span>
+    <span>платформа ROSDK.RU</span>
+  </div>
+
+  <div class="masthead-grid">
+    <div>
+      <h1>Команда цифрового прорыва:<br>от конкурса к годовому циклу</h1>
+      <p class="lead">Предлагается перейти от разового конкурса к повторяющемуся годовому циклу,
+      в котором колледж поднимает свою цифровую зрелость силами собственной управленческой
+      команды, а система СПО впервые получает карту зрелости всех своих организаций.</p>
+
+      <ul class="summary">
+        <li data-n="01"><strong>Меняется субъект.</strong> Соревнуется организация, а не участник. Команда 3+1 — её агент изменений.</li>
+        <li data-n="02"><strong>Появляется измерение.</strong> Индекс цифровой зрелости «ЗВЕЗДА»: шесть направлений, шесть уровней, одна цифра.</li>
+        <li data-n="03"><strong>Год вместо мероприятия.</strong> Шесть волн по направлениям, два среза, финал по приросту.</li>
+        <li data-n="04"><strong>Оценивают сами участники.</strong> Корпус асессоров из колледжей плюс выборочный аудит — это и есть способ выдержать масштаб страны.</li>
+        <li data-n="05"><strong>Результат остаётся в колледже.</strong> Работающие сервисы, паспорт зрелости, обученная команда.</li>
+      </ul>
+    </div>
+
+    <div class="starwrap">
+      <svg viewBox="0 0 520 430" width="100%" height="auto" role="img"
+           aria-label="Шкала ЗВЕЗДА: шесть направлений, на каждом шесть делений уровня зрелости, отмечен пример профиля колледжа">
+        <circle class="grid" cx="260" cy="205" r="150"/>
+        <circle class="grid" cx="260" cy="205" r="102"/>
+        <circle class="grid" cx="260" cy="205" r="54"/>
+
+        <!-- лучи -->
+        <line class="arm" x1="260" y1="205" x2="260"   y2="55"/>
+        <line class="arm" x1="260" y1="205" x2="389.9" y2="130"/>
+        <line class="arm" x1="260" y1="205" x2="389.9" y2="280"/>
+        <line class="arm" x1="260" y1="205" x2="260"   y2="355"/>
+        <line class="arm" x1="260" y1="205" x2="130.1" y2="280"/>
+        <line class="arm" x1="260" y1="205" x2="130.1" y2="130"/>
+
+        <!-- деления на верхнем луче: −1 … 4 -->
+        <g class="tick">
+          <line x1="253" y1="175" x2="267" y2="175"/>
+          <line x1="253" y1="151" x2="267" y2="151"/>
+          <line x1="253" y1="127" x2="267" y2="127"/>
+          <line x1="253" y1="103" x2="267" y2="103"/>
+          <line x1="253" y1="79"  x2="267" y2="79"/>
+          <line x1="253" y1="55"  x2="267" y2="55"/>
+        </g>
+        <g class="lv" text-anchor="start">
+          <text x="272" y="178">−1</text>
+          <text x="272" y="154">0</text>
+          <text x="272" y="130">1</text>
+          <text x="272" y="106">2</text>
+          <text x="272" y="82">3</text>
+          <text x="272" y="58">4</text>
+        </g>
+
+        <!-- профиль колледжа -->
+        <polygon class="prof" points="260,103 327.5,166 327.5,244 260,259 192.5,244 171.7,154"/>
+        <g class="dot">
+          <circle cx="260" cy="103" r="3.5"/><circle cx="327.5" cy="166" r="3.5"/>
+          <circle cx="327.5" cy="244" r="3.5"/><circle cx="260" cy="259" r="3.5"/>
+          <circle cx="192.5" cy="244" r="3.5"/><circle cx="171.7" cy="154" r="3.5"/>
+        </g>
+
+        <!-- подписи -->
+        <g text-anchor="middle">
+          <text class="lt" x="260" y="30">З</text><text class="ln" x="260" y="44">Знания и навыки</text>
+          <text class="lt" x="260" y="385">З</text><text class="ln" x="260" y="399">Защита данных</text>
+        </g>
+        <g text-anchor="start">
+          <text class="lt" x="402" y="124">В</text><text class="ln" x="402" y="138">Внешние связи</text>
+          <text class="lt" x="402" y="274">Е</text><text class="ln" x="402" y="288">Единое пространство</text>
+        </g>
+        <g text-anchor="end">
+          <text class="lt" x="118" y="124">А</text><text class="ln" x="118" y="138">Автоматизация</text>
+          <text class="lt" x="118" y="274">Д</text><text class="ln" x="118" y="288">Данные и аналитика</text>
+        </g>
+      </svg>
+      <p class="star-cap"><b>Так выглядит колледж на входе в цикл.</b> Шесть направлений, на каждом
+      деления от −1 «Хаос» до 4 «Проактивность». Индекс этого профиля — 41 из 100,
+      узкое место — защита данных. Через год измерение повторяется, и виден прирост.</p>
+    </div>
+  </div>
+</header>
+
+<section class="block">
+  <div class="marker">01<span>Момент</span></div>
+  <div class="body">
+    <h2>Почему это своевременно</h2>
+    <div class="facts">
+      <div class="fact"><span class="n">апрель 2026</span><span class="t">срок действующего положения истёк — основание для следующего цикла нужно принимать заново</span></div>
+      <div class="fact"><span class="n">5 отраслей</span><span class="t">включая образование, по которым регион отчитывается за цифровую зрелость (ПП РФ № 58 от 28.01.2025)</span></div>
+      <div class="fact"><span class="n">нет</span><span class="t">инструмента, измеряющего зрелость отдельного колледжа СПО по направлениям</span></div>
+      <div class="fact"><span class="n">≈3 600</span><span class="t">организаций СПО — потенциальный охват системы</span></div>
+    </div>
+    <p>Показатель цифровой зрелости у региона есть, ведомственные методики Минпросвещения есть,
+    инфраструктурные данные собирают ФГИС «Моя школа» и ЦОС. Чего нет — инструмента, который
+    показывает, на каком уровне стоит конкретный колледж и как он сдвинулся за год.</p>
+    <p><strong>Мы предлагаем не альтернативу государственным метрикам, а слой под ними:</strong>
+    организационный уровень, из которого агрегируется региональный. Это же снимает главный
+    вопрос совместимости — наш индекс должен собираться в ведомственные показатели, а не спорить с ними.</p>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">02<span>Конструкция</span></div>
+  <div class="body">
+    <h2>Что предлагается</h2>
+    <p>Пять шагов, повторяющихся каждый год. Это и есть цикл.</p>
+    <table>
+      <thead><tr><th style="width:130px">Шаг</th><th>Что происходит</th><th style="width:34%">Зачем именно так</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Срез</strong></td><td>Колледж отвечает на вопросы о себе тремя группами: руководство, педагоги, студенты</td><td>Расхождение между их ответами — самостоятельный диагноз. Состав команды 3+1 уже даёт эти три голоса</td></tr>
+        <tr><td><strong>Трек</strong></td><td>Директор выбирает одно-два направления на год, а не все шесть</td><td>Развитие идёт по ступеням: уровень нельзя перепрыгнуть, а работа по шести направлениям сразу даёт ноль по всем</td></tr>
+        <tr><td><strong>Шаг</strong></td><td>Команда поднимает выбранное направление на уровень, решая реальные задачи колледжа</td><td>Единица результата — изменённый процесс, а не пройденный курс</td></tr>
+        <tr><td><strong>Подтверждение</strong></td><td>Уровень подтверждается доказательством и проверяется асессором другого колледжа</td><td>Самооценка без доказательства завышается, причём сильнее всего у слабых</td></tr>
+        <tr><td><strong>Выход</strong></td><td>Паспорт цифровой зрелости, сертификаты участникам, публикация практики</td><td>Ценность признаётся вне системы: перед учредителем, работодателем, абитуриентом</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <p class="eyebrow">Что остаётся неизменным</p>
+      <p>Тренажёр МАЯК не переписывается. Он становится входом в цикл: за один день команда
+      проживает то, на что в работе уходят месяцы, и выходит с общим языком. Этап «Я» остаётся
+      индивидуальным допуском, модель «ЗВЕЗДА» — стратегическим ядром.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">03<span>Польза</span></div>
+  <div class="body">
+    <h2>Кому что даёт</h2>
+    <table class="tight">
+      <thead><tr><th style="width:150px">Кто</th><th>Что получает</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Минпросвещения</strong></td><td>Карту зрелости организаций СПО по шести направлениям, обновляемую ежегодно. Адресность поддержки: видно, кому нужны деньги на инфраструктуру, а кому — на компетенции. Библиотеку тиражируемых решений и кадровый резерв управленцев</td></tr>
+        <tr><td><strong>Регион</strong></td><td>Управляемый рост отраслевого показателя, за который он и так отвечает. Понимание, где в регионе провал по конкретному направлению</td></tr>
+        <tr><td><strong>Колледж и директор</strong></td><td>Диагностику своими руками и паспорт зрелости — документ для учредителя, работодателей, абитуриентов. Работающие сервисы, которые остаются в колледже: права на них принадлежат организации</td></tr>
+        <tr><td><strong>Педагог, сотрудник</strong></td><td>Компетенцию, портфолио подтверждённых дел, сертификат для зачёта как повышение квалификации, вход в кадровый резерв</td></tr>
+        <tr><td><strong>Студент</strong></td><td>Роль эксперта по пользовательскому опыту, а не помощника. Портфолио и рекомендации на стажировки партнёров</td></tr>
+        <tr><td><strong>Партнёры</strong></td><td>Доступ к аудитории системы СПО, участие в приёмке решений, ранний контакт со студентами</td></tr>
+        <tr><td><strong>Мы как оператор</strong></td><td>Держим шкалу, ритм года, подготовку Мастеров и асессоров, хранение доказательств и публикацию практик. Роль институциональная: методология остаётся у нас, исполнение расходится по системе</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">04<span>Измерение</span></div>
+  <div class="body">
+    <h2>Индекс цифровой зрелости</h2>
+    <p>Шесть направлений модели «ЗВЕЗДА» — это оси измерения. По каждой организация стоит
+    на одном из шести уровней:</p>
+
+    <div class="levels">
+      <div class="lvl"><span class="num">−1</span><div class="nm">Хаос</div><div class="ds">процессы на бумаге и в мессенджерах</div></div>
+      <div class="lvl"><span class="num">0</span><div class="nm">Информирование</div><div class="ds">односторонний цифровой канал</div></div>
+      <div class="lvl"><span class="num">1</span><div class="nm">Транзакция</div><div class="ds">заявку можно подать онлайн</div></div>
+      <div class="lvl"><span class="num">2</span><div class="nm">Электронный результат</div><div class="ds">результат приходит в кабинет</div></div>
+      <div class="lvl"><span class="num">3</span><div class="nm">Интеллект</div><div class="ds">сквозная автоматика и прогноз</div></div>
+      <div class="lvl"><span class="num">4</span><div class="nm">Проактивность</div><div class="ds">система действует до запроса</div></div>
+    </div>
+
+    <h3>Уровень засчитывается по трём слоям сразу</h3>
+    <p>Инструмент существует (<strong>среда</strong>) → им регулярно пользуются, есть след
+    (<strong>деятельность</strong>) → люди умеют и понимают зачем (<strong>сознание</strong>).
+    Если система куплена, но за квартал через неё прошло три обращения — уровень не засчитан.
+    Тип разрыва при этом сам становится диагнозом: закупили и не пользуются лечится процессом,
+    делают по приказу — людьми, понимают и нечем работать — деньгами.</p>
+
+    <h3>Одна цифра</h3>
+    <div class="formula">ИЦЗ  = (Луч₁ × Луч₂ × … × Луч₆) ^ 1/6        шкала 0…100
+Узкое место = минимальный луч            показывается рядом с индексом
+Прирост     = ИЦЗ выхода − ИЦЗ входа     основной показатель рейтинга</div>
+    <p>Геометрическое среднее выбрано не для красоты. Обычное среднее позволяет закрыть
+    провал сильным направлением — колледж качает то, где расти дешевле, и прячет нулевую защиту
+    данных. Так же устроен Индекс человеческого развития ООН: с 2010 года он считается
+    геометрическим средним именно потому, что направления не заменяют друг друга.</p>
+
+    <div class="note warn">
+      <p class="eyebrow">Что публично, а что нет</p>
+      <p>Публичны прирост, статусы и региональные своды. Абсолютный уровень колледжа доступен
+      ему самому, учредителю и региону. Причина практическая: там, где абсолютный уровень
+      публикуется, диагностика превращается в отчётность и слабые начинают завышать. Именно
+      поэтому европейский инструмент SELFIE, которым пользуются 7 400 школ, не публикует
+      уровни школ вообще.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">05<span>Год</span></div>
+  <div class="body">
+    <h2>Как устроен цикл</h2>
+    <p>Шесть волн по числу направлений. Все колледжи проходят все шесть — это расширяет
+    кругозор команды. Подтверждённый рост засчитывается там, где колледж заявил цель.</p>
+
+    <div class="year">
+      <div class="mon key"><div class="when">Сентябрь</div><div class="what">Вход</div><div class="sub">Сессия МАЯКа, входной срез тремя группами, директор утверждает цель года</div></div>
+      <div class="mon"><div class="when">Октябрь — ноябрь</div><div class="what">Волна 1 · Знания</div><div class="sub">Кейс направления, работа команды, приёмка</div></div>
+      <div class="mon"><div class="when">Декабрь — январь</div><div class="what">Волна 2 · Внешние связи</div><div class="sub">Подтверждает внешняя сторона — работодатель</div></div>
+      <div class="mon key"><div class="when">Февраль — март</div><div class="what">Волна 3 · Единое пространство</div><div class="sub">Промежуточный срез: виден сдвиг, план корректируется</div></div>
+      <div class="mon"><div class="when">Апрель — май</div><div class="what">Волна 4 · Защита данных</div><div class="sub">Кейс направления, приёмка</div></div>
+      <div class="mon"><div class="when">Июнь — июль</div><div class="what">Волна 5 · Данные</div><div class="sub">Кейс направления, приёмка</div></div>
+      <div class="mon"><div class="when">Август — сентябрь</div><div class="what">Волна 6 · Автоматизация</div><div class="sub">Кейс направления, приёмка</div></div>
+      <div class="mon key"><div class="when">Октябрь</div><div class="what">Выход и форум</div><div class="sub">Выходной срез, подтверждение уровней, награждение по приросту, публикация практик</div></div>
+    </div>
+
+    <div class="note">
+      <p class="eyebrow">Принцип, отличающий цикл от игры</p>
+      <p>Достижения не сгорают. Уровень, артефакты и статусы переходят в следующий год —
+      колледж входит в новый цикл с более высокой ступени. Сгорание наград в конце сезона,
+      на котором держатся игровые механики, здесь исключено намеренно: для организации это
+      бессмысленно и выжигает людей.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">06<span>Люди</span></div>
+  <div class="body">
+    <h2>Кто действует</h2>
+    <table class="tight">
+      <thead><tr><th style="width:170px">Роль</th><th>Ответственность</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Директор</strong><br><span class="muted">владелец уровня</span></td><td>Утверждает цель года, подписывает заявку на уровень, выделяет ресурс, принимает паспорт. Команда не может объявить зрелость организации за него</td></tr>
+        <tr><td><strong>Команда 3+1</strong></td><td>Три представителя АУП и педагогов — носители экспертизы и задачи; студент — эксперт по пользовательскому опыту. Ведёт кейсы, собирает доказательства, защищает результат</td></tr>
+        <tr><td><strong>Мастер трансформации</strong></td><td>Проводит стартовую сессию, задаёт язык, сопровождает колледжи. Готовится каскадом: один Мастер на 10–15 колледжей</td></tr>
+        <tr><td><strong>Асессор</strong></td><td>Подтверждает уровни другого колледжа по регламенту. Асессорами становятся сами участники — это отдельный трек развития со статусом и сертификатом</td></tr>
+        <tr><td><strong>Экспертный совет</strong></td><td>Верхние уровни, спорные случаи, выборочный аудит, эталонные кейсы для калибровки</td></tr>
+        <tr><td><strong>Региональный координатор</strong></td><td>Вовлечение колледжей региона. Отвечает за вход в цикл, но не за баллы участников</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Ступени и статусы</h3>
+    <table class="tight">
+      <thead><tr><th style="width:150px">Кто</th><th>Путь</th></tr></thead>
+      <tbody>
+        <tr><td>Организация</td><td>Участник цикла → Подтверждённый рост → Практика года → Маяк системы</td></tr>
+        <tr><td>Команда</td><td>Заявлена → Квалифицирована → Действующая → Сдавшая → Финалист → Команда-наставник</td></tr>
+        <tr><td>Участник</td><td>Зарегистрирован → Квалификация пройдена → Автор решения → Асессор → Мастер</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">Статусы Мастера и асессора не пожизненные: без работы в цикле и ежегодной
+    калибровки человек переходит в резерв. Так устроены корпуса экспертов в системах
+    аккредитации — подтверждение подготовки раз в три года там обязательно.</p>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">07<span>События</span></div>
+  <div class="body">
+    <h2>Три форума в году</h2>
+    <p>Каждое событие обслуживает свой контур системы, а не собирает людей вообще.</p>
+    <table>
+      <thead><tr><th style="width:170px">Событие</th><th style="width:130px">Когда</th><th>Что производит</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Слёт Мастеров</strong></td><td>август — сентябрь, до старта</td><td>Единая методология на весь год и подготовленные ведущие. Если провести позже — год работает несогласованная методика</td></tr>
+        <tr><td><strong>Школа асессоров</strong></td><td>январь — февраль, середина</td><td>Согласованность оценок между регионами, разбор спорных приёмок, повышение ступеней</td></tr>
+        <tr><td><strong>Форум лидеров</strong></td><td>октябрь, закрытие цикла</td><td>Защита результатов, награждение по приросту, библиотека практик. Приглашаются лучшие колледжи, а также асессоры и Мастера — статус должен быть виден</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">08<span>Масштаб</span></div>
+  <div class="body">
+    <h2>Как выдержать масштаб страны</h2>
+    <p>Экспертная проверка каждого результата невозможна: в американской премии Болдриджа
+    корпус из 300–400 подготовленных экзаменаторов обслуживает несколько десятков заявителей
+    в год. Поэтому глубина проверки растёт вместе с уровнем притязаний.</p>
+    <table>
+      <thead><tr><th style="width:210px">Что заявляет колледж</th><th style="width:230px">Кто подтверждает</th><th>Пропускная способность</th></tr></thead>
+      <tbody>
+        <tr><td>Срез — где мы стоим</td><td>никто, это самооценка трёх групп</td><td>не ограничена: доступна всем колледжам сразу</td></tr>
+        <tr><td>Уровни 0–2</td><td>асессор другого колледжа</td><td>растёт вместе с числом участников</td></tr>
+        <tr><td>Уровни 3–4</td><td>экспертный совет</td><td>таких заявок мало по определению</td></tr>
+        <tr><td>Выборочный аудит 5–10%</td><td>экспертный совет</td><td>фиксированная стоимость независимо от масштаба</td></tr>
+      </tbody>
+    </table>
+    <p>Три механизма делают это работающим: <strong>каскад</strong> — мы готовим Мастеров,
+    а не проводим тысячи сессий; <strong>корпус асессоров из участников</strong> — проверяя
+    чужую работу, человек учится быстрее, чем делая свою; <strong>аудит выборкой</strong> —
+    честность держится риском проверки, а не сплошным контролем.</p>
+    <div class="note">
+      <p class="eyebrow">Важное ограничение, которое стоит принять сразу</p>
+      <p>Массовым с первого дня может быть срез, но не подтверждение уровней. Если требовать
+      доказательств от всех одновременно, первый же цикл упрётся в приёмку и остановится.
+      Поэтому вход открыт для всех, а глубина разводится по фазам.</p>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">09<span>Карта</span></div>
+  <div class="body">
+    <h2>Дорожная карта</h2>
+    <p>У каждой фазы есть условие перехода. Не выполнено — следующая не начинается.</p>
+
+    <div class="phase">
+      <div class="phase-id">Фаза<b>0</b>основание</div>
+      <div>
+        <h3>Шкала, положение, первые Мастера</h3>
+        <p>Методика измерения: шесть направлений, шесть уровней, формулировки в логике
+        «есть ли доказательство». Проверка шкалы на трёх колледжах разного уровня. Сверка
+        с ведомственной методикой Минпросвещения. Новое положение цикла. Подготовка первой
+        волны Мастеров и согласование с Департаментом СПО и Союзом директоров.</p>
+        <p class="gate"><b>Условие перехода</b>Шкала различает колледжи между собой,
+        положение подписано, есть подготовленные Мастера и согласие регионов войти волной.</p>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-id">Фаза<b>1</b>первый цикл</div>
+      <div>
+        <h3>Массовый срез, выборочная глубина</h3>
+        <p>Открытый вход и срез для всех желающих. Полный трек с доказательствами — там,
+        где хватает Мастеров. Шесть волн, промежуточный и выходной срез, первый корпус
+        асессоров, первые паспорта зрелости, форум по приросту.</p>
+        <p class="gate"><b>Условие перехода</b>Большинство начавших трек дошли до выходного
+        среза; измерено расхождение между самооценкой и приёмкой. Первый цикл объявляется
+        калибровочным заранее — иначе слабые завысят оценки и данные года будут непригодны.</p>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-id">Фаза<b>2</b>динамика</div>
+      <div>
+        <h3>Появляется прирост</h3>
+        <p>Впервые есть с чем сравнивать: система получает динамику вместо снимка.
+        Региональные своды, команды-наставники снимают нагрузку с Мастеров, библиотека
+        практик начинает работать — решение считается практикой, когда его повторил другой колледж.</p>
+        <p class="gate"><b>Условие перехода</b>Большинство подтверждённых уровней устояло
+        при аудите; есть повторённые практики.</p>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-id">Фаза<b>3</b>институт</div>
+      <div>
+        <h3>Индекс признаётся источником данных</h3>
+        <p>Паспорт зрелости становится стандартным документом колледжа. Уровень учитывается
+        при адресной поддержке — решение государства, не наше. Публикуется годовой доклад
+        о цифровой зрелости СПО. Модель применима за пределами СПО: она универсальна
+        по построению.</p>
+        <p class="gate"><b>Условие перехода</b>Цикл прожил два года без ручного
+        вмешательства оператора в каждую волну.</p>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-id">Фаза<b>4</b>автономия</div>
+      <div>
+        <h3>Система работает без оператора в контуре</h3>
+        <p>Волны ведут Мастера и команды-наставники, подтверждают асессоры, ритм задан
+        календарём, к которому привыкли. За нами остаются шкала, корпус и годовой доклад.
+        Признак достижения: колледж входит в новый цикл сам, потому что ему нужен следующий
+        уровень, а не потому что пришло письмо из региона.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">10<span>Риски</span></div>
+  <div class="body">
+    <h2>Риски и красные линии</h2>
+    <table class="tight">
+      <thead><tr><th style="width:44%">Риск</th><th>Чем снимается</th></tr></thead>
+      <tbody>
+        <tr><td><strong>План по баллам превращает цикл в имитацию.</strong> Как только у региона или колледжа появляется норматив по активности, он выполняется приписками</td><td>Красная линия: никаких показателей по баллам участников. Координатор отвечает за вход в цикл, не за результат</td></tr>
+        <tr><td><strong>Самооценка завышается</strong>, причём сильнее всего у слабых организаций</td><td>Доказательство вместо мнения, выборочный аудит, первый цикл калибровочный, возможность понижения уровня</td></tr>
+        <tr><td><strong>Средний балл прячет провал</strong> по критическому направлению</td><td>Геометрическое среднее и отдельный показатель узкого места</td></tr>
+        <tr><td><strong>Не хватит приёмки</strong> при массовом входе</td><td>Четыре уровня достоверности, корпус асессоров, каскад Мастеров</td></tr>
+        <tr><td><strong>Персональные данные.</strong> Срез и доказательства затрагивают данные сотрудников и студентов</td><td>Основание обработки и режим предъявления обезличенных выгрузок — вопрос к юристам до старта</td></tr>
+        <tr><td><strong>Дублирование государственных инструментов</strong></td><td>Позиционирование слоем под ведомственными метриками и сверка методик</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <div class="marker">11<span>Решения</span></div>
+  <div class="body">
+    <h2>Что требуется решить</h2>
+    <p>Четыре решения уровня руководства. Всё остальное — рабочие вопросы, они не блокируют.</p>
+    <ol class="decide">
+      <li>
+        <h3>Событие или программа</h3>
+        <p>Конкурс с финалом — или постоянный инструмент отрасли, который повторяется ежегодно.
+        От этого зависит, что мы предъявляем Департаменту СПО и как формулируем положение.</p>
+      </li>
+      <li>
+        <h3>Дата первого цикла</h3>
+        <p>Сентябрь 2026 вмещает срез и пилотный трек. Полный цикл из шести волн — сезон 2027/28.
+        Решение определяет, что переносится, а что делаем сейчас.</p>
+      </li>
+      <li>
+        <h3>Кому виден абсолютный уровень колледжа</h3>
+        <p>Только колледжу, учредителю, региону или всем. От ответа зависит, скажут ли правду
+        в срезе, а значит и ценность всех собранных данных.</p>
+      </li>
+      <li>
+        <h3>Основание цикла</h3>
+        <p>Новое положение или правка действующего, срок которого истёк в апреле 2026.
+        Расхождений с реальным устройством накопилось восемь — новое положение дешевле.</p>
+      </li>
+    </ol>
+
+    <h3>Ближайшие шаги после решения</h3>
+    <ul>
+      <li>Собрать шкалу измерения и проверить её на трёх колледжах разного уровня — неделя работы, и она либо различает их, либо конструкция пересматривается.</li>
+      <li>Провести ревизию существующих обучающих программ: что переиспользуется как подготовка Мастера, чего не хватает.</li>
+      <li>Сверить шкалу с методикой расчёта показателей цифровой трансформации образования.</li>
+      <li>Подготовить проект нового положения на логике годового цикла.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <p><strong>На чей опыт опирается конструкция.</strong> SELFIE и рамка DigCompOrg Еврокомиссии —
+  самооценка цифровой зрелости школ и колледжей тремя группами, 7 400 организаций в 57 странах.
+  Digital elevation tool британского Jisc — уровни зрелости и готовые следующие шаги для колледжей.
+  Премия Болдриджа и модель EFQM — цикл «самооценка → внешняя оценка → отчёт обратной связи →
+  план улучшений» и корпус подготовленных асессоров. Методика ООН и ОЭСР по построению составных
+  индексов — расчёт одной цифры из нескольких измерений. Модель «ЗВЕЗДА» и тренажёр МАЯК —
+  собственная методологическая база проекта.</p>
+  <p class="muted">Документ подготовлен для обсуждения. Детальные материалы — в рабочей базе знаний
+  проекта: механики вовлечения, ядро измерения, дорожная карта, конструкция индекса, сетка доказательств.</p>
+</footer>
+
+</div>
+</body>
+</html>
