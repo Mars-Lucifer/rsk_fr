@@ -20,6 +20,9 @@ Related files:
 - `docs/mayak-access-contour.md` describes the external-access contour: delegated
   access rights, session links (inspector / plain / master / dashboard), entry
   accounting, and the master link — read it first for any token/entry work.
+- `docs/trainer-day2/architecture.md` describes MAYAK day two: tile-number
+  addressing, the three-takt automaton, the hall-wide takt clock, and
+  partner-as-inspector — read it first for anything in section `day2`.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
 
 ## Work Organization: One Workstream = One Branch
