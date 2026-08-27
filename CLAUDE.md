@@ -22,6 +22,11 @@ Related files:
   accounting, and the master link — read it first for any token/entry work.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
 
+Визуальная проверка гайда: у `/mayak-guide` и `/mayak-guide-3d` числа камеры,
+раскрытия и раскладки калибровочные — правятся по кадру, а не по коду. Снимать
+через MCP `playwright` (свой headless-браузер), а не через preview-панель:
+свёрнутая панель не композитит кадры, и это выглядит как поломка страницы.
+
 ## Work Organization: One Workstream = One Branch
 
 Several product lines are built in parallel in this repository, often by

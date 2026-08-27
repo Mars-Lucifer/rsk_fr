@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@/components/layout/Layout";
+import GuideTour from "@/components/features/mayak-guide/GuideTour";
+import { TOUR_HANDOFF_KEY, buildAccessTour } from "@/components/features/mayak-guide/accessTour.mjs";
 
 const MAYAK_GUEST_SUFFIX = "aaaaa";
 
@@ -26,6 +28,13 @@ function formatRemainingTime(expiresAt, nowTs) {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+// Название по умолчанию — сегодняшняя дата. В списке у мастера копятся сессии за разные
+// дни, и «1231» рядом с «Проба» не говорит ни о чём; дата говорит сразу. Мастер может
+// переписать — поле обычное.
+function defaultSessionName() {
+    return `Занятие ${new Date().toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
 }
 
 function getStorageKey(accessId) {
@@ -83,12 +92,37 @@ export default function MayakDelegatedAccessPage() {
         sessionName: "",
         tableCount: "1",
     });
+    const [tourOpen, setTourOpen] = useState(false);
+    // Шаги строятся в момент запуска: шагу создания нужно число сессий ДО инструкции,
+    // иначе у мастера с прошлыми занятиями он засчитается сразу и главное действие
+    // инструкции — создать свою тестовую сессию — окажется пропущено.
+    const [tourSteps, setTourSteps] = useState([]);
 
     const tableOptions = useMemo(() => buildTableOptions(), []);
     const right = overview.right || null;
     const sessions = Array.isArray(overview.sessions) ? overview.sessions : [];
     const materials = Array.isArray(overview.materials) ? overview.materials : [];
     const passedLessons = Array.isArray(overview.passedLessons) ? overview.passedLessons : [];
+
+    // Дату подставляем на клиенте, а не в начальном состоянии: значение на сервере и в
+    // браузере разошлось бы на границе суток, и React ругался бы на несовпадение разметки.
+    // Срабатывает и после создания сессии — форма очищает поле, а следующей нужна та же дата.
+    useEffect(() => {
+        if (!isUnlocked) return;
+        setForm((current) => (current.sessionName.trim() ? current : { ...current, sessionName: defaultSessionName() }));
+    }, [isUnlocked, sessions.length]);
+
+    const startTour = useCallback(() => {
+        setTourSteps(buildAccessTour(sessions.length));
+        // Метка для дашборда: он открывается по мастер-ссылке в новой вкладке и
+        // подхватывает инструкцию с того места, где консоль закончила.
+        try {
+            window.localStorage.setItem(TOUR_HANDOFF_KEY, "1");
+        } catch {
+            // Приватный режим — дашборд просто не продолжит сам, кнопка там своя.
+        }
+        setTourOpen(true);
+    }, [sessions.length]);
 
     const apiRequest = useCallback(
         async (body, passwordOverride) => {
@@ -370,12 +404,18 @@ export default function MayakDelegatedAccessPage() {
                     <div style={headerTitleBoxStyle}>
                         <div style={eyebrowStyle}>Доступ МАЯК</div>
                         <h1 style={titleStyle}>{right?.title || right?.fullName || "Сессии"}</h1>
+                        {/* Инструкция идёт по этому же экрану стрелками, а не уводит на
+                            отдельную страницу: мастер нажимает те самые кнопки, и шаг
+                            закрывается фактом — сессия создана, ссылка скопирована. */}
+                        <button type="button" style={tourButtonStyle} onClick={startTour}>
+                            <span aria-hidden="true">↳</span> Показать по шагам
+                        </button>
                         <div style={metaLineStyle}>
                             <span>{right?.taskRange || right?.sectionId || "Колода"}</span>
                             {right?.sectionId && right.sectionId !== right.taskRange ? <span>{right.sectionId}</span> : null}
                         </div>
                     </div>
-                    <div style={{ ...metricBoxStyle, ...(isCompact ? compactMetricBoxStyle : null) }}>
+                    <div data-tour="limit" style={{ ...metricBoxStyle, ...(isCompact ? compactMetricBoxStyle : null) }}>
                         <div style={metricTextStyle}>
                             <span style={metricValueStyle}>{`${right?.remainingParticipantLimit ?? 0}/${right?.totalParticipantLimit ?? 0}`}</span>
                             <span style={metricLabelStyle}>входов осталось</span>
@@ -390,7 +430,7 @@ export default function MayakDelegatedAccessPage() {
                 {message ? <div style={noticeSuccessStyle}>{message}</div> : null}
 
                 <form onSubmit={handleCreate} style={{ ...createPanelStyle, ...(isCompact ? compactCreatePanelStyle : null) }}>
-                    <label style={fieldStyle}>
+                    <label data-tour="name" style={fieldStyle}>
                         <span style={labelStyle}>Название сессии</span>
                         <input
                             value={form.sessionName}
@@ -401,7 +441,7 @@ export default function MayakDelegatedAccessPage() {
                         />
                     </label>
 
-                    <label style={fieldStyle}>
+                    <label data-tour="tables" style={fieldStyle}>
                         <span style={labelStyle}>Столы (команды)</span>
                         <select
                             value={form.tableCount}
@@ -418,6 +458,7 @@ export default function MayakDelegatedAccessPage() {
                     <div style={createActionStyle}>
                         <button
                             type="submit"
+                            data-tour="create"
                             className="ma-primary"
                             style={primaryButtonStyle}
                             disabled={creating}>
@@ -429,7 +470,7 @@ export default function MayakDelegatedAccessPage() {
 
                 {/* Руководство стоит между созданием сессии и материалами: мастер
                     читает его до игры, а материалы качает уже под конкретную. */}
-                <a href="/mayak-guide" target="_blank" rel="noreferrer" style={guideCardStyle}>
+                <a data-tour="guide" href="/mayak-guide" target="_blank" rel="noreferrer" style={guideCardStyle}>
                     <span style={guideCardTextStyle}>
                         <span style={eyebrowStyle}>Руководство мастера</span>
                         <span style={guideTitleStyle}>Как вести тренажёр</span>
@@ -440,8 +481,12 @@ export default function MayakDelegatedAccessPage() {
                     <span style={guideActionStyle}>Открыть →</span>
                 </a>
 
+                {/* Отдельной карточки «Демонстрация» больше нет: разбор «Как это
+                    работает» зашит в сам тренажёр кнопкой «?» в шапке, и демо
+                    открывается мастер-ссылкой из карточки сессии. Дублирующая
+                    карточка только удлиняла страницу. */}
                 {materials.length ? (
-                    <section style={materialsPanelStyle}>
+                    <section data-tour="materials" style={materialsPanelStyle}>
                         <h2 style={panelTitleStyle}>Материалы</h2>
                         <div style={materialsGridStyle}>
                             {materials.map((material) => (
@@ -502,7 +547,7 @@ export default function MayakDelegatedAccessPage() {
                         ].filter((row) => row.url);
 
                         return (
-                            <article key={item.sessionId} style={sessionRowStyle}>
+                            <article key={item.sessionId} data-tour="session" style={sessionRowStyle}>
                                 <div style={{ ...sessionHeaderStyle, ...(isCompact ? compactSessionHeaderStyle : null) }}>
                                     <div>
                                         <h2 style={sessionTitleStyle}>{item.sessionName || "Сессия"}</h2>
@@ -518,7 +563,11 @@ export default function MayakDelegatedAccessPage() {
                                             <span>{`Входы: ${token.usedCount || 0}/${token.usageLimit || item.participantLimit || 0}`}</span>
                                         </div>
                                     </div>
-                                    <button type="button" style={secondaryButtonStyle} onClick={() => handleComplete(item.sessionId, item.sessionName)}>
+                                    <button
+                                        type="button"
+                                        data-tour="finish"
+                                        style={secondaryButtonStyle}
+                                        onClick={() => handleComplete(item.sessionId, item.sessionName)}>
                                         Завершить
                                     </button>
                                 </div>
@@ -530,6 +579,7 @@ export default function MayakDelegatedAccessPage() {
                                         return (
                                             <div
                                                 key={row.key}
+                                                data-tour={`link-${row.key}`}
                                                 className="ma-link-row"
                                                 style={{ ...linkRowStyle, ...(isCompact ? compactLinkRowStyle : null), borderLeftColor: row.accent }}>
                                                 <span style={linkLabelBoxStyle}>
@@ -643,6 +693,13 @@ export default function MayakDelegatedAccessPage() {
                     }
 
                 `}</style>
+
+                <GuideTour
+                    steps={tourSteps}
+                    open={tourOpen && tourSteps.length > 0}
+                    onClose={() => setTourOpen(false)}
+                    title="Как вести занятие"
+                />
             </section>
         </Layout>
     );
@@ -983,6 +1040,24 @@ const headerTitleBoxStyle = {
     flexDirection: "column",
     gap: 6,
     minWidth: 0,
+};
+
+// Кнопка инструкции стоит под заголовком и намеренно узкая: alignSelf держит её по
+// ширине текста — в колонке заголовка она иначе растянулась бы во всю строку и читалась
+// бы как главное действие экрана, а главное здесь — создать сессию.
+const tourButtonStyle = {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    minHeight: 34,
+    width: "auto",
+    border: "1px dashed #b45309",
+    borderRadius: 9,
+    background: "#fff8ef",
+    color: "#8a4708",
+    padding: "0 12px",
+    fontSize: 13,
+    fontWeight: 800,
+    cursor: "pointer",
 };
 
 const eyebrowStyle = {
