@@ -5,6 +5,8 @@ import styles from "./dashboard.module.css";
 import TablePanel from "./TablePanel";
 import OverviewPanel from "./OverviewPanel";
 import ParticipantRow from "./ParticipantRow";
+import Day2TaktPanel from "./Day2TaktPanel";
+import { isDay2Section } from "@/lib/mayakDay2Mode";
 import { RefreshIcon, PencilIcon, BackIcon } from "./icons";
 import { playTimerEndChime, resumeTimerAudio, stopTimerSound } from "./timerSound";
 
@@ -57,6 +59,15 @@ export default function SessionDashboard({
 
     const [timer, setTimer] = useState({ inputMinutes: "5", totalSeconds: 300, remainingSeconds: 300, running: false });
 
+    // Пульт такта второго дня. Секрет берётся из того же URL, по которому
+    // дашборд читает данные: у мастера он в ссылке, у админа его нет вовсе —
+    // тогда сессия называется по id, а маршрут пускает по админской куке.
+    const [taktBusy, setTaktBusy] = useState(false);
+    const [taktError, setTaktError] = useState("");
+    // Ссылка на загрузчик: пульт объявлен выше него, а обновить дашборд после
+    // нажатия надо сразу, не дожидаясь пятисекундного опроса.
+    const fetchDataRef = useRef(null);
+
     const toastTimerRef = useRef(null);
     // Предыдущее значение остатка таймера — чтобы поймать переход >0 -> 0 и
     // проиграть звук окончания ровно один раз.
@@ -75,6 +86,36 @@ export default function SessionDashboard({
     }, []);
 
     // --- Загрузка данных ---
+    const sendTaktAction = useCallback(
+        async (action, minutes) => {
+            const secret = String(resolvedDashboardUrl).match(/[?&]secret=([^&]+)/)?.[1];
+            setTaktBusy(true);
+            setTaktError("");
+            try {
+                const response = await fetch("/api/mayak/master/day2-takt", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(
+                        secret
+                            ? { secret: decodeURIComponent(secret), action, minutes }
+                            : { sessionId, action, minutes }
+                    ),
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || !payload?.success) {
+                    setTaktError(payload?.error || "Не удалось изменить такт");
+                    return;
+                }
+                await fetchDataRef.current?.(false, { force: true });
+            } catch {
+                setTaktError("Сеть не отвечает");
+            } finally {
+                setTaktBusy(false);
+            }
+        },
+        [resolvedDashboardUrl, sessionId]
+    );
+
     const fetchData = useCallback(
         async (isManual = false, { force = false } = {}) => {
             // Фоновый поллинг не наслаиваем и не дёргаем во время редактирования
@@ -119,6 +160,10 @@ export default function SessionDashboard({
     useEffect(() => {
         editorModeRef.current = editorMode;
     }, [editorMode]);
+
+    useEffect(() => {
+        fetchDataRef.current = fetchData;
+    }, [fetchData]);
 
     useEffect(() => {
         // Сбрасываем сигнатуру при смене сессии, иначе первый реальный ответ
@@ -566,6 +611,17 @@ export default function SessionDashboard({
                             </div>
                         </div>
                     </section>
+                )}
+
+                {/* Второй день: такт зала. Стоит выше общего блока — за день
+                    ведущий нажимает эти кнопки чаще, чем смотрит на прогресс. */}
+                {isDay2Section(data.session?.sectionId) && (
+                    <Day2TaktPanel
+                        takt={data.day2Takt}
+                        busy={taktBusy}
+                        error={taktError}
+                        onAction={sendTaktAction}
+                    />
                 )}
 
                 <OverviewPanel

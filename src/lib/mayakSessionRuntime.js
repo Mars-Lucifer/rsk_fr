@@ -74,6 +74,22 @@ function day2PartnerNumber(cardNumber) {
     return number ? day2KeysFor(number).partner : 0;
 }
 
+/**
+ * Взял ли кто-нибудь этот тайл.
+ *
+ * За столом не всегда шестеро: при нечётном составе ровно один человек остаётся
+ * без партнёра, и его шов не увидит никто — очередь адресована номеру, а номера
+ * нет. Поэтому там, где партнёр не взят, проверять может любой за этим столом:
+ * лучше сосед, чем никто, и лучше, чем участник, запертый до вечера.
+ */
+function day2TileIsHeld(bucket, cardNumber) {
+    const number = normalizeDay2CardNumber(cardNumber);
+    if (!number) return false;
+    return Object.values(bucket?.participants || {}).some(
+        (candidate) => normalizeDay2CardNumber(candidate.cardNumber) === number
+    );
+}
+
 // Такт зала лежит в бакете сессии, а не в объекте сессии: он меняется по ходу
 // дня, а объект сессии — это её настройка. Читается с дефолтом, поэтому сессии,
 // уже лежащие на диске, не требуют миграции: у них такт просто не начат.
@@ -316,13 +332,27 @@ function applyPendingReviewExpirations(bucket) {
     return changed;
 }
 
+// Истечение таймеров на чтении состояния. Пишет ПОД ЛОКОМ и по свежему снимку,
+// а не по тому, что прочитали до лока.
+//
+// Раньше запись шла тем же объектом, который читали без лока, а writeStore
+// заменяет бакет сессии целиком. Восемнадцать участников опрашивают состояние
+// раз в пять секунд, и медленный запрос мог положить обратно свой устаревший
+// снимок, стерев то, что за это время записали другие: чужую сдачу, решение
+// инспектора, а с появлением такта — и запуск такта, отданный ведущим.
+//
+// Мутирует переданный store, чтобы вызывающий читал уже обновлённое состояние.
 async function expirePendingReviews(store, sessionId) {
     const bucket = ensureSessionBucket(store, sessionId);
-    const changed = applyPendingReviewExpirations(bucket);
-    if (changed) {
-        await writeStore(store, [sessionId]);
+    if (!applyPendingReviewExpirations(bucket)) {
+        return false;
     }
-    return changed;
+    const fresh = await mutateSessionRuntime(sessionId, (lockedStore, lockedBucket) => {
+        applyPendingReviewExpirations(lockedBucket);
+        return lockedBucket;
+    });
+    store.sessions[sessionId] = fresh;
+    return true;
 }
 
 function getBlockingTaskState(participant) {
@@ -392,7 +422,14 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
             // Номер тайла второго дня. У сессий, которые уже лежат на диске,
             // поля нет — дефолт обязателен, иначе ensureSessionBucket отдаст
             // undefined и участник во втором дне окажется без стола.
-            cardNumber: existing.cardNumber || null,
+            //
+            // При пересадке за другой стол номер сбрасывается: он кодирует стол,
+            // и пара {стол 2, тайл 13} ломает и партнёрство, и командный экран.
+            // Взять тайл нового стола человек может тем же набором номера.
+            cardNumber:
+                normalizeTableNumber(existing.tableNumber) === normalizedTableNumber
+                    ? existing.cardNumber || null
+                    : null,
             registeredAt: existing.registeredAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             tasks: existing.tasks || {},
@@ -522,6 +559,13 @@ export async function controlDay2Takt({ sessionId, action, minutes }) {
 
         return day2TaktStatus(bucket.day2Takt, Date.now());
     });
+}
+
+/** Текущий такт зала для пульта ведущего. Только чтение, без лока. */
+export async function getDay2TaktStatus(sessionId) {
+    const store = await readStore();
+    const bucket = store.sessions?.[sessionId];
+    return day2TaktStatus(readDay2Takt(bucket), Date.now());
 }
 
 export async function setMayakSessionParticipantRole({ sessionId, userId, role }) {
@@ -907,8 +951,17 @@ export async function resolveMayakSessionReview({ sessionId, reviewId, inspector
         // обязан сойтись (ТЗ, раздел В4). Роли во втором дне нет вообще.
         if (!debugSession) {
             if (isDay2Section(session?.sectionId)) {
+                const author = normalizeDay2CardNumber(review.participantCardNumber);
                 const partner = day2PartnerNumber(inspector.cardNumber);
-                if (!partner || partner !== normalizeDay2CardNumber(review.participantCardNumber)) {
+                const authorsPartner = day2PartnerNumber(author);
+                // Обычный случай: принимает партнёр по паре. Запасной: партнёрский
+                // тайл не взят никем (за столом нечётное число людей), и тогда
+                // принять может любой сосед по столу — иначе автор заперт до вечера.
+                const orphan = authorsPartner && !day2TileIsHeld(bucket, authorsPartner);
+                const sameTable =
+                    normalizeTableNumber(inspector.tableNumber) === normalizeTableNumber(review.participantTableNumber);
+                const mayCheck = partner === author || (orphan && sameTable && inspector.userId !== review.participantUserId);
+                if (!author || !mayCheck) {
                     throw new Error("Эту работу проверяет партнёр по паре");
                 }
             } else {
@@ -1010,7 +1063,19 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
         ? day2Partner > 0
         : Boolean(queueTargetTable) && (debugSession || isReviewerRole(participant.role));
     const belongsToQueue = day2Session && !debugSession
-        ? (review) => normalizeDay2CardNumber(review.participantCardNumber) === day2Partner
+        ? (review) => {
+              const author = normalizeDay2CardNumber(review.participantCardNumber);
+              if (author === day2Partner) return true;
+              // Шов «сироты» — того, чей партнёрский тайл не взят никем, — виден
+              // всему его столу: иначе он не виден никому.
+              const authorsPartner = day2PartnerNumber(author);
+              return Boolean(
+                  authorsPartner
+                      && !day2TileIsHeld(bucket, authorsPartner)
+                      && review.participantTableNumber === normalizeTableNumber(participant.tableNumber)
+                      && review.participantUserId !== participant.userId
+              );
+          }
         : (review) => review.participantTableNumber === queueTargetTable;
 
     const inspectorQueue = mayReview

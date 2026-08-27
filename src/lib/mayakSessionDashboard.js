@@ -3,7 +3,8 @@ import path from "path";
 
 import { getMayakSessionById } from "@/lib/mayakSessions";
 import { getSectionBundle } from "@/lib/mayakContentStorage";
-import { readSessionRuntimeParticipants, readSessionReviews } from "@/lib/mayakSessionRuntime";
+import { readSessionRuntimeParticipants, readSessionReviews, getDay2TaktStatus } from "@/lib/mayakSessionRuntime";
+import { isDay2Section } from "@/lib/mayakDay2Mode";
 import {
     WE_DIRECTIONS,
     resolveFormatKey,
@@ -636,6 +637,9 @@ export async function getMayakSessionDashboardData(sessionId) {
             tableCount,
             status: session.status || "active",
         },
+        // Такт зала — только для второго дня: пульту ведущего нужно знать, что
+        // сейчас идёт, чтобы показать кнопку «следующий», а не «запустить».
+        day2Takt: isDay2Section(session.sectionId) ? await getDay2TaktStatus(session.id) : null,
         directions: WE_DIRECTIONS.map(({ key, label }) => ({ key, label })),
         yaStarTarget: YA_STAR_TARGET,
         deck: {

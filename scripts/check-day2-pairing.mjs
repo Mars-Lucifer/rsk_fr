@@ -217,6 +217,34 @@ async function main() {
             assert.equal(byPartner.json?.success, true, byPartner.json?.error);
         });
 
+        // Нечётный состав стола: тайл 16 не взял никто, поэтому шов держателя 15
+        // не увидит партнёр — его нет. Такой шов открывается всему столу, иначе
+        // человек заперт до вечера.
+        const orphanReview = await submitDetail(OUTSIDER, sessionId);
+        const orphanId = orphanReview?.review?.id || orphanReview?.reviewId || orphanReview?.id;
+
+        const seenByAuthor = await queueOf(AUTHOR, sessionId);
+        check("шов без партнёра виден соседу по столу", () => {
+            assert.equal(seenByAuthor.length, 1, JSON.stringify(seenByAuthor.map((r) => r.taskNumber)));
+            assert.equal(String(seenByAuthor[0].taskNumber), String(OUTSIDER.card));
+        });
+
+        const orphanBySelf = await api("/api/mayak/session-runtime/review", {
+            method: "POST",
+            body: { sessionId, reviewId: orphanId, inspectorUserId: OUTSIDER.userId, action: "approve" },
+        });
+        check("но сам себе его не принять и без партнёра", () => {
+            assert.equal(orphanBySelf.json?.success, false, JSON.stringify(orphanBySelf.json));
+        });
+
+        const orphanByNeighbour = await api("/api/mayak/session-runtime/review", {
+            method: "POST",
+            body: { sessionId, reviewId: orphanId, inspectorUserId: AUTHOR.userId, action: "approve" },
+        });
+        check("сосед принимает шов без партнёра", () => {
+            assert.equal(orphanByNeighbour.json?.success, true, orphanByNeighbour.json?.error);
+        });
+
         const authorState = await api(`/api/mayak/session-runtime/state?sessionId=${sessionId}&userId=${AUTHOR.userId}`);
         const states = authorState.json?.data?.participant?.taskStates ?? authorState.json?.participant?.taskStates ?? [];
         check("деталь автора стала принятой", () => {

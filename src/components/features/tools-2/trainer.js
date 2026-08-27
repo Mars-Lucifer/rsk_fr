@@ -174,6 +174,10 @@ export default function TrainerPage({ goTo }) {
     // в режиме второго дня, первый день их не читает.
     const [day2NumberDraft, setDay2NumberDraft] = useState(null);
     const [day2Problem, setDay2Problem] = useState(null);
+    // Ключ карточки, которую участник открыл САМ. Без него показывать нечего:
+    // после перезагрузки вкладки колода встаёт на свою первую позицию, а у
+    // второго дня это изделие первого стола — чужая карточка чужого такта.
+    const [day2OpenKey, setDay2OpenKey] = useState(null);
 
     const isMobile = useMediaQuery("(max-width: 1023px)");
     const previewResizeStateRef = useRef(null);
@@ -1835,11 +1839,15 @@ export default function TrainerPage({ goTo }) {
     // Второй день листать нечем: набрал номер, нажал «Открыть» — и без карточки
     // на экране не меняется ничего, кнопка читается как сломанная.
     //
-    // Показывается только после того, как участник назвал свой номер: до этого
-    // currentTask — случайная позиция колоды, и выдавать её за его задание нельзя.
+    // Показывается только та карточка, которую участник открыл сам, и только
+    // пока колода на ней и стоит. Знать его номер — мало: после перезагрузки
+    // вкладки sessionStorage пуст, колода встаёт на первую позицию секции
+    // (изделие первого стола), и человек за третьим столом увидел бы полный
+    // текст чужого такта чужой команды при подписи «Такт 1 · деталь».
     const day2Card = useMemo(() => {
-        if (!isDay2 || !day2Number || !currentTask) return null;
+        if (!isDay2 || !day2OpenKey || !currentTask) return null;
         const number = String(currentTask.number || "");
+        if (number !== day2OpenKey) return null;
         const text = tasksTexts.find((item) => item.number === number) || {};
         return {
             // Номер для показа — без служебного суффикса переходника: рядом
@@ -1852,15 +1860,20 @@ export default function TrainerPage({ goTo }) {
             task: text.task || "",
             dueMidday: text.dueMidday || "",
         };
-    }, [isDay2, day2Number, currentTask, tasksTexts]);
+    }, [isDay2, day2OpenKey, currentTask, tasksTexts]);
 
     // Закрепить номер тайла за участником. Сервер проверяет диапазон, стол и то,
     // что сосед не взял этот же номер, и его отказ показывается как есть —
     // человеку в зале нужна причина, а не «не получилось».
     const claimDay2Number = async (number) => {
+        // Без сессии второй день не работает: такт, пара и очередь проверки
+        // живут в рантайме сессии. Такое бывает по обычной ссылке «без
+        // инспектора» — её заводят каждой сессии, включая day2. Раньше номер
+        // тихо оседал в черновике, и человек весь день сидел в такте 1, не
+        // понимая, почему сдача ничего не меняет.
         if (!runtimeSessionId || !activeUserId) {
-            setDay2NumberDraft(number);
-            return true;
+            setDay2Problem("Второй день работает только по ссылке с инспектором — эта ссылка без сессии");
+            return false;
         }
         try {
             const response = await fetch("/api/mayak/session-runtime/card-number", {
@@ -1888,9 +1901,13 @@ export default function TrainerPage({ goTo }) {
             setDay2Problem(parsed.hint);
             return;
         }
-        // Первый набранный номер детали и становится своим — на сервере.
+        // Набранный номер детали становится своим — на сервере. Это работает и
+        // при первом наборе, и когда номер поправляют: человек держит тайл 13,
+        // а первым набрал 15, потому что тайлы лежат рядом. Сервер сам откажет,
+        // если по прежнему номеру уже что-то сдано, и его отказ виден участнику.
+        // Без этого опечатка запирала бы двоих: и его, и настоящего владельца 15.
         let myNumber = day2Number;
-        if (!myNumber && parsed.kind === "detail") {
+        if (parsed.kind === "detail" && Number(parsed.key) !== myNumber) {
             if (!(await claimDay2Number(Number(parsed.key)))) {
                 return;
             }
@@ -1915,6 +1932,7 @@ export default function TrainerPage({ goTo }) {
             return;
         }
         setDay2Problem(null);
+        setDay2OpenKey(parsed.key);
         guardedGoToTask(index);
     };
 
