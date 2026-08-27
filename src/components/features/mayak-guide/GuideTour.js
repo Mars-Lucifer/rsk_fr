@@ -320,6 +320,16 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
         if (open) setIndex(0);
     }, [open]);
 
+    // Сигнал «разбор открыт» для страницы под туром. Тренажёру он нужен, чтобы
+    // в демо-режиме мастера пропускать окно отправки инспектору только во время
+    // разбора: постоянный пропуск отключал инспекторский контур у любого входа
+    // с админ-байпасом, и проверить настоящий поток мастер уже не мог.
+    useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+        window.dispatchEvent(new CustomEvent("mayak-guide-tour", { detail: { open: Boolean(open) } }));
+        return () => window.dispatchEvent(new CustomEvent("mayak-guide-tour", { detail: { open: false } }));
+    }, [open]);
+
     // Реальная высота карточки: у шагов текст разной длины, и разница доходит до сотни
     // пикселей. Меряем после отрисовки шага — до неё высоты ещё нет.
     useEffect(() => {

@@ -341,6 +341,17 @@ export default function TrainerPage({ goTo }) {
     });
 
     const [showBypassMenu, setShowBypassMenu] = useState(false);
+
+    // Разбор «Как это работает» открыт. GuideTour сообщает об этом событием:
+    // пропуск окна инспектора в демо действует только на время разбора, а не на
+    // весь админ-вход — иначе владелец байпаса не мог проверить настоящий
+    // поток отправки.
+    const [isTourActive, setIsTourActive] = useState(false);
+    useEffect(() => {
+        const onTour = (event) => setIsTourActive(Boolean(event?.detail?.open));
+        window.addEventListener("mayak-guide-tour", onTour);
+        return () => window.removeEventListener("mayak-guide-tour", onTour);
+    }, []);
     const [bypassPosition, setBypassPosition] = useState(() => {
         if (typeof window !== "undefined") {
             try {
@@ -1028,10 +1039,12 @@ export default function TrainerPage({ goTo }) {
         type,
         userType,
         who,
-        // В демо-режиме мастера (adminBypass) отправка инспектору не требуется:
-        // сдавать некому, и «Завершить» без этого условия не завершал задание —
-        // таймер продолжал тикать в ожидании загрузки, которой не будет.
-        sessionUploadRequired: isSessionMode && !isAdmin,
+        // Во время разбора в демо-режиме мастера отправка инспектору не
+        // требуется: сдавать некому, и «Завершить» без этого условия не
+        // завершал задание — таймер тикал в ожидании загрузки, которой не
+        // будет. Вне разбора админ-вход ведёт себя как обычный участник:
+        // владелец байпаса проверяет настоящий поток, включая окно инспектора.
+        sessionUploadRequired: isSessionMode && !(isAdmin && isTourActive),
         isCurrentTaskApproved: ["approved", "expired", "rework_expired"].includes(
             (Array.isArray(sessionRuntimeState?.participant?.taskStates)
                 ? sessionRuntimeState.participant.taskStates.find((task) => Number(task.taskIndex) === currentTaskIndex) || null
@@ -2214,12 +2227,11 @@ export default function TrainerPage({ goTo }) {
                 {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />}
                 <InstructionImageModal instructionModal={instructionModal} onClose={handleCloseInstructionModal} />
             </div>
-            {/* Демо-режим мастера (adminBypass) завершает задание без окон вообще:
-                сдавать инспектору некому, а сводка «задание выполнено» в демо только
-                прерывала разбор. Нажал «Завершить» — задание закрылось, попытка
-                записана в историю, тренажёр готов к следующему запуску. */}
+            {/* Пока идёт разбор в демо-режиме мастера, завершение обходится без
+                окон вообще: сдавать инспектору некому, а сводка «задание выполнено»
+                только прерывала разбор. Вне разбора всё как у участника. */}
             {showCompletionPopup &&
-                !isAdmin &&
+                !(isAdmin && isTourActive) &&
                 (isSessionMode && !isIntroTask(currentTaskIndex) ? (
                     <SessionTaskReviewPopup
                         taskData={currentTaskData}
