@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 
 import Button from "@/components/ui/Button";
 import Header from "@/components/layout/Header";
-import MayakDelegatedAdminPanel from "@/components/pages/profile/MayakDelegatedAdminPanel";
+// import MayakDelegatedAdminPanel from "@/components/pages/profile/MayakDelegatedAdminPanel";
 import PortalProfileEditor from "@/components/features/auth/PortalProfileEditor";
 import LinkIcon from "@/assets/general/link.svg";
 
@@ -339,7 +339,11 @@ export default function ProfileIndexPage({ goTo, initialEditing = false, initial
                     </div>
                 ) : null}
 
-                <MayakDelegatedAdminPanel />
+                {/* Админ-права МАЯК скрыты: у обычного участника блок висит на
+                    «Загружаем доступы МАЯК...» и ничем не заканчивается —
+                    доступов у него нет и не будет. Разметка и сам компонент
+                    оставлены целиком, включать обратно снятием комментария. */}
+                {/* <MayakDelegatedAdminPanel /> */}
 
                 {/* Материалы МАЯК скрыты до возврата к этой части: блок висел
                     пустым, потому что артефакты копятся в двух разных местах
