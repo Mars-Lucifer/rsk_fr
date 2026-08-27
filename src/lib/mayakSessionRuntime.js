@@ -6,7 +6,7 @@ import { completeMayakSession, getMayakSessionById } from "@/lib/mayakSessions";
 import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 import { convertToPdf, logLibreOffice } from "@/lib/libreofficeConverter";
 import { pickRandomMissionForRole } from "@/lib/mayakSecretMissions";
-import { isDay2Section } from "@/lib/mayakDay2Mode";
+import { isDay2Section, DAY2_TABLE_NAMES } from "@/lib/mayakDay2Mode";
 import { day2KeysFor } from "@/lib/mayakDay2Takt";
 import {
     DAY2_FIRST_TAKT,
@@ -1063,6 +1063,95 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
               }
             : null,
         inspectorQueue,
+    };
+}
+
+/**
+ * Командный экран: седьмая ячейка стола.
+ *
+ * Один ноутбук команды открыт на этой странице весь день. На нём видно, что
+ * происходит с шестью тайлами, пока сами тайлы лежат врозь: кто сдал, кто нет,
+ * сколько собрано, сколько осталось до конца такта.
+ *
+ * Чего здесь нет намеренно (ТЗ, раздел В11):
+ *   — содержания заданий: за содержанием человек идёт в свой телефон;
+ *   — чужих команд: соседний стол — не их дело;
+ *   — имён и персональных показателей. Кто сдал — общее дело, как кто работал —
+ *     не общее. Поэтому наружу уходят номера, а не люди, и страница не требует
+ *     входа: показывать по ней нечего, кроме шести галочек.
+ */
+export async function getDay2TeamBoard({ sessionId, tableNumber }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+    if (!isDay2Section(session.sectionId)) {
+        throw new Error("Командный экран есть только во втором дне");
+    }
+
+    const table = normalizeTableNumber(tableNumber);
+    if (table < 1 || table > normalizeTableNumber(session.tableCount)) {
+        throw new Error("Такого стола в этой сессии нет");
+    }
+
+    const store = await readStore();
+    const bucket = store.sessions?.[sessionId] || { participants: {}, reviews: {} };
+    const participants = Object.values(bucket.participants || {});
+
+    // Статус ключа берётся у того, кто этот тайл держит. Узел общий на двоих,
+    // поэтому засчитывается по любому из партнёров: сдаёт один, и это сдача пары.
+    const statusOfKey = (key, holders) => {
+        const states = holders
+            .map((holder) => holder?.tasks?.[key]?.status)
+            .filter(Boolean);
+        if (states.includes("approved")) return "approved";
+        if (states.includes("pending_review")) return "pending";
+        if (states.includes("rejected")) return "rejected";
+        return "none";
+    };
+
+    const holderOf = (cardNumber) => participants.find((p) => p.cardNumber === cardNumber) || null;
+
+    const tiles = [1, 2, 3, 4, 5, 6].map((position) => {
+        const number = table * 10 + position;
+        const holder = holderOf(number);
+        return {
+            number,
+            taken: Boolean(holder),
+            status: holder ? statusOfKey(String(number), [holder]) : "none",
+        };
+    });
+
+    const nodes = [1, 3, 5].map((position) => {
+        const low = table * 10 + position;
+        const high = low + 1;
+        const key = `${low}-${high}`;
+        const holders = [holderOf(low), holderOf(high)].filter(Boolean);
+        return {
+            key,
+            status: statusOfKey(key, holders),
+            adapterOpened: holders.some((holder) => Boolean(holder?.tasks?.[`${key}:adapter`])),
+        };
+    });
+
+    const assemblyKey = String(table * 10);
+    const assembly = statusOfKey(assemblyKey, participants.filter((p) => normalizeTableNumber(p.tableNumber) === table));
+
+    return {
+        sessionId,
+        table,
+        name: DAY2_TABLE_NAMES[table] || `Стол ${table}`,
+        takt: day2TaktStatus(readDay2Takt(bucket), Date.now()),
+        tiles,
+        nodes,
+        assembly,
+        counts: {
+            details: tiles.filter((tile) => tile.status === "approved").length,
+            detailsTotal: tiles.length,
+            nodes: nodes.filter((node) => node.status === "approved").length,
+            nodesTotal: nodes.length,
+            adapters: nodes.filter((node) => node.adapterOpened).length,
+        },
     };
 }
 

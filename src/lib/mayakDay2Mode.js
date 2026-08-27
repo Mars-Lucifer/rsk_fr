@@ -11,6 +11,11 @@
 
 export const DAY2_SECTIONS = ["day2"];
 
+// Имя стола — оно же имя команды и слово, которым открывается изделие.
+// Совпадает с надписью на центральном тайле: расхождение любой строки между
+// картоном и экраном ТЗ называет дефектом производства (раздел В9).
+export const DAY2_TABLE_NAMES = { 1: "Среда", 2: "Деятельность", 3: "Сознание" };
+
 export function isDay2Section(sectionId) {
     return DAY2_SECTIONS.includes(String(sectionId || "").trim());
 }
