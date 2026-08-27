@@ -46,7 +46,7 @@ export default function MayakServicesPanel({
 
     return (
         <>
-            <div className={serviceContainerClass}>
+            <div data-tour="services" className={serviceContainerClass}>
                 {!isMiscAccordionOpen &&
                     typeLinks.map((service, index) => (
                         <Button key={index} inverted className={serviceButtonClass} onClick={() => window.open(service.url, "_blank")}>

@@ -358,7 +358,7 @@ export const TrainerControls = memo(function TrainerControls({
                     )}
                     {currentTask?.toolLink1 && (
                         <span className="w-full" title={!canAccessTaskResources ? "Сначала начните задание" : ""}>
-                            <Button inverted as="a" href={currentTask.toolLink1} target="_blank" disabled={!canAccessTaskResources} className={`w-full ${!canAccessTaskResources ? "opacity-50 cursor-not-allowed" : ""}`} onClick={onToolLink1Click}>
+                            <Button data-tour="task-tool" inverted as="a" href={currentTask.toolLink1} target="_blank" disabled={!canAccessTaskResources} className={`w-full ${!canAccessTaskResources ? "opacity-50 cursor-not-allowed" : ""}`} onClick={onToolLink1Click}>
                                 {currentTask.toolName1 || "Инструмент"}
                             </Button>
                         </span>

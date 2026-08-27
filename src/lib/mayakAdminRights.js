@@ -11,7 +11,11 @@ import { readAccessLedgerCounts, syncAccessLedgerBaseline } from "@/lib/mayakAcc
 const RIGHTS_FILE = path.join(process.cwd(), "data", "mayak-admin-rights.json");
 const DEFAULT_TOTAL_QUOTA = 1000000;
 const DEFAULT_TOTAL_PARTICIPANT_LIMIT = 180;
-const DEFAULT_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+// 48 часов, а не 24: двухдневное занятие (день «Я» + день «МЫ») не влезало
+// в сутки — ссылки умирали между днями. Срок применяется при создании сессии
+// и сохраняется в её expiresAt; уже созданные сессии хранят свою дату и от
+// смены константы не меняются — активные ссылки доживают свой срок как есть.
+const DEFAULT_TOKEN_TTL_MS = 48 * 60 * 60 * 1000;
 const DEFAULT_MAX_TABLES = 6;
 
 function createEmptyStore() {

@@ -63,6 +63,16 @@ export const MEEPLE_COLORS = ["#2f6fd0", "#c9503f", "#1d2126", "#e2a03f", "#6aa8
 export const TYPE_CARDS = 5;
 export const START_CARDS = 6;
 
+// Второй набор — «ФЕДЕРАЦИЯ» (карты №4xx): регионы и ведомства вместо вузовских кейсов.
+// Он полнее: «Старт» девять карт вместо шести, у каждой своя рубашка, а в типе шесть
+// заданий — первое приходит из отдельного файла «База типы», за ним пять из раздела.
+// Седьмая карта раздела — «карта настроения»; она заданием не является, в раздачу не
+// идёт и лежит рядом файлом -mood.
+export const YA_DECKS = {
+    vuz: { id: "vuz", name: "ВУЗЫ", dir: "/mayak-guide/deck-ya", start: START_CARDS, type: TYPE_CARDS },
+    fed: { id: "fed", name: "Федерация", dir: "/mayak-guide/deck-ya-fed", start: 9, type: 6 },
+};
+
 // Пиксель viewBox → метры сцены: центр поля в нуле, X вправо, Z вниз (от игрока).
 export function pxToMeters(point) {
     return {
@@ -95,26 +105,126 @@ export function cluster(point, index, spread = 1) {
     };
 }
 
+// Ячейки поля под ярлыками. Живому столу нужно называть клетку строкой: сервер комнаты
+// геометрии не знает и хранит именно ярлык («inner:2», «type:text:ray:1»), а точку по
+// нему считает сцена. Демо ходит по тем же координатам напрямую — список собран из них
+// же, поэтому два режима не могут разъехаться при калибровке поля.
+// Форма клетки — не украшение, а её печатный контур. Подсветка обязана лечь ровно на
+// то, что нарисовано, иначе игрок целится в круг, а фишка встаёт в гекс. Числа сняты с
+// растра public/mayak-guide/pole_ya.png связными компонентами и радиальным профилем от
+// центра фигуры, а не подобраны: гексы лучей вышли 133 × 119 (плоским верхом, R ≈ 66),
+// центральный СТАРТ — выше, чем шире (вершиной вверх, R ≈ 110), а оба круга оказались
+// не рядами гексов, а секторами кольца.
+//
+// Углы отсчитываются от «вправо» по часовой стрелке — та же система, что у координат
+// поля, где Y растёт вниз.
+const HEX_START = { kind: "hex", r: 110, pointy: true };
+const HEX_RAY = { kind: "hex", r: 66, pointy: false };
+// Секторы нарезаны ровно: внутренний круг по 90°, кольцо типов по 60° — границы найдены
+// сменой цвета соседних секторов, а не на глаз. Из каждого вычтен зазор, которым они
+// разделены на печати: подсветка во всю ширину сектора наезжала на белую границу.
+const innerSector = (deg) => ({ kind: "sector", r0: 114, r1: 215, mid: deg, span: 82 });
+const typeSector = (deg) => ({ kind: "sector", r0: 229, r1: 336, mid: deg, span: 57 });
+
+// Внутренний круг обходится по часовой стрелке от правой ячейки; кольцо типов начинается
+// с верхнего сектора «Текст» и идёт тем же обходом, шагом 60°.
+const INNER_DEG = [0, 90, 180, 270];
+
+export const CELLS = [
+    { id: "start", label: "СТАРТ", at: CENTER, shape: HEX_START },
+    ...INNER.map((point, index) => ({
+        id: `inner:${index}`,
+        label: `Внутренний круг ${index + 1}`,
+        at: point,
+        shape: innerSector(INNER_DEG[index]),
+    })),
+    ...TYPES.flatMap((type, order) => [
+        { id: `type:${type.id}:sector`, label: type.name, at: type.sector, shape: typeSector(-90 + order * 60) },
+        ...type.ray.map((point, index) => ({
+            id: `type:${type.id}:ray:${index}`,
+            label: `${type.name} · луч ${index + 1}`,
+            at: point,
+            shape: HEX_RAY,
+        })),
+    ]),
+];
+
+// Контур клетки в метрах сцены, точками на плоскости стола. Секторы строятся от центра
+// фигуры (CENTER), гексы — вокруг собственной точки, поэтому обе формы отдаются уже
+// готовым списком вершин: сцене остаётся сделать из них полигон и обводку.
+// inset — насколько контур ужать внутрь клетки, в единицах viewBox. Нужен рамке: линия
+// в WebGL всегда толщиной в один пиксель, сколько ей ни задавай, поэтому обводка клетки
+// делается не линией, а кольцом между внешним и ужатым контуром.
+export function cellOutline(id, inset = 0) {
+    const cell = CELL_BY_ID.get(id);
+    if (!cell) return null;
+    const shape = cell.shape;
+
+    if (shape.kind === "hex") {
+        // Гекс «вершиной вверх» повёрнут на 30° относительно «плоского верха».
+        const turn = shape.pointy ? Math.PI / 6 : 0;
+        const r = Math.max(4, shape.r - inset);
+        return Array.from({ length: 6 }, (_, i) => {
+            const a = turn + (i * Math.PI) / 3;
+            return pxToMeters({ x: cell.at.x + Math.cos(a) * r, y: cell.at.y + Math.sin(a) * r });
+        });
+    }
+
+    // Сектор кольца: наружная дуга слева направо, внутренняя обратно. Шаг 4° — на глаз
+    // дуга уже гладкая, а вершин втрое меньше, чем при градусном шаге.
+    //
+    // Ужимается сектор со всех четырёх сторон одинаково: по радиусу напрямую, по углу —
+    // через длину дуги, иначе у внутреннего края рамка получается заметно толще.
+    const r0 = shape.r0 + inset;
+    const r1 = Math.max(r0 + 4, shape.r1 - inset);
+    const shrink = inset === 0 ? 0 : (inset / ((r0 + r1) / 2)) * (180 / Math.PI);
+    const span = Math.max(4, shape.span - shrink * 2);
+    const a0 = ((shape.mid - span / 2) * Math.PI) / 180;
+    const a1 = ((shape.mid + span / 2) * Math.PI) / 180;
+    const steps = Math.max(2, Math.round(span / 4));
+    const arc = (radius, from, to) =>
+        Array.from({ length: steps + 1 }, (_, i) => {
+            const a = from + ((to - from) * i) / steps;
+            return pxToMeters({ x: CENTER.x + Math.cos(a) * radius, y: CENTER.y + Math.sin(a) * radius });
+        });
+    return [...arc(r1, a0, a1), ...arc(r0, a1, a0)];
+}
+
+const CELL_BY_ID = new Map(CELLS.map((cell) => [cell.id, cell]));
+
+// Ярлык ячейки → точка в метрах сцены. index раздвигает шестерых внутри одной клетки:
+// на общей ячейке фишки не должны вставать друг в друга.
+export function cellToMeters(id, index = 0, spread = 0.9) {
+    const cell = CELL_BY_ID.get(id);
+    if (!cell) return null;
+    return pxToMeters(cluster(cell.at, index, spread));
+}
+
 // Стопки этапа «Я»: раздел «Старт» плюс шесть типов контента.
 // back — рубашка (обложка раздела из набора), faces — лица заданий.
-export const YA_STACKS = [
-    {
-        id: "start",
-        name: "Старт",
-        color: "#245a94",
-        at: START_DECK,
-        // Единственная стопка «Я», лежащая не в пазу-лепестке, а на краю поля:
-        // разворачивать её «от центра» незачем, она лежит ровно, как на столе.
-        spin: 0,
-        back: "/mayak-guide/deck-ya/start-back.png",
-        faces: Array.from({ length: START_CARDS }, (_, i) => `/mayak-guide/deck-ya/start-${i + 1}.jpg`),
-    },
-    ...TYPES.map((type) => ({
-        id: type.id,
-        name: type.name,
-        color: type.color,
-        at: type.deck,
-        back: `/mayak-guide/deck-ya/${type.id}-back.png`,
-        faces: Array.from({ length: TYPE_CARDS }, (_, i) => `/mayak-guide/deck-ya/${type.id}-${i + 1}.jpg`),
-    })),
-];
+export function yaStacks(deckId = "vuz") {
+    const deck = YA_DECKS[deckId] || YA_DECKS.vuz;
+    return [
+        {
+            id: "start",
+            name: "Старт",
+            color: "#245a94",
+            at: START_DECK,
+            // Единственная стопка «Я», лежащая не в пазу-лепестке, а на краю поля:
+            // разворачивать её «от центра» незачем, она лежит ровно, как на столе.
+            spin: 0,
+            back: `${deck.dir}/start-back.png`,
+            faces: Array.from({ length: deck.start }, (_, i) => `${deck.dir}/start-${i + 1}.jpg`),
+        },
+        ...TYPES.map((type) => ({
+            id: type.id,
+            name: type.name,
+            color: type.color,
+            at: type.deck,
+            back: `${deck.dir}/${type.id}-back.png`,
+            faces: Array.from({ length: deck.type }, (_, i) => `${deck.dir}/${type.id}-${i + 1}.jpg`),
+        })),
+    ];
+}
+
+export const YA_STACKS = yaStacks();

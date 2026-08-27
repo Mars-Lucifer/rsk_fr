@@ -5,8 +5,19 @@ import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei/core/Texture";
 import * as THREE from "three";
 
-import { MY_STACKS, pxToMeters as pxMy } from "./fieldLayout.mjs";
-import { CENTRE_M as YA_CENTRE, YA_STACKS, pxToMeters as pxYa } from "./fieldLayoutYa.mjs";
+import { myStacks, pxToMeters as pxMy } from "./fieldLayout.mjs";
+import { CENTRE_M as YA_CENTRE, yaStacks, pxToMeters as pxYa } from "./fieldLayoutYa.mjs";
+
+// Какой набор заданий лежит на столе: «ВУЗЫ» (№6xx) или «ФЕДЕРАЦИЯ» (№4xx). Выбирается
+// адресом страницы (?deck=fed) и читается один раз при загрузке модуля.
+//
+// Именно так, а не пропом: списки текстур, индексы карт и гнёзда стопок собираются
+// модульными константами, и смена набора на лету означала бы пересборку половины файла
+// ради того, что в жизни меняют между партиями, а не посреди неё. Переключатель в сцене
+// меняет адрес и перезагружает страницу — тот же жест, что убрать со стола одну колоду
+// и выложить другую.
+export const DECK_ID =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("deck") === "fed" ? "fed" : "vuz";
 import { CARD_MM, DECK_BOX, HAND_PILE, MAX_ANISOTROPY } from "./tableSpots.mjs";
 import { roundedPlateGeometry } from "./roundedPlate";
 
@@ -80,12 +91,12 @@ function outwardSpin(at, centre) {
 // Стопки обеих сторон в одном списке: slot — гнездо в коробке набора, at — паз на поле.
 // Гнёзда нумеруются внутри своей стороны: в коробке одновременно лежит только одна.
 const STACKS = [
-    ...YA_STACKS.map((stack, slot) => {
+    ...yaStacks(DECK_ID).map((stack, slot) => {
         const at = pxYa(stack.at);
         return { ...stack, side: "ya", slot, at, spin: stack.spin ?? outwardSpin(at, YA_CENTRE) };
     }),
     // Панели направлений на поле «МЫ» стоят ровной сеткой 3 × 2 и не развёрнуты.
-    ...MY_STACKS.map((stack, slot) => ({ ...stack, side: "my", slot, at: pxMy(stack.at), spin: 0 })),
+    ...myStacks(DECK_ID).map((stack, slot) => ({ ...stack, side: "my", slot, at: pxMy(stack.at), spin: 0 })),
 ];
 
 const CARDS = STACKS.flatMap((stack, si) => stack.faces.map((_, idx) => ({ stack: si, idx })));
