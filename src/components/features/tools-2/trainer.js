@@ -1028,7 +1028,10 @@ export default function TrainerPage({ goTo }) {
         type,
         userType,
         who,
-        sessionUploadRequired: isSessionMode,
+        // В демо-режиме мастера (adminBypass) отправка инспектору не требуется:
+        // сдавать некому, и «Завершить» без этого условия не завершал задание —
+        // таймер продолжал тикать в ожидании загрузки, которой не будет.
+        sessionUploadRequired: isSessionMode && !isAdmin,
         isCurrentTaskApproved: ["approved", "expired", "rework_expired"].includes(
             (Array.isArray(sessionRuntimeState?.participant?.taskStates)
                 ? sessionRuntimeState.participant.taskStates.find((task) => Number(task.taskIndex) === currentTaskIndex) || null
@@ -2207,11 +2210,13 @@ export default function TrainerPage({ goTo }) {
                 {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />}
                 <InstructionImageModal instructionModal={instructionModal} onClose={handleCloseInstructionModal} />
             </div>
-            {/* Демо-режим мастера (adminBypass) минует отправку инспектору: мастер
-                смотрит устройство тренажёра, сдавать ему некому, и окно загрузки
-                материала только сбивало с толку при разборе. */}
+            {/* Демо-режим мастера (adminBypass) завершает задание без окон вообще:
+                сдавать инспектору некому, а сводка «задание выполнено» в демо только
+                прерывала разбор. Нажал «Завершить» — задание закрылось, попытка
+                записана в историю, тренажёр готов к следующему запуску. */}
             {showCompletionPopup &&
-                (isSessionMode && !isAdmin && !isIntroTask(currentTaskIndex) ? (
+                !isAdmin &&
+                (isSessionMode && !isIntroTask(currentTaskIndex) ? (
                     <SessionTaskReviewPopup
                         taskData={currentTaskData}
                         elapsedTime={formatTaskTime(timerState.readyElapsedTime ?? timerState.elapsedTime ?? 0)}

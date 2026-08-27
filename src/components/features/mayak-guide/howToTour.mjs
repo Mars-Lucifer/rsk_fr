@@ -182,7 +182,7 @@ export function buildTrainerHowTo(sample) {
             ? [
                   {
                       sel: '[data-tour="card-panel"] img',
-                      frac: [0.72, 0, 0.28, 0.14],
+                      frac: [0.82, 0.015, 0.15, 0.09],
                       also: ".input-wrapper.text-center input",
                       optional: true,
                       title: "Номер на карте — номер в поле",
@@ -191,7 +191,7 @@ export function buildTrainerHowTo(sample) {
                   },
                   {
                       sel: '[data-tour="card-panel"] img',
-                      frac: [0, 0, 0.28, 0.14],
+                      frac: [0.03, 0.015, 0.12, 0.09],
                       also: { sel: "button", match: "Доп.материал" },
                       optional: true,
                       title: "Знак «?» на карте — материалы здесь",
