@@ -3,6 +3,7 @@ import TextareaAutosize from "react-textarea-autosize";
 
 import Button from "@/components/ui/Button";
 import ContestLessonPanel from "@/components/features/tools-2/ContestLessonPanel";
+import { formatDay2TaskNumber } from "@/lib/mayakDay2Mode";
 import Input from "@/components/ui/Input/Input";
 import Switcher from "@/components/ui/Switcher";
 
@@ -19,7 +20,7 @@ import RandomIcon from "@/assets/general/random.svg";
  * показывает такт, а не номер задания. Отказ разбора пишется тут же — участник
  * в зале должен понять, что делать, без ведущего.
  */
-function Day2TaskNav({ state, problem, onOpen, disabled }) {
+function Day2TaskNav({ state, card, problem, onOpen, disabled }) {
     const [value, setValue] = useState("");
     // Отказ относится к тому, что набрали, а не к полю вообще: «сначала сдайте
     // деталь 13» обязан исчезнуть, как только человек начал править ввод.
@@ -72,6 +73,21 @@ function Day2TaskNav({ state, problem, onOpen, disabled }) {
 
             {problem && value === asked && (
                 <span className="text-sm" style={{ color: "var(--color-red)" }}>{problem}</span>
+            )}
+
+            {card && (
+                <div className="flex flex-col gap-[0.4rem] rounded-[0.75rem] border border-gray-200 p-[0.75rem]">
+                    <span className="text-sm font-semibold">
+                        {formatDay2TaskNumber(card.number)}
+                        {card.title ? ` · ${card.title}` : ""}
+                    </span>
+                    {card.question && <span className="text-sm">{card.question}</span>}
+                    {card.description && <span className="text-sm text-gray-500">{card.description}</span>}
+                    {card.task && <span className="text-sm">{card.task}</span>}
+                    {card.dueMidday && (
+                        <span className="text-sm text-gray-500">Готово, когда: {card.dueMidday}</span>
+                    )}
+                </div>
             )}
         </div>
     );
@@ -190,6 +206,7 @@ const EyeClosedIcon = () => (
 export const TrainerControls = memo(function TrainerControls({
     isDay2,
     day2State,
+    day2Card,
     day2Problem,
     onDay2Open,
     who,
@@ -383,6 +400,7 @@ export const TrainerControls = memo(function TrainerControls({
                 {!isContestMode && isDay2 && (
                     <Day2TaskNav
                         state={day2State}
+                        card={day2Card}
                         problem={day2Problem}
                         onOpen={onDay2Open}
                         disabled={isTaskRunning || isTaskNavigationLocked}

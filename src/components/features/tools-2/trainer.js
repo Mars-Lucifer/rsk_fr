@@ -1802,6 +1802,27 @@ export default function TrainerPage({ goTo }) {
         [isDay2, day2Number, day2Tasks]
     );
 
+    // Открытая карточка показывается на экране. Первый день обходится строкой
+    // «Задание №N» со стрелками — там колода листается, и видно, что сдвинулся.
+    // Второй день листать нечем: набрал номер, нажал «Открыть» — и без карточки
+    // на экране не меняется ничего, кнопка читается как сломанная.
+    //
+    // Показывается только после того, как участник назвал свой номер: до этого
+    // currentTask — случайная позиция колоды, и выдавать её за его задание нельзя.
+    const day2Card = useMemo(() => {
+        if (!isDay2 || !day2Number || !currentTask) return null;
+        const number = String(currentTask.number || "");
+        const text = tasksTexts.find((item) => item.number === number) || {};
+        return {
+            number,
+            title: currentTask.title || "",
+            question: text.question || "",
+            description: text.description || "",
+            task: text.task || "",
+            dueMidday: text.dueMidday || "",
+        };
+    }, [isDay2, day2Number, currentTask, tasksTexts]);
+
     const openDay2 = (raw) => {
         const parsed = parseDay2Input(raw);
         if (!parsed.ok) {
@@ -1836,6 +1857,7 @@ export default function TrainerPage({ goTo }) {
     const trainerControlsProps = {
         isDay2,
         day2State,
+        day2Card,
         day2Problem,
         onDay2Open: openDay2,
         who,
