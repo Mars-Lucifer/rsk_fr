@@ -2216,7 +2216,11 @@ export default function TrainerPage({ goTo }) {
         // Провайдер общий для шапки и панели: переключение урока в лесенке
         // сразу меняет карточку задания, без перезагрузки страницы.
         <ContestLessonsProvider>
-            <Header>
+            {/* flex-wrap только здесь, а не в общем Header: в шапке тренажёра
+                накапливается до шести значков — стол, роль, направление,
+                джокеры, отладка, завершение, — и на телефоне 4 дюйма последние
+                уезжали за правый край. Остальному порталу перенос не нужен. */}
+            <Header className="flex-wrap gap-y-[0.5rem]">
                 <Header.Heading>МАЯК ОКО</Header.Heading>
                 {isContestMode && <ContestLessonStepper />}
                 {effectiveTableNumber ? (

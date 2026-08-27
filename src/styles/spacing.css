@@ -9,6 +9,12 @@ main {
     min-height: 100vh;
     position: relative;
     flex-direction: column;
+    /* Без этого `flex: 1` даёт min-width: auto, и main не сжимается ниже своего
+       содержимого: любой широкий потомок делает страницу шире экрана. На
+       root-layout висит overflow-x-clip, поэтому наружу это выходит не полосой
+       прокрутки, а срезанным правым краем — на телефоне 4 дюйма в тренажёре
+       так пропадали таймер, кнопка и правая треть текста. */
+    min-width: 0;
 }
 
 aside {
@@ -549,7 +555,11 @@ meter {
     gap: 1.25rem;
     display: grid;
     padding: 1.5rem;
-    grid-template-columns: repeat(12, 1fr);
+    /* minmax(0, 1fr), а не 1fr: голое `1fr` означает `minmax(auto, 1fr)`, то есть
+       колонка не сжимается ниже своего содержимого. На телефоне 4 дюйма из-за
+       этого весь тренажёр становился шире экрана — таймер, кнопка «Открыть» и
+       правый край текста просто срезались, причём в обоих днях. */
+    grid-template-columns: repeat(12, minmax(0, 1fr));
 
     .auth_cntr {
         gap: 1.5rem;
@@ -565,7 +575,7 @@ meter {
     }
 
     @media (max-width: 900px) {
-        grid-template-columns: repeat(6, 1fr);
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         padding: 1.125rem;
         gap: 0.875rem;
 
