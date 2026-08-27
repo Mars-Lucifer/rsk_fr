@@ -318,16 +318,25 @@ export const useMayakCompletionActions = ({
         return { success: true };
     }, [downloadCertificateStrict, downloadLogsStrict, handleDownloadAnalytics]);
 
-    const handleSaveSessionCompletion = useCallback(async () => {
+    const handleSaveSessionCompletion = useCallback(async ({ artifactsAlreadyDownloaded = false } = {}) => {
         setCompletionLoading(true);
 
         try {
             const activeUser = getUserFromCookies();
             const isGuestUser = Boolean(activeUser?.guestMode);
+            // Когда сертификат и лог уже скачаны отдельными кнопками (новое окно
+            // завершения), при закрытии сессии гостю остаётся только аналитика —
+            // повторное скачивание тех же PDF лишь путало.
+            const guestPersist = artifactsAlreadyDownloaded
+                ? async () => {
+                      await handleDownloadAnalytics();
+                      return { success: true };
+                  }
+                : handleDownloadGuestArtifacts;
             await executeMayakSessionCompletion({
                 elapsedTime,
                 levels,
-                onPersistArtifacts: isGuestUser ? handleDownloadGuestArtifacts : handleSaveArtifactsToProfile,
+                onPersistArtifacts: isGuestUser ? guestPersist : handleSaveArtifactsToProfile,
                 onClearState: () =>
                     clearMayakSessionCompletionState({
                         getStorageKey,
@@ -345,9 +354,11 @@ export const useMayakCompletionActions = ({
         } finally {
             setCompletionLoading(false);
         }
-    }, [elapsedTime, getStorageKey, handleDownloadGuestArtifacts, handleSaveArtifactsToProfile, levels, removeKeyCookie, resetSovaSessionState, setSelectedRole, setShowSessionCompletionPopup, setShowThirdQuestionnaire, setCompletionLoading]);
+    }, [elapsedTime, getStorageKey, handleDownloadAnalytics, handleDownloadGuestArtifacts, handleSaveArtifactsToProfile, levels, removeKeyCookie, resetSovaSessionState, setSelectedRole, setShowSessionCompletionPopup, setShowThirdQuestionnaire, setCompletionLoading]);
 
     return {
+        downloadCertificateStrict,
+        downloadLogsStrict,
         handleDownloadAnalytics,
         handleDownloadCertificate,
         handleDownloadLogs,
