@@ -115,7 +115,9 @@ def cards_and_texts():
             pair = f"{low}-{high}"
             names = f"{dict(RAYS)[low_pos]} + {dict(RAYS)[PARTNER[low_pos]]}"
 
-            cards.append(card(pair, f"Узел {low}+{high}", "Узел"))
+            # Название короткое: в шапке карточки оно стоит рядом с номером,
+            # и «13-14 · Узел 13+14» читается как заикание.
+            cards.append(card(pair, "Узел", "Узел"))
             texts.append({
                 "number": pair,
                 "question": "Рыба. Вопрос узла подставит модуль А.",
@@ -127,7 +129,7 @@ def cards_and_texts():
             })
 
             adapter = f"{pair}:adapter"
-            cards.append(card(adapter, f"Переходник {low}+{high}", "Переходник"))
+            cards.append(card(adapter, "Переходник", "Переходник"))
             texts.append({
                 "number": adapter,
                 "question": "Чего не хватает между вашими частями?",

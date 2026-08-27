@@ -64,7 +64,7 @@ import MasterDashboardLink from "./MasterDashboardLink";
 
 // Второй день. Всё, что ниже, включается только на секции второго дня
 // (isDay2Section по слогу): первый день этих веток не видит.
-import { isDay2Section, findDay2TaskIndex } from "@/lib/mayakDay2Mode";
+import { isDay2Section, findDay2TaskIndex, day2AccentColors } from "@/lib/mayakDay2Mode";
 import { parseDay2Input } from "@/lib/mayakDay2Input";
 import { computeDay2Takt, canOpenDay2 } from "@/lib/mayakDay2Takt";
 
@@ -1814,7 +1814,10 @@ export default function TrainerPage({ goTo }) {
         const number = String(currentTask.number || "");
         const text = tasksTexts.find((item) => item.number === number) || {};
         return {
-            number,
+            // Номер для показа — без служебного суффикса переходника: рядом
+            // стоит название, и «13-14 · переходник · Переходник» заикается.
+            numberLabel: number.split(":")[0],
+            accent: day2AccentColors(number),
             title: currentTask.title || "",
             question: text.question || "",
             description: text.description || "",

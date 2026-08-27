@@ -13,6 +13,53 @@ import Plusicon from "@/assets/general/plus.svg";
 import RandomIcon from "@/assets/general/random.svg";
 
 /**
+ * Открытая карточка второго дня.
+ *
+ * Полоса слева повторяет цвет тайла, который лежит у человека в руке: у детали
+ * один цвет луча, у узла и переходника два — как раскрашена грань стыка на
+ * картоне. Сверять номера глазами после этого не нужно, рука и экран говорят
+ * одно (ТЗ, раздел В9).
+ *
+ * Порядок чтения задан сверху вниз: номер, вопрос дня, ситуация, что сделать.
+ * Вопрос стоит вторым и набран крупнее остального — в 12:40 человек читает
+ * первые две строки, а не абзац.
+ */
+function Day2Card({ card }) {
+    const accent = card.accent?.length ? card.accent : ["#E5E7EB"];
+
+    return (
+        <div className="flex overflow-hidden rounded-[0.75rem] border border-gray-200">
+            <div className="flex w-[0.375rem] shrink-0 flex-col" aria-hidden="true">
+                {accent.map((color, index) => (
+                    <span key={`${color}-${index}`} className="flex-1" style={{ background: color }} />
+                ))}
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-[0.75rem] p-[1rem]">
+                <div className="flex flex-wrap items-baseline gap-x-[0.5rem] gap-y-[0.125rem]">
+                    <span className="text-lg font-semibold leading-none">{card.numberLabel}</span>
+                    {card.title && <span className="text-sm text-gray-500">{card.title}</span>}
+                </div>
+
+                {card.question && <span className="text-base leading-snug">{card.question}</span>}
+                {card.description && <span className="text-sm text-gray-500">{card.description}</span>}
+
+                {card.task && (
+                    <div className="flex flex-col gap-[0.25rem]">
+                        <span className="text-xs uppercase tracking-wide text-gray-400">Что сделать</span>
+                        <span className="text-sm">{card.task}</span>
+                    </div>
+                )}
+
+                {card.dueMidday && (
+                    <span className="text-sm text-gray-500">Готово, когда: {card.dueMidday}</span>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/**
  * Блок навигации второго дня.
  *
  * Заменяет собой «Задание №N» со стрелками. Отличий три: поле принимает текст,
@@ -75,20 +122,7 @@ function Day2TaskNav({ state, card, problem, onOpen, disabled }) {
                 <span className="text-sm" style={{ color: "var(--color-red)" }}>{problem}</span>
             )}
 
-            {card && (
-                <div className="flex flex-col gap-[0.4rem] rounded-[0.75rem] border border-gray-200 p-[0.75rem]">
-                    <span className="text-sm font-semibold">
-                        {formatDay2TaskNumber(card.number)}
-                        {card.title ? ` · ${card.title}` : ""}
-                    </span>
-                    {card.question && <span className="text-sm">{card.question}</span>}
-                    {card.description && <span className="text-sm text-gray-500">{card.description}</span>}
-                    {card.task && <span className="text-sm">{card.task}</span>}
-                    {card.dueMidday && (
-                        <span className="text-sm text-gray-500">Готово, когда: {card.dueMidday}</span>
-                    )}
-                </div>
-            )}
+            {card && <Day2Card card={card} />}
         </div>
     );
 }
