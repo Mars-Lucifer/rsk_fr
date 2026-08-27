@@ -28,6 +28,8 @@ const LOGOUT_CONFIRM_LABEL = "\u0412\u044B \u0443\u0432\u0435\u0440\u0435\u043D\
 const SAVE_PROFILE_LABEL = "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F";
 // \u0411\u043B\u043E\u043A \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u043E\u0432 \u041C\u0410\u042F\u041A \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u0441\u043D\u044F\u0442 \u0441\u043E \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B, \u0441\u043C. \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439 \u0443 \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0438.
 const SHOW_MAYAK_MATERIALS = false;
+// Блок «Переходы» снят со страницы, см. комментарий у разметки.
+const SHOW_PROFILE_SHORTCUTS = false;
 
 const MAYAK_FILE_LABELS = {
     certificate: "Сертификат",
@@ -303,9 +305,11 @@ export default function ProfileIndexPage({ goTo, initialEditing = false, initial
             />
 
             <div className="hero" style={{ gridTemplateRows: "repeat(3, auto)" }}>
-                {/* Организация уехала в форму выше; здесь остались только ссылки
-                    на карточку организации и команды. */}
-                {organizationLinkId || userData.data.team_id ? (
+                {/* Блок «Переходы» скрыт: организация и команда уже названы в форме
+                    выше, а ссылка на их страницы дублировала то же самое третьей
+                    строкой. Разметка оставлена целиком, включать обратно сменой
+                    флага SHOW_PROFILE_SHORTCUTS. */}
+                {SHOW_PROFILE_SHORTCUTS && (organizationLinkId || userData.data.team_id) ? (
                     <div className="block-wrapper col-span-12">
                         <h6>{"\u041F\u0435\u0440\u0435\u0445\u043E\u0434\u044B"}</h6>
                         <div className="flex flex-col gap-[0.75rem]">

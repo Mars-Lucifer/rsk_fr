@@ -147,7 +147,7 @@ export default function OrganizationPicker({ region = "", valueLabel = "", onSel
                 type="text"
                 id="org-search"
                 name="org-search"
-                placeholder={region ? "Начните вводить название или ИНН" : "Сначала выберите регион"}
+                placeholder="Начните вводить название или ИНН"
                 value={query}
                 disabled={disabled}
                 onChange={(event) => setQuery(event.target.value)}
@@ -182,7 +182,10 @@ export default function OrganizationPicker({ region = "", valueLabel = "", onSel
                             type="button"
                             onClick={() => pick(item)}
                             disabled={Boolean(pendingInn)}
-                            className="flex flex-col items-start justify-start! gap-[.125rem] p-[.75rem]! rounded-[.75rem] text-left transition"
+                            // items-start!, а не items-start: глобальное правило для button
+                            // центрует содержимое, и обе строки подсказки стояли по центру
+                            // карточки — список читался как набор заголовков, а не как строки.
+                            className="flex flex-col items-start! justify-start! gap-[.125rem] p-[.75rem]! rounded-[.75rem] text-left! transition"
                             style={{
                                 // Цвета задаём явно: глобальный стиль кнопки красит
                                 // подсказку в чёрное, и она выпадает из карточки.
@@ -191,10 +194,12 @@ export default function OrganizationPicker({ region = "", valueLabel = "", onSel
                                 border: "1.5px solid var(--color-gray-plus-50)",
                             }}>
                             <span className="link">{item.short_name || item.full_name}</span>
+                            {/* Откуда запись — из базы портала или из реестра — участнику
+                                знать незачем: выбор в обоих случаях один и тот же клик,
+                                а разница обрабатывается в pick(). */}
                             <span className="text-sm" style={{ color: "var(--color-gray-black)" }}>
                                 {item.inn ? `ИНН ${item.inn}` : ""}
                                 {item.region ? ` · ${item.region}` : ""}
-                                {item.source === "portal" ? " · уже в базе" : " · из реестра"}
                                 {item.is_main === false ? " · филиал" : ""}
                             </span>
                             {pendingInn === item.inn ? (
