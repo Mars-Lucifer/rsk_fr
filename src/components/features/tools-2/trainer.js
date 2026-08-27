@@ -2369,7 +2369,11 @@ export default function TrainerPage({ goTo }) {
                         rejectedComment={currentTaskReviewComment}
                         uploadLoading={sessionUploadLoading}
                         uploadError={sessionUploadError}
-                        canUseJoker={currentTaskIsWeDirection && jokerBalance > 0}
+                        canUseJoker={
+                            // Джокер во втором дне не выдаётся: пропустить проверку шва нельзя,
+                            // непроверенный шов всплывёт на сборке в 15:25, когда чинить некогда.
+                            !isDay2 && currentTaskIsWeDirection && jokerBalance > 0
+                        }
                         jokerBalance={jokerBalance}
                         onUseJoker={tokenType === "bypass" ? handleUseBypassJokerStar : handleUseJokerStar}
                         onClose={() => {
@@ -2382,7 +2386,7 @@ export default function TrainerPage({ goTo }) {
                     <TaskCompletionPopup
                         taskData={currentTaskData}
                         elapsedTime={timerState.readyElapsedTime}
-                        canUseJoker={tokenType === "bypass" && who === "we" && jokerBalance > 0}
+                        canUseJoker={!isDay2 && tokenType === "bypass" && who === "we" && jokerBalance > 0}
                         jokerBalance={jokerBalance}
                         onUseJoker={handleUseBypassJokerStar}
                         onClose={() => {

@@ -59,6 +59,14 @@ function normalizeDay2CardNumber(value) {
     return tens >= 1 && tens <= 3 && position >= 1 && position <= 6 ? parsed : 0;
 }
 
+// Партнёр по паре: 11+12, 13+14, 15+16, одинаково на всех трёх столах.
+// Партнёрство напечатано на картоне — сборка сессии его не выбирает, а получает
+// как данность, и сервер считает его из номера, а не хранит отдельно.
+function day2PartnerNumber(cardNumber) {
+    const number = normalizeDay2CardNumber(cardNumber);
+    return number ? day2KeysFor(number).partner : 0;
+}
+
 function getFileExtension(filename = "") {
     return path.extname(String(filename || "")).toLowerCase();
 }
@@ -313,6 +321,7 @@ function serializeReviewSummary(sessionId, review) {
         participantUserId: review.participantUserId,
         participantName: review.participantName,
         participantTableNumber: review.participantTableNumber,
+        participantCardNumber: review.participantCardNumber || null,
         reviewerTableNumber: review.reviewerTableNumber,
         taskKey: review.taskKey,
         taskNumber: review.taskNumber,
@@ -738,6 +747,10 @@ export async function createMayakSessionReview({
             participantUserId: participant.userId,
             participantName: participant.name,
             participantTableNumber: participant.tableNumber,
+            // Второй день адресует проверку не столу, а партнёру по паре, и
+            // номер должен лежать в самой заявке: участник может к моменту
+            // разбора уже уйти дальше по такту.
+            participantCardNumber: participant.cardNumber || null,
             reviewerTableNumber,
             taskKey,
             taskNumber: normalizeString(taskNumber),
@@ -794,11 +807,26 @@ export async function resolveMayakSessionReview({ sessionId, reviewId, inspector
 
         const inspector = bucket.participants?.[inspectorUserId];
         const debugSession = isDebugSession(session);
-        if (!inspector || (!debugSession && !isReviewerRole(inspector.role))) {
+        if (!inspector) {
             throw new Error("Проверку может выполнить только инспектор");
         }
-        if (!debugSession && inspector.inspectorTargetTable !== review.participantTableNumber) {
-            throw new Error("Этот инспектор не закреплён за выбранным столом");
+        // Второй день меняет не механику проверки, а её смысл: шов смотрит не
+        // назначенный инспектор, а партнёр по паре — тот, с чьей частью этот шов
+        // обязан сойтись (ТЗ, раздел В4). Роли во втором дне нет вообще.
+        if (!debugSession) {
+            if (isDay2Section(session?.sectionId)) {
+                const partner = day2PartnerNumber(inspector.cardNumber);
+                if (!partner || partner !== normalizeDay2CardNumber(review.participantCardNumber)) {
+                    throw new Error("Эту работу проверяет партнёр по паре");
+                }
+            } else {
+                if (!isReviewerRole(inspector.role)) {
+                    throw new Error("Проверку может выполнить только инспектор");
+                }
+                if (inspector.inspectorTargetTable !== review.participantTableNumber) {
+                    throw new Error("Этот инспектор не закреплён за выбранным столом");
+                }
+            }
         }
 
         const participant = bucket.participants?.[review.participantUserId];
@@ -874,18 +902,32 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
     }
 
     const blockingTask = getBlockingTaskState(participant);
-    // В debug-сессии (соло, 1 стол) очередь видна при любой роли: целевой стол
-    // проверки = собственный стол участника, иначе — закреплённый стол инспектора.
+    // Кого этот участник проверяет.
+    //
+    // Первый день: назначенного инспектора закрепляют за соседним столом.
+    // Второй день: роли нет, шов смотрит партнёр по паре — тот, с чьей частью
+    // он обязан сойтись (ТЗ, раздел В4).
+    // В debug-сессии (соло, один стол) оба правила сняты: очередь видна при
+    // любой роли и равна собственному столу, иначе соло-прогон не пройти.
     const debugSession = isDebugSession(session);
+    const day2Session = isDay2Section(session?.sectionId);
+    const day2Partner = day2Session ? day2PartnerNumber(participant.cardNumber) : 0;
     const queueTargetTable = participant.inspectorTargetTable || (debugSession ? participant.tableNumber : null);
-    const inspectorQueue =
-        queueTargetTable && (debugSession || isReviewerRole(participant.role))
-            ? Object.values(bucket.reviews || {})
-                  .filter((review) => review.status === "pending" && review.participantTableNumber === queueTargetTable)
-                  .filter((review) => isReviewReadyForInspector(review))
-                  .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
-                  .map((review) => serializeReviewSummary(sessionId, review))
-            : [];
+
+    const mayReview = day2Session && !debugSession
+        ? day2Partner > 0
+        : Boolean(queueTargetTable) && (debugSession || isReviewerRole(participant.role));
+    const belongsToQueue = day2Session && !debugSession
+        ? (review) => normalizeDay2CardNumber(review.participantCardNumber) === day2Partner
+        : (review) => review.participantTableNumber === queueTargetTable;
+
+    const inspectorQueue = mayReview
+        ? Object.values(bucket.reviews || {})
+              .filter((review) => review.status === "pending" && belongsToQueue(review))
+              .filter((review) => isReviewReadyForInspector(review))
+              .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+              .map((review) => serializeReviewSummary(sessionId, review))
+        : [];
 
     const taskStates = Object.values(participant.tasks || {})
         .sort((a, b) => (Number(a.taskIndex) || 0) - (Number(b.taskIndex) || 0))
