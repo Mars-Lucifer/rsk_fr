@@ -501,7 +501,7 @@ export default function IndexPage({ goTo }) {
                                 {copied ? "Скопировано!" : "Скопировать"}
                             </Button>
 
-                            <div className="flex flex-wrap lg:flex-nowrap gap-[0.5rem]">
+                            <div data-tour="services" className="flex flex-wrap lg:flex-nowrap gap-[0.5rem]">
                                 {!isMiscAccordionOpen &&
                                     (defaultLinks[type] || [])
                                         .slice()

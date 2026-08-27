@@ -26,6 +26,10 @@ import { createPortal } from "react-dom";
 const PAD = 8; // зазор между вырезом и краем цели
 const GAP = 14; // отступ карточки от выреза
 const CARD_W = 340;
+// Высота карточки до того, как она измерена: текст у шагов разный, и одной константы
+// не хватает. Карточка над целью отсчитывается от своей нижней кромки — с неверной
+// высотой она наезжала на то, что подсвечивает.
+const CARD_H = 200;
 const POLL_MS = 250;
 // Сколько ждать необязательную цель, прежде чем перешагнуть. Такие шаги описывают то,
 // что есть не у каждой карты: инструкция, доп.материал, источник. Без пропуска мастер
@@ -100,20 +104,20 @@ function rectOf(sel, frameSel, nth, match) {
 // Куда положить карточку. Снизу, если внизу есть место, иначе сверху; когда цель
 // занимает экран по высоте — сбоку. Считается по видимой области, а не по документу:
 // карточка не должна уезжать под сгиб.
-function placeCard(box, prefer) {
+function placeCard(box, prefer, cardH = CARD_H) {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    if (!box) return { left: Math.max(16, (vw - CARD_W) / 2), top: Math.max(16, vh / 2 - 120), arrow: null };
+    if (!box) return { left: Math.max(16, (vw - CARD_W) / 2), top: Math.max(16, vh / 2 - cardH / 2), arrow: null };
 
     const below = vh - box.bottom;
     const above = box.top;
-    const side = prefer && prefer !== "auto" ? prefer : below > 180 || below > above ? "bottom" : "top";
+    const side = prefer && prefer !== "auto" ? prefer : below > cardH + GAP || below > above ? "bottom" : "top";
 
     let left = box.left + box.width / 2 - CARD_W / 2;
     left = Math.min(Math.max(16, left), vw - CARD_W - 16);
 
     if (side === "left" || side === "right") {
-        const top = Math.min(Math.max(16, box.top), vh - 200);
+        const top = Math.min(Math.max(16, box.top), Math.max(16, vh - cardH - 16));
         return {
             left: side === "left" ? Math.max(16, box.left - CARD_W - GAP) : Math.min(vw - CARD_W - 16, box.right + GAP),
             top,
@@ -123,7 +127,7 @@ function placeCard(box, prefer) {
 
     return {
         left,
-        top: side === "bottom" ? box.bottom + GAP : Math.max(16, box.top - GAP - 190),
+        top: side === "bottom" ? box.bottom + GAP : Math.max(16, box.top - GAP - cardH),
         arrow: side === "bottom" ? "top" : "bottom",
     };
 }
@@ -132,6 +136,8 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     const [index, setIndex] = useState(0);
     const [box, setBox] = useState(null);
     const [ready, setReady] = useState(false);
+    const [cardH, setCardH] = useState(CARD_H);
+    const cardRef = useRef(null);
     const step = steps[Math.min(index, steps.length - 1)] || null;
     const selRef = useRef("");
     const frameRef = useRef("");
@@ -278,9 +284,16 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
         if (open) setIndex(0);
     }, [open]);
 
+    // Реальная высота карточки: у шагов текст разной длины, и разница доходит до сотни
+    // пикселей. Меряем после отрисовки шага — до неё высоты ещё нет.
+    useEffect(() => {
+        const measured = cardRef.current?.offsetHeight;
+        if (measured && Math.abs(measured - cardH) > 1) setCardH(measured);
+    });
+
     if (!open || !step || typeof document === "undefined") return null;
 
-    const card = placeCard(box, step.place);
+    const card = placeCard(box, step.place, cardH);
     const waiting = step.wait ?? (step.sel ? "click" : "next");
     const hole = box
         ? {
@@ -306,7 +319,7 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
                 <div className="veil" />
             )}
 
-            <div className="card" style={{ left: card.left, top: card.top }}>
+            <div className="card" ref={cardRef} style={{ left: card.left, top: card.top }}>
                 {card.arrow ? <span className={`arrow ${card.arrow}`} /> : null}
 
                 <div className="head">
