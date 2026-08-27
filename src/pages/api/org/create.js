@@ -1,4 +1,5 @@
 import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+import { shouldUseLocalProfileMock } from "@/lib/localProfileMock";
 
 // Создание организации по выбранной подсказке. Передаём только ИНН: название,
 // регион и тип берутся из реестра на бэкенде, поэтому подменить их нельзя.
@@ -9,7 +10,9 @@ export default async function CreateOrg(req, res) {
     }
 
     const token = req.cookies.users_access_token;
-    if (!token) {
+    // Под локальным мок-профилем портальной куки нет, и выбор организации из
+    // реестра упирался в «No token provided» — проверить сценарий было нельзя.
+    if (!token && !shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing: true })) {
         return res.status(401).json({ success: false, error: "No token provided" });
     }
 

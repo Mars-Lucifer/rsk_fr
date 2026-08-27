@@ -14,6 +14,11 @@ export default async function SuggestOrgs(req, res) {
 
     try {
         const params = new URLSearchParams({ query, count: String(req.query.count || 10) });
+        // Регион сужает подсказки по названию на стороне реестра.
+        const region = String(req.query.region || "").trim();
+        if (region) {
+            params.append("region", region);
+        }
         const response = await fetch(`${PORTAL_API_BASE}/orgs/organizations/suggest?${params.toString()}`, {
             headers: {
                 Accept: "application/json",

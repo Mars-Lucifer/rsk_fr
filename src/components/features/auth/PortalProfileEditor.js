@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import Button from "@/components/ui/Button";
@@ -6,10 +6,10 @@ import Input from "@/components/ui/Input/Input";
 import Textarea from "@/components/ui/Textarea";
 import DropdownInput from "@/components/ui/Input/DropdownInput";
 import Switcher from "@/components/ui/Switcher";
-import { getPortalOrganizationId } from "@/lib/portalProfile";
+import { getPortalOrganizationId, getPortalOrganizationLabel } from "@/lib/portalProfile";
 import StudentIcon from "@/assets/general/cours_les.svg";
 import StaffIcon from "@/assets/general/persons.svg";
-import OrgRegistrySearch from "@/components/features/auth/OrgRegistrySearch";
+import OrganizationPicker from "@/components/features/auth/OrganizationPicker";
 import { primePortalProfileCache } from "@/lib/portalProfileClient";
 import { removeCookie, setCookie } from "@/utils/cookies";
 
@@ -48,28 +48,38 @@ function Field({ label, children }) {
 
 // Тип профиля карточками, а не переключателем: у каждого варианта есть
 // пояснение, и промахнуться сложнее.
-function RoleCard({ value, current, onSelect, title, Icon }) {
+function RoleCard({ value, current, onSelect, title, Icon, iconViewBox, disabled = false }) {
     const isActive = current === value;
     return (
         <button
             type="button"
+            disabled={disabled}
             onClick={() => onSelect(value)}
-            className="flex items-center gap-[0.75rem] p-[1rem] rounded-[0.75rem] text-left transition"
+            // justify-start! перебивает глобальное правило для button
+            // (justify-content: center): из-за него иконки двух карточек стояли
+            // на разной вертикали — блок съезжал вслед за длиной подписи.
+            className="flex items-center justify-start! gap-[0.75rem] p-[1rem]! rounded-[0.75rem] text-left transition"
             style={{
                 border: `1.5px solid ${isActive ? "var(--color-blue)" : "var(--color-gray-plus-50)"}`,
                 background: isActive ? "var(--color-blue-noise)" : "transparent",
+                cursor: disabled ? "default" : "pointer",
+                opacity: disabled && !isActive ? 0.55 : 1,
             }}>
-            {Icon ? <Icon style={{ width: "1.75rem", height: "1.75rem", flexShrink: 0, color: isActive ? "var(--color-blue)" : "var(--color-gray-white)" }} /> : null}
+            {/* viewBox задаём руками: svgr прогоняет иконки через svgo, тот по
+                умолчанию вырезает viewBox, и растянутый до 1.5rem svg рисует
+                содержимое в исходном масштабе (16 и 14 px) в углу бокса —
+                иконки выходят разного размера и не по центру. */}
+            {Icon ? (
+                <span className="flex items-center justify-center shrink-0" style={{ width: "1.5rem", height: "1.5rem", color: isActive ? "var(--color-blue)" : "var(--color-gray-white)" }}>
+                    <Icon viewBox={iconViewBox} preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "100%", display: "block" }} />
+                </span>
+            ) : null}
             {/* Цвет задаём явно: у неактивной карточки текст сливался с фоном. */}
             <span className="big" style={{ fontWeight: 600, color: "var(--color-black)" }}>
                 {title}
             </span>
         </button>
     );
-}
-
-function resolveSelectedOrganization(orgList, organizationId) {
-    return orgList.find((item) => String(item.id ?? item.organization_id ?? "") === String(organizationId || "")) || null;
 }
 
 export default function PortalProfileEditor({
@@ -81,24 +91,35 @@ export default function PortalProfileEditor({
     description = "",
     showDescription = false,
     showRole = false,
+    readOnly = false,
+    headerSlot = null,
 }) {
     const initialState = useMemo(() => buildInitialFormState(profilePayload), [profilePayload]);
     const profileData = getProfileData(profilePayload);
+    const organizationLabel = getPortalOrganizationLabel(profilePayload) || "";
 
     const [formData, setFormData] = useState(initialState);
     const [region, setRegion] = useState(initialState.Region);
     const [role, setRole] = useState(initialState.role);
-    const [orgList, setOrgList] = useState([]);
+    // Выбранная организация целиком, а не только id: после сохранения нужно
+    // показать её название, не ходя за ним ещё раз.
+    const currentOrgOption = useMemo(() => {
+        const id = getPortalOrganizationId(profilePayload);
+        const label = getPortalOrganizationLabel(profilePayload);
+        return id && label ? { id: String(id), short_name: label } : null;
+    }, [profilePayload]);
+    const [selectedOrg, setSelectedOrg] = useState(currentOrgOption);
     const [isSaving, setIsSaving] = useState(false);
     const [orgFieldTyped, setOrgFieldTyped] = useState(false);
-    const orgDropdownRef = useRef(null);
+    const selectedOrganizationLabel = selectedOrg?.short_name || selectedOrg?.full_name || organizationLabel;
 
     useEffect(() => {
         setFormData(initialState);
         setRegion(initialState.Region);
         setRole(initialState.role);
         setOrgFieldTyped(false);
-    }, [initialState]);
+        setSelectedOrg(currentOrgOption);
+    }, [initialState, currentOrgOption]);
 
     const isDirty = useMemo(() => {
         return (
@@ -113,36 +134,6 @@ export default function PortalProfileEditor({
         );
     }, [formData, initialState, orgFieldTyped, role]);
 
-    useEffect(() => {
-        if (!region) {
-            setOrgList([]);
-            return undefined;
-        }
-
-        let cancelled = false;
-        const loadOrganizations = async () => {
-            try {
-                const response = await fetch(`/api/org/all?region=${encodeURIComponent(region)}`, {
-                    credentials: "include",
-                });
-                const payload = await response.json().catch(() => ({}));
-                if (!cancelled) {
-                    setOrgList(payload.success ? payload.data || [] : []);
-                }
-            } catch (error) {
-                if (!cancelled) {
-                    console.error("Failed to load organizations:", error);
-                    setOrgList([]);
-                }
-            }
-        };
-
-        loadOrganizations();
-        return () => {
-            cancelled = true;
-        };
-    }, [region]);
-
     const updateField = (name, value) => {
         setFormData((prev) => ({
             ...prev,
@@ -151,13 +142,10 @@ export default function PortalProfileEditor({
     };
 
     const handleSubmit = async () => {
-        let organizationField = formData.Organization;
-        if (orgDropdownRef.current && typeof orgDropdownRef.current.commitPendingValue === "function") {
-            const committed = orgDropdownRef.current.commitPendingValue();
-            if (committed !== undefined && committed !== null) {
-                organizationField = committed;
-            }
-        }
+        // Организация теперь только выбирается из выдачи поиска, руками её
+        // не вписать — значит и «дожимать» набранный текст перед отправкой
+        // больше нечего.
+        const organizationField = formData.Organization;
 
         const orgStrRequired = String(organizationField ?? "").trim();
         if (!formData.Surname?.trim() || !formData.NameIRL?.trim() || !orgStrRequired) {
@@ -209,8 +197,8 @@ export default function PortalProfileEditor({
         const orgIdRaw = String(organizationField ?? "").trim();
         const orgIdNum = Number.parseInt(orgIdRaw, 10);
         let selectedOrganization =
-            orgChanged && Number.isFinite(orgIdNum) && orgIdNum >= 1
-                ? resolveSelectedOrganization(orgList, orgIdNum)
+            orgChanged && Number.isFinite(orgIdNum) && orgIdNum >= 1 && String(selectedOrg?.id ?? "") === String(orgIdNum)
+                ? selectedOrg
                 : null;
         if (
             orgChanged &&
@@ -245,10 +233,6 @@ export default function PortalProfileEditor({
             if (!response.ok) {
                 alert(payload?.error || "Не удалось сохранить профиль.");
                 return;
-            }
-
-            if (orgChanged && selectedOrganization == null && Number.isFinite(orgIdNum) && orgIdNum >= 1) {
-                selectedOrganization = resolveSelectedOrganization(orgList, orgIdNum);
             }
 
             const nextData = {
@@ -300,19 +284,13 @@ export default function PortalProfileEditor({
         }
     };
 
-    const handleOrgFromRegistry = (org) => {
+    const handleOrganizationSelected = (org) => {
         const id = org?.id ?? org?.organization_id;
         if (!id) return;
 
-        setOrgList((prev) => (prev.some((item) => String(item.id) === String(id)) ? prev : [...prev, org]));
+        setSelectedOrg({ ...org, id: String(id) });
         updateField("Organization", String(id));
         setOrgFieldTyped(true);
-        // Регион берём из реестра: он обязателен для команды, а руками участник
-        // впишет его иначе, чем в справочнике.
-        if (org.region) {
-            setRegion(org.region);
-            setFormData((prev) => ({ ...prev, Region: org.region }));
-        }
     };
 
     const content = (
@@ -321,7 +299,10 @@ export default function PortalProfileEditor({
                 Раньше всё шло одной узкой лентой, и на широком экране форма
                 занимала треть ширины, а поиск организации терялся между полями. */}
             <div className="flex flex-col gap-[1.25rem] p-[1.5rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ background: "var(--color-white)", border: "1.5px solid var(--color-gray-plus-50)" }}>
-                <h5>{title || "Профиль"}</h5>
+                <div className="flex items-center justify-between gap-[1rem]">
+                    <h5>{title || "Профиль"}</h5>
+                    {headerSlot}
+                </div>
                 {description ? (
                     <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
                         {description}
@@ -332,18 +313,18 @@ export default function PortalProfileEditor({
                     {/* Левая колонка — человек */}
                     <div className="flex flex-col gap-[0.75rem]">
                         <Field label="Фамилия">
-                            <Input type="text" name="Surname" placeholder="Введите фамилию" value={formData.Surname} onChange={(event) => updateField("Surname", event.target.value)} required />
+                            <Input type="text" name="Surname" placeholder="Введите фамилию" value={formData.Surname} onChange={(event) => updateField("Surname", event.target.value)} disabled={readOnly} required />
                         </Field>
                         <Field label="Имя">
-                            <Input type="text" name="NameIRL" placeholder="Введите имя" value={formData.NameIRL} onChange={(event) => updateField("NameIRL", event.target.value)} required />
+                            <Input type="text" name="NameIRL" placeholder="Введите имя" value={formData.NameIRL} onChange={(event) => updateField("NameIRL", event.target.value)} disabled={readOnly} required />
                         </Field>
                         <Field label="Отчество">
-                            <Input type="text" name="Patronymic" placeholder="Введите отчество" value={formData.Patronymic} onChange={(event) => updateField("Patronymic", event.target.value)} />
+                            <Input type="text" name="Patronymic" placeholder="Введите отчество" value={formData.Patronymic} onChange={(event) => updateField("Patronymic", event.target.value)} disabled={readOnly} />
                         </Field>
 
                         {showDescription ? (
                             <Field label="О себе">
-                                <Textarea inverted name="Description" placeholder="Краткое описание поможет другим участникам лучше вас узнать" value={formData.Description} onChange={(event) => updateField("Description", event.target.value)} />
+                                <Textarea inverted name="Description" placeholder="Краткое описание поможет другим участникам лучше вас узнать" value={formData.Description} onChange={(event) => updateField("Description", event.target.value)} disabled={readOnly} />
                             </Field>
                         ) : null}
 
@@ -353,33 +334,20 @@ export default function PortalProfileEditor({
                                     Тип профиля
                                 </span>
                                 <div className="grid grid-cols-2 gap-[0.75rem] max-[640px]:grid-cols-1">
-                                    <RoleCard value="student" current={role} onSelect={setRole} title="Студент" Icon={StudentIcon} />
-                                    <RoleCard value="teacher" current={role} onSelect={setRole} title="Сотрудник" Icon={StaffIcon} />
+                                    <RoleCard value="student" current={role} onSelect={setRole} title="Студент" Icon={StudentIcon} iconViewBox="0 0 16 16" disabled={readOnly} />
+                                    <RoleCard value="teacher" current={role} onSelect={setRole} title="Сотрудник" Icon={StaffIcon} iconViewBox="0 0 14 14" disabled={readOnly} />
                                 </div>
                             </div>
                         ) : null}
-
-                        <Field label="Организация">
-                            <DropdownInput
-                                ref={orgDropdownRef}
-                                id="Organization"
-                                name="Organization"
-                                placeholder={region ? "Начните вводить название" : "Сначала выберите регион справа"}
-                                value={formData.Organization}
-                                options={orgList}
-                                onChange={(event) => updateField("Organization", event.target.value)}
-                                onQueryChange={() => setOrgFieldTyped(true)}
-                                disabled={!region}
-                            />
-                        </Field>
                     </div>
 
-                    {/* Правая колонка — как найти организацию: сначала регион,
-                        он сужает список слева, потом поиск по ИНН для тех,
-                        кого в списке нет. */}
+                    {/* Правая колонка — организация целиком: где человек учится
+                        или работает, и всё, чем это меняют. Раньше поле
+                        «Организация» стояло слева, а искали её справа — две
+                        половины одного действия в разных углах формы. */}
                     <div className="flex flex-col gap-[1.25rem]">
                         <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
-                            <h6>Поиск организации</h6>
+                            <h6>Организация</h6>
 
                             <Field label="Регион">
                                 <DropdownInput
@@ -397,33 +365,43 @@ export default function PortalProfileEditor({
                                         }));
                                     }}
                                     src="/data/regions.txt"
+                                    disabled={readOnly}
                                 />
                             </Field>
 
-                            <hr style={{ borderColor: "var(--color-gray-plus-50)" }} />
+                            {/* В просмотре берём название прямо из профиля:
+                                поиск ищет по базе и реестру, а показать нужно
+                                то, что уже сохранено. */}
+                            {readOnly ? (
+                                <Field label="Организация">
+                                    <Input type="text" name="OrganizationLabel" value={organizationLabel} placeholder="Не указана" disabled readOnly />
+                                </Field>
+                            ) : (
+                                <>
+                                    <Field label="Организация">
+                                        <OrganizationPicker region={region} valueLabel={selectedOrganizationLabel} onSelected={handleOrganizationSelected} disabled={!region} />
+                                    </Field>
 
-                            <Field label="Нет в списке? Найдите по ИНН">
-                                {/* Список в базе неполный, и без этого участник
-                                    из непопавшего колледжа не двигается дальше. */}
-                                <OrgRegistrySearch showHint={false} onSelected={handleOrgFromRegistry} />
-                            </Field>
-
-                            <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                                Если организации нет ни в списке, ни в реестре, заполните{" "}
-                                <Link target="_blank" className="text-(--color-blue)" href="https://forms.yandex.ru/u/690391e1068ff0a3ba625eef">
-                                    форму
-                                </Link>
-                                .
-                            </p>
+                                    <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
+                                        Ищем и среди уже заведённых организаций, и в реестре ФНС. Если организации нет нигде, заполните{" "}
+                                        <Link target="_blank" className="text-(--color-blue)" href="https://forms.yandex.ru/u/690391e1068ff0a3ba625eef">
+                                            форму
+                                        </Link>
+                                        .
+                                    </p>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-[1rem] pt-[0.25rem] max-[640px]:flex-col max-[640px]:items-stretch">
-                    <Button className="w-fit! max-[640px]:w-full!" onClick={handleSubmit} disabled={isSaving || !isDirty}>
-                        {isSaving ? "Сохранение..." : submitLabel}
-                    </Button>
-                </div>
+                {readOnly ? null : (
+                    <div className="flex items-center gap-[1rem] pt-[0.25rem] max-[640px]:flex-col max-[640px]:items-stretch">
+                        <Button className="w-fit! max-[640px]:w-full!" onClick={handleSubmit} disabled={isSaving || !isDirty}>
+                            {isSaving ? "Сохранение..." : submitLabel}
+                        </Button>
+                    </div>
+                )}
             </div>
         </>
     );

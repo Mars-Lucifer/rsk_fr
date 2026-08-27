@@ -41,7 +41,10 @@ const DropdownInput = forwardRef(function DropdownInput(
                 {...props}
             />
             {showDropdown && (
-                <div className="dropdown-wrapper">
+                // mousedown по варианту гасим: иначе input теряет фокус, handleBlur
+                // закрывает список, вариант размонтируется — и click по нему уже
+                // некому обработать. Выбор мышью просто не срабатывал.
+                <div className="dropdown-wrapper" onMouseDown={(event) => event.preventDefault()}>
                     <div className="dropdown" style={{ transition: "opacity 0.25s, transform 0.25s", opacity: 1, transform: "translateY(0)" }}>
                         {filtered.map((item) => (
                             <p key={item.value} onClick={() => handleSelect(item)} className="cursor-pointer hover:bg-gray-100 px-2 py-1">
