@@ -1887,6 +1887,9 @@ export default function TrainerPage({ goTo }) {
                             ))}
                         </Switcher>
                     </div>
+                    {/* data-tour="fields": вводный шаг разбора подсвечивает все семь полей
+                        разом, а не первое — обёртка объединяет обе группы. */}
+                    <div data-tour="fields" className="flex flex-col gap-[1.25rem]">
                     <div className="flex flex-col gap-[0.5rem]">
                         <div className="flex justify-between items-center">
                             <span className="big">Цели и целевая направленность</span>
@@ -1923,6 +1926,7 @@ export default function TrainerPage({ goTo }) {
                                 savedField={savedField}
                             />
                         ))}
+                    </div>
                     </div>
                 </div>
                 <div className="mt-4 flex w-full flex-col gap-2">

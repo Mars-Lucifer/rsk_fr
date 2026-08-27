@@ -436,7 +436,7 @@ export default function IndexPage({ goTo }) {
                             </div>
 
                             {/* Остальная часть формы */}
-                            <div className="flex flex-col gap-[1.25rem]">
+                            <div data-tour="fields" className="flex flex-col gap-[1.25rem]">
                                 <div className="flex flex-col gap-[0.5rem]">
                                     <div className="flex justify-between items-center">
                                         <span className="big">Цели и целевая направленность</span>
