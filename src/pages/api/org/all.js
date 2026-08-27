@@ -1,9 +1,14 @@
 import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+import { shouldUseLocalProfileMock } from "@/lib/localProfileMock";
 
 export default async function orgAll(req, res) {
     try {
         const token = req.cookies.users_access_token || req.headers.authorization?.replace('Bearer ', '');
-        if (!token) {
+        // Сам реестр организаций у бэкенда открытый — токен здесь требует только
+        // этот прокси. Под локальным мок-профилем портальной куки нет, и список
+        // организаций в форме профиля оставался пустым: проверить выбор было
+        // нечем. В обычном режиме требование токена не меняется.
+        if (!token && !shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing: true })) {
             return res.status(401).json({ success: false, error: "No token provided" });
         }
 
