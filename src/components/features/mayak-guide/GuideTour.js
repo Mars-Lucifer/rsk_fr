@@ -65,6 +65,15 @@ function frameOffset(frameSel) {
 // N-я подходящая цель. Нужна там, где селектора на одну штуку не существует: в тренажёре
 // ряд кнопок сервисов размечен теми же классами, что ряд «Начать задание», и отличаются
 // они только порядком. Городить ради этого атрибуты в чужой странице — дороже.
+// Невидимая цель — не цель. У страницы есть скрытые двойники: мобильная раскладка
+// рендерится рядом с десктопной и лежит в DOM с нулевым размером. Подсветка вставала
+// на такой двойник, и шаг про «Создать запрос» ждал кнопку, которая на экране была.
+function visible(node) {
+    if (!node) return false;
+    const box = node.getBoundingClientRect();
+    return box.width >= 1 || box.height >= 1;
+}
+
 function pick(scope, sel, nth = 0, match = "") {
     if (!scope || !sel) return null;
     // Поиск по надписи. В тренажёре кнопки задания различаются только текстом: классы у
@@ -72,13 +81,16 @@ function pick(scope, sel, nth = 0, match = "") {
     // собраны Tailwind'ом из утилит. Текст на кнопке — то же, что видит мастер, и меняется
     // он вместе со смыслом кнопки, а не при перевёрстке.
     if (match) {
-        const wanted = match.toLowerCase();
-        const all = [...scope.querySelectorAll(sel)];
-        const hit = all.filter((node) => node.textContent.trim().toLowerCase().includes(wanted));
+        // Пробелы приводим к одному виду: в вёрстке между словами стоит &nbsp;
+        // («Создать запрос»), и поиск по надписи с обычным пробелом не находил
+        // ничего — шаг про сборку промта висел в ожидании кнопки, видимой на экране.
+        const norm = (text) => text.replace(/\s+/g, " ").trim().toLowerCase();
+        const wanted = norm(match);
+        const hit = [...scope.querySelectorAll(sel)].filter((node) => norm(node.textContent).includes(wanted) && visible(node));
         return hit[nth] || null;
     }
-    if (!nth) return scope.querySelector(sel);
-    return scope.querySelectorAll(sel)[nth] || null;
+    const all = [...scope.querySelectorAll(sel)].filter(visible);
+    return all[nth] || null;
 }
 
 function rectOf(sel, frameSel, nth, match) {

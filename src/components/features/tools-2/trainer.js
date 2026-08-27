@@ -2119,10 +2119,8 @@ export default function TrainerPage({ goTo }) {
                     {!isContestMode && (
                         <Button
                             icon
-                            roundeful
                             disabled={timerState.isRunning}
-                            className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                            className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
                             onClick={handleOpenHistory}
                             title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
                             <TimeIcon className="w-[18px] h-[18px] text-slate-700 block" />
@@ -2131,10 +2129,8 @@ export default function TrainerPage({ goTo }) {
                     {isAdmin && (
                         <Button
                             icon
-                            roundeful
                             disabled={timerState.isRunning}
-                            className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                            className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
                             onClick={handleAdminResetSession}
                             title={timerState.isRunning ? "Недоступно во время выполнения задания" : "Сбросить сессию (админ)"}>
                             <svg className="w-[18px] h-[18px] text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
