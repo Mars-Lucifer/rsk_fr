@@ -1,5 +1,6 @@
 import { normalizePortalProfile } from "@/lib/portalProfile";
 import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+import { readLocalProfileMock, shouldUseLocalProfileMock } from "@/lib/localProfileMock";
 
 export class PortalProfileRequestError extends Error {
     constructor(message, status = 500) {
@@ -69,4 +70,26 @@ export async function fetchPortalProfileFromRequest(req) {
         payload,
         profile: normalizePortalProfile(payload),
     };
+}
+
+// Тот же ответ, что отдаёт /api/profile/info, но без похода по HTTP: нужен
+// getServerSideProps, чтобы страница приезжала с данными и не мигала
+// «Загружаем профиль...». Возвращает null, если профиля нет или сессия чужая —
+// решение, куда отправлять пользователя, принимает вызывающий.
+export async function resolveProfilePayloadForRequest(req) {
+    try {
+        if (shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing: true })) {
+            const localProfile = await readLocalProfileMock();
+            return { success: true, data: localProfile.data, userId: localProfile.userId, isMock: true };
+        }
+
+        const { payload } = await fetchPortalProfileFromRequest(req);
+        return { success: true, data: payload };
+    } catch (error) {
+        if (error instanceof PortalProfileRequestError) {
+            return null;
+        }
+        console.error("Profile SSR: failed to resolve profile:", error);
+        return null;
+    }
 }

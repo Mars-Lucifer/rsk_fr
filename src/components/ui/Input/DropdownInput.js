@@ -6,7 +6,7 @@ const DropdownInput = forwardRef(function DropdownInput(
     ref
 ) {
     const dropdownRef = useRef(null);
-    const { inputValue, filtered, showDropdown, handleInput, handleSelect, setShowDropdown, handleEnter, handleBlur, commitPendingValue } =
+    const { inputValue, filtered, showDropdown, handleInput, handleSelect, setShowDropdown, handleEnter, handleBlur, commitPendingValue, openDropdown } =
         useDropdownFilter(controlledValue, onChange, src, name, options, onQueryChange);
 
     useImperativeHandle(ref, () => ({ commitPendingValue }), [commitPendingValue]);
@@ -33,14 +33,18 @@ const DropdownInput = forwardRef(function DropdownInput(
                 value={inputValue}
                 onChange={(e) => handleInput(e.target.value)}
                 onBlur={handleBlur}
-                onFocus={() => inputValue && setShowDropdown(true)}
+                onFocus={() => !props.disabled && openDropdown()}
+                onClick={() => !props.disabled && openDropdown()}
                 onKeyDown={handleKeyDown}
                 autoComplete="off"
                 name={name}
                 {...props}
             />
             {showDropdown && (
-                <div className="dropdown-wrapper">
+                // mousedown по варианту гасим: иначе input теряет фокус, handleBlur
+                // закрывает список, вариант размонтируется — и click по нему уже
+                // некому обработать. Выбор мышью просто не срабатывал.
+                <div className="dropdown-wrapper" onMouseDown={(event) => event.preventDefault()}>
                     <div className="dropdown" style={{ transition: "opacity 0.25s, transform 0.25s", opacity: 1, transform: "translateY(0)" }}>
                         {filtered.map((item) => (
                             <p key={item.value} onClick={() => handleSelect(item)} className="cursor-pointer hover:bg-gray-100 px-2 py-1">

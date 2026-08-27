@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export function useDropdownFilter(controlledValue, onChange, src, name, options, onQueryChange) {
     const [inputValue, setInputValue] = useState("");
     const [items, setItems] = useState([]);
     const [filtered, setFiltered] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
+    // Выбранный вариант исчезает из DOM прямо во время обработки клика, и
+    // браузер добивает событие по элементу под курсором — то есть по самому
+    // полю. Его onClick открывал список заново: значение выбрано, а список
+    // снова висит, будто выбор не сработал. Флаг съедает ровно этот клик.
+    const skipNextOpenRef = useRef(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -46,6 +51,13 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
                 frameId = requestAnimationFrame(() => {
                     setInputValue(match.label);
                 });
+            } else if (!options) {
+                // Справочник из текстового файла: значение и есть подпись.
+                // Регион, которого нет в regions.txt (старая запись, ручной
+                // ввод), иначе показывался пустым полем — как будто не заполнен.
+                frameId = requestAnimationFrame(() => {
+                    setInputValue(String(controlledValue));
+                });
             }
         } else if (!controlledValue) {
             frameId = requestAnimationFrame(() => {
@@ -58,7 +70,7 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
                 cancelAnimationFrame(frameId);
             }
         };
-    }, [controlledValue, items]);
+    }, [controlledValue, items, options]);
 
     const handleInput = (val) => {
         setInputValue(val);
@@ -71,6 +83,24 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
         }
         const matches = items.filter((i) => String(i.label).toLowerCase().includes(val.toLowerCase()));
         setFiltered(matches);
+        setShowDropdown(true);
+    };
+
+    // Открыть список без ввода: пользователю нужно уметь пролистать варианты,
+    // а не угадывать первую букву. Раньше список появлялся только при наборе,
+    // и заполненное поле выглядело как тупик.
+    const openDropdown = () => {
+        if (skipNextOpenRef.current) {
+            skipNextOpenRef.current = false;
+            return;
+        }
+        const query = String(inputValue || "").trim().toLowerCase();
+        // Значение в поле — уже выбранный вариант, а не поисковый запрос:
+        // фильтровать по нему нельзя, иначе список схлопывается в одну строку
+        // и соседний регион не выбрать, не стерев поле руками.
+        const isPickedValue = items.some((i) => String(i.label).toLowerCase() === query);
+        const matches = query && !isPickedValue ? items.filter((i) => String(i.label).toLowerCase().includes(query)) : items;
+        setFiltered(matches.length > 0 ? matches : items);
         setShowDropdown(true);
     };
 
@@ -121,6 +151,7 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
     }, [controlledValue, inputValue, items, name, onChange]);
 
     const handleSelect = (item) => {
+        skipNextOpenRef.current = true;
         setInputValue(item.label);
         setShowDropdown(false);
         onChange?.({ target: { name, value: item.value } });
@@ -145,6 +176,7 @@ export function useDropdownFilter(controlledValue, onChange, src, name, options,
     return {
         inputValue,
         filtered,
+        openDropdown,
         showDropdown,
         setShowDropdown,
         handleInput,
