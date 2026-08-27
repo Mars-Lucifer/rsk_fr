@@ -2042,7 +2042,7 @@ export default function TrainerPage({ goTo }) {
         <ContestLessonsProvider>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
-                <HowTo screen="trainer" />
+                <HowTo screen="trainer" tasks={tasks} onPickTask={goToTask} minIndex={allowedMinIndex} maxIndex={allowedMaxIndex} />
                 {isContestMode && <ContestLessonStepper />}
                 {effectiveTableNumber ? (
                     <div className="inline-flex items-center justify-center !rounded-full border border-slate-200 bg-white !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
