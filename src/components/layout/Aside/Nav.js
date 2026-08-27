@@ -25,7 +25,11 @@ const BASE_NAV_LINKS = [
             { label: "Моя команда", href: "/teams/my" },
         ],
     },
-    { label: "Организации", disable: false, login: true, learn: false, href: "/organizations", icon: dynamic(() => import("@/assets/nav/organ.svg")) },
+    // Один раздел на всё: справочник колледжей из государственных реестров и
+    // участие в конкурсе — это одни и те же организации, ключ у них общий (ИНН).
+    // Без входа: сведения реестров открытые, абитуриенту они нужны до всякой
+    // регистрации, а метрики конкурса на карточке появляются только у участников.
+    { label: "Организации", disable: false, login: false, learn: false, href: "/organizations", icon: dynamic(() => import("@/assets/nav/organ.svg")) },
     { label: "Проекты", disable: false, login: true, learn: true, href: "/projects", icon: dynamic(() => import("@/assets/nav/projects.svg")) },
     { label: "Маяк Око", href: "/tools/mayak-oko", login: false, learn: false, icon: dynamic(() => import("@/assets/nav/inst.svg")) },
     { label: "Тренажер МАЯК", href: "/tools/mayak-trainer#overview", login: false, learn: false, icon: dynamic(() => import("@/assets/nav/mayak-trainer.svg")) },

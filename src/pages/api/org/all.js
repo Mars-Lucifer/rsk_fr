@@ -1,9 +1,14 @@
 import { PORTAL_API_BASE } from "@/lib/portalApiBase";
+import { shouldUseLocalProfileMock } from "@/lib/localProfileMock";
 
 export default async function orgAll(req, res) {
     try {
         const token = req.cookies.users_access_token || req.headers.authorization?.replace('Bearer ', '');
-        if (!token) {
+        // Сам реестр организаций у бэкенда открытый — токен здесь требует только
+        // этот прокси. Под локальным мок-профилем портальной куки нет, и список
+        // организаций в форме профиля оставался пустым: проверить выбор было
+        // нечем. В обычном режиме требование токена не меняется.
+        if (!token && !shouldUseLocalProfileMock(req, { fallbackWhenAuthMissing: true })) {
             return res.status(401).json({ success: false, error: "No token provided" });
         }
 
@@ -20,7 +25,9 @@ export default async function orgAll(req, res) {
         // Валидация параметров
         const validSortBy = ['name', 'members'].includes(sort_by) ? sort_by : 'name';
         const validOrder = ['asc', 'desc'].includes(order) ? order : 'asc';
-        const validLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 200);
+        // Потолок поднят с 200: в справочнике 4163 колледжа, и в Москве их 206 —
+        // на прежнем пределе список организаций региона обрывался молча.
+        const validLimit = Math.min(Math.max(parseInt(limit) || 50, 1), 1000);
         const validOffset = Math.max(parseInt(offset) || 0, 0);
 
         // Формируем URL с параметрами
