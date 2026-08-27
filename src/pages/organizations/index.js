@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 
 import Header from "@/components/layout/Header";
 import Layout from "@/components/layout/Layout";
+import DropdownInput from "@/components/ui/Input/DropdownInput";
 
 import { listEduOrgs, countEduOrgs, listEduRegions, getEduSourceDate, EduRegistryMissingError } from "@/lib/eduRegistry";
 
@@ -210,27 +211,23 @@ export default function OrganizationsPage(props) {
                                         className="w-full"
                                     />
                                 </div>
-                                {/* Родной datalist вместо выпадающего списка: печатаешь
-                                    «Моск» — подсказки появляются сразу, и выдача сужается,
-                                    не дожидаясь выбора из списка. Введённое сводится к
-                                    настоящим названиям субъектов в фасаде. */}
-                                <div className="input-wrapper w-[20rem] max-[640px]:w-full">
-                                    <input
-                                        type="text"
+                                {/* Портальный DropdownInput вместо родного datalist: тот
+                                    рисуется средствами ОС и к остальной странице отношения
+                                    не имеет. onQueryChange оставляет прежнее поведение —
+                                    набрал «Моск», выдача сузилась, не дожидаясь выбора из
+                                    списка. Введённое сводится к настоящим названиям
+                                    субъектов в фасаде. */}
+                                <div className="w-[20rem] max-[640px]:w-full">
+                                    <DropdownInput
                                         id="edu-region"
                                         name="region"
-                                        list="edu-regions"
-                                        autoComplete="off"
-                                        value={region}
-                                        onChange={(event) => change(setRegion)(event.target.value)}
                                         placeholder="Регион"
+                                        value={region}
+                                        options={regions}
+                                        onQueryChange={change(setRegion)}
+                                        onChange={(event) => change(setRegion)(event.target.value)}
                                         className="w-full"
                                     />
-                                    <datalist id="edu-regions">
-                                        {regions.map((item) => (
-                                            <option key={item} value={item} />
-                                        ))}
-                                    </datalist>
                                 </div>
                             </form>
 
