@@ -64,7 +64,8 @@ import MasterDashboardLink from "./MasterDashboardLink";
 
 // Второй день. Всё, что ниже, включается только на секции второго дня
 // (isDay2Section по слогу): первый день этих веток не видит.
-import { isDay2Section, findDay2TaskIndex, day2AccentColors } from "@/lib/mayakDay2Mode";
+import { isDay2Section, findDay2TaskIndex } from "@/lib/mayakDay2Mode";
+import { day2AccentColors } from "@/lib/mayakDay2Palette";
 import { parseDay2Input } from "@/lib/mayakDay2Input";
 import { computeDay2Takt, canOpenDay2 } from "@/lib/mayakDay2Takt";
 
@@ -170,7 +171,7 @@ export default function TrainerPage({ goTo }) {
 
     // Второй день: свой номер тайла и последний отказ разбора. Оба живут только
     // в режиме второго дня, первый день их не читает.
-    const [day2Number, setDay2Number] = useState(null);
+    const [day2NumberDraft, setDay2NumberDraft] = useState(null);
     const [day2Problem, setDay2Problem] = useState(null);
 
     const isMobile = useMediaQuery("(max-width: 1023px)");
@@ -1787,8 +1788,12 @@ export default function TrainerPage({ goTo }) {
     // убраны, подпись показывает такт, кнопка оценки промпта скрыта (ТЗ В5 —
     // именно скрыта, не заблокирована). Сам флаг `isDay2` объявлен выше.
     //
-    // Свой номер участник называет сам, набрав его в первый раз: в бою он придёт
-    // из регистрации за столом, а до неё держится в этой же вкладке.
+    // Свой номер участник называет сам, набрав его в первый раз, — и номер
+    // закрепляется за ним НА СЕРВЕРЕ. Пока он жил только во вкладке, стол
+    // участник назначал себе сам первым набором, и проверка «это чужой стол»
+    // сравнивала его выбор с его же выбором. Черновик рядом нужен ровно на
+    // время между ответом сервера и следующим опросом состояния, а в bypass
+    // без сессии он единственный источник.
     const day2Tasks = useMemo(
         () => (sessionRuntimeState?.participant?.taskStates || []).map((ts) => ({
             key: String(ts.taskNumber || ""),
@@ -1796,6 +1801,8 @@ export default function TrainerPage({ goTo }) {
         })),
         [sessionRuntimeState?.participant?.taskStates]
     );
+
+    const day2Number = Number(sessionRuntimeState?.participant?.cardNumber) || day2NumberDraft;
 
     const day2State = useMemo(
         () => (isDay2 && day2Number ? computeDay2Takt({ myNumber: day2Number, tasks: day2Tasks }) : null),
@@ -1826,19 +1833,53 @@ export default function TrainerPage({ goTo }) {
         };
     }, [isDay2, day2Number, currentTask, tasksTexts]);
 
-    const openDay2 = (raw) => {
+    // Закрепить номер тайла за участником. Сервер проверяет диапазон, стол и то,
+    // что сосед не взял этот же номер, и его отказ показывается как есть —
+    // человеку в зале нужна причина, а не «не получилось».
+    const claimDay2Number = async (number) => {
+        if (!runtimeSessionId || !activeUserId) {
+            setDay2NumberDraft(number);
+            return true;
+        }
+        try {
+            const response = await fetch("/api/mayak/session-runtime/card-number", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId: runtimeSessionId, userId: activeUserId, cardNumber: number }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.success) {
+                setDay2Problem(payload?.error || "Не удалось закрепить номер тайла");
+                return false;
+            }
+            setDay2NumberDraft(number);
+            refreshSessionRuntimeState();
+            return true;
+        } catch (error) {
+            setDay2Problem("Сеть не отвечает. Наберите номер ещё раз");
+            return false;
+        }
+    };
+
+    const openDay2 = async (raw) => {
         const parsed = parseDay2Input(raw);
         if (!parsed.ok) {
             setDay2Problem(parsed.hint);
             return;
         }
-        // Первый набранный номер детали и становится своим.
-        const state = day2State
-            || (parsed.kind === "detail" ? computeDay2Takt({ myNumber: Number(parsed.key), tasks: day2Tasks }) : null);
-        if (!state) {
+        // Первый набранный номер детали и становится своим — на сервере.
+        let myNumber = day2Number;
+        if (!myNumber && parsed.kind === "detail") {
+            if (!(await claimDay2Number(Number(parsed.key)))) {
+                return;
+            }
+            myNumber = Number(parsed.key);
+        }
+        if (!myNumber) {
             setDay2Problem("Сначала наберите номер своей детали");
             return;
         }
+        const state = computeDay2Takt({ myNumber, tasks: day2Tasks });
         const allowed = canOpenDay2({ state, parsed });
         if (!allowed.ok) {
             setDay2Problem(allowed.hint);
@@ -1852,7 +1893,6 @@ export default function TrainerPage({ goTo }) {
             setDay2Problem(`Карточки ${parsed.key} нет в этой секции`);
             return;
         }
-        if (parsed.kind === "detail") setDay2Number(Number(parsed.key));
         setDay2Problem(null);
         guardedGoToTask(index);
     };

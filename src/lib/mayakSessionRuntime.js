@@ -6,6 +6,8 @@ import { completeMayakSession, getMayakSessionById } from "@/lib/mayakSessions";
 import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 import { convertToPdf, logLibreOffice } from "@/lib/libreofficeConverter";
 import { pickRandomMissionForRole } from "@/lib/mayakSecretMissions";
+import { isDay2Section } from "@/lib/mayakDay2Mode";
+import { day2KeysFor } from "@/lib/mayakDay2Takt";
 
 const SESSION_RUNTIME_FILE = path.join(process.cwd(), "data", "mayak-session-runtime.json");
 const SESSION_FILES_ROOT = path.join(process.cwd(), "data", "mayak-session-files");
@@ -41,6 +43,20 @@ function isReviewerRole(role) {
 
 function buildTaskKey(taskNumber) {
     return String(taskNumber || "").trim();
+}
+
+// Второй день: номер тайла, который человек держит в руках. Это не
+// идентификатор, а координата в сборке — десяток задаёт стол, позиция задаёт
+// луч и партнёра по паре. Рабочих номеров восемнадцать: 11-16, 21-26, 31-36.
+// Центры 10, 20, 30 — место сборки стола, их в руки не берут.
+function normalizeDay2CardNumber(value) {
+    const parsed = parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return 0;
+    }
+    const tens = Math.floor(parsed / 10);
+    const position = parsed % 10;
+    return tens >= 1 && tens <= 3 && position >= 1 && position <= 6 ? parsed : 0;
 }
 
 function getFileExtension(filename = "") {
@@ -345,6 +361,10 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
             tableNumber: normalizedTableNumber,
             role: existing.role || "",
             inspectorTargetTable: existing.inspectorTargetTable || null,
+            // Номер тайла второго дня. У сессий, которые уже лежат на диске,
+            // поля нет — дефолт обязателен, иначе ensureSessionBucket отдаст
+            // undefined и участник во втором дне окажется без стола.
+            cardNumber: existing.cardNumber || null,
             registeredAt: existing.registeredAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             tasks: existing.tasks || {},
@@ -357,6 +377,68 @@ export async function registerMayakSessionParticipant({ sessionId, userId, name,
             secretMission: existing.secretMission || null,
         };
         return bucket.participants[userId];
+    });
+}
+
+/**
+ * Второй день: закрепить за участником номер его тайла.
+ *
+ * До этого номер жил только в состоянии вкладки: человек называл его сам первым
+ * набором, и проверка «это чужой стол» сравнивала его выбор с его же выбором.
+ * Стол, партнёр по паре и содержимое командного экрана считаются из номера,
+ * поэтому он обязан лежать на сервере.
+ */
+export async function setMayakSessionParticipantCardNumber({ sessionId, userId, cardNumber }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+    if (!isDay2Section(session.sectionId)) {
+        throw new Error("Номер тайла есть только во втором дне");
+    }
+
+    const number = normalizeDay2CardNumber(cardNumber);
+    if (!number) {
+        throw new Error("Такого тайла нет. Номера идут 11–16, 21–26, 31–36");
+    }
+
+    const debugSession = isDebugSession(session);
+
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
+        }
+        if (participant.cardNumber === number) {
+            return participant;
+        }
+
+        // Сменить номер можно, пока по нему ничего не сдано. Иначе такт
+        // пересчитается по чужой истории, и человек окажется в третьем такте,
+        // не сделав ни одной детали.
+        if (participant.cardNumber && Object.keys(participant.tasks || {}).length) {
+            throw new Error("Номер уже нельзя сменить: по нему есть сданные задания");
+        }
+
+        // Стол задаёт тайл, а не выбор на входе: на столе лежат только свои шесть
+        // номеров, взять чужой можно лишь встав из-за стола. В debug-сессии стол
+        // один, и это ограничение сделало бы её непроходимой — там оно снято,
+        // ровно как снят запрет на чужую проверку.
+        const table = Math.floor(number / 10);
+        if (!debugSession && table !== normalizeTableNumber(participant.tableNumber)) {
+            throw new Error(`Тайл ${number} лежит на столе ${table}, а вы за столом ${participant.tableNumber}`);
+        }
+
+        const takenByAnother = Object.values(bucket.participants || {}).find(
+            (candidate) => candidate.userId !== userId && candidate.cardNumber === number
+        );
+        if (takenByAnother) {
+            throw new Error(`Тайл ${number} уже взят за этим столом`);
+        }
+
+        participant.cardNumber = number;
+        participant.updatedAt = new Date().toISOString();
+        return participant;
     });
 }
 
