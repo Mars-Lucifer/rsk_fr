@@ -46,7 +46,7 @@ export default function InstructionPreviewPanel({ previewFileUrl, previewTitle, 
     };
 
     return (
-        <div className="flex h-full min-h-[320px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div data-tour="card-panel" className="flex h-full min-h-[320px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2">
                 <div className="min-w-0">
                     <h6 className="text-black !text-base leading-tight">{title}</h6>

@@ -2042,16 +2042,17 @@ export default function TrainerPage({ goTo }) {
         <ContestLessonsProvider>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
-                <HowTo screen="trainer" tasks={tasks} onPickTask={goToTask} minIndex={allowedMinIndex} maxIndex={allowedMaxIndex} />
                 {isContestMode && <ContestLessonStepper />}
+                {/* Высота и радиус — как у соседних icon-кнопок (40px / 12px): три формы
+                    в одном ряду (круглые пилюли, квадраты, овалы) читались как беспорядок. */}
                 {effectiveTableNumber ? (
-                    <div className="inline-flex items-center justify-center !rounded-full border border-slate-200 bg-white !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
+                    <div className="inline-flex items-center justify-center !rounded-xl border border-slate-200 bg-white !px-3 !h-10 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
                         Стол №{effectiveTableNumber}
                     </div>
                 ) : null}
                 {selectedRole && (
                     <div style={{ position: "relative" }} className="role-tooltip-wrap">
-                        <div className="inline-flex items-center justify-center !rounded-full border border-blue-200 bg-blue-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-blue-700 whitespace-nowrap cursor-default">
+                        <div className="inline-flex items-center justify-center !rounded-xl border border-blue-200 bg-blue-50 !px-3 !h-10 leading-none text-sm font-semibold text-blue-700 whitespace-nowrap cursor-default">
                             {selectedRole}
                         </div>
                         <div
@@ -2094,20 +2095,20 @@ export default function TrainerPage({ goTo }) {
                     <button
                         type="button"
                         onClick={() => setShowBypassMenu((prev) => !prev)}
-                        className="inline-flex items-center justify-center gap-1 !rounded-full border border-amber-200 !bg-amber-100 hover:!bg-amber-200 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold !text-amber-700 cursor-pointer transition-colors !shadow-none !w-auto !flex-initial flex-shrink-0 whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-1 !rounded-xl border border-amber-200 !bg-amber-100 hover:!bg-amber-200 !px-3 !h-10 leading-none text-sm font-semibold !text-amber-700 cursor-pointer transition-colors !shadow-none !w-auto !flex-initial flex-shrink-0 whitespace-nowrap"
                     >
                         <span className="leading-none">⚙️</span>
                         <span className="leading-none">Отладка</span>
                     </button>
                 )}
                 {sessionRuntimeState?.participant?.yaDirection && (
-                    <div className="inline-flex items-center justify-center !rounded-full border border-teal-200 bg-teal-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-teal-700 whitespace-nowrap capitalize cursor-default">
+                    <div className="inline-flex items-center justify-center !rounded-xl border border-teal-200 bg-teal-50 !px-3 !h-10 leading-none text-sm font-semibold text-teal-700 whitespace-nowrap capitalize cursor-default">
                         Направление: {sessionRuntimeState.participant.yaDirection}
                     </div>
                 )}
                 {jokerBalance > 0 && (
                     <div
-                        className="inline-flex items-center justify-center gap-1 !rounded-full border border-rose-200 bg-rose-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-rose-700 whitespace-nowrap cursor-default"
+                        className="inline-flex items-center justify-center gap-1 !rounded-xl border border-rose-200 bg-rose-50 !px-3 !h-10 leading-none text-sm font-semibold text-rose-700 whitespace-nowrap cursor-default"
                         title="Звёзды-джокеры: мгновенно засчитывают задание части «Мы» без инспектора">
                         <svg className="w-4 h-4 flex-shrink-0 text-red-500 fill-red-500 drop-shadow-[0_0_3px_rgba(239,68,68,0.6)]" viewBox="0 0 24 24">
                             <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
@@ -2116,6 +2117,9 @@ export default function TrainerPage({ goTo }) {
                     </div>
                 )}
                 <div className="flex items-center gap-2 ml-auto">
+                    {/* «?» стоит в правом блоке, после «Отладки»: слева от него — состояние
+                        сессии (стол, роль), справа — действия. Разбор — действие. */}
+                    <HowTo screen="trainer" tasks={tasks} onPickTask={goToTask} minIndex={allowedMinIndex} maxIndex={allowedMaxIndex} />
                     {!isContestMode && (
                         <Button
                             icon
@@ -2145,7 +2149,7 @@ export default function TrainerPage({ goTo }) {
                         <Button
                             inverted
                             roundeful
-                            className="inline-flex items-center justify-center !rounded-full !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                            className="inline-flex items-center justify-center !rounded-xl !px-3 !h-10 leading-none !text-sm whitespace-nowrap"
                             onClick={() => { window.location.href = "/cours"; }}>
                             Вернуться&nbsp;к&nbsp;урокам
                         </Button>
@@ -2153,7 +2157,7 @@ export default function TrainerPage({ goTo }) {
                         <Button
                             inverted
                             roundeful
-                            className="inline-flex items-center justify-center !rounded-full !bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                            className="inline-flex items-center justify-center !rounded-xl !bg-(--color-red-noise) !text-(--color-red) !px-3 !h-10 leading-none !text-sm whitespace-nowrap"
                             onClick={handleCompleteSession}>
                             Завершить&nbsp;сессию
                         </Button>
@@ -2203,8 +2207,11 @@ export default function TrainerPage({ goTo }) {
                 {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />}
                 <InstructionImageModal instructionModal={instructionModal} onClose={handleCloseInstructionModal} />
             </div>
+            {/* Демо-режим мастера (adminBypass) минует отправку инспектору: мастер
+                смотрит устройство тренажёра, сдавать ему некому, и окно загрузки
+                материала только сбивало с толку при разборе. */}
             {showCompletionPopup &&
-                (isSessionMode && !isIntroTask(currentTaskIndex) ? (
+                (isSessionMode && !isAdmin && !isIntroTask(currentTaskIndex) ? (
                     <SessionTaskReviewPopup
                         taskData={currentTaskData}
                         elapsedTime={formatTaskTime(timerState.readyElapsedTime ?? timerState.elapsedTime ?? 0)}

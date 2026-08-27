@@ -93,7 +93,7 @@ function pick(scope, sel, nth = 0, match = "") {
     return all[nth] || null;
 }
 
-function rectOf(sel, frameSel, nth, match) {
+function rectOf(sel, frameSel, nth, match, frac) {
     if (!sel) return null;
     const scope = docOf(frameSel);
     const node = pick(scope, sel, nth, match);
@@ -103,14 +103,32 @@ function rectOf(sel, frameSel, nth, match) {
     // вырезать дырку в пустом месте — для шага это то же самое, что цели ещё нет.
     if (box.width < 1 && box.height < 1) return null;
     const shift = frameOffset(frameSel);
+    let { left, top, width, height } = box;
+    // Доля цели вместо целой: [x, y, w, h] в долях от рамки. Нужна для картинок —
+    // номер и знак «?» напечатаны в углах карты задания, и своих DOM-узлов у них нет.
+    if (Array.isArray(frac) && frac.length === 4) {
+        left += width * frac[0];
+        top += height * frac[1];
+        width *= frac[2];
+        height *= frac[3];
+    }
     return {
-        left: box.left + shift.x,
-        top: box.top + shift.y,
-        right: box.right + shift.x,
-        bottom: box.bottom + shift.y,
-        width: box.width,
-        height: box.height,
+        left: left + shift.x,
+        top: top + shift.y,
+        right: left + width + shift.x,
+        bottom: top + height + shift.y,
+        width,
+        height,
     };
+}
+
+// Вторая цель шага (step.also) — для шагов-соответствий: «номер на карте — тот же,
+// что в поле ввода». Двумя дырками через box-shadow не обойтись — тени закрыли бы
+// вырезы друг друга, — поэтому при also затемнение рисуется SVG-маской.
+function rectOfAlso(also) {
+    if (!also) return null;
+    const spec = typeof also === "string" ? { sel: also } : also;
+    return rectOf(spec.sel, spec.frame, spec.nth, spec.match, spec.frac);
 }
 
 // Куда положить карточку. Снизу, если внизу есть место, иначе сверху; когда цель
@@ -147,6 +165,7 @@ function placeCard(box, prefer, cardH = CARD_H) {
 export default function GuideTour({ steps, open, onClose, onFinish, title = "Инструкция" }) {
     const [index, setIndex] = useState(0);
     const [box, setBox] = useState(null);
+    const [boxAlso, setBoxAlso] = useState(null);
     const [ready, setReady] = useState(false);
     const [cardH, setCardH] = useState(CARD_H);
     const cardRef = useRef(null);
@@ -155,10 +174,14 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     const frameRef = useRef("");
     const nthRef = useRef(0);
     const matchRef = useRef("");
+    const fracRef = useRef(null);
+    const alsoRef = useRef(null);
     selRef.current = step?.sel || "";
     frameRef.current = step?.frame || "";
     nthRef.current = step?.nth || 0;
     matchRef.current = step?.match || "";
+    fracRef.current = step?.frac || null;
+    alsoRef.current = step?.also || null;
 
     const finish = useCallback(() => {
         onFinish?.();
@@ -184,8 +207,9 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
     useEffect(() => {
         if (!open) return undefined;
         const measure = () => {
-            const next = rectOf(selRef.current, frameRef.current, nthRef.current, matchRef.current);
+            const next = rectOf(selRef.current, frameRef.current, nthRef.current, matchRef.current, fracRef.current);
             setBox(next);
+            setBoxAlso(rectOfAlso(alsoRef.current));
             setReady(!selRef.current || Boolean(next));
         };
         measure();
@@ -307,14 +331,17 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
 
     const card = placeCard(box, step.place, cardH);
     const waiting = step.wait ?? (step.sel ? "click" : "next");
-    const hole = box
-        ? {
-              left: box.left - PAD,
-              top: box.top - PAD,
-              width: box.width + PAD * 2,
-              height: box.height + PAD * 2,
-          }
-        : null;
+    const pad = (rect) =>
+        rect
+            ? {
+                  left: rect.left - PAD,
+                  top: rect.top - PAD,
+                  width: rect.width + PAD * 2,
+                  height: rect.height + PAD * 2,
+              }
+            : null;
+    const hole = pad(box);
+    const holeAlso = pad(boxAlso);
 
     // Подсказка рендерится порталом в body, а не там, где стоит кнопка. Кнопка живёт
     // в шапке, и без портала карточка оказывалась потомком <header>: её собственные
@@ -324,8 +351,25 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
         <div className="tour" role="dialog" aria-label={title}>
             {/* Затемнение с дыркой. Дырка — не вырез в маске, а элемент с гигантской
                 тенью наружу: так подсветка не перехватывает клик по цели, а именно
-                клик и засчитывает шаг. */}
-            {hole ? (
+                клик и засчитывает шаг. Когда у шага две цели (also), тени не годятся —
+                они закрывают вырезы друг друга, — и затемнение рисуется SVG-маской
+                с двумя дырками и отдельными рамками. */}
+            {hole && holeAlso ? (
+                <>
+                    <svg className="veilSvg" width="100%" height="100%" aria-hidden="true">
+                        <defs>
+                            <mask id="guide-tour-mask">
+                                <rect x="0" y="0" width="100%" height="100%" fill="#fff" />
+                                <rect x={hole.left} y={hole.top} width={hole.width} height={hole.height} rx="12" fill="#000" />
+                                <rect x={holeAlso.left} y={holeAlso.top} width={holeAlso.width} height={holeAlso.height} rx="12" fill="#000" />
+                            </mask>
+                        </defs>
+                        <rect x="0" y="0" width="100%" height="100%" fill="rgba(10, 14, 18, 0.62)" mask="url(#guide-tour-mask)" />
+                    </svg>
+                    <div className="ring" style={hole} />
+                    <div className="ring" style={holeAlso} />
+                </>
+            ) : hole ? (
                 <div className="hole" style={hole} />
             ) : (
                 <div className="veil" />
@@ -397,6 +441,18 @@ export default function GuideTour({ steps, open, onClose, onFinish, title = "И�
                     outline: 2px solid #ffd166;
                     outline-offset: 0;
                     transition: left 0.18s ease, top 0.18s ease, width 0.18s ease, height 0.18s ease;
+                }
+                .veilSvg {
+                    position: fixed;
+                    inset: 0;
+                    pointer-events: none;
+                }
+                .ring {
+                    position: fixed;
+                    border-radius: 12px;
+                    outline: 2px solid #ffd166;
+                    outline-offset: 0;
+                    pointer-events: none;
                 }
                 .card {
                     position: fixed;

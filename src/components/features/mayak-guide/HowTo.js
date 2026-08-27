@@ -50,7 +50,10 @@ export default function HowTo({
                 не главное действие экрана. Что за кнопка, объясняет всплывающая подпись.
                 Размер берётся у штатной icon-кнопки: своя разметка давала квадрат
                 на 36 пикселей рядом с соседями на 44. */}
-            <Button icon type="button" className="howto" onClick={start} title={hint} aria-label={label}>
+            {/* Размер инлайном: штатная icon-кнопка растягивается по высоте строки
+                (height: 100%), и в узком ряду шапки тренажёра «?» сжимался до 33px
+                рядом с соседями на 42. Инлайн-стиль не проигрывает каскаду. */}
+            <Button icon type="button" className="howto" style={{ width: 42, height: 42, flex: "none" }} onClick={start} title={hint} aria-label={label}>
                 <span className="howto-glyph">?</span>
             </Button>
 
