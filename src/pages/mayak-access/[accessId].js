@@ -334,11 +334,6 @@ export default function MayakDelegatedAccessPage() {
         return `${window.location.origin}/mayak-master/${String(masterSecret).trim()}`;
     };
 
-    // Демонстрация берётся из самой свежей сессии: её мастер-ссылка ведёт в демо-тренажёр
-    // с колодой этого доступа. Пока своей сессии нет — нет и карточки демонстрации,
-    // и инструкция сначала доводит мастера до создания.
-    const demoUrl = sessions.length ? buildMasterLink(sessions[0]?.links?.masterSecret) : "";
-
     if (!isUnlocked && restoring) {
         return (
             <Layout style={layoutStyle}>
@@ -486,24 +481,10 @@ export default function MayakDelegatedAccessPage() {
                     <span style={guideActionStyle}>Открыть →</span>
                 </a>
 
-                {/* Демонстрация тренажёра прямо здесь. Это та же страница, что открывается
-                    по мастер-ссылке, только не в новой вкладке: мастер смотрит, как всё
-                    устроено, не теряя консоль и не тратя входы участников. Инструкция
-                    целится внутрь этого окна — страница своя, документ доступен. */}
-                {demoUrl ? (
-                    <a data-tour="demo-open" href={demoUrl} target="_blank" rel="noreferrer" style={guideCardStyle}>
-                        <span style={guideCardTextStyle}>
-                            <span style={eyebrowStyle}>Демонстрация</span>
-                            <span style={guideTitleStyle}>Тренажёр МАЯК с колодой</span>
-                            <span style={guideTextStyle}>
-                                Откроется ваш демо-тренажёр. В шапке там кнопка со знаком вопроса — разбор экрана по шагам
-                                на вашем же задании. Такая кнопка есть у каждого, кто зашёл по ссылке.
-                            </span>
-                        </span>
-                        <span style={guideActionStyle}>Открыть →</span>
-                    </a>
-                ) : null}
-
+                {/* Отдельной карточки «Демонстрация» больше нет: разбор «Как это
+                    работает» зашит в сам тренажёр кнопкой «?» в шапке, и демо
+                    открывается мастер-ссылкой из карточки сессии. Дублирующая
+                    карточка только удлиняла страницу. */}
                 {materials.length ? (
                     <section data-tour="materials" style={materialsPanelStyle}>
                         <h2 style={panelTitleStyle}>Материалы</h2>
