@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import Button from "@/components/ui/Button";
 import CloseIcon from "@/assets/general/close.svg";
+import { formatDay2TaskNumber } from "@/lib/mayakDay2Mode";
 
 const REJECT_REASON_OPTIONS = [
     { value: "mismatch", label: "Результат не соответствует задаче", comment: "Результат не соответствует задаче" },
@@ -134,7 +135,7 @@ export function SessionTaskReviewPopup({ taskData, elapsedTime, rejectedComment,
             <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
                     <div>
-                        <h3 className="text-xl font-bold">Загрузить материал по заданию №{taskData.number}</h3>
+                        <h3 className="text-xl font-bold">Загрузить материал по заданию №{formatDay2TaskNumber(taskData.number)}</h3>
                         <p className="mt-1 text-sm text-slate-500">Время выполнения: {elapsedTime}</p>
                     </div>
                     <Button icon className="!bg-transparent !text-black hover:!bg-black/5" onClick={onClose}>
@@ -302,7 +303,10 @@ function RejectReasonPicker({ onRejectPreset, onCancelOther, loading }) {
 }
 
 export function InspectorReviewModal({ review, loading, error, onApprove, onReject, onClose }) {
-    const title = useMemo(() => `Проверка задания №${review?.taskNumber || ""}`, [review?.taskNumber]);
+    const title = useMemo(
+        () => `Проверка задания №${formatDay2TaskNumber(review?.taskNumber || "")}`,
+        [review?.taskNumber]
+    );
     const remainingSeconds = useRemainingSeconds(review?.expiresAt, review?.remainingSeconds || 0);
     const progress = buildProgress(remainingSeconds, review?.durationSeconds || review?.remainingSeconds || 120);
     const [showRejectOptions, setShowRejectOptions] = useState(false);
@@ -492,7 +496,7 @@ export function SessionReviewStatusBanner({ taskNumber, status, comment, expires
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <div className="font-semibold">Задание №{taskNumber} на проверке</div>
+                    <div className="font-semibold">Задание №{formatDay2TaskNumber(taskNumber)} на проверке</div>
                     <div className="mt-1 text-blue-700">Ожидаем решение инспектора.</div>
                 </div>
                 <div className="shrink-0 rounded-full bg-white/80 px-3 py-1 font-semibold text-blue-900">{formatRemaining(liveRemainingSeconds)}</div>

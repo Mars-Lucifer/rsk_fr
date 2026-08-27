@@ -11,6 +11,72 @@ import CopyIcon from "@/assets/general/copy.svg";
 import Plusicon from "@/assets/general/plus.svg";
 import RandomIcon from "@/assets/general/random.svg";
 
+/**
+ * Блок навигации второго дня.
+ *
+ * Заменяет собой «Задание №N» со стрелками. Отличий три: поле принимает текст,
+ * а не только цифры; ходить по колоде некуда, поэтому стрелок нет; подпись
+ * показывает такт, а не номер задания. Отказ разбора пишется тут же — участник
+ * в зале должен понять, что делать, без ведущего.
+ */
+function Day2TaskNav({ state, problem, onOpen, disabled }) {
+    const [value, setValue] = useState("");
+    // Отказ относится к тому, что набрали, а не к полю вообще: «сначала сдайте
+    // деталь 13» обязан исчезнуть, как только человек начал править ввод.
+    // Иначе он висит поверх уже открывшегося такта и читается как поломка.
+    const [asked, setAsked] = useState("");
+
+    const submit = (event) => {
+        event.preventDefault();
+        setAsked(value);
+        onOpen(value);
+    };
+
+    return (
+        <div className="flex flex-col gap-[0.75rem]">
+            <div className="flex items-center justify-between w-full gap-[0.5rem]">
+                <span className="text-sm font-medium">{state ? state.label : "Такт 1 · деталь"}</span>
+                <div className="flex items-center gap-[0.25rem]">
+                    {[1, 2, 3].map((i) => (
+                        <span
+                            key={i}
+                            className="inline-block w-[1.5rem] h-[0.3rem] rounded-full"
+                            style={{ background: state && i <= state.index ? "var(--color-black)" : "#E5E7EB" }}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            <span className="text-sm text-gray-500">
+                {!state && "Наберите номер своей детали с тайла."}
+                {state?.takt === "DETAIL" && `Партнёр — ${state.partner}. Соединяетесь после обеда.`}
+                {state?.takt === "NODE" && `Ваш узел — ${state.node.replace("-", " ")}. Не сошлось — так и наберите.`}
+                {state?.takt === "PRODUCT" && "Изделие открывается словом стола."}
+            </span>
+
+            <form onSubmit={submit} className="flex items-center gap-[0.5rem]">
+                <div className="flex-1 min-w-0">
+                    <Input
+                        type="text"
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        placeholder="13 · 13 14 · 13 14 не сошлось · среда"
+                        className="!h-10"
+                        disabled={disabled}
+                    />
+                </div>
+                <Button className="!w-auto !h-10 !px-[1.25rem]" type="submit" disabled={disabled}>
+                    Открыть
+                </Button>
+            </form>
+
+            {problem && value === asked && (
+                <span className="text-sm" style={{ color: "var(--color-red)" }}>{problem}</span>
+            )}
+        </div>
+    );
+}
+
 export const ROLE_DESCRIPTIONS = {
     ЛЕТОПИСЕЦ: "Превращает рабочий процесс в историю. Фиксирует не только факты, но и эмоции команды. Делает фото и видео ярких моментов, создает итоговый ролик о пути команды.",
     Инспектор: "Страж качества и правил. Следит за объективностью оценки, анализирует работу соседних команд и предоставляет им аргументированную обратную связь.",
@@ -122,6 +188,10 @@ const EyeClosedIcon = () => (
     </svg>
 );
 export const TrainerControls = memo(function TrainerControls({
+    isDay2,
+    day2State,
+    day2Problem,
+    onDay2Open,
     who,
     taskVersion,
     currentTaskIndex,
@@ -203,7 +273,11 @@ export const TrainerControls = memo(function TrainerControls({
                 </div>
             )}
 
-            {(isSessionMode || tokenType === "bypass") && who === "im" && yaProgress && (
+            {/* Счётчик «0 из 4» — прогресс автомата ПЕРВОГО дня
+                (START → CONTENT_TYPES → …). У второго дня свой автомат из трёх
+                состояний, и его подпись стоит в блоке навигации. Два прогресса
+                на одном экране противоречили бы друг другу. */}
+            {!isDay2 && (isSessionMode || tokenType === "bypass") && who === "im" && yaProgress && (
                 <div className="flex flex-col gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 relative">
                     <div className="flex justify-between items-center text-xs font-semibold text-slate-600">
                         <span className="flex items-center gap-1 flex-wrap">
@@ -303,7 +377,18 @@ export const TrainerControls = memo(function TrainerControls({
 
             <div className="flex flex-col gap-[0.75rem]">
                 {isContestMode && <ContestLessonPanel />}
-                {!isContestMode && <div className="flex flex-col gap-[0.75rem]">
+                {/* Второй день: вместо ходьбы по колоде — одно текстовое поле.
+                    Участник набирает то, что видит на тайле: 13 · 13 14 ·
+                    13 14 не сошлось · среда. Стрелок нет: деталь у него одна. */}
+                {!isContestMode && isDay2 && (
+                    <Day2TaskNav
+                        state={day2State}
+                        problem={day2Problem}
+                        onOpen={onDay2Open}
+                        disabled={isTaskRunning || isTaskNavigationLocked}
+                    />
+                )}
+                {!isContestMode && !isDay2 && <div className="flex flex-col gap-[0.75rem]">
                     <div className="flex items-center justify-between w-full">
                         <div className="flex items-center gap-[0.5rem]">
                             <span className="text-sm text-gray-500">Задание №{tasks.length > 0 && tasks[currentTaskIndex] ? tasks[currentTaskIndex].number || currentTaskIndex + 1 : 0}</span>
@@ -440,7 +525,10 @@ export const TrainerControls = memo(function TrainerControls({
                             </Button>
                         </span>
                     )}
-                    {!isContestMode && isCurrentTaskRoleSelection && who === "im" && (
+                    {/* Роль во втором дне не выбирают: она задана номером тайла —
+                        это луч участника. А инспектор здесь не назначенная роль,
+                        а партнёр по паре (ТЗ В4). */}
+                    {!isContestMode && !isDay2 && isCurrentTaskRoleSelection && who === "im" && (
 
                             <span className="w-full" title={!canAccessTaskResources ? "Сначала начните задание" : ""}>
                                 <Button inverted onClick={onShowRolePopup} disabled={!canAccessTaskResources} className={`w-full ${!canAccessTaskResources ? "opacity-50 cursor-not-allowed" : ""}`}>

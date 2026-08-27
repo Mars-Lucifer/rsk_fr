@@ -62,6 +62,12 @@ import { useMayakPopupState } from "./hooks/useMayakPopupState";
 import { useMayakTypeUiState } from "./hooks/useMayakTypeUiState";
 import MasterDashboardLink from "./MasterDashboardLink";
 
+// Второй день. Всё, что ниже, включается только на секции второго дня
+// (isDay2Section по слогу): первый день этих веток не видит.
+import { isDay2Section, findDay2TaskIndex } from "@/lib/mayakDay2Mode";
+import { parseDay2Input } from "@/lib/mayakDay2Input";
+import { computeDay2Takt, canOpenDay2 } from "@/lib/mayakDay2Takt";
+
 const TRAINER_PREFIX = "trainer_v2"; // Уникальный префикс для этого тренажера
 const PREVIEW_WIDTH_MIN = 320;
 const PREVIEW_WIDTH_MAX = 560;
@@ -70,7 +76,7 @@ const MAX_SESSION_SUBMISSION_TEXT_LENGTH = 10000;
 
 const SOVA_EVALUATION_LIMIT = 20;
 const getStorageKey = (key) => `${TRAINER_PREFIX}_${key}`;
-const isIntroTask = (index) => index % 100 < 3;
+const isIntroTaskByDeckIndex = (index) => index % 100 < 3;
 const isRoleSelectionTask = (task) => {
     const taskNumber = parseInt(task?.number, 10);
     const sectionStart = Number.isFinite(task?._sectionStart) ? task._sectionStart : null;
@@ -161,6 +167,11 @@ const AdminIcon = memo(AdminIconComponent);
 
 export default function TrainerPage({ goTo }) {
     const [savedField, setSavedField] = useState(null);
+
+    // Второй день: свой номер тайла и последний отказ разбора. Оба живут только
+    // в режиме второго дня, первый день их не читает.
+    const [day2Number, setDay2Number] = useState(null);
+    const [day2Problem, setDay2Problem] = useState(null);
 
     const isMobile = useMediaQuery("(max-width: 1023px)");
     const previewResizeStateRef = useRef(null);
@@ -575,6 +586,22 @@ export default function TrainerPage({ goTo }) {
         getStorageKey,
         goTo,
     });
+
+    // Режим второго дня включается слогом секции. Считается здесь, до всего
+    // остального: от него зависит вводность карточек, а её спрашивают уже
+    // в первых хуках.
+    const isDay2 = isDay2Section(tokenSectionId);
+
+    // Вводных карточек во втором дне нет. Первый день кладёт в начало каждой
+    // сотни три вводных, и по позиции в колоде их узнаёт весь тренажёр: у них
+    // нет сдачи, проверки и оценки. Второй день адресуется НОМЕРОМ, и на первых
+    // трёх позициях у него стоят изделие 10 и детали 11 и 12 — карточки, которые
+    // обязаны сдаваться, как все прочие. Без этой поправки владельцы 11 и 12
+    // не закрывают такт 1 вообще.
+    const isIntroTask = useCallback(
+        (index) => !isDay2 && isIntroTaskByDeckIndex(index),
+        [isDay2]
+    );
 
     const {
         tasks,
@@ -1754,7 +1781,63 @@ export default function TrainerPage({ goTo }) {
         goToTask(nextIndex);
     };
 
+    // ─────────── второй день ───────────
+    //
+    // Отличий от первого дня четыре: поле ввода текстовое, стрелки по колоде
+    // убраны, подпись показывает такт, кнопка оценки промпта скрыта (ТЗ В5 —
+    // именно скрыта, не заблокирована). Сам флаг `isDay2` объявлен выше.
+    //
+    // Свой номер участник называет сам, набрав его в первый раз: в бою он придёт
+    // из регистрации за столом, а до неё держится в этой же вкладке.
+    const day2Tasks = useMemo(
+        () => (sessionRuntimeState?.participant?.taskStates || []).map((ts) => ({
+            key: String(ts.taskNumber || ""),
+            status: ts.status,
+        })),
+        [sessionRuntimeState?.participant?.taskStates]
+    );
+
+    const day2State = useMemo(
+        () => (isDay2 && day2Number ? computeDay2Takt({ myNumber: day2Number, tasks: day2Tasks }) : null),
+        [isDay2, day2Number, day2Tasks]
+    );
+
+    const openDay2 = (raw) => {
+        const parsed = parseDay2Input(raw);
+        if (!parsed.ok) {
+            setDay2Problem(parsed.hint);
+            return;
+        }
+        // Первый набранный номер детали и становится своим.
+        const state = day2State
+            || (parsed.kind === "detail" ? computeDay2Takt({ myNumber: Number(parsed.key), tasks: day2Tasks }) : null);
+        if (!state) {
+            setDay2Problem("Сначала наберите номер своей детали");
+            return;
+        }
+        const allowed = canOpenDay2({ state, parsed });
+        if (!allowed.ok) {
+            setDay2Problem(allowed.hint);
+            return;
+        }
+        // Ключ берётся целиком: у переходника `13-14:adapter` своя карточка,
+        // отдельная от узла `13-14`. Срезать суффикс — значит на «не сошлось»
+        // показать ту же карточку, что и на «сошлось».
+        const index = findDay2TaskIndex(tasks, parsed.key);
+        if (index < 0) {
+            setDay2Problem(`Карточки ${parsed.key} нет в этой секции`);
+            return;
+        }
+        if (parsed.kind === "detail") setDay2Number(Number(parsed.key));
+        setDay2Problem(null);
+        guardedGoToTask(index);
+    };
+
     const trainerControlsProps = {
+        isDay2,
+        day2State,
+        day2Problem,
+        onDay2Open: openDay2,
         who,
         taskVersion,
         currentTaskIndex,
@@ -1929,11 +2012,17 @@ export default function TrainerPage({ goTo }) {
                                 Создать&nbsp;промт
                             </Button>
                         </span>
-                        <span className="block w-full" title={createWithEvaluationDisabledReason}>
-                            <Button className="w-full" type="button" onClick={createPromptWithEvaluation} disabled={isCreateWithEvaluationDisabled}>
-                                Создать&nbsp;промт&nbsp;с&nbsp;оценкой&nbsp;({sovaChecksRemaining}/{evaluationLimit})
-                            </Button>
-                        </span>
+                        {/* Во втором дне оценка промпта СКРЫТА, а не заблокирована
+                            (ТЗ В5): видимая неактивная кнопка читается как поломка,
+                            скрытая — как другой режим. Опора снимается ступенчато:
+                            вчера правильность называла программа, сегодня — результат. */}
+                        {!isDay2 && (
+                            <span className="block w-full" title={createWithEvaluationDisabledReason}>
+                                <Button className="w-full" type="button" onClick={createPromptWithEvaluation} disabled={isCreateWithEvaluationDisabled}>
+                                    Создать&nbsp;промт&nbsp;с&nbsp;оценкой&nbsp;({sovaChecksRemaining}/{evaluationLimit})
+                                </Button>
+                            </span>
+                        )}
                     </div>
                 </div>
             </form>

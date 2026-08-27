@@ -1,0 +1,34 @@
+// Признак второго дня — слог секции контента, а не отдельный флаг.
+//
+// Так режим включается там же, где выдаётся содержание: токен ведёт на секцию,
+// секция определяет день. Отдельный флаг пришлось бы держать в токене, в сессии
+// и в рантайме синхронно, и он бы разъехался.
+//
+// Номера карточек второго дня — 10..36, номера тайлов. В диапазон слога они не
+// укладываются намеренно: второй день адресуется НОМЕРОМ, а не позицией
+// в колоде, поэтому rangeStart для него не значит ничего. Ходить стрелками там
+// некуда — у человека одна деталь.
+
+export const DAY2_SECTIONS = ["day2"];
+
+export function isDay2Section(sectionId) {
+    return DAY2_SECTIONS.includes(String(sectionId || "").trim());
+}
+
+// Номер переходника — служебный ключ `13-14:adapter`, тот же, что отдаёт разбор
+// ввода. Показывать его человеку в таком виде нельзя: на экране он читается как
+// сбой. Первому дню функция ничего не меняет — там номера без суффикса.
+const ADAPTER_SUFFIX = ":adapter";
+
+export function formatDay2TaskNumber(number) {
+    const raw = String(number ?? "");
+    return raw.endsWith(ADAPTER_SUFFIX)
+        ? `${raw.slice(0, -ADAPTER_SUFFIX.length)} · переходник`
+        : raw;
+}
+
+/** Позиция карточки в загруженной колоде по её номеру. -1, если такой нет. */
+export function findDay2TaskIndex(tasks, number) {
+    const wanted = String(number).trim();
+    return (tasks || []).findIndex((task) => String(task?.number || "").trim() === wanted);
+}
