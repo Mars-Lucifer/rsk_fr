@@ -1053,6 +1053,8 @@ export default function TrainerPage({ goTo }) {
     });
 
     const {
+        downloadCertificateStrict,
+        downloadLogsStrict,
         handleDownloadCertificate,
         handleDownloadLogs,
         handleSaveSessionCompletion,
@@ -2200,7 +2202,12 @@ export default function TrainerPage({ goTo }) {
                     certificateLoading={completionLoading}
                     onOpenTesting={handleOpenCompletionTesting}
                     onOpenSurvey={handleOpenCompletionSurvey}
-                    onGetCertificate={handleGetCompletionCertificate}
+                    // Строгие версии: при ошибке бросают, попап не помечает файл
+                    // скачанным и участник пробует ещё раз, а не уходит с пустыми
+                    // руками. Завершение уже не качает сертификат и лог повторно.
+                    onDownloadCertificate={downloadCertificateStrict}
+                    onDownloadLog={downloadLogsStrict}
+                    onFinishSession={() => handleSaveSessionCompletion({ artifactsAlreadyDownloaded: true })}
                 />
             )}
 
