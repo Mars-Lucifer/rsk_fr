@@ -8,6 +8,13 @@ import { convertToPdf, logLibreOffice } from "@/lib/libreofficeConverter";
 import { pickRandomMissionForRole } from "@/lib/mayakSecretMissions";
 import { isDay2Section } from "@/lib/mayakDay2Mode";
 import { day2KeysFor } from "@/lib/mayakDay2Takt";
+import {
+    DAY2_FIRST_TAKT,
+    DAY2_LAST_TAKT,
+    clampDay2TaktSeconds,
+    day2DefaultSeconds,
+    day2TaktStatus,
+} from "@/lib/mayakDay2Schedule";
 
 const SESSION_RUNTIME_FILE = path.join(process.cwd(), "data", "mayak-session-runtime.json");
 const SESSION_FILES_ROOT = path.join(process.cwd(), "data", "mayak-session-files");
@@ -65,6 +72,18 @@ function normalizeDay2CardNumber(value) {
 function day2PartnerNumber(cardNumber) {
     const number = normalizeDay2CardNumber(cardNumber);
     return number ? day2KeysFor(number).partner : 0;
+}
+
+// Такт зала лежит в бакете сессии, а не в объекте сессии: он меняется по ходу
+// дня, а объект сессии — это её настройка. Читается с дефолтом, поэтому сессии,
+// уже лежащие на диске, не требуют миграции: у них такт просто не начат.
+function readDay2Takt(bucket) {
+    const stored = bucket?.day2Takt;
+    return {
+        index: Number(stored?.index) || DAY2_FIRST_TAKT,
+        startedAt: stored?.startedAt || null,
+        durationSeconds: Number(stored?.durationSeconds) || day2DefaultSeconds(Number(stored?.index) || DAY2_FIRST_TAKT),
+    };
 }
 
 function getFileExtension(filename = "") {
@@ -448,6 +467,60 @@ export async function setMayakSessionParticipantCardNumber({ sessionId, userId, 
         participant.cardNumber = number;
         participant.updatedAt = new Date().toISOString();
         return participant;
+    });
+}
+
+/**
+ * Пульт ведущего: такт зала.
+ *
+ * Время такта задаёт сервер, участники его только показывают. Иначе три
+ * команды разойдутся на минуты, а к финалу — на четверть часа, и на сборке всё
+ * равно будут ждать друг друга (ТЗ, раздел В10).
+ *
+ * Действия ровно четыре, и все нажимает человек:
+ *   start — запустить текущий такт от сейчас;
+ *   next  — перейти к следующему и запустить его;
+ *   shift — прибавить или убавить минут текущему такту, пересчитав остаток;
+ *   stop  — снять запуск, оставив номер такта (перерыв, эвакуация, что угодно).
+ */
+export async function controlDay2Takt({ sessionId, action, minutes }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+    if (!isDay2Section(session.sectionId)) {
+        throw new Error("Такты есть только во втором дне");
+    }
+
+    const normalizedAction = normalizeString(action);
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const current = readDay2Takt(bucket);
+        const now = new Date().toISOString();
+
+        if (normalizedAction === "start") {
+            bucket.day2Takt = { ...current, startedAt: now };
+        } else if (normalizedAction === "next") {
+            if (current.index >= DAY2_LAST_TAKT) {
+                throw new Error("Это последний такт дня");
+            }
+            const index = current.index + 1;
+            bucket.day2Takt = { index, startedAt: now, durationSeconds: day2DefaultSeconds(index) };
+        } else if (normalizedAction === "shift") {
+            const delta = Math.round(Number(minutes));
+            if (!Number.isFinite(delta) || delta === 0) {
+                throw new Error("Сдвиг задаётся в минутах");
+            }
+            bucket.day2Takt = {
+                ...current,
+                durationSeconds: clampDay2TaktSeconds(current.durationSeconds + delta * 60),
+            };
+        } else if (normalizedAction === "stop") {
+            bucket.day2Takt = { ...current, startedAt: null };
+        } else {
+            throw new Error("Неизвестное действие с тактом");
+        }
+
+        return day2TaktStatus(bucket.day2Takt, Date.now());
     });
 }
 
@@ -954,6 +1027,9 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
             tasks: undefined,
             taskStates,
         },
+        // Такт зала: один на всех, считается от серверной метки старта.
+        // Участнику из него нужна одна строка — какой такт и сколько осталось.
+        day2Takt: day2Session ? day2TaktStatus(readDay2Takt(bucket), Date.now()) : null,
         tableDirections,
         blockingTask: blockingTask
             ? {

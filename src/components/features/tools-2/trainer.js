@@ -5,7 +5,7 @@ import RankingTestPopup from "./addons/RankingTestPopup";
 import MayakServicesPanel from "./MayakServicesPanel";
 import InstructionImageModal from "./InstructionImageModal";
 import InstructionPreviewPanel from "./InstructionPreviewPanel";
-import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
+import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup, useRemainingSeconds } from "./SessionReviewWidgets";
 import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
 import ContestLessonStepper from "./ContestLessonStepper";
 import { isContestModeActive } from "@/lib/mayakContestAccess";
@@ -66,6 +66,7 @@ import MasterDashboardLink from "./MasterDashboardLink";
 // (isDay2Section по слогу): первый день этих веток не видит.
 import { isDay2Section, findDay2TaskIndex } from "@/lib/mayakDay2Mode";
 import { day2AccentColors } from "@/lib/mayakDay2Palette";
+import { formatDay2Remaining } from "@/lib/mayakDay2Schedule";
 import { parseDay2Input } from "@/lib/mayakDay2Input";
 import { computeDay2Takt, canOpenDay2 } from "@/lib/mayakDay2Takt";
 
@@ -1809,6 +1810,26 @@ export default function TrainerPage({ goTo }) {
         [isDay2, day2Number, day2Tasks]
     );
 
+    // Такт зала. Сервер отдаёт абсолютную метку конца, клиент только тикает —
+    // тем же хуком, что отсчитывает время на проверку у инспектора. Вкладку
+    // можно свернуть или усыпить ноутбук: остаток пересчитается от метки,
+    // а не от накопленного счётчика.
+    const day2TaktState = isDay2 ? sessionRuntimeState?.day2Takt || null : null;
+    const day2TaktRemaining = useRemainingSeconds(day2TaktState?.expiresAt || null, day2TaktState?.remainingSeconds || 0);
+    const day2Takt = useMemo(
+        () =>
+            day2TaktState
+                ? {
+                      label: day2TaktState.label,
+                      running: day2TaktState.running,
+                      overdue: day2TaktState.running && day2TaktRemaining <= 0,
+                      remaining: formatDay2Remaining(day2TaktRemaining),
+                      mark: day2TaktState.mark || null,
+                  }
+                : null,
+        [day2TaktState, day2TaktRemaining]
+    );
+
     // Открытая карточка показывается на экране. Первый день обходится строкой
     // «Задание №N» со стрелками — там колода листается, и видно, что сдвинулся.
     // Второй день листать нечем: набрал номер, нажал «Открыть» — и без карточки
@@ -1901,6 +1922,7 @@ export default function TrainerPage({ goTo }) {
         isDay2,
         day2State,
         day2Card,
+        day2Takt,
         day2Problem,
         onDay2Open: openDay2,
         who,

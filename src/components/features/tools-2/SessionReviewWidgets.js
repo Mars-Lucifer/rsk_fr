@@ -19,7 +19,11 @@ function formatRemaining(seconds) {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
 
-function useRemainingSeconds(expiresAt, fallbackSeconds = 0) {
+// Обратный отсчёт по АБСОЛЮТНОЙ серверной метке, а не по локально
+// накопленному счётчику: вкладку можно свернуть, усыпить ноутбук и вернуться —
+// остаток всё равно останется верным. Тем же хуком идёт такт второго дня,
+// поэтому он экспортируется.
+export function useRemainingSeconds(expiresAt, fallbackSeconds = 0) {
     const [remainingSeconds, setRemainingSeconds] = useState(() => {
         if (!expiresAt) return Math.max(0, Number(fallbackSeconds) || 0);
         return Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000));

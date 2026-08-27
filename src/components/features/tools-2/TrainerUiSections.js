@@ -67,7 +67,7 @@ function Day2Card({ card }) {
  * показывает такт, а не номер задания. Отказ разбора пишется тут же — участник
  * в зале должен понять, что делать, без ведущего.
  */
-function Day2TaskNav({ state, card, problem, onOpen, disabled }) {
+function Day2TaskNav({ state, card, takt, problem, onOpen, disabled }) {
     const [value, setValue] = useState("");
     // Отказ относится к тому, что набрали, а не к полю вообще: «сначала сдайте
     // деталь 13» обязан исчезнуть, как только человек начал править ввод.
@@ -82,9 +82,31 @@ function Day2TaskNav({ state, card, problem, onOpen, disabled }) {
 
     return (
         <div className="flex flex-col gap-[0.75rem]">
+            {/* Строка такта. Слева — какой такт идёт в зале, справа — сколько
+                до его конца. Время серверное, здесь оно только тикает: три
+                команды иначе разойдутся к вечеру на четверть часа. Больше на
+                экране участника про расписание ничего нет (ТЗ, раздел В10). */}
             <div className="flex items-center justify-between w-full gap-[0.5rem]">
-                <span className="text-sm font-medium">{state ? state.label : "Такт 1 · деталь"}</span>
-                <div className="flex items-center gap-[0.25rem]">
+                <span className="text-sm font-medium">
+                    {takt?.label || state?.label || "Такт 1 · деталь"}
+                </span>
+                {takt?.running && (
+                    <span
+                        className="text-sm font-semibold tabular-nums"
+                        style={{ color: takt.overdue ? "var(--color-red)" : "var(--color-black)" }}>
+                        {takt.overdue ? "время вышло" : takt.remaining}
+                    </span>
+                )}
+            </div>
+
+            <div className="flex items-start justify-between w-full gap-[0.5rem]">
+                <span className="text-sm text-gray-500">
+                    {!state && "Наберите номер своей детали с тайла."}
+                    {state?.takt === "DETAIL" && `Партнёр — ${state.partner}. Соединяетесь после обеда.`}
+                    {state?.takt === "NODE" && `Ваш узел — ${state.node.replace("-", " ")}. Не сошлось — так и наберите.`}
+                    {state?.takt === "PRODUCT" && "Изделие открывается словом стола."}
+                </span>
+                <div className="flex items-center gap-[0.25rem] shrink-0 pt-[0.4rem]">
                     {[1, 2, 3].map((i) => (
                         <span
                             key={i}
@@ -95,12 +117,16 @@ function Day2TaskNav({ state, card, problem, onOpen, disabled }) {
                 </div>
             </div>
 
-            <span className="text-sm text-gray-500">
-                {!state && "Наберите номер своей детали с тайла."}
-                {state?.takt === "DETAIL" && `Партнёр — ${state.partner}. Соединяетесь после обеда.`}
-                {state?.takt === "NODE" && `Ваш узел — ${state.node.replace("-", " ")}. Не сошлось — так и наберите.`}
-                {state?.takt === "PRODUCT" && "Изделие открывается словом стола."}
-            </span>
+            {/* Отметка такта. Всплывает сама и у всех разом, потому что привязана
+                к серверному времени. Первая ловит главный дефект дня — проверку
+                продукта на машине автора (ТЗ, раздел В3). */}
+            {takt?.mark && (
+                <div
+                    className="rounded-[0.75rem] px-[0.875rem] py-[0.625rem] text-sm"
+                    style={{ background: "#FAEEDA", color: "#633806" }}>
+                    {takt.mark.text}
+                </div>
+            )}
 
             <form onSubmit={submit} className="flex items-center gap-[0.5rem]">
                 <div className="flex-1 min-w-0">
@@ -241,6 +267,7 @@ export const TrainerControls = memo(function TrainerControls({
     isDay2,
     day2State,
     day2Card,
+    day2Takt,
     day2Problem,
     onDay2Open,
     who,
@@ -435,6 +462,7 @@ export const TrainerControls = memo(function TrainerControls({
                     <Day2TaskNav
                         state={day2State}
                         card={day2Card}
+                        takt={day2Takt}
                         problem={day2Problem}
                         onOpen={onDay2Open}
                         disabled={isTaskRunning || isTaskNavigationLocked}
