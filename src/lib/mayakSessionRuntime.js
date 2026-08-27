@@ -805,6 +805,25 @@ export async function createMayakSessionReview({
             throw new Error("Участник не зарегистрирован в этой сессии");
         }
 
+        // Второй день: сдать можно только СВОИ четыре ключа — деталь, узел,
+        // переходник и изделие своего стола. Ворота на клиенте (canOpenDay2)
+        // отговаривают, но запрос в обход экрана они не остановят, а чужая
+        // сдача сломает и такт соседа, и очередь его партнёра.
+        //
+        // Это же и есть ограничение по столу из ТЗ (раздел В9): стол закодирован
+        // в самом номере, поэтому проверять достаточно принадлежность ключа.
+        if (isDay2Section(session.sectionId)) {
+            const own = normalizeDay2CardNumber(participant.cardNumber);
+            if (!own) {
+                throw new Error("Сначала наберите номер своего тайла");
+            }
+            const keys = day2KeysFor(own);
+            const allowed = new Set([keys.detail, keys.node, keys.adapter, keys.assembly]);
+            if (!allowed.has(taskKey)) {
+                throw new Error(`Задание ${taskKey} не ваше: ваш тайл ${own}`);
+            }
+        }
+
         const existingTaskState = participant.tasks?.[taskKey];
         if (existingTaskState?.status === "pending_review" && existingTaskState?.isBlocking) {
             throw new Error("Это задание уже отправлено инспектору и ждёт проверки");

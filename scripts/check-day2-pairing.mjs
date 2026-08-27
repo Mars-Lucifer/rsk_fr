@@ -11,6 +11,10 @@
 // за собой. Нужен запущенный дев-сервер.
 //
 //     node scripts/check-day2-pairing.mjs [--base http://localhost:1239]
+//
+// Если первый запуск сразу после правки исходника падает с пустым ответом —
+// это не продукт, а дев-сервер: Next в этот момент пересобирает маршрут и
+// отвечает до того, как он готов. Повторный запуск проходит.
 
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -76,7 +80,11 @@ async function register(person, sessionId) {
         method: "POST",
         body: { sessionId, userId: person.userId, name: person.name, organization: "проверка", tableNumber: TABLE },
     });
-    assert.equal(registered.json?.success, true, `регистрация ${person.name}: ${registered.json?.error}`);
+    assert.equal(
+        registered.json?.success,
+        true,
+        `регистрация ${person.name}: HTTP ${registered.status} ${JSON.stringify(registered.json)}`
+    );
 
     const claimed = await api("/api/mayak/session-runtime/card-number", {
         method: "POST",
@@ -158,6 +166,18 @@ async function main() {
         check("тайл чужого стола не берётся", () => {
             assert.equal(wrongTable.json?.success, false);
             assert.match(String(wrongTable.json?.error), /стол/i);
+        });
+
+        const foreign = new FormData();
+        foreign.set("sessionId", sessionId);
+        foreign.set("userId", AUTHOR.userId);
+        foreign.set("taskNumber", String(OUTSIDER.card));
+        foreign.set("taskName", "Чужая деталь");
+        foreign.set("submissionText", "попытка сдать не своё");
+        const sentForeign = await api("/api/mayak/session-runtime/upload", { method: "POST", form: foreign });
+        check("чужое задание не сдаётся даже в обход экрана", () => {
+            assert.equal(sentForeign.json?.success, false, JSON.stringify(sentForeign.json));
+            assert.match(String(sentForeign.json?.error), /не ваше/i);
         });
 
         const review = await submitDetail(AUTHOR, sessionId);
