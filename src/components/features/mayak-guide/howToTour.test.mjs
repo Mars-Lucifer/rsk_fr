@@ -5,12 +5,16 @@ import { buildTrainerHowTo, pickSampleTask } from "./howToTour.mjs";
 
 const card = (number, extra = {}) => ({ number, ...extra });
 
+const FILE = { hasFile: true, file: "3.docx" };
+const INSTR = { hasInstruction: true, instruction: "3.pdf" };
+const SOURCE = { hasSource: true, sourceLink: "https://example" };
+
 test("для разбора берётся карта с материалами, а не первая по счёту", () => {
     const tasks = [
         card(1),
-        card(2, { hasSource: true }),
-        card(3, { hasFile: true, hasInstruction: true, hasSource: true, toolLink1: "https://qwen", toolName1: "Qwen" }),
-        card(4, { hasInstruction: true }),
+        card(2, SOURCE),
+        card(3, { ...FILE, ...INSTR, ...SOURCE, toolLink1: "https://qwen", toolName1: "Qwen" }),
+        card(4, INSTR),
     ];
 
     const sample = pickSampleTask(tasks);
@@ -19,9 +23,17 @@ test("для разбора берётся карта с материалами,
     assert.equal(sample.toolName, "Qwen");
 });
 
+test("флаг без файла не считается материалом — кнопки для него рантайм не рисует", () => {
+    const tasks = [card(1, { hasFile: true, file: "" }), card(2, INSTR)];
+
+    const sample = pickSampleTask(tasks);
+    assert.equal(sample.number, 2);
+    assert.equal(sample.hasFile, false);
+});
+
 test("карта ищется только среди разрешённых доступу", () => {
-    const rich = { hasFile: true, toolLink1: "https://qwen", toolName1: "Qwen" };
-    const tasks = [card(1, rich), card(2), card(3, { hasInstruction: true })];
+    const rich = { ...FILE, toolLink1: "https://qwen", toolName1: "Qwen" };
+    const tasks = [card(1, rich), card(2), card(3, INSTR)];
 
     // Богатая карта вне диапазона: goToTask её всё равно не откроет.
     const sample = pickSampleTask(tasks, { from: 1, to: 2 });

@@ -20,8 +20,12 @@
 // задание нечем выполнять.
 export function pickSampleTask(tasks, { from = 0, to = Number.MAX_SAFE_INTEGER } = {}) {
     const list = Array.isArray(tasks) ? tasks : [];
+    // Считаем по имени файла, а не по флагу: рантайм рисует кнопку только когда есть
+    // и флаг, и файл на диске (reconcileTasksToDisk обнуляет имя, если файла нет).
+    // По одному флагу разбор выбирал бы карту с несуществующим материалом.
+    const has = { file: (t) => t?.hasFile && t?.file, instruction: (t) => t?.hasInstruction && t?.instruction, source: (t) => t?.hasSource && t?.sourceLink };
     const weigh = (task) =>
-        (task?.hasFile ? 8 : 0) + (task?.toolLink1 ? 4 : 0) + (task?.hasInstruction ? 2 : 0) + (task?.hasSource ? 1 : 0);
+        (has.file(task) ? 8 : 0) + (task?.toolLink1 ? 4 : 0) + (has.instruction(task) ? 2 : 0) + (has.source(task) ? 1 : 0);
 
     let best = null;
     let bestWeight = -1;
@@ -43,9 +47,9 @@ export function pickSampleTask(tasks, { from = 0, to = Number.MAX_SAFE_INTEGER }
     return {
         index,
         number: task.number,
-        hasFile: Boolean(task.hasFile),
-        hasInstruction: Boolean(task.hasInstruction),
-        hasSource: Boolean(task.hasSource),
+        hasFile: Boolean(has.file(task)),
+        hasInstruction: Boolean(has.instruction(task)),
+        hasSource: Boolean(has.source(task)),
         toolName: task.toolLink1 ? String(task.toolName1 || "Инструмент") : "",
     };
 }
@@ -203,8 +207,10 @@ export function buildTrainerHowTo(sample) {
         ...(sample?.toolName
             ? [
                   {
-                      sel: "a",
-                      match: sample.toolName,
+                      // Помечено атрибутом: кнопка сервиса задания и одноимённая кнопка
+                      // в общем ряду внизу называются одинаково, и поиск по надписи
+                      // показывал бы то на одну, то на другую.
+                      sel: '[data-tour="task-tool"]',
                       title: `Сервис задания — «${sample.toolName}»`,
                       text: "У карты бывает своя ссылка на сервис: не общий список внизу, а именно тот инструмент, которым это задание решается. Открывается в новой вкладке вашим аккаунтом.",
                       wait: "next",
