@@ -231,14 +231,36 @@ function isDebugSession(session) {
     return String(session?.source || "") === "debug";
 }
 
+// Второй день считает время проверки иначе, и вот почему.
+//
+// В первом дне проверяет назначенный инспектор: это его роль, он сидит на
+// очереди и ждёт заявок, поэтому две минуты — разумный срок. Во втором дне
+// проверяет ПАРТНЁР ПО ПАРЕ, а он в это время делает свою деталь и в экран
+// не смотрит. Две минуты там означают, что шов протухнет раньше, чем его
+// заметят: задание уйдёт в expired, такт не сдвинется, и человек будет сдавать
+// по кругу, не понимая, почему ничего не происходит.
+//
+// Полчаса — нижняя граница, ниже которой не опускаемся даже по настройке
+// сессии: такт длится 90 минут, и шов, отданный в его середине, обязан дожить
+// до конца такта.
+const DAY2_MIN_REVIEW_TIMEOUT_SECONDS = 30 * 60;
+
 function getReviewTimeoutSeconds(session) {
     const parsed = parseInt(session?.reviewTimeoutSeconds, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REVIEW_TIMEOUT_SECONDS;
+    const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REVIEW_TIMEOUT_SECONDS;
+    return isDay2Section(session?.sectionId)
+        ? Math.max(seconds, DAY2_MIN_REVIEW_TIMEOUT_SECONDS)
+        : seconds;
 }
 
 function getReworkTimeoutSeconds(session) {
     const parsed = parseInt(session?.reworkTimeoutSeconds, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REWORK_TIMEOUT_SECONDS;
+    const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REWORK_TIMEOUT_SECONDS;
+    // Доработка во втором дне — это переписать запрос вдвоём, а не поправить
+    // опечатку. Три минуты первого дня здесь тоже не работают.
+    return isDay2Section(session?.sectionId)
+        ? Math.max(seconds, DAY2_MIN_REVIEW_TIMEOUT_SECONDS)
+        : seconds;
 }
 
 function buildExpirationMeta(expiresAt) {

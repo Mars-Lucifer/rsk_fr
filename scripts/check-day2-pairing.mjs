@@ -184,6 +184,13 @@ async function main() {
         const reviewId = review?.review?.id || review?.reviewId || review?.id;
         assert.ok(reviewId, "сервер не вернул id заявки");
 
+        check("у шва есть время дожить до конца такта", () => {
+            // Две минуты первого дня здесь означали бы, что шов протухнет раньше,
+            // чем партнёр оторвётся от своей детали.
+            const seconds = Number(review?.review?.durationSeconds ?? review?.durationSeconds);
+            assert.ok(seconds >= 30 * 60, `срок проверки ${seconds} с`);
+        });
+
         const partnerQueue = await queueOf(PARTNER, sessionId);
         check("партнёр видит шов в своей очереди", () => {
             assert.equal(partnerQueue.length, 1);
