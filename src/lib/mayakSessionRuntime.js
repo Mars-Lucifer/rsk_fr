@@ -561,6 +561,70 @@ export async function controlDay2Takt({ sessionId, action, minutes }) {
     });
 }
 
+/**
+ * Отладка второго дня: поставить участника в нужный такт одним нажатием.
+ *
+ * Такт выводится из принятых заданий, поэтому «посмотреть, как выглядит такт 3»
+ * штатным путём стоит двух сдач и двух проверок. Для показа и разбора это
+ * непроходимо, а возвращаться назад штатно нельзя вовсе.
+ *
+ * Только для debug-сессии: в настоящей сессии такой рычаг обнулял бы весь смысл
+ * ступени, которую держит система, а не голос ведущего.
+ */
+export async function setDay2DebugTakt({ sessionId, userId, takt }) {
+    const session = await getMayakSessionById(sessionId);
+    if (!session || session.status !== "active") {
+        throw new Error("Сессия недоступна или уже завершена");
+    }
+    if (!isDay2Section(session.sectionId)) {
+        throw new Error("Такты есть только во втором дне");
+    }
+    if (!isDebugSession(session)) {
+        throw new Error("Отладка тактов работает только в отладочной сессии");
+    }
+
+    const target = Number(takt);
+    if (![1, 2, 3].includes(target)) {
+        throw new Error("Такт бывает первый, второй или третий");
+    }
+
+    return mutateSessionRuntime(sessionId, (store, bucket) => {
+        const participant = bucket.participants?.[userId];
+        if (!participant) {
+            throw new Error("Участник не зарегистрирован в этой сессии");
+        }
+        const own = normalizeDay2CardNumber(participant.cardNumber);
+        if (!own) {
+            throw new Error("Сначала наберите номер своего тайла");
+        }
+
+        const keys = day2KeysFor(own);
+        const approved = (key) => ({
+            taskKey: key,
+            taskNumber: key,
+            taskIndex: 0,
+            taskName: `Отладка · ${key}`,
+            status: "approved",
+            reviewId: null,
+            isBlocking: false,
+            comment: "",
+            updatedAt: new Date().toISOString(),
+        });
+
+        // Ставим ровно то, что нужно такту, и снимаем всё остальное: иначе
+        // «вернуться в первый такт» не работало бы — сданное не отменяется.
+        participant.tasks = participant.tasks || {};
+        for (const key of [keys.detail, keys.node, keys.adapter, keys.assembly]) {
+            delete participant.tasks[key];
+        }
+        if (target >= 2) participant.tasks[keys.detail] = approved(keys.detail);
+        if (target >= 3) participant.tasks[keys.node] = approved(keys.node);
+
+        participant.updatedAt = new Date().toISOString();
+        return { takt: target, cardNumber: own };
+    });
+}
+
 /** Текущий такт зала для пульта ведущего. Только чтение, без лока. */
 export async function getDay2TaktStatus(sessionId) {
     const store = await readStore();
@@ -1114,6 +1178,9 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
         // Такт зала: один на всех, считается от серверной метки старта.
         // Участнику из него нужна одна строка — какой такт и сколько осталось.
         day2Takt: day2Session ? day2TaktStatus(readDay2Takt(bucket), Date.now()) : null,
+        // Отладочная сессия называет себя сама: клиент по этому признаку решает,
+        // показывать ли рычаги переходов по тактам.
+        debugSession,
         tableDirections,
         blockingTask: blockingTask
             ? {
@@ -1401,6 +1468,13 @@ export async function autoApproveMayakSessionTask({ sessionId, userId, taskNumbe
     const taskKey = buildTaskKey(taskNumber);
     if (!taskKey) {
         throw new Error("Не удалось определить номер задания");
+    }
+
+    // Второй день этим путём не ходит: у него нет вводных карточек, ради которых
+    // автоприём и сделан. А маршрут открыт наружу, и без этой проверки им можно
+    // было бы объявить принятым любое задание, включая чужое.
+    if (isDay2Section(session.sectionId)) {
+        throw new Error("Во втором дне задание принимает партнёр по паре");
     }
 
     return mutateSessionRuntime(sessionId, (store, bucket) => {

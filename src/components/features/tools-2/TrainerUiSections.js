@@ -60,6 +60,44 @@ function Day2Card({ card }) {
 }
 
 /**
+ * Отладочная полоса второго дня. Видна только в отладочной сессии.
+ *
+ * Такт выводится из принятых заданий, поэтому «посмотреть такт 3» штатным путём
+ * стоит двух сдач и двух проверок, а вернуться назад нельзя вообще. Для показа
+ * и разбора это непроходимо — отсюда три кнопки, которые ставят такт напрямую.
+ * В настоящей сессии их нет, и сервер такой запрос отклоняет.
+ */
+function Day2DebugBar({ state, busy, onTakt }) {
+    const current = state?.index || 1;
+    return (
+        <div className="flex flex-wrap items-center gap-[0.375rem] rounded-[0.5rem] px-[0.625rem] py-[0.5rem]"
+            style={{ background: "#FAEEDA" }}>
+            <span className="text-xs" style={{ color: "#633806" }}>Отладка · такт:</span>
+            {[1, 2, 3].map((index) => (
+                <button
+                    key={index}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onTakt(index)}
+                    className="text-xs rounded-[0.375rem] px-[0.5rem] py-[0.1875rem]"
+                    style={{
+                        width: "auto",
+                        border: "1px solid #EF9F27",
+                        background: current === index ? "#633806" : "transparent",
+                        color: current === index ? "#FFFFFF" : "#633806",
+                        opacity: busy ? 0.5 : 1,
+                    }}>
+                    {index}
+                </button>
+            ))}
+            <span className="text-xs" style={{ color: "#854F0B" }}>
+                ставит такт напрямую, сдачу и проверку не спрашивает
+            </span>
+        </div>
+    );
+}
+
+/**
  * Блок навигации второго дня.
  *
  * Заменяет собой «Задание №N» со стрелками. Отличий три: поле принимает текст,
@@ -67,7 +105,7 @@ function Day2Card({ card }) {
  * показывает такт, а не номер задания. Отказ разбора пишется тут же — участник
  * в зале должен понять, что делать, без ведущего.
  */
-function Day2TaskNav({ state, card, takt, problem, onOpen, disabled }) {
+function Day2TaskNav({ state, card, takt, problem, onOpen, disabled, debug, onDebugTakt, debugBusy }) {
     const [value, setValue] = useState("");
     // Отказ относится к тому, что набрали, а не к полю вообще: «сначала сдайте
     // деталь 13» обязан исчезнуть, как только человек начал править ввод.
@@ -87,8 +125,13 @@ function Day2TaskNav({ state, card, takt, problem, onOpen, disabled }) {
                 команды иначе разойдутся к вечеру на четверть часа. Больше на
                 экране участника про расписание ничего нет (ТЗ, раздел В10). */}
             <div className="flex items-center justify-between w-full gap-[0.5rem]">
+                {/* Подпись — о своём такте, время — о такте зала. Обычно они
+                    совпадают; расходятся, когда человек ушёл вперёд, сдав
+                    деталь раньше остальных. В этом случае ему нужно знать, что
+                    открыто ЕМУ, а не что идёт по расписанию, — иначе экран
+                    спорит сам с собой: подпись «такт 1», а под ней карточка узла. */}
                 <span className="text-sm font-medium">
-                    {takt?.label || state?.label || "Такт 1 · деталь"}
+                    {state?.label || takt?.label || "Такт 1 · деталь"}
                 </span>
                 {takt?.running && (
                     <span
@@ -149,6 +192,8 @@ function Day2TaskNav({ state, card, takt, problem, onOpen, disabled }) {
             )}
 
             {card && <Day2Card card={card} />}
+
+            {debug && <Day2DebugBar state={state} busy={debugBusy} onTakt={onDebugTakt} />}
         </div>
     );
 }
@@ -269,7 +314,10 @@ export const TrainerControls = memo(function TrainerControls({
     day2Card,
     day2Takt,
     day2Problem,
+    day2Debug,
+    day2DebugBusy,
     onDay2Open,
+    onDay2DebugTakt,
     who,
     taskVersion,
     currentTaskIndex,
@@ -464,6 +512,9 @@ export const TrainerControls = memo(function TrainerControls({
                         card={day2Card}
                         takt={day2Takt}
                         problem={day2Problem}
+                        debug={day2Debug}
+                        debugBusy={day2DebugBusy}
+                        onDebugTakt={onDay2DebugTakt}
                         onOpen={onDay2Open}
                         disabled={isTaskRunning || isTaskNavigationLocked}
                     />

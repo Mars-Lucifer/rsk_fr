@@ -1895,6 +1895,37 @@ export default function TrainerPage({ goTo }) {
         }
     };
 
+    // Отладка: поставить такт напрямую и вернуться назад. Сервер пускает только
+    // в отладочной сессии — в настоящей ступень держит система, а не кнопка.
+    const day2Debug = Boolean(isDay2 && sessionRuntimeState?.debugSession);
+    const [day2DebugBusy, setDay2DebugBusy] = useState(false);
+
+    const setDay2DebugTakt = async (takt) => {
+        if (!runtimeSessionId || !activeUserId) return;
+        setDay2DebugBusy(true);
+        try {
+            const response = await fetch("/api/mayak/session-runtime/day2-debug", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sessionId: runtimeSessionId, userId: activeUserId, takt }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload?.success) {
+                setDay2Problem(payload?.error || "Не удалось сменить такт");
+                return;
+            }
+            setDay2Problem(null);
+            // Карточка закрывается: она была от прежнего такта и теперь может
+            // оказаться недоступной по воротам.
+            setDay2OpenKey(null);
+            refreshSessionRuntimeState();
+        } catch (error) {
+            setDay2Problem("Сеть не отвечает");
+        } finally {
+            setDay2DebugBusy(false);
+        }
+    };
+
     const openDay2 = async (raw) => {
         const parsed = parseDay2Input(raw);
         if (!parsed.ok) {
@@ -1942,7 +1973,10 @@ export default function TrainerPage({ goTo }) {
         day2Card,
         day2Takt,
         day2Problem,
+        day2Debug,
+        day2DebugBusy,
         onDay2Open: openDay2,
+        onDay2DebugTakt: setDay2DebugTakt,
         who,
         taskVersion,
         currentTaskIndex,

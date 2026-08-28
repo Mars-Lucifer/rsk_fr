@@ -17,8 +17,11 @@
 тот же ключ, что отдаёт парсер; в имя файла он не попадает, у этих
 карточек нет вложений.
 
-Тексты пока рыба из примеров ТЗ (разделы Б1-Б4). Настоящие соберёт модуль А
-из расшифровки встречи конкретной организации.
+Тексты — демонстрационная колода одной вымышленной организации, она лежит
+в `day2_demo_deck.py`. Настоящую соберёт модуль А из расшифровки встречи; пока
+его нет, в секции должна стоять связная выдумка, а не заглушка «рыба»: по
+заглушке нельзя понять ни что делать, ни зачем, и карточка читается как
+поломка.
 
 Запуск:
     python scripts/make-day2-section.py [--dir C:/tmp/mayak-deck]
@@ -30,6 +33,8 @@ import os
 import re
 import sys
 
+from day2_demo_deck import DETAILS, NODES, ORG, PRODUCTS
+
 SLUG = "day2"
 
 RAYS = [
@@ -40,9 +45,7 @@ RAYS = [
     (5, "Единое цифровое пространство"),
     (6, "Защита данных"),
 ]
-TABLES = [(1, "Среда", "Чем мы располагаем и чего не хватает?"),
-          (2, "Деятельность", "Успеваем ли, и что нужно доделать?"),
-          (3, "Сознание", "Как передать то, что уже прожили?")]
+TABLES = [(1, "Среда"), (2, "Деятельность"), (3, "Сознание")]
 
 PARTNER = {1: 2, 2: 1, 3: 4, 4: 3, 5: 6, 6: 5}
 
@@ -79,32 +82,36 @@ def card(number, title, content_type, partner=""):
 
 def cards_and_texts():
     cards, texts = [], []
-    for tens, table_label, day_question in TABLES:
+    for tens, table_label in TABLES:
+        product = PRODUCTS[tens]
         centre = str(tens * 10)
+
         cards.append(card(centre, f"Изделие · {table_label}", "Сборка"))
         texts.append({
             "number": centre,
-            "question": day_question,
-            "description": "Три пары сошлись в кольцо. Дальше собирается одно изделие, "
-                           "и приёмочные проверки пишутся до того, как оно появится.",
+            "question": product["day_question"],
+            "description": f"Три пары сошлись в кольцо. Дальше собирается одно изделие — "
+                           f"{product['name'].lower()}. К вечеру: {product['evening']}",
             "task": "Собрать изделие команды. Единое цифровое пространство диктует, "
                     "печатает Автоматизация. Остальные четверо пишут приёмочные проверки "
-                    "своих швов. Сдать: адрес, открывающийся по ссылке.",
+                    "своих швов — сейчас, до того как собранное появится. "
+                    "Сдать: адрес, открывающийся по ссылке.",
             "dueMidday": f"Чек-лист готовности: {CHECKLIST}.",
         })
 
         for pos, ray_label in RAYS:
-            number = str(tens * 10 + pos)
+            tile = tens * 10 + pos
+            number = str(tile)
             partner = str(tens * 10 + PARTNER[pos])
+            detail = DETAILS[tile]
             cards.append(card(number, ray_label, "Деталь", partner))
             texts.append({
                 "number": number,
-                "question": "Какой вопрос перестанут задавать голосом, когда это заработает?",
-                "description": "Рыба. Настоящую историю подставит модуль А: прямая речь "
-                               "из расшифровки встречи, с автором и датой.",
-                "task": f"Сделать свою часть продукта по лучу «{ray_label}». "
-                        f"Сдать: ссылка на файл. После обеда соединяетесь с {partner}.",
-                "dueMidday": "Рыба. Критерий готовности подставит модуль А.",
+                "question": product["day_question"],
+                "description": detail["quote"],
+                "task": f"{detail['task']} Сдать: {detail['give']}. "
+                        f"После обеда соединяетесь с {partner}.",
+                "dueMidday": detail["midday"],
             })
 
         # Узел и переходник — на пару, не на человека. Ключ по возрастанию: тот же,
@@ -114,18 +121,17 @@ def cards_and_texts():
             high = tens * 10 + PARTNER[low_pos]
             pair = f"{low}-{high}"
             names = f"{dict(RAYS)[low_pos]} + {dict(RAYS)[PARTNER[low_pos]]}"
+            node = NODES[(low, high)]
 
             # Название короткое: в шапке карточки оно стоит рядом с номером,
             # и «13-14 · Узел 13+14» читается как заикание.
             cards.append(card(pair, "Узел", "Узел"))
             texts.append({
                 "number": pair,
-                "question": "Рыба. Вопрос узла подставит модуль А.",
-                "description": f"Шов {names}. Что должно получиться — рыба, "
-                               f"настоящее описание даст модуль А.",
+                "question": node["question"],
+                "description": f"Шов {names}. {node['result']}",
                 "task": f"{PAIR_RULE} Сдать: один запрос на двоих.",
-                "dueMidday": "По чему видно, что соединились: рыба, наблюдаемое событие "
-                             "подставит модуль А.",
+                "dueMidday": f"По чему видно, что соединились: {node['visible']}",
             })
 
             adapter = f"{pair}:adapter"
@@ -176,7 +182,12 @@ def check(cards, texts):
 
     for text in texts:
         for field in ("question", "description", "task", "dueMidday"):
-            assert str(text.get(field) or "").strip(), f"{text['number']}: пусто поле {field}"
+            value = str(text.get(field) or "").strip()
+            assert value, f"{text['number']}: пусто поле {field}"
+            # Заглушка на месте задания хуже пустоты: человек видит служебное
+            # слово вместо работы и решает, что экран сломан.
+            assert "рыба" not in value.lower(), f"{text['number']}: в поле {field} осталась рыба"
+            assert len(value) > 25, f"{text['number']}: поле {field} слишком короткое"
 
 
 def main():
@@ -207,6 +218,7 @@ def main():
         json.dump(manifest, open(manifest_path, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
     print(f"секция {SLUG}: {len(cards)} карточек, {len(texts)} текстов -> {section}")
+    print(f"организация демо-колоды: {ORG}")
     print("номера:", ", ".join(c["number"] for c in cards))
 
 
