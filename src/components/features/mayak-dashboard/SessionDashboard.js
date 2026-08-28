@@ -618,6 +618,7 @@ export default function SessionDashboard({
                 {isDay2Section(data.session?.sectionId) && (
                     <Day2TaktPanel
                         takt={data.day2Takt}
+                        debug={data.session?.source === "debug"}
                         busy={taktBusy}
                         error={taktError}
                         onAction={sendTaktAction}

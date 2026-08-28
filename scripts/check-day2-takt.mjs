@@ -130,6 +130,19 @@ async function main() {
             assert.notEqual(afterShift.expiresAt, seenByB.expiresAt);
         });
 
+        const tooEarly = await takt("next");
+        check("через голову идущего такта не перешагнуть", () => {
+            assert.equal(tooEarly.json?.success, false, JSON.stringify(tooEarly.json));
+            assert.match(String(tooEarly.json?.error), /ещё идёт/i);
+        });
+
+        const finished = await takt("finish");
+        check("такт завершается досрочно, и время у него выходит", () => {
+            assert.equal(finished.json?.success, true, finished.json?.error);
+            assert.equal(finished.json?.data?.overdue, true);
+            assert.equal(finished.json?.data?.index, 1);
+        });
+
         const next = await takt("next");
         check("следующий такт — семьдесят минут", () => {
             assert.equal(next.json?.success, true, next.json?.error);
@@ -138,7 +151,9 @@ async function main() {
             assert.match(String(next.json?.data?.label), /узел/i);
         });
 
+        await takt("finish");
         await takt("next");
+        await takt("finish");
         const past = await takt("next");
         check("за третьим тактом такта нет", () => {
             assert.equal(past.json?.success, false);

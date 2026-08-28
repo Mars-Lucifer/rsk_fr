@@ -15,7 +15,7 @@ import { formatDay2Remaining } from "@/lib/mayakDay2Schedule";
 
 const SHIFTS = [-10, -5, 5, 10];
 
-export default function Day2TaktPanel({ takt, onAction, busy, error }) {
+export default function Day2TaktPanel({ takt, onAction, busy, error, debug }) {
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -33,7 +33,8 @@ export default function Day2TaktPanel({ takt, onAction, busy, error }) {
     const button = (label, action, minutes, extra = {}) => (
         <button
             type="button"
-            disabled={busy}
+            disabled={busy || extra.off}
+            title={extra.why || ""}
             onClick={() => onAction(action, minutes)}
             style={{
                 border: "1px solid #D3D1C7",
@@ -42,8 +43,8 @@ export default function Day2TaktPanel({ takt, onAction, busy, error }) {
                 borderRadius: 10,
                 padding: "8px 14px",
                 fontSize: 14,
-                cursor: busy ? "default" : "pointer",
-                opacity: busy ? 0.5 : 1,
+                cursor: busy || extra.off ? "default" : "pointer",
+                opacity: busy || extra.off ? 0.4 : 1,
                 // В проекте глобальное `button { width: 100% }` — без этого
                 // «Снять» и «Следующий такт» растягиваются на всю панель.
                 width: "auto",
@@ -75,8 +76,21 @@ export default function Day2TaktPanel({ takt, onAction, busy, error }) {
                 {takt.running
                     ? button("Снять", "stop")
                     : button("Запустить такт", "start", undefined, { primary: true })}
-                {button("Следующий такт", "next", undefined, { primary: takt.running })}
+                {takt.running && !overdue && button("Завершить такт", "finish")}
+                {button("Следующий такт", "next", undefined, {
+                    primary: overdue,
+                    // Через голову идущего такта не перешагиваем: три стола
+                    // окажутся в разных местах дня. Закончить раньше можно,
+                    // но осознанно — соседней кнопкой.
+                    off: !takt.running || !overdue,
+                    why: !takt.running
+                        ? "Текущий такт ещё не запускали"
+                        : !overdue
+                        ? "Такт ещё идёт — дождитесь конца или завершите его"
+                        : "",
+                })}
                 <span style={{ width: 12 }} />
+                {debug && button("Сбросить в такт 1", "reset")}
                 {SHIFTS.map((minutes) =>
                     <span key={minutes}>{button(minutes > 0 ? `+${minutes} мин` : `${minutes} мин`, "shift", minutes)}</span>
                 )}
@@ -84,7 +98,11 @@ export default function Day2TaktPanel({ takt, onAction, busy, error }) {
 
             <span style={{ fontSize: 13, color: error ? "#A32D2D" : "#5F5E5A" }}>
                 {error
-                    || "Такт идёт у всех столов одновременно. Сдвиг пересчитывает конец такта и доезжает до участников за пять секунд."}
+                    || (overdue
+                        ? "Время такта вышло. Можно переходить к следующему."
+                        : takt.running
+                        ? "Такт идёт у всех столов одновременно. Следующий откроется, когда время выйдет."
+                        : "Такт зала: 90 · 70 · 45 минут. Пока не запущен, у участников время не идёт.")}
             </span>
         </section>
     );

@@ -14,6 +14,7 @@ import {
     clampDay2TaktSeconds,
     day2DefaultSeconds,
     day2TaktStatus,
+    formatDay2Remaining,
 } from "@/lib/mayakDay2Schedule";
 
 const SESSION_RUNTIME_FILE = path.join(process.cwd(), "data", "mayak-session-runtime.json");
@@ -556,11 +557,35 @@ export async function controlDay2Takt({ sessionId, action, minutes }) {
         const current = readDay2Takt(bucket);
         const now = new Date().toISOString();
 
+        const status = day2TaktStatus(current, Date.now());
+
         if (normalizedAction === "start") {
             bucket.day2Takt = { ...current, startedAt: now };
+        } else if (normalizedAction === "finish") {
+            // Закончить текущий такт сейчас: длительность становится равной уже
+            // прошедшему. Это не то же, что «следующий»: день остаётся на том же
+            // такте, но время у него вышло — и на всех экранах видно, что вышло.
+            if (!status.running) {
+                throw new Error("Такт ещё не запущен");
+            }
+            bucket.day2Takt = { ...current, durationSeconds: Math.max(1, status.elapsedSeconds) };
         } else if (normalizedAction === "next") {
             if (current.index >= DAY2_LAST_TAKT) {
                 throw new Error("Это последний такт дня");
+            }
+            // Через голову текущего такта не перешагиваем. Такт — это общее
+            // время зала: если ведущий проскочит его, три стола окажутся в
+            // разных местах дня, а участники — с недоделанной деталью, которую
+            // у них уже никто не примет. Закончить раньше можно, но осознанно:
+            // кнопкой «завершить такт», и тогда это видно всем.
+            if (!status.running) {
+                throw new Error("Текущий такт ещё не запускали");
+            }
+            if (!status.overdue) {
+                throw new Error(
+                    `Такт ещё идёт, осталось ${formatDay2Remaining(status.remainingSeconds)}. `
+                    + "Дождитесь конца или завершите его кнопкой «Завершить такт»"
+                );
             }
             const index = current.index + 1;
             bucket.day2Takt = { index, startedAt: now, durationSeconds: day2DefaultSeconds(index) };
@@ -575,6 +600,17 @@ export async function controlDay2Takt({ sessionId, action, minutes }) {
             };
         } else if (normalizedAction === "stop") {
             bucket.day2Takt = { ...current, startedAt: null };
+        } else if (normalizedAction === "reset") {
+            // Вернуть день в начало. Только для отладочной сессии: в настоящей
+            // назад не ходят — день прожит, и переигрывать его нечем.
+            if (!isDebugSession(session)) {
+                throw new Error("Сбросить такты можно только в отладочной сессии");
+            }
+            bucket.day2Takt = {
+                index: DAY2_FIRST_TAKT,
+                startedAt: null,
+                durationSeconds: day2DefaultSeconds(DAY2_FIRST_TAKT),
+            };
         } else {
             throw new Error("Неизвестное действие с тактом");
         }

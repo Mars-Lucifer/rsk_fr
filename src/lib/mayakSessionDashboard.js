@@ -636,6 +636,9 @@ export async function getMayakSessionDashboardData(sessionId) {
             sectionId: session.sectionId || "",
             tableCount,
             status: session.status || "active",
+            // Отладочная сессия называет себя: пульт по этому признаку решает,
+            // показывать ли кнопку возврата в первый такт.
+            source: session.source || "",
         },
         // Такт зала — только для второго дня: пульту ведущего нужно знать, что
         // сейчас идёт, чтобы показать кнопку «следующий», а не «запустить».

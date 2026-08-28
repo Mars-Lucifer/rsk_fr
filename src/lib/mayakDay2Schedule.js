@@ -83,7 +83,13 @@ const MARKS = [
 export function day2TaktStatus(takt, nowMs) {
     const index = Number(takt?.index) || DAY2_FIRST_TAKT;
     const plan = day2TaktByIndex(index) || DAY2_TAKTS[0];
-    const durationSeconds = clampDay2TaktSeconds(takt?.durationSeconds || day2DefaultSeconds(index));
+    // Длительность берётся как лежит, без подтягивания к границам: границы —
+    // это правило ВВОДА, они проверяются там, где ведущий двигает такт. Если
+    // подтягивать их ещё и здесь, «завершить такт сейчас» перестанет работать:
+    // досрочно законченный такт короче нижней границы сдвига, и статус вернул
+    // бы его обратно в «идёт».
+    const stored = Number(takt?.durationSeconds);
+    const durationSeconds = Number.isFinite(stored) && stored > 0 ? stored : day2DefaultSeconds(index);
     const startedMs = takt?.startedAt ? Date.parse(takt.startedAt) : NaN;
 
     if (!Number.isFinite(startedMs)) {
