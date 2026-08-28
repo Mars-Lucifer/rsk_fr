@@ -3,7 +3,7 @@ import TextareaAutosize from "react-textarea-autosize";
 
 import Button from "@/components/ui/Button";
 import ContestLessonPanel from "@/components/features/tools-2/ContestLessonPanel";
-import { formatDay2TaskNumber } from "@/lib/mayakDay2Mode";
+import { formatDay2TaskNumber, DAY2_TABLE_NAMES } from "@/lib/mayakDay2Mode";
 import Input from "@/components/ui/Input/Input";
 import Switcher from "@/components/ui/Switcher";
 
@@ -112,11 +112,48 @@ function Day2TaskNav({ state, card, takt, problem, onOpen, disabled, debug, onDe
     // Иначе он висит поверх уже открывшегося такта и читается как поломка.
     const [asked, setAsked] = useState("");
 
+    const open = (text) => {
+        setValue(text);
+        setAsked(text);
+        onOpen(text);
+    };
+
     const submit = (event) => {
         event.preventDefault();
-        setAsked(value);
-        onOpen(value);
+        open(value);
     };
+
+    // Что доступно ПРЯМО СЕЙЧАС. Поле остаётся — набор номера это повтор
+    // рукой сделанного действия, ТЗ на этом настаивает, — но помнить формат
+    // человек не обязан: в 12:40 он смотрит на экран три секунды.
+    //
+    // На первом такте, пока номер не назван, кнопки нет намеренно: номер надо
+    // взять с картона и набрать самому. Дальше система его уже знает, и
+    // подставить пару или слово стола она может за него.
+    const chips = [];
+    if (state?.takt === "DETAIL") {
+        chips.push({ text: state.detail, label: `${state.detail} · моя деталь` });
+    }
+    if (state?.takt === "NODE") {
+        const pair = state.node.replace("-", " ");
+        chips.push({ text: pair, label: `${pair} · наш узел` });
+        chips.push({ text: `${pair} не сошлось`, label: "не сошлось" });
+        chips.push({ text: state.detail, label: `${state.detail} · моя деталь`, quiet: true });
+    }
+    if (state?.takt === "PRODUCT") {
+        const word = DAY2_TABLE_NAMES[state.table] || "";
+        if (word) chips.push({ text: word.toLowerCase(), label: `${word.toLowerCase()} · изделие` });
+        chips.push({ text: state.node.replace("-", " "), label: `${state.node.replace("-", " ")} · наш узел`, quiet: true });
+        chips.push({ text: state.detail, label: `${state.detail} · моя деталь`, quiet: true });
+    }
+
+    const placeholder = !state
+        ? "наберите номер своего тайла"
+        : state.takt === "DETAIL"
+        ? `${state.detail} — ваш номер с тайла`
+        : state.takt === "NODE"
+        ? `${state.node.replace("-", " ")} — вы и партнёр`
+        : "слово вашего стола";
 
     return (
         <div className="flex flex-col gap-[0.75rem]">
@@ -177,7 +214,7 @@ function Day2TaskNav({ state, card, takt, problem, onOpen, disabled, debug, onDe
                         type="text"
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
-                        placeholder="13 · 13 14 · 13 14 не сошлось · среда"
+                        placeholder={placeholder}
                         className="!h-10"
                         disabled={disabled}
                     />
@@ -186,6 +223,32 @@ function Day2TaskNav({ state, card, takt, problem, onOpen, disabled, debug, onDe
                     Открыть
                 </Button>
             </form>
+
+            {chips.length > 0 && (
+                <div className="flex flex-wrap items-center gap-[0.375rem]">
+                    {chips.map((chip) => (
+                        <button
+                            key={chip.label}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => open(chip.text)}
+                            className="text-sm rounded-full px-[0.75rem] py-[0.3125rem]"
+                            style={{
+                                // Глобальное `button { width: 100% }` растянуло бы
+                                // каждую кнопку на всю строку.
+                                width: "auto",
+                                border: "1px solid",
+                                borderColor: chip.quiet ? "#E5E7EB" : "var(--color-black)",
+                                background: chip.quiet ? "transparent" : "var(--color-black)",
+                                color: chip.quiet ? "#6B7280" : "#FFFFFF",
+                                opacity: disabled ? 0.4 : 1,
+                                cursor: disabled ? "default" : "pointer",
+                            }}>
+                            {chip.label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {problem && value === asked && (
                 <span className="text-sm" style={{ color: "var(--color-red)" }}>{problem}</span>
