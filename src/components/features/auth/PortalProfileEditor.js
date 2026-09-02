@@ -346,7 +346,7 @@ export default function PortalProfileEditor({
                         «Организация» стояло слева, а искали её справа — две
                         половины одного действия в разных углах формы. */}
                     <div className="flex flex-col gap-[1.25rem]">
-                        <div className="flex flex-col gap-[0.75rem] p-[1.25rem] rounded-[1rem] max-[640px]:p-[1rem]" style={{ border: "1.5px solid var(--color-gray-plus-50)" }}>
+                        <div className="flex flex-col gap-[0.75rem]">
                             <h6>Организация</h6>
 
                             <Field label="Регион">
@@ -379,11 +379,15 @@ export default function PortalProfileEditor({
                             ) : (
                                 <>
                                     <Field label="Организация">
-                                        <OrganizationPicker region={region} valueLabel={selectedOrganizationLabel} onSelected={handleOrganizationSelected} disabled={!region} />
+                                        {/* Регион только сужает выдачу, искать можно и без него.
+                                            Пока поле блокировалось до выбора региона, участник с
+                                            пустым регионом упирался в мёртвое поле: организация
+                                            в профиле не показана и выбрать её нечем. */}
+                                        <OrganizationPicker region={region} valueLabel={selectedOrganizationLabel} onSelected={handleOrganizationSelected} />
                                     </Field>
 
                                     <p className="text-sm" style={{ color: "var(--color-gray-black)" }}>
-                                        Ищем и среди уже заведённых организаций, и в реестре ФНС. Если организации нет нигде, заполните{" "}
+                                        Если организации нет нигде, заполните{" "}
                                         <Link target="_blank" className="text-(--color-blue)" href="https://forms.yandex.ru/u/690391e1068ff0a3ba625eef">
                                             форму
                                         </Link>
