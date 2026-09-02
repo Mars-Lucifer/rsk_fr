@@ -155,9 +155,13 @@ function placeCard(box, prefer, cardH = CARD_H) {
         };
     }
 
+    // Прижимаем к видимой области: у высокой цели (семь полей на весь экран) места
+    // снизу меньше карточки, и без зажима нижний край с кнопками «Дальше»/«Назад»
+    // уезжал за сгиб — шаг было не пролистать.
+    const top = side === "bottom" ? box.bottom + GAP : box.top - GAP - cardH;
     return {
         left,
-        top: side === "bottom" ? box.bottom + GAP : Math.max(16, box.top - GAP - cardH),
+        top: Math.min(Math.max(16, top), Math.max(16, vh - cardH - 16)),
         arrow: side === "bottom" ? "top" : "bottom",
     };
 }
