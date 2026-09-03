@@ -10,7 +10,7 @@
 // Белое на белом читается только затенением в стыках. Поэтому мягкая тень под объектами
 // здесь не украшение — без неё тумбы сливаются с платформой в одно пятно.
 
-import { ContactShadows, Html } from "@react-three/drei";
+import { ContactShadows, Environment, Html, Lightformer } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
@@ -18,17 +18,49 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import { LEVELS, RAYS } from "../model/zvezda.mjs";
-import { ACCENT, OVERVIEW, PEDESTAL, STAR, TOWER, inlay, pedestalAt, rayAngle, rayCamera, starOutline, tiers } from "../model/platform.mjs";
+import { ACCENT, OVERVIEW, PEDESTAL, STAR, TOWER, crown, inlay, pedestalAt, plinth, rayAngle, rayCamera, starOutline, staveAngles, tiers } from "../model/platform.mjs";
 
 const BG = "#eceef1";
 const PLASTER = "#f2f3f5";
 
-// Свечение маяка задаётся цветом, а не мощностью. На тёплом #ffcf8a любая интенсивность
-// даёт апельсин: разница красного и синего на выходе около 78 при эталонных 21. Почти белый
-// с тёплым уклоном даёт белое ядро и тёплую кайму — то, что на эталоне и есть.
-const GLOW = "#fff0d8";
+// Свечение маяка. Промер эталона по стенке яруса: 220,190,168 в середине и 242,207,173
+// у верха, то есть разница красного и синего 52-69 — свечение там насыщенно-тёплое, а не
+// белое. Прежняя пара «почти белый цвет плюс мощность 4.2» давала обратное: каналы упирались
+// в потолок, нейтральный тонмаппинг досаживал остаток насыщенности, и на кадре выходило
+// 237,227,215 при разнице 22 — вдвое бледнее эталона.
+//
+// Отсюда правило: тёплый цвет и мощность около единицы. Мощность выше вымывает цвет в белый
+// независимо от того, какой он был.
+const GLOW = "#ffd49b";
 const LIT = "#ffcf8a";
 
+
+// Циклорама: мягкое световое пятно под конструкцией вместо ровной заливки. На эталоне пол
+// студийный — к краям кадра он темнеет, и именно это отделяет сцену от фона, у которого тон
+// тот же. Градиент рисуется в canvas один раз и растягивается на 15 единиц сцены; дальше
+// текстура зажимается краевым пикселем, поэтому он обязан совпадать с цветом фона — иначе
+// на стыке плиты с фоном появится видимое кольцо.
+function useBackdrop() {
+    return useMemo(() => {
+        const size = 256;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        g.addColorStop(0, "#fafbfc");
+        g.addColorStop(0.45, "#f3f4f6");
+        g.addColorStop(1, BG);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const spread = 240 / 15;
+        tex.repeat.set(spread, spread);
+        tex.offset.set(-(spread - 1) / 2, -(spread - 1) / 2);
+        return tex;
+    }, []);
+}
 
 function StarSlab() {
     const geo = useMemo(() => {
@@ -71,13 +103,29 @@ function Pedestal({ index, color, ray, active, dimmed, onPick }) {
                 onPointerOver={() => (document.body.style.cursor = "pointer")}
                 onPointerOut={() => (document.body.style.cursor = "")}
             >
-                <cylinderGeometry args={[PEDESTAL.radius, PEDESTAL.radius, PEDESTAL.height, 48]} />
+                <cylinderGeometry args={[PEDESTAL.radius, PEDESTAL.radius, PEDESTAL.height - PEDESTAL.chamfer, 48]} />
                 <meshStandardMaterial color={PLASTER} roughness={0.82} metalness={0} />
             </mesh>
+            {/* Фаска кромки. Отдельным конусом, а не скруглением геометрии: цилиндр в three
+                фасок не умеет, а усечённый конус в 0.022 высотой даёт ровно ту светлую линию,
+                которой на эталоне столешница отделена от боковой стенки. */}
+            <mesh position={[0, PEDESTAL.height / 2 - PEDESTAL.chamfer / 2, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[PEDESTAL.radius - PEDESTAL.chamfer, PEDESTAL.radius, PEDESTAL.chamfer, 48]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.82} metalness={0} />
+            </mesh>
+            {/* Бортик по краю столешницы: тор, выступающий над крышкой цилиндра ровно на свой
+                малый радиус. Поле от этого оказывается утопленным, тумба читается блюдцем.
+                Тором, а не открытым цилиндром: у открытого цилиндра нет верхней грани, и на
+                просвет видно его изнанку. */}
+            <mesh position={[0, PEDESTAL.height / 2, 0]} rotation={[-Math.PI / 2, 0, 0]} castShadow receiveShadow>
+                <torusGeometry args={[PEDESTAL.radius - PEDESTAL.chamfer - PEDESTAL.lip, PEDESTAL.lip, 10, 64]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.82} />
+            </mesh>
+
             {/* Кольцо цвета лежит на верхней кромке. Свечения нет намеренно: со свечением
                 старший канал упирается в потолок, кольцо становится ровной полосой без
                 светотени по окружности — на эталоне же она есть и заметная. */}
-            <mesh position={[0, PEDESTAL.height / 2 + 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh position={[0, PEDESTAL.height / 2 + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
                 <torusGeometry args={[PEDESTAL.rimRadius, PEDESTAL.rimThickness, 12, 72]} />
                 <meshStandardMaterial color={color} roughness={0.5} />
             </mesh>
@@ -175,37 +223,85 @@ function Inlay({ index, color }) {
     return (
         <mesh position={[Math.cos(a) * line.mid, 0.004, Math.sin(a) * line.mid]} rotation={[0, -a, 0]}>
             <boxGeometry args={[line.length, 0.008, 0.026]} />
-            <meshStandardMaterial color={color} roughness={0.5} />
+            {/* Жила слегка светится — ровно настолько, чтобы блум дал вокруг неё цветную дымку,
+                как на эталоне. Больше нельзя: на 1.0 канал упирается в потолок, цвет вымывается
+                в белый, и вместо цветной линии выходит светлая царапина. Кольца на тумбах
+                оставлены матовыми намеренно — там свечение съедало светотень по окружности. */}
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.45} roughness={0.5} />
         </mesh>
     );
 }
 
 // Маяк. Ярус светится, если уровень достигнут: сколько горит — там организация и стоит.
 // Легенды не требует, и это главное, ради чего он в центре.
+// Кольцо вертикальных стоек вокруг яруса. Ставится и на ярусы, и на фонарь, поэтому вынесено
+// отдельно. Шесть ярусов по четырнадцать стоек — 84 меша, но сцена рисуется по запросу
+// и стоит неподвижно, так что платит за них только подлёт камеры.
+function Staves({ y, radius, height }) {
+    const angles = useMemo(staveAngles, []);
+    return angles.map((a) => (
+        <mesh key={a} position={[Math.cos(a) * radius, y, Math.sin(a) * radius]} rotation={[0, -a, 0]}>
+            <boxGeometry args={[TOWER.staveOut * 2, height, TOWER.staveWidth]} />
+            <meshStandardMaterial color={PLASTER} emissive={GLOW} emissiveIntensity={0.12} roughness={0.8} />
+        </mesh>
+    ));
+}
+
+// Окна яруса. Две штуки на противоположных сторонах: одно всегда смотрит на камеру обзора,
+// второе появляется при подлёте к дальнему лучу. Больше не нужно — на четырёх окнах ярус
+// начинает выглядеть дырявым.
+function Windows({ y, radius }) {
+    return [Math.PI / 4, Math.PI * 1.25].map((a) => (
+        <mesh key={a} position={[Math.cos(a) * radius, y, Math.sin(a) * radius]} rotation={[0, -a, 0]}>
+            <boxGeometry args={[TOWER.windowDepth, TOWER.windowSize, TOWER.windowSize]} />
+            <meshStandardMaterial color={PLASTER} roughness={0.8} />
+        </mesh>
+    ));
+}
+
 function Tower({ level }) {
     const stack = useMemo(tiers, []);
-    const top = TOWER.baseHeight + LEVELS.length * TOWER.tierHeight;
+    const foot = useMemo(plinth, []);
+    const c = useMemo(crown, []);
+    const lanternOn = level >= LEVELS.length;
     return (
         <group>
-            <mesh position={[0, TOWER.baseHeight / 2, 0]} castShadow receiveShadow>
-                <cylinderGeometry args={[TOWER.baseRadius * 0.82, TOWER.baseRadius, TOWER.baseHeight, 48]} />
+            {/* Цоколь. Между двумя ступенями светящаяся щель: на эталоне свет у подножия
+                выходит из-под маяка щелью, а сам цоколь остаётся белым. Щель горит всегда —
+                нижний уровень шкалы это «маяк зажжён на один ярус», а не потухший маяк. */}
+            <mesh position={[0, foot.bottom.y, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[foot.bottom.radius, foot.bottom.radius, foot.bottom.height, 48]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.82} />
+            </mesh>
+            <mesh position={[0, foot.glow.y, 0]}>
+                <cylinderGeometry args={[foot.glow.radius, foot.glow.radius, foot.glow.height, 48]} />
+                <meshStandardMaterial color={PLASTER} emissive={GLOW} emissiveIntensity={1.5 + level * 0.12} roughness={0.6} />
+            </mesh>
+            <mesh position={[0, foot.top.y, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[foot.top.radius, foot.top.radius, foot.top.height, 48]} />
                 <meshStandardMaterial color={PLASTER} roughness={0.82} />
             </mesh>
 
             {stack.map((t) => {
                 const on = t.level <= level;
+                const wallHeight = t.height - TOWER.corniceHeight;
+                const wallY = t.y - TOWER.corniceHeight / 2;
                 return (
                     <group key={t.level}>
-                        <mesh position={[0, t.y, 0]} castShadow receiveShadow>
-                            <cylinderGeometry args={[t.rTop, t.rBottom, t.height, 40]} />
-                            <meshStandardMaterial color={on ? LIT : PLASTER} emissive={on ? GLOW : "#000000"} emissiveIntensity={on ? 2.2 : 0} roughness={0.72} />
+                        <mesh position={[0, wallY, 0]} castShadow receiveShadow>
+                            <cylinderGeometry args={[t.rTop, t.rBottom, wallHeight, 40]} />
+                            <meshStandardMaterial color={PLASTER} emissive={on ? GLOW : "#000000"} emissiveIntensity={on ? 2.1 : 0} roughness={0.72} />
                         </mesh>
+                        {/* Вертикальные стойки по окружности. Стенка светится, стойки белые —
+                            на этом контрасте ярус читается строением, а не лампой. */}
+                        <Staves y={wallY} radius={(t.rTop + t.rBottom) / 2} height={wallHeight} />
+                        <Windows y={wallY} radius={(t.rTop + t.rBottom) / 2} />
                         {/* Карниз на стыке ярусов. Без него шесть цилиндров сливаются в один
-                            конус, и «шесть ярусов» перестаёт читаться. После утоньшения ствола
-                            прежний вынос стал вровень со стволом, и башня превратилась в стопку
-                            бубликов — вынос срезан вдвое. */}
-                        <mesh position={[0, t.y - t.height / 2 + 0.008, 0]} castShadow receiveShadow>
-                            <cylinderGeometry args={[t.rBottom * 1.04, t.rBottom * 1.04, 0.014, 40]} />
+                            конус, и «шесть ярусов» перестаёт читаться. Стоит поверх стенки, а не
+                            у нижней кромки: на эталоне обод венчает ярус и служит опорой
+                            следующему, более узкому. */}
+                        <mesh position={[0, t.y + t.height / 2 - TOWER.corniceHeight / 2, 0]} castShadow receiveShadow>
+                            <cylinderGeometry args={[t.rTop * TOWER.corniceOut, t.rTop * TOWER.corniceOut, TOWER.corniceHeight, 40]} />
                             <meshStandardMaterial color={PLASTER} roughness={0.78} />
                         </mesh>
                     </group>
@@ -213,25 +309,47 @@ function Tower({ level }) {
             })}
 
             {/* Площадка галереи под фонарём. Радиус обязан превышать rTop, иначе диск
-                прячется внутрь силуэта яруса и ступени не видно: карниз в коде стоит
-                у нижней кромки яруса, у верхней ничего нет. */}
-            <mesh position={[0, top + 0.015, 0]} castShadow receiveShadow>
-                <cylinderGeometry args={[TOWER.galleryRadius, TOWER.galleryRadius, 0.03, 32]} />
+                прячется внутрь силуэта яруса и ступени не видно. */}
+            <mesh position={[0, c.galleryY, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[TOWER.galleryRadius, TOWER.galleryRadius, TOWER.galleryHeight, 32]} />
                 <meshStandardMaterial color={PLASTER} roughness={0.8} />
             </mesh>
 
             {/* Фонарь горит только на верхнем уровне: маяк заработал целиком. */}
-            <mesh position={[0, top + TOWER.lanternHeight / 2 + 0.03, 0]} castShadow>
-                <cylinderGeometry args={[TOWER.lanternRadius * 0.85, TOWER.lanternRadius, TOWER.lanternHeight, 24]} />
+            <mesh position={[0, c.lanternY, 0]} castShadow>
+                <cylinderGeometry args={[TOWER.lanternRadius * 0.92, TOWER.lanternRadius, TOWER.lanternHeight, 24]} />
                 <meshStandardMaterial
-                    color={level >= LEVELS.length ? LIT : PLASTER}
-                    emissive={level >= LEVELS.length ? GLOW : "#000000"}
-                    emissiveIntensity={level >= LEVELS.length ? 3.5 : 0}
+                    color={PLASTER}
+                    emissive={lanternOn ? GLOW : "#000000"}
+                    emissiveIntensity={lanternOn ? 2.8 : 0}
                     roughness={0.6}
                 />
             </mesh>
-            <mesh position={[0, top + TOWER.lanternHeight + 0.075, 0]} castShadow>
-                <coneGeometry args={[TOWER.lanternRadius * 1.15, 0.11, 24]} />
+            <Staves y={c.lanternY} radius={TOWER.lanternRadius * 0.96} height={TOWER.lanternHeight} />
+
+            {/* Купол полусферический, не конус: конус на этом месте превращает маяк в ракету.
+                Ободок под ним прячет стык купола с фонарём. */}
+            <mesh position={[0, c.rimY, 0]} castShadow>
+                <cylinderGeometry args={[TOWER.lanternRadius * 1.2, TOWER.lanternRadius * 1.2, TOWER.domeRim, 32]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.8} />
+            </mesh>
+            <mesh position={[0, c.domeBase, 0]} scale={[1, TOWER.domeSquash, 1]} castShadow>
+                <sphereGeometry args={[c.domeRadius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.78} />
+            </mesh>
+
+            {/* Шпиль: ножка, шар, остриё. На общем плане различим только силуэт, но без него
+                купол выглядит срезанным. */}
+            <mesh position={[0, c.stemY, 0]} castShadow>
+                <cylinderGeometry args={[0.011, 0.013, TOWER.finialStem, 12]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.8} />
+            </mesh>
+            <mesh position={[0, c.ballY, 0]} castShadow>
+                <sphereGeometry args={[TOWER.finialBall, 16, 12]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.78} />
+            </mesh>
+            <mesh position={[0, c.tipY, 0]} castShadow>
+                <coneGeometry args={[0.014, TOWER.finialTip, 12]} />
                 <meshStandardMaterial color={PLASTER} roughness={0.8} />
             </mesh>
 
@@ -240,19 +358,30 @@ function Tower({ level }) {
             {/* После среза заливки та же мощность залила середину звезды тёплым пятном:
                 лужа должна лежать у подножия, а не выбеливать половину платформы. */}
             <pointLight position={[0, 0.34 + level * 0.06, 0]} intensity={0.5 + level * 0.2} distance={2.1} decay={2.2} color={LIT} />
+            {/* Второй тёплый источник — на середине горящей части ствола. Стойки и карнизы
+                стоят снаружи стенки, свет изнутри до них не доходит, и при одном источнике
+                у подножия верхние ярусы выходили серыми: конструкция темнее того, что она
+                подсвечивает. Источник едет вверх вместе с уровнем — он и есть «свет из окон». */}
+            <pointLight position={[0, TOWER.baseHeight + level * TOWER.tierHeight * 0.55, 0]} intensity={0.35 + level * 0.08} distance={1.5} decay={2} color={LIT} />
         </group>
     );
 }
 
-export default function Platform({ level = 1, ray = null, onPickRay = () => {} }) {
+// children — точка вставки для того, что ставится НА платформу: предметы на тумбах.
+// Сама платформа о них ничего не знает и знать не должна, поэтому они приходят снаружи,
+// а не заводятся здесь. Добавка чисто аддитивная: без детей файл ведёт себя как прежде.
+export default function Platform({ level = 1, ray = null, onPickRay = () => {}, children }) {
     const rayIndex = ray ? RAYS.findIndex((r) => r.id === ray) : null;
+    const backdrop = useBackdrop();
     return (
         <Canvas
             // Сцена статична: кадр рисуется только по запросу от рига камеры.
             frameloop="demand"
-            // Потолок плотности снижен: при 2 холст выходил на 3.6 мегапикселя, и всю эту
-            // площадь каждый кадр прогоняли затенение и блум.
-            dpr={[1, 1.5]}
+            // Плотность вернулась к двум. Полтора ставили, когда сцена рисовалась в режиме
+            // always и платила за плотность непрерывно; в demand кадр считается только пока
+            // едет камера, а стоит гладкость кромок дорого: на 1.5 карнизы и стойки маяка
+            // шли лесенкой, и вся аккуратность рендера уходила в неё.
+            dpr={[1, 2]}
             shadows={{ type: THREE.PCFShadowMap }}
             camera={{ position: OVERVIEW.position, fov: OVERVIEW.fov }}
             // Клик по пустому месту возвращает к обзору — но только если это действительно
@@ -266,7 +395,7 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {} }
                 camera.lookAt(...OVERVIEW.target);
                 scene.background = new THREE.Color(BG);
             }}
-            gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: 1.05 }}
+            gl={{ antialias: true, toneMapping: THREE.NeutralToneMapping, toneMappingExposure: 0.95 }}
         >
             {/* Свет студийный, но заливки заметно меньше, чем кажется правильным на слух.
                 При прежней заливке гипс выходил светлее фона, а на эталоне он темнее фона —
@@ -274,16 +403,33 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {} }
                 клякс, отъезжавших от тумб вбок, шли именно от низкого угла, на эталоне их
                 нет ни у одной тумбы. Перепад «верх против боковой стенки» при этом растёт
                 с 11 уровней до полусотни ещё до всякого AO. */}
-            <ambientLight intensity={0.3} />
-            <hemisphereLight args={["#ffffff", "#d5d8dd", 0.55]} />
+            {/* Студийное окружение вместо голых источников. Эталон — продуктовый рендер:
+                гипс там освещён со всех сторон отражённым светом, и потому остаётся белым
+                даже в тени. У нас стоял один направленный ключ, и всё, что он не доставал —
+                стойки, карнизы, изнанка тумб — уходило в серое; затенение эту серость ещё и
+                удваивало, отчего сцена читалась пыльной.
+                Окружение собрано из Lightformer прямо в сцене, а не взято пресетом: пресеты
+                drei тянут HDRI из сети, а сцена обязана работать без неё. Считается один раз
+                (frames по умолчанию), потом только читается. */}
+            <Environment resolution={256}>
+                {/* Софтбокс сверху — основной свет студии. */}
+                <Lightformer form="rect" intensity={1.7} position={[0, 6, 1]} rotation={[-Math.PI / 2, 0, 0]} scale={[12, 12, 1]} />
+                {/* Боковые заполняющие: они и делают белое белым в тенях. */}
+                <Lightformer form="rect" intensity={0.7} position={[-7, 3, 3]} rotation={[0, -Math.PI / 3, 0]} scale={[8, 6, 1]} />
+                <Lightformer form="rect" intensity={0.55} position={[7, 2.5, 2]} rotation={[0, Math.PI / 3, 0]} scale={[8, 6, 1]} />
+                {/* Контровой сзади: отделяет силуэт от фона того же тона. */}
+                <Lightformer form="rect" intensity={0.9} position={[0, 3, -8]} rotation={[0, Math.PI, 0]} scale={[10, 5, 1]} />
+            </Environment>
+
+            {/* Направленный оставлен только ради отбрасываемой тени: окружение теней не даёт.
+                Мощность срезана втрое против прежней — теперь он рисует тень, а не освещает. */}
+            <ambientLight intensity={0.12} />
             <directionalLight
                 position={[-3.4, 15.5, 3.1]}
-                intensity={2.2}
+                intensity={1.35}
                 castShadow
                 shadow-mapSize={[2048, 2048]}
                 shadow-radius={20}
-                // Заливку срезали, и тень стала проваливаться глубже эталонной: освещённый
-                // пол против затенённого давал 68% перепада против эталонных 46%.
                 shadow-intensity={0.8}
                 shadow-camera-left={-6}
                 shadow-camera-right={6}
@@ -291,7 +437,6 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {} }
                 shadow-camera-bottom={-6}
                 shadow-bias={-0.0004}
             />
-            <directionalLight position={[6, 4.5, 3]} intensity={0.25} />
 
             <StarSlab />
             {RAYS.map((ray, i) => (
@@ -309,6 +454,7 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {} }
                 />
             ))}
             <Tower level={level} />
+            {children}
             <CameraRig ray={rayIndex} level={level} />
 
             {/* Мягкая тень под всей конструкцией: она отрывает звезду от фона. Без неё
@@ -318,7 +464,12 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {} }
             {/* Площадка тени вынесена далеко за кадр. При scale 11 её собственная кромка
                 попадала в кадр и читалась светлым трапециевидным швом поперёк плиты —
                 тот самый шов, который я сперва списал на карту теней и на плиту. */}
-            <ContactShadows position={[0, -(STAR.thickness + STAR.bevel) - 0.02, 0]} opacity={0.42} scale={34} blur={5} far={3} resolution={2048} frames={1} color="#a09890" />
+            {/* Тень двухслойная. Один мягкий слой давал ровное серое пятно: на эталоне у самой
+                кромки тень заметно плотнее, а дальше растворяется. Плотный слой снят коротким
+                far — он ловит только касание платформы и тумб, длинный отвечает за ореол.
+                Оба стоят чуть на разной высоте: на одной прозрачные плоскости мерцают. */}
+            <ContactShadows position={[0, -(STAR.thickness + STAR.bevel) - 0.02, 0]} opacity={0.34} scale={34} blur={5} far={3} resolution={2048} frames={1} color="#a09890" />
+            <ContactShadows position={[0, -(STAR.thickness + STAR.bevel) - 0.015, 0]} opacity={0.5} scale={16} blur={1.1} far={0.55} resolution={2048} frames={1} color="#8d857b" />
 
             {/* Плита уходит далеко за кадр — при длинном объективе её кромка иначе попадает
                 в верх кадра и читается горизонтом.
@@ -330,8 +481,8 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {} }
                 <planeGeometry args={[240, 240]} />
                 {/* Материал без освещения. Освещаемая плита реагировала и на карту теней,
                     и на экранное затенение, и обе давали на ней видимый шов по своей границе.
-                    Неосвещаемая заливка цветом фона шва дать не может в принципе. */}
-                <meshBasicMaterial color={BG} />
+                    Неосвещаемая заливка шва дать не может в принципе. */}
+                <meshBasicMaterial map={backdrop} />
             </mesh>
 
             {/* Затенение в стыках. Белое на белом читается только им: без AO верхние грани
@@ -339,7 +490,14 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {} }
                 Порядок важен — тонмаппинг последним, иначе блум работает по уже сжатому
                 сигналу и порог не срабатывает. */}
             <EffectComposer disableNormalPass multisampling={4}>
-                <N8AO aoRadius={0.55} distanceFalloff={0.75} intensity={3.4} color="#7a736a" />
+                {/* Радиус срезан после появления стоек на маяке. Затенение экранное: оно не
+                    различает, что под ним — стык или светящаяся стенка, и на широком радиусе
+                    каждая стойка гасила свечение вокруг себя, из-за чего горящий ярус выходил
+                    бледно-кремовым вместо тёплого. На узком радиусе AO остаётся там, ради чего
+                    он и стоит, — в стыках тумб с платформой.
+                    Качество поднято по той же причине: на дефолтном числе сэмплов частокол
+                    стоек давал видимую зернистость по карнизам. */}
+                <N8AO aoRadius={0.28} distanceFalloff={0.7} intensity={3} quality="high" color="#7a736a" />
                 <Bloom intensity={0.55} luminanceThreshold={0.82} luminanceSmoothing={0.25} mipmapBlur />
                 <ToneMapping mode={ToneMappingMode.NEUTRAL} />
             </EffectComposer>
