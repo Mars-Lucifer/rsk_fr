@@ -114,7 +114,7 @@ function RealPedestal({ ray }) {
 export default function PropView({ file, dist = 1, raw = false }) {
     // Луч определяется именем файла: knowledge.glb -> knowledge. Кольцо тумбы красится
     // в его цвет, и сразу видно, тот ли предмет положили на тот луч.
-    const ray = file.replace(/.glb$/i, "");
+    const ray = file.replace(/\.glb$/i, "");
     return (
         <Canvas
             frameloop="demand"

@@ -15,6 +15,8 @@ import { LEVELS, RAYS } from "@/components/features/mayak-zvezda/model/zvezda.mj
 //
 // Состояние в адресе (?level=&ray=): кадром проверяется без кликов, ссылкой делится.
 const Platform = dynamic(() => import("@/components/features/mayak-zvezda/star/Platform"), { ssr: false });
+// Предметы приходят в сцену детьми: платформа о них ничего не знает.
+const Props = dynamic(() => import("@/components/features/mayak-zvezda/star/Props"), { ssr: false });
 
 const icz = (l) => (l.icz > 0 ? `+${l.icz}` : String(l.icz));
 
@@ -67,7 +69,9 @@ export default function ZvezdaPlatform() {
                 <title>ЗВЕЗДА · платформа</title>
             </Head>
             <div className="stage">
-                <Platform level={level} ray={ray} onPickRay={pickRay} />
+                <Platform level={level} ray={ray} onPickRay={pickRay}>
+                    <Props ray={ray} />
+                </Platform>
 
                 <div className="hud">
                     <div className="tl">
