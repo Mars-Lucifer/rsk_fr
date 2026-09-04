@@ -10,29 +10,25 @@
 // Белое на белом читается только затенением в стыках. Поэтому мягкая тень под объектами
 // здесь не украшение — без неё тумбы сливаются с платформой в одно пятно.
 
-import { ContactShadows, Environment, Html, Lightformer } from "@react-three/drei";
+import { ContactShadows, Environment, Lightformer } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bloom, EffectComposer, N8AO, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 
 import { LEVELS, RAYS } from "../model/zvezda.mjs";
-import { ACCENT, OVERVIEW, PEDESTAL, STAR, TOWER, crown, inlay, pedestalAt, plinth, rayAngle, rayCamera, starOutline, staveAngles, tiers } from "../model/platform.mjs";
+import { ACCENT, OVERVIEW, PEDESTAL, STAR, TOWER, crown, inlay, pedestalAt, plinth, rayAngle, rayCamera, raySector, starOutline, staveAngles, tiers } from "../model/platform.mjs";
+import Props from "./Props";
 
 const BG = "#eceef1";
 const PLASTER = "#f2f3f5";
 
-// Свечение маяка. Промер эталона по стенке яруса: 220,190,168 в середине и 242,207,173
-// у верха, то есть разница красного и синего 52-69 — свечение там насыщенно-тёплое, а не
-// белое. Прежняя пара «почти белый цвет плюс мощность 4.2» давала обратное: каналы упирались
-// в потолок, нейтральный тонмаппинг досаживал остаток насыщенности, и на кадре выходило
-// 237,227,215 при разнице 22 — вдвое бледнее эталона.
-//
-// Отсюда правило: тёплый цвет и мощность около единицы. Мощность выше вымывает цвет в белый
-// независимо от того, какой он был.
-const GLOW = "#ffd49b";
-const LIT = "#ffcf8a";
+// Свечение маяка: тёплый золотистый поток линзы Френеля (~3200K).
+// Вольфрамово-янтарный луч рассекает пространство, создавая благородный контраст с белым гипсом.
+const GLOW = "#ffe6ba";
+const LIT = "#ffd485";
+
 
 
 // Циклорама: мягкое световое пятно под конструкцией вместо ровной заливки. На эталоне пол
@@ -89,7 +85,7 @@ function StarSlab() {
     );
 }
 
-function Pedestal({ index, color, ray, active, dimmed, onPick }) {
+function Pedestal({ index, color, ray, active, dimmed, onPick, onHover }) {
     const at = pedestalAt(index);
     return (
         <group position={at}>
@@ -100,8 +96,14 @@ function Pedestal({ index, color, ray, active, dimmed, onPick }) {
                     e.stopPropagation();
                     onPick(ray.id);
                 }}
-                onPointerOver={() => (document.body.style.cursor = "pointer")}
-                onPointerOut={() => (document.body.style.cursor = "")}
+                onPointerOver={() => {
+                    document.body.style.cursor = "pointer";
+                    onHover(ray.id);
+                }}
+                onPointerOut={() => {
+                    document.body.style.cursor = "";
+                    onHover(null);
+                }}
             >
                 <cylinderGeometry args={[PEDESTAL.radius, PEDESTAL.radius, PEDESTAL.height - PEDESTAL.chamfer, 48]} />
                 <meshStandardMaterial color={PLASTER} roughness={0.82} metalness={0} />
@@ -130,23 +132,6 @@ function Pedestal({ index, color, ray, active, dimmed, onPick }) {
                 <meshStandardMaterial color={color} roughness={0.5} />
             </mesh>
 
-            {/* Подпись луча — DOM поверх сцены, а не текст в WebGL: она обязана оставаться
-                читаемой при любом размере и не крутиться вместе с объектом. Она же кнопка.
-                Стоит над тумбой на выносной линии, как метки на igloo. */}
-            <Html position={[0, PEDESTAL.height / 2 + 0.05, 0]} center zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
-                <button
-                    type="button"
-                    className={"ray-label" + (active ? " on" : "") + (dimmed ? " dim" : "")}
-                    style={{ "--c": color, pointerEvents: "auto" }}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onPick(ray.id);
-                    }}
-                >
-                    <i />
-                    <b>{ray.name}</b>
-                </button>
-            </Html>
         </group>
     );
 }
@@ -158,30 +143,111 @@ function Pedestal({ index, color, ray, active, dimmed, onPick }) {
 // Он же водитель отрисовки. Сцена стоит в режиме demand и по умолчанию не рисуется вовсе;
 // кадр запрашивается, только пока камера едет. Это главная экономия: сцена статична, и
 // прежний режим always жёг полный кадр каждые 26 мс круглосуточно.
+// Кратчайшая угловая разница на окружности в диапазоне [-PI, PI]
+function shortestAngle(from, to) {
+    return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
+
 function CameraRig({ ray, level }) {
     const camera = useThree((s) => s.camera);
     const invalidate = useThree((s) => s.invalidate);
     const target = useRef(new THREE.Vector3(...OVERVIEW.target));
     const goalPos = useRef(new THREE.Vector3());
+    const isFirstMount = useRef(true);
+
+    const warmupFrames = useRef(0);
 
     // Сменились луч или уровень — разбудить отрисовку. Уровень меняет свечение ярусов,
     // и без этого маяк переключался бы только при следующем движении камеры.
     useEffect(() => {
+        warmupFrames.current = 0;
         invalidate();
+        const t1 = setTimeout(invalidate, 80);
+        const t2 = setTimeout(invalidate, 300);
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
     }, [ray, level, invalidate]);
 
     useFrame((_, dt) => {
         const goal = ray == null ? OVERVIEW : rayCamera(ray);
+
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            if (ray != null) {
+                camera.position.set(goal.position[0], goal.position[1], goal.position[2]);
+                camera.fov = goal.fov;
+                camera.updateProjectionMatrix();
+                target.current.set(goal.target[0], goal.target[1], goal.target[2]);
+                camera.lookAt(target.current);
+                invalidate();
+                return;
+            }
+        }
         // Кламп обязателен именно в режиме demand: dt первого кадра после простоя равен
         // длине простоя, и без ограничения камера телепортируется в конечную точку.
         const d = Math.min(dt, 1 / 30);
-        const k = 3.2;
-        camera.position.x = THREE.MathUtils.damp(camera.position.x, goal.position[0], k, d);
-        camera.position.y = THREE.MathUtils.damp(camera.position.y, goal.position[1], k, d);
-        camera.position.z = THREE.MathUtils.damp(camera.position.z, goal.position[2], k, d);
-        target.current.x = THREE.MathUtils.damp(target.current.x, goal.target[0], k, d);
-        target.current.y = THREE.MathUtils.damp(target.current.y, goal.target[1], k, d);
-        target.current.z = THREE.MathUtils.damp(target.current.z, goal.target[2], k, d);
+        const k = 3.4;
+
+        // Цилиндрическая/дуговая интерполяция позиции камеры:
+        // при переходе между соседними лучами камера скользит по круговой орбите вокруг маяка,
+        // сохраняя комфортную дистанцию и не проваливаясь внутрь башни.
+        const curX = camera.position.x;
+        const curZ = camera.position.z;
+        const curR = Math.hypot(curX, curZ);
+        const goalX = goal.position[0];
+        const goalZ = goal.position[2];
+        const goalR = Math.hypot(goalX, goalZ);
+        const goalA = Math.atan2(goalZ, goalX);
+        const curA = curR > 0.1 ? Math.atan2(curZ, curX) : goalA;
+
+        const diffA = shortestAngle(curA, goalA);
+        const nextA = THREE.MathUtils.damp(curA, curA + diffA, k, d);
+        const nextR = THREE.MathUtils.damp(curR, goalR, k, d);
+        const nextY = THREE.MathUtils.damp(camera.position.y, goal.position[1], k, d);
+
+        camera.position.x = nextR * Math.cos(nextA);
+        camera.position.y = nextY;
+        camera.position.z = nextR * Math.sin(nextA);
+
+        // Цилиндрическая интерполяция точки взгляда (target):
+        // между тумбами фокус скользит по круговой дуге расположения тумб,
+        // не прорезая ствол маяка по прямой хорде.
+        const curTx = target.current.x;
+        const curTz = target.current.z;
+        const curTR = Math.hypot(curTx, curTz);
+        const goalTx = goal.target[0];
+        const goalTz = goal.target[2];
+        const goalTR = Math.hypot(goalTx, goalTz);
+        const goalTA = Math.atan2(goalTz, goalTx);
+
+        if (goalTR < 0.08) {
+            // Возврат к центру (обзор)
+            const nextTR = THREE.MathUtils.damp(curTR, goalTR, k, d);
+            const nextTY = THREE.MathUtils.damp(target.current.y, goal.target[1], k, d);
+            target.current.x = curTR > 0.01 ? nextTR * (curTx / curTR) : 0;
+            target.current.y = nextTY;
+            target.current.z = curTR > 0.01 ? nextTR * (curTz / curTR) : 0;
+        } else if (curTR < 0.08) {
+            // Выезд от центра к выбранному лучу
+            const nextTR = THREE.MathUtils.damp(curTR, goalTR, k, d);
+            const nextTY = THREE.MathUtils.damp(target.current.y, goal.target[1], k, d);
+            target.current.x = nextTR * Math.cos(goalTA);
+            target.current.y = nextTY;
+            target.current.z = nextTR * Math.sin(goalTA);
+        } else {
+            // Переход между соседними тумбами по круговой дуге
+            const curTA = Math.atan2(curTz, curTx);
+            const diffTA = shortestAngle(curTA, goalTA);
+            const nextTA = THREE.MathUtils.damp(curTA, curTA + diffTA, k, d);
+            const nextTR = THREE.MathUtils.damp(curTR, goalTR, k, d);
+            const nextTY = THREE.MathUtils.damp(target.current.y, goal.target[1], k, d);
+            target.current.x = nextTR * Math.cos(nextTA);
+            target.current.y = nextTY;
+            target.current.z = nextTR * Math.sin(nextTA);
+        }
+
         const fov = THREE.MathUtils.damp(camera.fov, goal.fov, k, d);
         if (Math.abs(fov - camera.fov) > 1e-4) {
             camera.fov = fov;
@@ -190,11 +256,6 @@ function CameraRig({ ray, level }) {
         camera.lookAt(target.current);
 
         // Не доехали — просим следующий кадр. Доехали — отрисовка засыпает сама.
-        //
-        // Затухание подходит к цели бесконечно долго, и на строгом пороге сцена продолжала
-        // рисоваться три секунды после того, как движение уже не видно глазом. Поэтому
-        // порог взят видимый — половина миллиметра сцены, — и по нему камера встаёт в цель
-        // точно, а не продолжает подползать.
         goalPos.current.set(goal.position[0], goal.position[1], goal.position[2]);
         const closePos = camera.position.distanceToSquared(goalPos.current) < 2.5e-5;
         const closeFov = Math.abs(camera.fov - goal.fov) < 0.02;
@@ -210,6 +271,10 @@ function CameraRig({ ray, level }) {
                 camera.updateProjectionMatrix();
             }
             camera.lookAt(target.current);
+            if (warmupFrames.current < 25) {
+                warmupFrames.current += 1;
+                invalidate();
+            }
             return;
         }
         invalidate();
@@ -217,20 +282,249 @@ function CameraRig({ ray, level }) {
     return null;
 }
 
-function Inlay({ index, color }) {
-    const line = inlay(index);
+const INLAY_STATIONS = [
+    TOWER.baseRadius + 0.06,
+    STAR.inner * Math.cos(Math.PI / 6),
+    1.8,
+    PEDESTAL.at - PEDESTAL.radius * 0.45,
+];
+
+function fullSectorHalfWidth(x) {
+    const xMin = INLAY_STATIONS[0];
+    const xValley = INLAY_STATIONS[1];
+    const hValley = STAR.inner * Math.sin(Math.PI / 6);
+    if (x <= xValley) {
+        const t = (x - xMin) / (xValley - xMin);
+        const hBase = xMin * Math.tan(Math.PI / 6);
+        return hBase + (hValley - hBase) * t;
+    }
+    const t = (x - xValley) / (STAR.outer - xValley);
+    return Math.max(0.013, hValley * (1 - t));
+}
+
+// Прогрессия закрашивания луча: на уровне -1 (level 1) — тонкая линия жилы,
+// к уровню +4 (level 6) — сектор полностью заполняется акцентным цветом.
+function Inlay({ index, color, level = 1 }) {
+    const line = useMemo(() => inlay(index), [index]);
     const a = line.angle;
+    const targetU = Math.max(0, Math.min(1, (level - 1) / 5));
+    const currentU = useRef(targetU);
+    const invalidate = useThree((s) => s.invalidate);
+
+    const { geo, posAttr } = useMemo(() => {
+        const g = new THREE.BufferGeometry();
+        // 4 станции x 2 вершины = 8 вершин
+        const pos = new Float32Array(8 * 3);
+        const normals = new Float32Array(8 * 3);
+        for (let i = 0; i < 8; i += 1) {
+            normals[i * 3 + 1] = 1;
+        }
+        const indices = [
+            0, 1, 2,  2, 1, 3,
+            2, 3, 4,  4, 3, 5,
+            4, 5, 6,  6, 5, 7,
+        ];
+        g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+        g.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
+        g.setIndex(indices);
+        g.boundingSphere = new THREE.Sphere(new THREE.Vector3(1.5, 0, 0), 3.0);
+        return { geo: g, posAttr: g.attributes.position };
+    }, []);
+
+    useEffect(() => {
+        return () => geo.dispose();
+    }, [geo]);
+
+    const updateVerts = (u) => {
+        const h0 = 0.013;
+        for (let i = 0; i < INLAY_STATIONS.length; i += 1) {
+            const x = INLAY_STATIONS[i];
+            const hw = h0 + (fullSectorHalfWidth(x) - h0) * u;
+            posAttr.setXYZ(i * 2, x, 0.0025, -hw);
+            posAttr.setXYZ(i * 2 + 1, x, 0.0025, hw);
+        }
+        posAttr.needsUpdate = true;
+    };
+
+    useLayoutEffect(() => {
+        updateVerts(currentU.current);
+    }, [geo]);
+
+    useEffect(() => {
+        invalidate();
+    }, [level, invalidate]);
+
+    useFrame((_, dt) => {
+        const diff = targetU - currentU.current;
+        if (Math.abs(diff) < 1e-4) {
+            if (currentU.current !== targetU) {
+                currentU.current = targetU;
+                updateVerts(targetU);
+                invalidate();
+            }
+            return;
+        }
+        currentU.current = THREE.MathUtils.damp(currentU.current, targetU, 5.0, Math.min(dt, 1 / 30));
+        updateVerts(currentU.current);
+        invalidate();
+    });
+
     return (
-        <mesh position={[Math.cos(a) * line.mid, 0.004, Math.sin(a) * line.mid]} rotation={[0, -a, 0]}>
-            <boxGeometry args={[line.length, 0.008, 0.026]} />
-            {/* Жила слегка светится — ровно настолько, чтобы блум дал вокруг неё цветную дымку,
-                как на эталоне. Больше нельзя: на 1.0 канал упирается в потолок, цвет вымывается
-                в белый, и вместо цветной линии выходит светлая царапина. Кольца на тумбах
-                оставлены матовыми намеренно — там свечение съедало светотень по окружности. */}
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.45} roughness={0.5} />
-        </mesh>
+        <group rotation={[0, -a, 0]}>
+            {/* Расширяющийся сектор маркетри на платформе */}
+            <mesh geometry={geo}>
+                <meshStandardMaterial
+                    color={color}
+                    emissive={color}
+                    emissiveIntensity={0.32 + targetU * 0.25}
+                    roughness={0.42}
+                    metalness={0.05}
+                    side={THREE.DoubleSide}
+                />
+            </mesh>
+            {/* Центральная яркая жила-сердцевина */}
+            <mesh position={[line.mid, 0.005, 0]}>
+                <boxGeometry args={[line.length, 0.006, 0.026]} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.65} roughness={0.35} />
+            </mesh>
+        </group>
     );
 }
+
+// Направленный свет маяка на выбранный объект:
+// когда выбран луч (ray != null), прожектор из фонаря маяка поворачивается к тумбе,
+// и между маяком и тумбой возникает мягкий световой луч.
+function LighthouseBeam({ rayIndex }) {
+    const spotRef = useRef();
+    const beamRef = useRef();
+    const beamMatRef = useRef();
+    const targetObj = useMemo(() => new THREE.Object3D(), []);
+    const invalidate = useThree((s) => s.invalidate);
+
+    const c = useMemo(crown, []);
+    const lanternY = c.lanternY;
+
+    const currIntensity = useRef(0);
+    const currOpacity = useRef(0);
+    const currTarget = useRef(new THREE.Vector3(0, 0, 0));
+    const goalVec = useRef(new THREE.Vector3(0, 0, 0));
+    const vStart = useRef(new THREE.Vector3(0, 0, 0));
+    const vEnd = useRef(new THREE.Vector3(0, 0, 0));
+    const vDir = useRef(new THREE.Vector3(0, 0, 0));
+    const vUp = new THREE.Vector3(0, 1, 0);
+
+    useEffect(() => {
+        invalidate();
+    }, [rayIndex, invalidate]);
+
+    useFrame((_, dt) => {
+        const active = rayIndex != null;
+        const goalIntensity = active ? 3.4 : 0;
+        const goalOpacity = active ? 0.2 : 0;
+
+        let goalPos = [0, 0, 0];
+        const d = Math.min(dt, 1 / 30);
+        const k = 4.0;
+
+        if (active) {
+            const [px, py, pz] = pedestalAt(rayIndex);
+            goalPos = [px, py + 0.22, pz];
+            const goalR = Math.hypot(px, pz);
+            const goalA = Math.atan2(pz, px);
+            const curR = Math.hypot(currTarget.current.x, currTarget.current.z);
+            const curA = curR > 0.05 ? Math.atan2(currTarget.current.z, currTarget.current.x) : goalA;
+            const diffA = shortestAngle(curA, goalA);
+            const nextA = THREE.MathUtils.damp(curA, curA + diffA, k, d);
+            const nextR = THREE.MathUtils.damp(curR > 0.05 ? curR : goalR, goalR, k, d);
+            const nextY = THREE.MathUtils.damp(currTarget.current.y, py + 0.22, k, d);
+            currTarget.current.set(nextR * Math.cos(nextA), nextY, nextR * Math.sin(nextA));
+        } else {
+            goalPos = [currTarget.current.x, currTarget.current.y, currTarget.current.z];
+        }
+        goalVec.current.set(goalPos[0], goalPos[1], goalPos[2]);
+
+        currIntensity.current = THREE.MathUtils.damp(currIntensity.current, goalIntensity, k, d);
+        currOpacity.current = THREE.MathUtils.damp(currOpacity.current, goalOpacity, k, d);
+
+        if (spotRef.current) {
+            spotRef.current.intensity = currIntensity.current;
+            targetObj.position.copy(currTarget.current);
+            targetObj.updateMatrixWorld();
+        }
+
+        if (beamRef.current && beamMatRef.current) {
+            beamMatRef.current.opacity = currOpacity.current;
+            if (currOpacity.current > 1e-4) {
+                beamRef.current.visible = true;
+                const tx = currTarget.current.x;
+                const ty = currTarget.current.y;
+                const tz = currTarget.current.z;
+
+                vStart.current.set(0, lanternY, 0);
+                vEnd.current.set(tx, ty, tz);
+                vDir.current.subVectors(vEnd.current, vStart.current);
+                const len = vDir.current.length();
+
+                beamRef.current.position.set(tx / 2, (ty + lanternY) / 2, tz / 2);
+                beamRef.current.scale.set(1, len, 1);
+                vDir.current.negate().normalize();
+                beamRef.current.quaternion.setFromUnitVectors(vUp, vDir.current);
+            } else {
+                beamRef.current.visible = false;
+            }
+        }
+
+        const moving =
+            Math.abs(currIntensity.current - goalIntensity) > 1e-3 ||
+            Math.abs(currOpacity.current - goalOpacity) > 1e-3 ||
+            (active && currTarget.current.distanceToSquared(goalVec.current) > 1e-4);
+
+        if (moving) {
+            invalidate();
+        }
+    });
+
+    const beamGeo = useMemo(() => {
+        // Усечённый конус единичной высоты от фонаря к тумбе
+        return new THREE.CylinderGeometry(0.08, 0.48, 1, 32, 1, true);
+    }, []);
+
+    useEffect(() => {
+        return () => beamGeo.dispose();
+    }, [beamGeo]);
+
+    return (
+        <>
+            <primitive object={targetObj} />
+            <spotLight
+                ref={spotRef}
+                position={[0, lanternY, 0]}
+                target={targetObj}
+                angle={Math.PI / 8}
+                penumbra={0.85}
+                distance={7.5}
+                color="#fff4dc"
+                intensity={0}
+                castShadow
+                shadow-mapSize={[1024, 1024]}
+                shadow-bias={-0.0002}
+            />
+            <mesh ref={beamRef} geometry={beamGeo} visible={false}>
+                <meshBasicMaterial
+                    ref={beamMatRef}
+                    color="#ffe3aa"
+                    transparent
+                    opacity={0}
+                    blending={THREE.AdditiveBlending}
+                    side={THREE.DoubleSide}
+                    depthWrite={false}
+                    toneMapped={false}
+                />
+            </mesh>
+        </>
+    );
+}
+
 
 // Маяк. Ярус светится, если уровень достигнут: сколько горит — там организация и стоит.
 // Легенды не требует, и это главное, ради чего он в центре.
@@ -266,20 +560,22 @@ function Tower({ level }) {
     const lanternOn = level >= LEVELS.length;
     return (
         <group>
-            {/* Цоколь. Между двумя ступенями светящаяся щель: на эталоне свет у подножия
-                выходит из-под маяка щелью, а сам цоколь остаётся белым. Щель горит всегда —
-                нижний уровень шкалы это «маяк зажжён на один ярус», а не потухший маяк. */}
+            {/* Цоколь с округлым основанием и светящейся щелью */}
             <mesh position={[0, foot.bottom.y, 0]} castShadow receiveShadow>
                 <cylinderGeometry args={[foot.bottom.radius, foot.bottom.radius, foot.bottom.height, 48]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.82} />
+                <meshStandardMaterial color={PLASTER} roughness={0.35} metalness={0.04} />
+            </mesh>
+            <mesh position={[0, foot.bottom.y, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+                <torusGeometry args={[foot.bottom.radius, foot.bottom.height * 0.36, 16, 48]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.35} metalness={0.04} />
             </mesh>
             <mesh position={[0, foot.glow.y, 0]}>
                 <cylinderGeometry args={[foot.glow.radius, foot.glow.radius, foot.glow.height, 48]} />
-                <meshStandardMaterial color={PLASTER} emissive={GLOW} emissiveIntensity={1.5 + level * 0.12} roughness={0.6} />
+                <meshStandardMaterial color={PLASTER} emissive={GLOW} emissiveIntensity={1.8 + level * 0.15} roughness={0.5} />
             </mesh>
             <mesh position={[0, foot.top.y, 0]} castShadow receiveShadow>
                 <cylinderGeometry args={[foot.top.radius, foot.top.radius, foot.top.height, 48]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.82} />
+                <meshStandardMaterial color={PLASTER} roughness={0.35} metalness={0.04} />
             </mesh>
 
             {stack.map((t) => {
@@ -290,29 +586,33 @@ function Tower({ level }) {
                     <group key={t.level}>
                         <mesh position={[0, wallY, 0]} castShadow receiveShadow>
                             <cylinderGeometry args={[t.rTop, t.rBottom, wallHeight, 40]} />
-                            <meshStandardMaterial color={PLASTER} emissive={on ? GLOW : "#000000"} emissiveIntensity={on ? 2.1 : 0} roughness={0.72} />
+                            <meshStandardMaterial color={PLASTER} emissive={on ? GLOW : "#000000"} emissiveIntensity={on ? 2.3 : 0} roughness={0.55} />
                         </mesh>
                         {/* Вертикальные стойки по окружности. Стенка светится, стойки белые —
                             на этом контрасте ярус читается строением, а не лампой. */}
                         <Staves y={wallY} radius={(t.rTop + t.rBottom) / 2} height={wallHeight} />
                         <Windows y={wallY} radius={(t.rTop + t.rBottom) / 2} />
-                        {/* Карниз на стыке ярусов. Без него шесть цилиндров сливаются в один
-                            конус, и «шесть ярусов» перестаёт читаться. Стоит поверх стенки, а не
-                            у нижней кромки: на эталоне обод венчает ярус и служит опорой
-                            следующему, более узкому. */}
+                        {/* Округлый карниз-обод на стыке ярусов (по эталонному 3D-рендеру) */}
+                        <mesh position={[0, t.y + t.height / 2 - TOWER.corniceHeight / 2, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+                            <torusGeometry args={[t.rTop * TOWER.corniceOut, TOWER.corniceHeight * 0.38, 16, 48]} />
+                            <meshStandardMaterial color={PLASTER} roughness={0.32} metalness={0.04} />
+                        </mesh>
                         <mesh position={[0, t.y + t.height / 2 - TOWER.corniceHeight / 2, 0]} castShadow receiveShadow>
-                            <cylinderGeometry args={[t.rTop * TOWER.corniceOut, t.rTop * TOWER.corniceOut, TOWER.corniceHeight, 40]} />
-                            <meshStandardMaterial color={PLASTER} roughness={0.78} />
+                            <cylinderGeometry args={[t.rTop * TOWER.corniceOut, t.rTop * TOWER.corniceOut, TOWER.corniceHeight * 0.8, 40]} />
+                            <meshStandardMaterial color={PLASTER} roughness={0.32} metalness={0.04} />
                         </mesh>
                     </group>
                 );
             })}
 
-            {/* Площадка галереи под фонарём. Радиус обязан превышать rTop, иначе диск
-                прячется внутрь силуэта яруса и ступени не видно. */}
+            {/* Округлая площадка галереи под фонарём */}
+            <mesh position={[0, c.galleryY, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
+                <torusGeometry args={[TOWER.galleryRadius, TOWER.galleryHeight * 0.42, 16, 48]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.32} metalness={0.04} />
+            </mesh>
             <mesh position={[0, c.galleryY, 0]} castShadow receiveShadow>
-                <cylinderGeometry args={[TOWER.galleryRadius, TOWER.galleryRadius, TOWER.galleryHeight, 32]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.8} />
+                <cylinderGeometry args={[TOWER.galleryRadius, TOWER.galleryRadius, TOWER.galleryHeight * 0.85, 32]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.32} metalness={0.04} />
             </mesh>
 
             {/* Фонарь горит только на верхнем уровне: маяк заработал целиком. */}
@@ -322,35 +622,25 @@ function Tower({ level }) {
                     color={PLASTER}
                     emissive={lanternOn ? GLOW : "#000000"}
                     emissiveIntensity={lanternOn ? 2.8 : 0}
-                    roughness={0.6}
+                    roughness={0.5}
                 />
             </mesh>
             <Staves y={c.lanternY} radius={TOWER.lanternRadius * 0.96} height={TOWER.lanternHeight} />
 
-            {/* Купол полусферический, не конус: конус на этом месте превращает маяк в ракету.
-                Ободок под ним прячет стык купола с фонарём. */}
-            <mesh position={[0, c.rimY, 0]} castShadow>
-                <cylinderGeometry args={[TOWER.lanternRadius * 1.2, TOWER.lanternRadius * 1.2, TOWER.domeRim, 32]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.8} />
+            {/* Округлый ободок под куполом */}
+            <mesh position={[0, c.rimY, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+                <torusGeometry args={[TOWER.lanternRadius * 1.16, TOWER.domeRim * 0.45, 16, 48]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.32} metalness={0.04} />
             </mesh>
-            <mesh position={[0, c.domeBase, 0]} scale={[1, TOWER.domeSquash, 1]} castShadow>
-                <sphereGeometry args={[c.domeRadius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.78} />
+            <mesh position={[0, c.rimY, 0]} castShadow>
+                <cylinderGeometry args={[TOWER.lanternRadius * 1.16, TOWER.lanternRadius * 1.16, TOWER.domeRim * 0.85, 32]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.32} metalness={0.04} />
             </mesh>
 
-            {/* Шпиль: ножка, шар, остриё. На общем плане различим только силуэт, но без него
-                купол выглядит срезанным. */}
-            <mesh position={[0, c.stemY, 0]} castShadow>
-                <cylinderGeometry args={[0.011, 0.013, TOWER.finialStem, 12]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.8} />
-            </mesh>
-            <mesh position={[0, c.ballY, 0]} castShadow>
-                <sphereGeometry args={[TOWER.finialBall, 16, 12]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.78} />
-            </mesh>
-            <mesh position={[0, c.tipY, 0]} castShadow>
-                <coneGeometry args={[0.014, TOWER.finialTip, 12]} />
-                <meshStandardMaterial color={PLASTER} roughness={0.8} />
+            {/* Гладкий чистый полусферический купол БЕЗ верхней пимпочки (шпиль удален по запросу) */}
+            <mesh position={[0, c.domeBase, 0]} scale={[1, TOWER.domeSquash, 1]} castShadow>
+                <sphereGeometry args={[c.domeRadius, 36, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                <meshStandardMaterial color={PLASTER} roughness={0.26} metalness={0.05} />
             </mesh>
 
             {/* Тёплая лужа света на платформе вокруг основания — она и делает «горит»
@@ -370,13 +660,12 @@ function Tower({ level }) {
 // children — точка вставки для того, что ставится НА платформу: предметы на тумбах.
 // Сама платформа о них ничего не знает и знать не должна, поэтому они приходят снаружи,
 // а не заводятся здесь. Добавка чисто аддитивная: без детей файл ведёт себя как прежде.
-export default function Platform({ level = 1, ray = null, onPickRay = () => {}, children }) {
+export default function Platform({ level = 1, ray = null, onPickRay = () => {}, onHoverRay = () => {}, freeze = null, children }) {
     const rayIndex = ray ? RAYS.findIndex((r) => r.id === ray) : null;
     const backdrop = useBackdrop();
     return (
         <Canvas
-            // Сцена статична: кадр рисуется только по запросу от рига камеры.
-            frameloop="demand"
+            frameloop="always"
             // Плотность вернулась к двум. Полтора ставили, когда сцена рисовалась в режиме
             // always и платила за плотность непрерывно; в demand кадр считается только пока
             // едет камера, а стоит гладкость кромок дорого: на 1.5 карнизы и стойки маяка
@@ -440,7 +729,7 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {}, 
 
             <StarSlab />
             {RAYS.map((ray, i) => (
-                <Inlay key={`in-${ray.id}`} index={i} color={ACCENT[ray.id]} />
+                <Inlay key={`in-${ray.id}`} index={i} color={ACCENT[ray.id]} level={level} />
             ))}
             {RAYS.map((r, i) => (
                 <Pedestal
@@ -451,9 +740,12 @@ export default function Platform({ level = 1, ray = null, onPickRay = () => {}, 
                     active={ray === r.id}
                     dimmed={ray != null && ray !== r.id}
                     onPick={onPickRay}
+                    onHover={onHoverRay}
                 />
             ))}
             <Tower level={level} />
+            <LighthouseBeam rayIndex={rayIndex} />
+            <Props ray={ray} level={level} freeze={freeze} />
             {children}
             <CameraRig ray={rayIndex} level={level} />
 

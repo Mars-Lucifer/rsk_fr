@@ -27,19 +27,26 @@ const FIELD = PEDESTAL.rimRadius - PEDESTAL.rimThickness;
 // Потолок высоты. Без него узкие и длинные предметы (серверная стойка) вымахивают в столб:
 // ограничение по следу их не держит, след у них маленький.
 const MAX_HEIGHT = PEDESTAL.radius * 1.5;
+import Materialize, { usePrintCycle } from "./Materialize";
 import { report } from "./propAnalysis.mjs";
 
 const BG = "#eceef1";
 const PLASTER = new THREE.MeshStandardMaterial({ color: "#f2f3f5", roughness: 0.92, metalness: 0 });
 
-function Prop({ file }) {
+function Prop({ file, print, t, play }) {
+    // При проигрывании момент печати ведёт таймер, иначе — число из адреса.
+    const cycled = usePrintCycle({ play });
+    const shown = cycled == null ? t : cycled;
     const { scene } = useGLTF(`/zvezda-props/${file}`, "/draco/");
     const group = useRef();
 
     // Модель приводится к размеру тумбы: генераторы отдают что угодно по масштабу и с
-    // произвольным началом координат. Габарит меряем после перекраски, сажаем подошвой на
-    // столешницу и центруем по горизонтали.
-    const model = useMemo(() => {
+    // произвольным началом координат.
+    //
+    // Подгонка идёт здесь же, в одном проходе с клонированием, а НЕ в эффекте. Эффект
+    // отрабатывает после рендера, и слои голограммы, которые читают преобразование модели
+    // во время рендера, успевали взять её в исходном размере генератора — вдвое больше тумбы.
+    const { model, fit } = useMemo(() => {
         const root = scene.clone(true);
         root.traverse((n) => {
             if (!n.isMesh) return;
@@ -47,12 +54,7 @@ function Prop({ file }) {
             n.castShadow = true;
             n.receiveShadow = true;
         });
-        return root;
-    }, [scene]);
-
-    useLayoutEffect(() => {
-        if (!group.current) return;
-        const box = new THREE.Box3().setFromObject(model);
+        const box = new THREE.Box3().setFromObject(root);
         const size = new THREE.Vector3();
         const center = new THREE.Vector3();
         box.getSize(size);
@@ -67,16 +69,26 @@ function Prop({ file }) {
         const kFoot = (FIELD * 2 * 0.72) / Math.max(size.x, size.z);
         const kHeight = MAX_HEIGHT / size.y;
         const k = Math.min(kFoot, kHeight);
-        model.scale.setScalar(k);
-        model.position.set(-center.x * k, -box.min.y * k, -center.z * k);
-        report(model, file, size, k);
-        // eslint-disable-next-line no-console
-        console.log("[посадка]", "след", +(Math.max(size.x, size.z) * k).toFixed(3), "из", +(FIELD * 2).toFixed(3), "| высота", +(size.y * k).toFixed(3), "из", MAX_HEIGHT.toFixed(3), "| держит", kFoot < kHeight ? "след" : "высота");
-    }, [model, file]);
+        root.scale.setScalar(k);
+        root.position.set(-center.x * k, -box.min.y * k, -center.z * k);
+        root.updateMatrixWorld(true);
+        return { model: root, fit: { size, k, kFoot, kHeight } };
+    }, [scene]);
 
+    useLayoutEffect(() => {
+        report(model, file, fit.size, fit.k);
+        // eslint-disable-next-line no-console
+        console.log("[посадка]", "след", +(Math.max(fit.size.x, fit.size.z) * fit.k).toFixed(3), "из", +(FIELD * 2).toFixed(3), "| высота", +(fit.size.y * fit.k).toFixed(3), "из", MAX_HEIGHT.toFixed(3), "| держит", fit.kFoot < fit.kHeight ? "след" : "высота");
+    }, [model, file, fit]);
+
+    const rayKey = RAY_BY_FILE[file] ?? file.replace(/\.glb$/i, "");
+    const rayColor = ACCENT[rayKey] ?? "#e8a848";
+
+    // Печать или готовая вещь. В режиме печати исходная модель не рисуется вовсе: её место
+    // занимают три слоя материализации — гипс под линией, проекция над ней.
     return (
         <group ref={group} position={[0, TOP, 0]}>
-            <primitive object={model} />
+            {print ? <Materialize object={model} t={shown} color={rayColor} /> : <primitive object={model} />}
         </group>
     );
 }
@@ -88,7 +100,7 @@ function Prop({ file }) {
 // Файл Platform.js принадлежит другой сессии, поэтому здесь именно повтор по её числам,
 // а не импорт компонента: общий модуль потребовал бы правки чужого файла.
 function RealPedestal({ ray }) {
-    const color = ACCENT[ray] ?? "#8f6fbe";
+    const color = ACCENT[ray] ?? "#e8a848";
     return (
         <group position={[0, TOP - PEDESTAL.height / 2, 0]}>
             <mesh castShadow receiveShadow>
@@ -111,13 +123,21 @@ function RealPedestal({ ray }) {
     );
 }
 
-export default function PropView({ file, dist = 1, raw = false }) {
+const RAY_BY_FILE = {
+    "knowledge.glb": "knowledge",
+    "cabinet.glb": "data",
+    "tall_narrow_six-drawer_storage_cabinet_sharp_edge.glb": "data",
+    "data.glb": "data",
+    "stylized_monitor_displaying_ascending_bar_chart_s.glb": "data",
+};
+
+export default function PropView({ file, dist = 1, raw = false, print = false, t = 1, play = false }) {
     // Луч определяется именем файла: knowledge.glb -> knowledge. Кольцо тумбы красится
     // в его цвет, и сразу видно, тот ли предмет положили на тот луч.
-    const ray = file.replace(/\.glb$/i, "");
+    const ray = RAY_BY_FILE[file] ?? file.replace(/\.glb$/i, "");
     return (
         <Canvas
-            frameloop="demand"
+            frameloop={play ? "always" : "demand"}
             dpr={[1, 1.5]}
             shadows={{ type: THREE.PCFShadowMap }}
             camera={{ position: [1.4 * dist, 1.15 * dist, 1.8 * dist], fov: 32 }}
@@ -136,7 +156,7 @@ export default function PropView({ file, dist = 1, raw = false }) {
                 Для моделей, которые сами являются сценой, она мешает — гасится через ?raw=1. */}
             {!raw && <RealPedestal ray={ray} />}
 
-            <Prop file={file} />
+            <Prop file={file} print={print} t={t} play={play} />
 
             <ContactShadows position={[0, BOTTOM - 0.002, 0]} opacity={0.45} scale={9} blur={2.4} far={2} resolution={1024} frames={1} color="#a09890" />
         </Canvas>

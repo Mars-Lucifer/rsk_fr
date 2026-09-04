@@ -15,8 +15,6 @@ import { LEVELS, RAYS } from "@/components/features/mayak-zvezda/model/zvezda.mj
 //
 // Состояние в адресе (?level=&ray=): кадром проверяется без кликов, ссылкой делится.
 const Platform = dynamic(() => import("@/components/features/mayak-zvezda/star/Platform"), { ssr: false });
-// Предметы приходят в сцену детьми: платформа о них ничего не знает.
-const Props = dynamic(() => import("@/components/features/mayak-zvezda/star/Props"), { ssr: false });
 
 const icz = (l) => (l.icz > 0 ? `+${l.icz}` : String(l.icz));
 
@@ -24,6 +22,13 @@ export default function ZvezdaPlatform() {
     const router = useRouter();
     const [level, setLevel] = useState(1);
     const [ray, setRay] = useState(null);
+    // ?print=0.35 останавливает печать на заданном моменте — для проверки кадром.
+    const [freeze, setFreeze] = useState(null);
+    // Наведение на тумбу подсвечивает её строку в списке справа. Подписей над предметами
+    // больше нет: они садились прямо на вещь и портили кадр. Связь «тумба ↔ строка» и есть
+    // замена подписи — она работает в обе стороны и ничего не загораживает.
+    const [hover, setHover] = useState(null);
+    const [ready, setReady] = useState(false);
 
     useEffect(() => {
         if (!router.isReady) return;
@@ -31,7 +36,10 @@ export default function ZvezdaPlatform() {
         if (l >= 1 && l <= 6) setLevel(l);
         const r = router.query.ray;
         setRay(RAYS.some((x) => x.id === r) ? r : null);
-    }, [router.isReady, router.query.level, router.query.ray]);
+        const f = router.query.print;
+        setFreeze(f == null ? null : Math.max(0, Math.min(1, Number(f))));
+        setReady(true);
+    }, [router.isReady, router.query.level, router.query.ray, router.query.print]);
 
     // Адрес обновляется без перезагрузки и без записи в историю: «назад» в браузере должен
     // уводить со страницы, а не отматывать двадцать кликов по лучам.
@@ -58,6 +66,33 @@ export default function ZvezdaPlatform() {
         [sync]
     );
 
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+            if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                const currIdx = ray ? RAYS.findIndex((r) => r.id === ray) : 0;
+                const prevIdx = (currIdx - 1 + RAYS.length) % RAYS.length;
+                pickRay(RAYS[prevIdx].id);
+            } else if (e.key === "ArrowRight") {
+                e.preventDefault();
+                const currIdx = ray ? RAYS.findIndex((r) => r.id === ray) : -1;
+                const nextIdx = (currIdx + 1) % RAYS.length;
+                pickRay(RAYS[nextIdx].id);
+            } else if (e.key === "Escape") {
+                pickRay(null);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                pickLevel(Math.min(6, level + 1));
+            } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                pickLevel(Math.max(1, level - 1));
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [ray, level, pickRay, pickLevel]);
+
     const lv = LEVELS[level - 1];
     const step = transitionTo(level);
     const rayInfo = ray ? RAYS.find((r) => r.id === ray) : null;
@@ -69,9 +104,7 @@ export default function ZvezdaPlatform() {
                 <title>ЗВЕЗДА · платформа</title>
             </Head>
             <div className="stage">
-                <Platform level={level} ray={ray} onPickRay={pickRay}>
-                    <Props ray={ray} />
-                </Platform>
+                {ready && <Platform level={level} ray={ray} freeze={freeze} onPickRay={pickRay} onHoverRay={setHover} />}
 
                 <div className="hud">
                     <div className="tl">
@@ -84,7 +117,14 @@ export default function ZvezdaPlatform() {
 
                     <div className={"rays mono" + (ray ? " hidden" : "")}>
                         {RAYS.map((r) => (
-                            <button key={r.id} onClick={() => pickRay(r.id)} style={{ "--c": ACCENT[r.id] }}>
+                            <button
+                                key={r.id}
+                                onClick={() => pickRay(r.id)}
+                                onMouseEnter={() => setHover(r.id)}
+                                onMouseLeave={() => setHover(null)}
+                                className={hover === r.id ? "on" : ""}
+                                style={{ "--c": ACCENT[r.id] }}
+                            >
                                 <i />
                                 {r.name}
                             </button>
@@ -94,9 +134,35 @@ export default function ZvezdaPlatform() {
                     <div className={"panel" + (ray ? " open" : "")} role="complementary" aria-hidden={!ray}>
                         {cell && (
                             <>
-                                <button className="back" onClick={() => pickRay(null)}>
-                                    ← к обзору
-                                </button>
+                                <div className="panelNav">
+                                    <button className="back" onClick={() => pickRay(null)}>
+                                        ← к обзору
+                                    </button>
+                                    <div className="rayFlippers">
+                                        <button
+                                            className="flipBtn"
+                                            onClick={() => {
+                                                const idx = RAYS.findIndex((r) => r.id === ray);
+                                                const prev = RAYS[(idx - 1 + RAYS.length) % RAYS.length];
+                                                pickRay(prev.id);
+                                            }}
+                                            title="Предыдущий луч (←)"
+                                        >
+                                            ‹
+                                        </button>
+                                        <button
+                                            className="flipBtn"
+                                            onClick={() => {
+                                                const idx = RAYS.findIndex((r) => r.id === ray);
+                                                const next = RAYS[(idx + 1) % RAYS.length];
+                                                pickRay(next.id);
+                                            }}
+                                            title="Следующий луч (→)"
+                                        >
+                                            ›
+                                        </button>
+                                    </div>
+                                </div>
                                 <p className="mono kicker" style={{ color: ACCENT[ray] }}>
                                     {rayInfo.name} · {icz(lv)} {lv.name}
                                 </p>
@@ -139,60 +205,6 @@ export default function ZvezdaPlatform() {
                 </div>
             </div>
 
-            <style jsx global>{`
-                /* Подписи над тумбами рисует сцена через Html из drei, поэтому стили только
-                   глобальные: внутрь портала scoped-классы Next не попадают. */
-                .ray-label {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    gap: 4px;
-                    padding: 0;
-                    border: 0;
-                    background: none;
-                    color: #1b2130;
-                    font-family: inherit;
-                    cursor: pointer;
-                    transform: translateY(-100%);
-                    white-space: nowrap;
-                    transition: opacity 0.35s;
-                }
-                .ray-label i {
-                    display: block;
-                    width: 1px;
-                    height: 34px;
-                    background: linear-gradient(to top, var(--c), rgba(27, 33, 48, 0));
-                    order: 2;
-                }
-                .ray-label b {
-                    order: 1;
-                    font-size: 12px;
-                    font-weight: 500;
-                    letter-spacing: 0.02em;
-                    padding: 4px 9px;
-                    border-radius: 4px;
-                    background: rgba(255, 255, 255, 0.82);
-                    border: 1px solid rgba(27, 33, 48, 0.1);
-                    border-bottom: 2px solid var(--c);
-                    backdrop-filter: blur(4px);
-                }
-                .ray-label span {
-                    order: 0;
-                    max-width: 250px;
-                    white-space: normal;
-                    text-align: center;
-                    font-size: 12px;
-                    line-height: 1.4;
-                    color: rgba(27, 33, 48, 0.62);
-                    margin-bottom: 4px;
-                }
-                .ray-label:hover b {
-                    background: #fff;
-                }
-                .ray-label.dim {
-                    opacity: 0.22;
-                }
-            `}</style>
 
             <style jsx>{`
                 .stage {
@@ -266,8 +278,12 @@ export default function ZvezdaPlatform() {
                     color: rgba(27, 33, 48, 0.5);
                     cursor: pointer;
                 }
-                .rays button:hover {
+                .rays button:hover,
+                .rays button.on {
                     color: #1b2130;
+                }
+                .rays button.on i {
+                    box-shadow: 0 0 0 3px rgba(27, 33, 48, 0.08);
                 }
                 .rays i {
                     width: 7px;
@@ -294,9 +310,15 @@ export default function ZvezdaPlatform() {
                 .panel.open {
                     transform: translateX(0);
                 }
+                .panelNav {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin: 0 0 18px;
+                }
                 .back {
                     display: block;
-                    margin: 0 0 18px;
+                    margin: 0;
                     padding: 0;
                     border: 0;
                     background: none;
@@ -307,6 +329,33 @@ export default function ZvezdaPlatform() {
                 }
                 .back:hover {
                     color: #1b2130;
+                }
+                .rayFlippers {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .flipBtn {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 6px;
+                    border: 1px solid rgba(27, 33, 48, 0.12);
+                    background: rgba(255, 255, 255, 0.7);
+                    color: rgba(27, 33, 48, 0.65);
+                    font-size: 16px;
+                    font-weight: 600;
+                    line-height: 1;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+                .flipBtn:hover {
+                    background: #ffffff;
+                    color: #1b2130;
+                    border-color: rgba(27, 33, 48, 0.28);
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
                 }
                 .kicker {
                     margin: 0 0 8px;

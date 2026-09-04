@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { LEVELS, RAYS } from "./zvezda.mjs";
-import { OVERVIEW, PEDESTAL, STAR, TOWER, crown, inlay, pedestalAt, plinth, rayAngle, rayCamera, starOutline, staveAngles, tiers, towerHeight } from "./platform.mjs";
+import { OVERVIEW, PEDESTAL, STAR, TOWER, crown, inlay, pedestalAt, plinth, rayAngle, rayCamera, raySector, starOutline, staveAngles, tiers, towerHeight } from "./platform.mjs";
 
 test("контур звезды: двенадцать вершин, внешние и внутренние чередуются", () => {
     const pts = starOutline();
@@ -141,3 +141,17 @@ test("обзорная камера выше и дальше любой из л�
         assert.ok(far > 0, "обзорная камера в центре сцены");
     });
 });
+
+test("сектор луча расширяется от тонкой полоски (u=0) до полного сектора звезды (u=1)", () => {
+    RAYS.forEach((ray, i) => {
+        const thin = raySector(i, 0);
+        const full = raySector(i, 1);
+        assert.equal(thin.points.length, full.points.length);
+        // При u=0 полуширина тонкая (0.013)
+        assert.ok(Math.abs(Math.abs(thin.points[0][1]) - 0.013) < 1e-4, `${ray.id}: тонкая полоска не равна 0.013`);
+        // При u=1 сектор заметно шире
+        assert.ok(Math.abs(full.points[1][1]) > 0.5, `${ray.id}: сектор не расширяется у впадины`);
+        assert.ok(Math.abs(full.points[1][1]) > Math.abs(thin.points[1][1]));
+    });
+});
+

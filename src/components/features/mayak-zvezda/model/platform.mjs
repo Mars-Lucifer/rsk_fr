@@ -204,28 +204,71 @@ export function inlay(index) {
     return { angle: a, from, to, length: to - from, mid: (from + to) / 2 };
 }
 
+// Расчёт геометрии сектора луча для прогрессии закрашивания от -1 (u=0) до +4 (u=1).
+// При u=0 — тонкая полоска (полуширина 0.013, ширина 0.026).
+// При u=1 — полный сектор луча звезды от основания маяка до тумбы.
+export function raySector(index, u = 0) {
+    const a = rayAngle(index);
+    const clampedU = Math.max(0, Math.min(1, u));
+    const h0 = 0.013; // полуширина тонкой жилы
+
+    const xMin = TOWER.baseRadius + 0.06; // ~0.56
+    const xValley = STAR.inner * Math.cos(Math.PI / 6); // ~1.1085
+    const hValley = STAR.inner * Math.sin(Math.PI / 6); // 0.64
+    const xOuter = STAR.outer; // 3.05
+    const xPed = PEDESTAL.at - PEDESTAL.radius * 0.45; // ~2.4275
+
+    // Полная полуширина сектора звезды на радиальном удалении x
+    const fullH = (x) => {
+        if (x <= xValley) {
+            const t = (x - xMin) / (xValley - xMin);
+            const hBase = xMin * Math.tan(Math.PI / 6);
+            return hBase + (hValley - hBase) * t;
+        }
+        const t = (x - xValley) / (xOuter - xValley);
+        return Math.max(h0, hValley * (1 - t));
+    };
+
+    const stations = [xMin, xValley, 1.8, xPed];
+    const pts = [];
+
+    // Левая сторона (вдоль луча от центра наружу)
+    for (const x of stations) {
+        const hw = h0 + (fullH(x) - h0) * clampedU;
+        pts.push([x, -hw]);
+    }
+    // Правая сторона (вдоль луча снаружи внутрь)
+    for (let i = stations.length - 1; i >= 0; i -= 1) {
+        const x = stations[i];
+        const hw = h0 + (fullH(x) - h0) * clampedU;
+        pts.push([x, hw]);
+    }
+
+    return {
+        angle: a,
+        points: pts,
+        xMin,
+        xPed,
+        clampedU,
+    };
+}
+
 // Точка, куда встаёт камера при подъезде к лучу, и точка, на которую она смотрит.
 export function rayCamera(index) {
     const a = rayAngle(index);
     const [x, , z] = pedestalAt(index);
-    // Камера садится снаружи и выше тумбы: если подлетать по лучу изнутри, маяк закрывает
-    // половину кадра, а тумба уходит за нижнюю кромку.
-    //
-    // Вынос считается от габарита тумбы, а не задан числом: тумбу уже пришлось ужать под
-    // эталон, и зашитая дистанция от прежнего размера сажала камеру вплотную — тумба
-    // не помещалась в кадр целиком.
-    const out = PEDESTAL.radius * 5.2;
-    // Боковой снос. Справа выезжает панель на четверть экрана, и тумба, стоящая по центру
-    // кадра, оказывается наполовину под ней. Камера сдвигается поперёк луча, чтобы предмет
-    // встал в середину свободной части, а не всего вьюпорта.
-    const side = 0.62;
+    // Камера садится снаружи и выше тумбы. Дистанция и ракурс рассчитаны так, чтобы на переднем
+    // плане читался предмет на тумбе, а на заднем плане по центру возвышался маяк с горящим фонарём.
+    const out = PEDESTAL.radius * 5.8;
+    // Боковой снос: справа открывается панель HUD, поэтому предмет сдвинут в свободную левую
+    // треть кадра, оставляя маяк и свет читаемыми в центральной части.
+    const side = 0.58;
     const px = Math.sin(a) * side;
     const pz = -Math.cos(a) * side;
     return {
-        position: [x + Math.cos(a) * out + px, PEDESTAL.top + 2.05, z + Math.sin(a) * out + pz],
-        target: [x, PEDESTAL.top + 0.22, z],
-        // Обзор снят длинным объективом; с двух единиц тумба в него не помещается.
-        fov: 30,
+        position: [x + Math.cos(a) * out + px, PEDESTAL.top + 2.25, z + Math.sin(a) * out + pz],
+        target: [x, PEDESTAL.top + 0.72, z],
+        fov: 38,
     };
 }
 
@@ -246,16 +289,16 @@ export const OVERVIEW = {
     fov: 14,
 };
 
-// Цвета акцентов этой сцены. Отдельно от RAY_COLOR из набросков: те подобраны под тёмный
-// фон SVG и на белом гипсе выбеливаются в пастель. Общий RAY_COLOR трогать нельзя — он кормит
-// Sketches, StarMap и Dome.
+// Цвета акцентов этой сцены — сняты из векторного PDF с карточками шести лучей:
+// Знания (книга), Взаимодействия (портфель), Пространство (глобус), Защита (замок),
+// Данные (график), Автоматизация (круговые стрелки).
 export const ACCENT = {
-    knowledge: "#efb000",
-    interaction: "#3aac99",
-    space: "#448ac5",
-    security: "#8f6fbe",
-    data: "#afc43a",
-    automation: "#d6533f",
+    knowledge: "#e8a848",
+    interaction: "#ce5f44",
+    space: "#a0c9d4",
+    security: "#90c843",
+    data: "#0eb4ea",
+    automation: "#245a94",
 };
 
 export const RAY_IDS = RAYS.map((r) => r.id);
