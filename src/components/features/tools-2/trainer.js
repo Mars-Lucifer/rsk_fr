@@ -878,6 +878,16 @@ export default function TrainerPage({ goTo }) {
         return detectDeckLayout(byNumber, 1).key === "day2";
     }, [tasks]);
 
+    // День 2: позиция текущей карточки внутри колоды (без пустых заглушек) и её минуты.
+    const dayTwoDeckPosition = useMemo(() => {
+        if (!isDayTwo) return null;
+        const deck = (tasks || []).map((card, index) => ({ card, index })).filter((x) => String(x.card?.number ?? "").trim());
+        const pos = deck.findIndex((x) => x.index === currentTaskIndex);
+        if (pos < 0) return null;
+        const mins = Number(deck[pos].card?.day2?.mins) || 0;
+        return { pos: pos + 1, total: deck.length, mins };
+    }, [isDayTwo, tasks, currentTaskIndex]);
+
     // День 2: состояние стола (гексы, пары, точка 0) с /session-runtime/table.
     // Опрос раз в 5 секунд, только в сессии и только для колоды дня 2; если
     // сервер ответил dayTwo:false — опрос прекращается, блок не рисуется.
@@ -1400,6 +1410,9 @@ export default function TrainerPage({ goTo }) {
 
     const canMoveToTaskIndex = useCallback(
         (nextIndex) => {
+            // День 2: пока деталь у инспектора, участник открывает карточку узла и
+            // работает дальше — блокировать переход нельзя (см. текст карточек).
+            if (isDayTwo) return true;
             if (!isSessionMode || !sessionBlockingTask) return true;
             const blockedIndex = Number(sessionBlockingTask.taskIndex);
             if (!Number.isFinite(blockedIndex)) return true;
@@ -1408,7 +1421,7 @@ export default function TrainerPage({ goTo }) {
             }
             return true;
         },
-        [isSessionMode, sessionBlockingTask]
+        [isSessionMode, sessionBlockingTask, isDayTwo]
     );
 
     useEffect(() => {
@@ -2231,6 +2244,15 @@ export default function TrainerPage({ goTo }) {
                 {effectiveTableNumber ? (
                     <div className="inline-flex items-center justify-center !rounded-xl border border-slate-200 bg-white !px-3 !h-10 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
                         Стол №{effectiveTableNumber}
+                    </div>
+                ) : null}
+                {/* День 2: где мы в дне и сколько на это отведено. Минуты берутся из
+                    карточки (day2.mins), ход времени — из штатного таймера задания. */}
+                {isDayTwo && dayTwoDeckPosition ? (
+                    <div className="inline-flex items-center justify-center gap-2 !rounded-xl border border-amber-200 bg-amber-50 !px-3 !h-10 leading-none text-sm font-semibold text-amber-800 whitespace-nowrap">
+                        <span>Карточка {dayTwoDeckPosition.pos} из {dayTwoDeckPosition.total}</span>
+                        {dayTwoDeckPosition.mins ? <span>· {dayTwoDeckPosition.mins} мин</span> : null}
+                        {timerState.isRunning ? <span>· идёт {formatTaskTime(timerState.elapsedTime || 0)}</span> : null}
                     </div>
                 ) : null}
                 {selectedRole && (
