@@ -55,6 +55,12 @@ export const MAYAK_ADMIN_SECTIONS = [
         description: "PPTX-шаблоны инструкций по сервисам и форматам для автогенерации инструкций заданий.",
         href: "/admin/mayak-service-templates",
     },
+    {
+        id: "day2",
+        title: "День 2",
+        description: "Стратегическая сессия дня 2: бриф, колода, раздел, сессия, выгрузка и треки — девять этапов со «следующим шагом».",
+        href: "/admin/mayak-day2",
+    },
 ];
 
 const MAYAK_ADMIN_AUTH_URL = "/api/admin/mayak-auth";
