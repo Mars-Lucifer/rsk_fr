@@ -150,11 +150,14 @@ function computeNextStep({ cards, myStatusByIndex, hexByNumber, pairs, point0, m
         if (s === "none" || s === "started") return step(`Ваша деталь: карточка ${myDetail.number}`, myDetail);
         if (s === "rejected") return step(`Деталь ${hexLabel} на доработку: карточка ${myDetail.number}`, myDetail);
         if (s === "pending_review") {
+            // Ждать у экрана не нужно: пока инспектор смотрит деталь, участник
+            // открывает карточку узла своей пары и начинает соединение.
             const pair = pairs.find((p) => p.hexes.some((h) => myDetail.hexes.includes(h)));
+            const nodeCard = pair && pair.cardNumber ? cards.find((c) => c.number === String(pair.cardNumber)) || null : null;
             return step(
-                `Деталь ${hexLabel} у инспектора — дождитесь решения`,
-                null,
-                pair && pair.cardNumber ? `Дальше — узел ${pair.n} (карточка ${pair.cardNumber})` : ""
+                `Деталь ${hexLabel} у инспектора. Пока ждёте — откройте узел ${pair ? pair.n : ""}`.trim(),
+                nodeCard,
+                "Истекло — значит принято"
             );
         }
     }
