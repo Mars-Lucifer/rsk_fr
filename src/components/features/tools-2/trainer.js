@@ -2236,7 +2236,11 @@ export default function TrainerPage({ goTo }) {
         // Провайдер общий для шапки и панели: переключение урока в лесенке
         // сразу меняет карточку задания, без перезагрузки страницы.
         <ContestLessonsProvider>
-            <Header>
+            {/* День 2 на мобильном: шапка переносится на несколько строк. Иначе её
+                min-content (пилюли «Стол», «Карточка K из N», роль, кнопки) распирает
+                <main> шире экрана, и всё под ней — карта, стол, поля — обрезается.
+                Вне дня 2 className не передаётся, разметка прежняя. */}
+            <Header className={isDayTwo && isMobile ? "flex-wrap" : undefined}>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
                 {isContestMode && <ContestLessonStepper />}
                 {/* Высота и радиус — как у соседних icon-кнопок (40px / 12px): три формы
