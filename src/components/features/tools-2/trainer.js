@@ -27,7 +27,7 @@ import CloseIcon from "@/assets/general/close.svg";
 import { clearUserCookie, removeKeyCookie, addUserToCookies, getUserFromCookies } from "./actions";
 // Добавляем эти две строки для работы сертификата
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { resolveFormatKey, resolveDirectionKey, classifyMoodCard, YA_FORMAT_TYPES, computeTrainerYaProgress } from "@/lib/mayakProgressModel";
+import { resolveFormatKey, resolveDirectionKey, classifyMoodCard, YA_FORMAT_TYPES, computeTrainerYaProgress, detectDeckLayout } from "@/lib/mayakProgressModel";
 import { AchievementToast, TrainerDebugPanel } from "./TrainerOverlays";
 import CourseIcon from "@/assets/nav/course.svg";
 import Button from "@/components/ui/Button";
@@ -862,6 +862,20 @@ export default function TrainerPage({ goTo }) {
             fallbackSectionId: tokenSectionId,
         });
     }, [sessionRuntimeState?.participant?.taskStates, sessionRuntimeState?.participant?.yaDirection, sessionDebugOverride, isSessionMode, isAdmin, tasks, sessionRuntimeState?.participant?.sectionId, tokenSectionId, tokenType, bypassPhase, bypassProgress, bypassDirection, bypassWeProgress]);
+
+    // День 2 (стратегическая сессия): колода без части «Я» с направлениями «Мы».
+    // Признак считается по самой колоде тем же правилом, что и на сервере
+    // (detectDeckLayout → day2). Для остальных колод всегда false, и ничего
+    // в тренажёре не меняется.
+    const isDayTwo = useMemo(() => {
+        const byNumber = new Map();
+        (tasks || []).forEach((card) => {
+            const num = String(card?.number ?? "").trim();
+            if (num) byNumber.set(num, card);
+        });
+        if (byNumber.size === 0) return false;
+        return detectDeckLayout(byNumber, 1).key === "day2";
+    }, [tasks]);
 
     // Баланс звёзд-джокеров: 1 начисляется за зажжённую звезду специализации
     // части «Я» минус уже потраченные (jokerSpent из рантайма). earned берётся
@@ -1874,7 +1888,7 @@ export default function TrainerPage({ goTo }) {
         taskActionLabel: isCurrentTaskPendingReview ? "\u041d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435" : isCurrentTaskRejected ? "\u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c" : "\u041d\u0430\u0447\u0430\u0442\u044c \u0437\u0430\u0434\u0430\u043d\u0438\u0435",
         materialDownloadNotice,
         onTaskFileDownloaded: handleTaskFileDownloaded,
-        yaProgress,
+        yaProgress: isDayTwo ? null : yaProgress,
         isSessionMode,
         onShowYaDirectionSelection: () => setShowYaDirectionPopup(true),
         tokenType,
@@ -1890,18 +1904,21 @@ export default function TrainerPage({ goTo }) {
         <Block className="!h-full flex-1 min-w-0 self-stretch">
             <form className="flex flex-col h-full justify-between">
                 <div className="flex flex-col gap-[1.25rem]">
-                    <div className="flex flex-col gap-[1rem]">
-                        <Switcher
-                            value={activeTypeKey}
-                            onChange={handleTypeSwitch}
-                            className="!w-full !flex-wrap">
-                            {mayakData.defaultTypes.map((t) => (
-                                <Switcher.Option key={t.key} value={t.key}>
-                                    {t.label}
-                                </Switcher.Option>
-                            ))}
-                        </Switcher>
-                    </div>
+                    {/* День 2: типы контента к деталям продукта не относятся, полоса скрыта. */}
+                    {!isDayTwo && (
+                        <div className="flex flex-col gap-[1rem]">
+                            <Switcher
+                                value={activeTypeKey}
+                                onChange={handleTypeSwitch}
+                                className="!w-full !flex-wrap">
+                                {mayakData.defaultTypes.map((t) => (
+                                    <Switcher.Option key={t.key} value={t.key}>
+                                        {t.label}
+                                    </Switcher.Option>
+                                ))}
+                            </Switcher>
+                        </div>
+                    )}
                     {/* data-tour="fields": вводный шаг разбора подсвечивает все семь полей
                         разом, а не первое — обёртка объединяет обе группы. */}
                     <div data-tour="fields" className="flex flex-col gap-[1.25rem]">
