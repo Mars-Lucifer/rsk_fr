@@ -8,6 +8,7 @@ import InstructionImageModal from "./InstructionImageModal";
 import InstructionPreviewPanel from "./InstructionPreviewPanel";
 import { InspectorReviewModal, InspectorReviewQueue, SessionReviewStatusBanner, SessionTaskReviewPopup } from "./SessionReviewWidgets";
 import { MayakField, TrainerControls, ROLE_DESCRIPTIONS } from "./TrainerUiSections";
+import DayTwoTableBoard from "./DayTwoTableBoard";
 import ContestLessonStepper from "./ContestLessonStepper";
 import { isContestModeActive } from "@/lib/mayakContestAccess";
 import { ContestLessonsProvider } from "./useContestLessons";
@@ -876,6 +877,61 @@ export default function TrainerPage({ goTo }) {
         if (byNumber.size === 0) return false;
         return detectDeckLayout(byNumber, 1).key === "day2";
     }, [tasks]);
+
+    // День 2: состояние стола (гексы, пары, точка 0) с /session-runtime/table.
+    // Опрос раз в 5 секунд, только в сессии и только для колоды дня 2; если
+    // сервер ответил dayTwo:false — опрос прекращается, блок не рисуется.
+    const [dayTwoTable, setDayTwoTable] = useState(null);
+    // Карта скрыта кнопкой-«глазом» (для дня 2 карта открыта сразу, без старта).
+    const [isDayTwoMapHidden, setIsDayTwoMapHidden] = useState(false);
+    // Семь полей под картой свёрнуты; раскрываются при старте задания и вводе.
+    const [isDayTwoFieldsOpen, setIsDayTwoFieldsOpen] = useState(false);
+
+    useEffect(() => {
+        if (!isDayTwo || !isSessionMode || !runtimeSessionId || !activeUserId) {
+            setDayTwoTable(null);
+            return undefined;
+        }
+        let cancelled = false;
+        let intervalId = null;
+        const loadTable = async () => {
+            try {
+                const response = await fetch(
+                    `/api/mayak/session-runtime/table?sessionId=${encodeURIComponent(runtimeSessionId)}&userId=${encodeURIComponent(activeUserId)}`,
+                    { cache: "no-store" }
+                );
+                const payload = await response.json().catch(() => ({}));
+                if (cancelled || !response.ok || !payload.success) return;
+                const next = payload.data || null;
+                if (!next || next.dayTwo === false) {
+                    setDayTwoTable(null);
+                    if (intervalId) window.clearInterval(intervalId);
+                    return;
+                }
+                setDayTwoTable(next);
+            } catch {
+                /* временный сбой опроса стола не критичен: покажем прошлое состояние */
+            }
+        };
+        loadTable();
+        intervalId = window.setInterval(loadTable, 5000);
+        return () => {
+            cancelled = true;
+            window.clearInterval(intervalId);
+        };
+    }, [isDayTwo, isSessionMode, runtimeSessionId, activeUserId]);
+
+    useEffect(() => {
+        if (!isDayTwo) return;
+        if (timerState.isRunning || Object.values(fields).some((v) => v)) {
+            setIsDayTwoFieldsOpen(true);
+        }
+    }, [isDayTwo, timerState.isRunning, fields]);
+
+    useEffect(() => {
+        if (!isDayTwo) return;
+        setIsDayTwoMapHidden(false);
+    }, [isDayTwo, currentTaskIndex]);
 
     // Баланс звёзд-джокеров: 1 начисляется за зажжённую звезду специализации
     // части «Я» минус уже потраченные (jokerSpent из рантайма). earned берётся
@@ -1786,6 +1842,17 @@ export default function TrainerPage({ goTo }) {
         goToTask(nextIndex);
     };
 
+    // День 2: переход к карточке по номеру из блока «Стол» (следующий шаг, пара,
+    // точка 0). Та же штатная навигация, что у стрелок и плашек типов: во время
+    // выполнения задания и вне разрешённого диапазона ничего не делаем.
+    const handleOpenDayTwoCard = (cardNumber) => {
+        if (timerState.isRunning) return;
+        const idx = tasks.findIndex((t) => t && String(t.number ?? "") === String(cardNumber));
+        if (idx < 0 || idx < allowedMinIndex || idx > allowedMaxIndex) return;
+        setTaskInputValue(tokenTaskRange ? String(tasks[idx].number ?? idx + 1) : String(idx + 1));
+        guardedGoToTask(idx);
+    };
+
     const trainerControlsProps = {
         who,
         taskVersion,
@@ -1796,9 +1863,10 @@ export default function TrainerPage({ goTo }) {
         instructionFileUrl,
         taskFileUrl,
         mapFileUrl,
-        isMapPreviewOpen: previewMode === "map" && !!previewFileUrl,
+        // День 2: «глаз» показывает/прячет карту, которая открыта сразу и на любом экране.
+        isMapPreviewOpen: isDayTwo ? (!!mapFileUrl && !isDayTwoMapHidden) : previewMode === "map" && !!previewFileUrl,
         isInstructionPreviewOpen: previewMode === "instruction" && !!previewFileUrl,
-        canToggleMapPreview: !!(mapFileUrl && canAccessCurrentTaskResources && !isMobile),
+        canToggleMapPreview: isDayTwo ? !!mapFileUrl : !!(mapFileUrl && canAccessCurrentTaskResources && !isMobile),
         sourceUrl,
         currentTask,
         isCurrentTaskAllowed,
@@ -1872,7 +1940,7 @@ export default function TrainerPage({ goTo }) {
             guardedGoToTask(idx);
         },
         onToggleTaskTimer: guardedToggleTaskTimer,
-        onToggleMapPreview: handleToggleMapPreview,
+        onToggleMapPreview: isDayTwo ? () => setIsDayTwoMapHidden((prev) => !prev) : handleToggleMapPreview,
         onToggleInstructionPreview: handleToggleInstructionPreview,
         onShowRolePopup: handleShowRolePopup,
         onToolLink1Click: handleToolLink1Click,
@@ -1899,6 +1967,19 @@ export default function TrainerPage({ goTo }) {
         onBypassDirectionChange: handleBypassDirectionChange,
         onResetBypassAchievements: handleResetBypassAchievements,
     };
+
+    // День 2: блок «Стол» (следующий шаг, гексы, пары, точка 0). Пока сервер не
+    // ответил или колода не дня 2 — null, ничего не рисуется.
+    const dayTwoBoard =
+        isDayTwo && dayTwoTable ? (
+            <DayTwoTableBoard
+                table={dayTwoTable}
+                tasks={tasks}
+                taskStates={sessionRuntimeState?.participant?.taskStates}
+                currentTaskIndex={currentTaskIndex}
+                onOpenCard={handleOpenDayTwoCard}
+            />
+        ) : null;
 
     const trainerFieldsBlock = (
         <Block className="!h-full flex-1 min-w-0 self-stretch">
@@ -1982,6 +2063,9 @@ export default function TrainerPage({ goTo }) {
     const trainerOutputBlock = (
         <div className="flex h-full min-h-0 flex-1 min-w-0 flex-col gap-4 self-stretch">
             {!isMobile && <TrainerControls {...trainerControlsProps} />}
+            {/* День 2, широкий экран: блок «Стол» сразу под кнопками задания.
+                На мобильном он стоит под картой (см. dayTwoLayout). */}
+            {isDayTwo && !isMobile ? dayTwoBoard : null}
 
             {sessionRuntimeError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{sessionRuntimeError}</div> : null}
             {(isCurrentTaskPendingReview || isCurrentTaskRejected) ? (
@@ -2074,6 +2158,66 @@ export default function TrainerPage({ goTo }) {
             <InstructionPreviewPanel previewFileUrl={previewFileUrl} previewTitle={previewTitle} onClose={handleClosePreview} />
         </div>
     );
+
+    // День 2: карта задания — главный элемент, открыта сразу (без «Начать
+    // задание»), слева и крупно; если участник открыл инструкцию — на её месте
+    // инструкция. Семь полей — под картой, свёрнуты в «Написать промпт».
+    // Блок «Стол» — справа, на мобильном под картой. Кнопки и потоки те же.
+    const dayTwoPreviewUrl = previewMode === "instruction" && instructionFileUrl ? instructionFileUrl : mapFileUrl;
+    const dayTwoMapPanel = isDayTwo ? (
+        dayTwoPreviewUrl && (previewMode === "instruction" || !isDayTwoMapHidden) ? (
+            <div className="min-h-[420px] flex-1">
+                <InstructionPreviewPanel
+                    previewFileUrl={dayTwoPreviewUrl}
+                    previewTitle={previewTitle}
+                    onClose={previewMode === "instruction" ? handleClosePreview : () => setIsDayTwoMapHidden(true)}
+                />
+            </div>
+        ) : (
+            <div className="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white px-4 text-sm text-slate-500">
+                {mapFileUrl ? (
+                    <Button type="button" inverted className="!w-auto !px-4" onClick={() => setIsDayTwoMapHidden(false)}>
+                        Показать карту
+                    </Button>
+                ) : (
+                    "У этой карточки нет карты"
+                )}
+            </div>
+        )
+    ) : null;
+
+    const dayTwoFieldsBlock = isDayTwo ? (
+        <div className="flex flex-col rounded-xl border border-slate-200 bg-white">
+            <button
+                type="button"
+                onClick={() => setIsDayTwoFieldsOpen((prev) => !prev)}
+                aria-expanded={isDayTwoFieldsOpen}
+                className="flex w-full items-center justify-between !rounded-xl !bg-transparent px-4 py-3 text-left !text-black !shadow-none">
+                <span className="font-semibold">Написать промпт</span>
+                <span className="text-xs text-slate-500">{isDayTwoFieldsOpen ? "Свернуть ▲" : "Семь полей ▼"}</span>
+            </button>
+            <div className={isDayTwoFieldsOpen ? "flex" : "hidden"}>{trainerFieldsBlock}</div>
+        </div>
+    ) : null;
+
+    const dayTwoLayout = isDayTwo ? (
+        isMobile ? (
+            <div className="col-span-12 flex flex-col gap-4">
+                {dayTwoMapPanel}
+                {dayTwoBoard}
+                {dayTwoFieldsBlock}
+                {trainerOutputBlock}
+            </div>
+        ) : (
+            <div className="col-span-12 hidden h-full min-h-0 lg:flex gap-4 items-stretch">
+                <div className="flex min-w-0 flex-1 flex-col gap-4">
+                    {dayTwoMapPanel}
+                    {dayTwoFieldsBlock}
+                </div>
+                <div className="flex w-[420px] shrink-0 flex-col">{trainerOutputBlock}</div>
+            </div>
+        )
+    ) : null;
 
     return (
         // Провайдер общий для шапки и панели: переключение урока в лесенке
@@ -2234,7 +2378,9 @@ export default function TrainerPage({ goTo }) {
                         <TrainerControls {...trainerControlsProps} />
                     </div>
                 )}
-                {!isMobile && isPreviewOpen ? (
+                {isDayTwo ? (
+                    dayTwoLayout
+                ) : !isMobile && isPreviewOpen ? (
                     <div className="col-span-12 hidden h-full min-h-0 lg:flex gap-4 items-stretch">
                         {trainerFieldsBlock}
                         {trainerOutputBlock}
