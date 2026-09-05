@@ -76,7 +76,10 @@ function describeCard(card, index) {
         return { kind: String(meta.kind), hexes: Array.isArray(meta.hexes) ? meta.hexes.map(Number).filter(Boolean) : [] };
     }
     const ct = card?.contentType || "";
-    if (index < 3) return { kind: "intro", hexes: [] };
+    // Позиция внутри колоды, а не в общем массиве тренажёра: там перед колодой
+    // лежат пустые заглушки с индексами 0..N, и «первые три» считались бы от них.
+    const positionInDeck = Number.isFinite(Number(card?._sectionStart)) ? index - (Number(card._sectionStart) - 1) : index;
+    if (positionInDeck < 3) return { kind: "intro", hexes: [] };
     if (isStartType(ct)) return { kind: "point0", hexes: [] };
     const dirKey = resolveDirectionKey(ct);
     if (dirKey && HEX_BY_DIRECTION[dirKey]) return { kind: "detail", hexes: [HEX_BY_DIRECTION[dirKey]] };
@@ -187,8 +190,12 @@ function computeNextStep({ cards, myStatusByIndex, hexByNumber, pairs, point0, m
 }
 
 const DayTwoTableBoard = memo(function DayTwoTableBoard({ table, tasks, taskStates, currentTaskIndex, onOpenCard }) {
+    // Пустые заглушки тренажёра (без номера) — не карточки колоды, их не считаем.
     const cards = useMemo(
-        () => (tasks || []).map((card, index) => ({ index, number: String(card?.number ?? "").trim(), ...describeCard(card, index) })),
+        () =>
+            (tasks || [])
+                .map((card, index) => ({ index, number: String(card?.number ?? "").trim(), ...describeCard(card, index) }))
+                .filter((c) => c.number),
         [tasks]
     );
 
