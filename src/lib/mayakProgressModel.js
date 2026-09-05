@@ -226,7 +226,11 @@ export function validateDeckStandard(tasks) {
     }
     const missingFormats = YA_FORMAT_TYPES.filter((f) => !formats.has(f.key));
     const missingDirections = WE_DIRECTIONS.filter((d) => !directions.has(d.key));
-    if (typed > 0 && missingFormats.length > 0) {
+    // Колода дня 2: части «Я» нет вовсе, прогресс считается только по направлениям.
+    const dayTwo = typed > 0 && formats.size === 0 && missingDirections.length === 0;
+    if (dayTwo) {
+        warnings.push("Колода без части «Я» (день 2): прогресс только по направлениям «Мы».");
+    } else if (typed > 0 && missingFormats.length > 0) {
         issues.push(`Часть «Я»: не распознаны типы — ${missingFormats.map((f) => f.label).join(", ")}`);
     }
     if (typed > 0 && missingDirections.length > 0) {
@@ -247,7 +251,7 @@ export function validateDeckStandard(tasks) {
         );
     }
 
-    const dashboardReady = typed > 0 && missingFormats.length === 0 && missingDirections.length === 0;
+    const dashboardReady = typed > 0 && missingDirections.length === 0 && (missingFormats.length === 0 || dayTwo);
 
     return {
         dashboardReady,
@@ -294,13 +298,30 @@ export function validateDeckStandard(tasks) {
 export const DECK_LAYOUTS = {
     spo: { key: "spo", startCards: 6, formatFrom: 7, formatTo: 47 },
     base: { key: "base", startCards: 9, formatFrom: 10, formatTo: 50 },
+    // День 2 (стратегическая сессия): три вводные карты, части «Я» нет,
+    // часть «Мы» идёт сразу с четвёртой карты. formatTo < formatFrom — форматов нет.
+    day2: { key: "day2", startCards: 3, formatFrom: 4, formatTo: 3 },
 };
+
+// Колода дня 2 узнаётся по содержимому: ни одной карты формата «Я» и хотя бы
+// одна карта направления «Мы». Номер о раскладке не говорит.
+function isDayTwoDeck(cardByNumber) {
+    let formats = 0;
+    let directions = 0;
+    cardByNumber.forEach((card) => {
+        const info = classifyTask(card?.contentType || "");
+        if (info.kind === "ya-format" || (info.kind === "mood" && info.standard && info.section === "ya")) formats += 1;
+        if (info.kind === "we-direction" || (info.kind === "mood" && info.standard && info.section === "we")) directions += 1;
+    });
+    return formats === 0 && directions > 0;
+}
 
 // Раскладку определяем по самой колоде, а не по списку номеров: номер о ней
 // ничего не говорит (201-300 — СПО, 401-500 — базовая, обе «не с единицы»),
 // и такой список пришлось бы дописывать при каждой новой колоде.
 // Признак — что лежит на 7-й карте: у СПО там уже формат, у базовой ещё вводная.
 export function detectDeckLayout(cardByNumber, rangeStart) {
+    if (isDayTwoDeck(cardByNumber)) return DECK_LAYOUTS.day2;
     const probe = cardByNumber.get(String(rangeStart + DECK_LAYOUTS.spo.formatFrom - 1));
     const rawType = probe?.contentType || "";
     const mood = classifyMoodCard(rawType);

@@ -5,6 +5,7 @@ import { getMayakSessionById } from "@/lib/mayakSessions";
 import { getSectionBundle } from "@/lib/mayakContentStorage";
 import { readSessionRuntimeParticipants, readSessionReviews } from "@/lib/mayakSessionRuntime";
 import {
+    detectDeckLayout,
     WE_DIRECTIONS,
     resolveFormatKey,
     resolveDirectionKey,
@@ -215,9 +216,20 @@ async function readTaskTypeMap(sectionId) {
     }
     const startPos = rangeStart - 1;
 
+    // Граница части «Мы» зависит от раскладки колоды (СПО, базовая, день 2),
+    // поэтому кладём её в каждую запись, а не держим одним числом на модуль.
+    const cardByNumber = new Map();
+    (bundle.tasks || []).forEach((task) => {
+        const num = String(task?.number ?? "").trim();
+        if (num) cardByNumber.set(num, task);
+    });
+    // Для обычных колод граница остаётся прежней (51): поведение основного МАЯКа не меняется.
+    const layout = detectDeckLayout(cardByNumber, rangeStart);
+    const weFrom = layout.key === "day2" ? layout.formatTo + 1 : WE_RANGE.from;
+
     (bundle.tasks || []).forEach((task, index) => {
         const globalIndex = startPos + index;
-        const info = { contentType: task?.contentType || "", base: index + 1 };
+        const info = { contentType: task?.contentType || "", base: index + 1, weFrom };
         map.set(globalIndex, info);
         map.set(index, info);
     });
@@ -386,7 +398,7 @@ function computeParticipant(participant, taskTypeMap, deltaByUser, allAttempts, 
         const base = typeInfo ? typeInfo.base : Number(task.taskNumber) || null;
         if (!base) return;
 
-        if (base >= WE_RANGE.from && base <= WE_RANGE.to) {
+        if (base >= (typeInfo?.weFrom ?? WE_RANGE.from) && base <= WE_RANGE.to) {
             weApprovedCount += 1;
             const rawType = typeInfo?.contentType || "";
             const mood = classifyMoodCard(rawType);
@@ -507,7 +519,7 @@ export async function getJokerSpendContext(sessionId, userId, taskIndex) {
     const directionKey = mood.isMood
         ? (mood.standard && mood.section === "we" ? mood.key : null)
         : resolveDirectionKey(rawType);
-    const isWeDirectionTask = Boolean(base && base >= WE_RANGE.from && base <= WE_RANGE.to && directionKey);
+    const isWeDirectionTask = Boolean(base && base >= (typeInfo?.weFrom ?? WE_RANGE.from) && base <= WE_RANGE.to && directionKey);
 
     return { earned, jokerSpent, balance: Math.max(0, earned - jokerSpent), base, directionKey, isWeDirectionTask, contentType: rawType };
 }
