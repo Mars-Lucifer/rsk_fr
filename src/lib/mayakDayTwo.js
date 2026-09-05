@@ -142,6 +142,18 @@ export async function getDayTwoTableState({ sessionId, userId }) {
         .sort((x, y) => String(y.createdAt || "").localeCompare(String(x.createdAt || "")))
         .map((r) => ({ text: r.submissionText || "", status: r.status, by: r.participantName || "" }))[0] || null;
 
+    // Карты стола (точка 0, сборка, приёмка, дорожная карта): сдаёт один за всех,
+    // поэтому статус берётся по лучшему результату среди участников стола.
+    const TABLE_KINDS = new Set(["point0", "assembly", "acceptance", "roadmap"]);
+    const tableCards = {};
+    cards
+        .filter((c) => TABLE_KINDS.has(c.kind))
+        .forEach((c) => {
+            let status = "none";
+            tableMates.forEach((p) => { status = strongerStatus(status, taskStatusOf(p, c.card.number)); });
+            tableCards[String(c.card.number)] = status;
+        });
+
     return {
         dayTwo: true,
         sessionActive: true,
@@ -150,5 +162,6 @@ export async function getDayTwoTableState({ sessionId, userId }) {
         hexes,
         pairs,
         point0,
+        tableCards,
     };
 }

@@ -104,8 +104,14 @@ function describePair(pair, hexByNumber) {
 // «Следующий шаг»: идём по порядку дня и останавливаемся на первом незакрытом.
 // Табличные вещи (точка 0, гексы, пары) — по состоянию стола, личные
 // (вводные, питчи, сборка, приёмка, карта) — по собственным статусам карточек.
-function computeNextStep({ cards, myStatusByIndex, hexByNumber, pairs, point0, myHexes }) {
-    const my = (c) => myStatusByIndex.get(c.index) || "none";
+function computeNextStep({ cards, myStatusByIndex, hexByNumber, pairs, point0, myHexes, tableCards }) {
+    // Карты стола (точка 0, сборка, приёмка, дорожная карта) сдаёт один за всех:
+    // их статус — по столу, личные карты — по своим статусам.
+    const TABLE_KINDS = new Set(["point0", "assembly", "acceptance", "roadmap"]);
+    const my = (c) => {
+        if (TABLE_KINDS.has(c.kind) && tableCards && tableCards[c.number]) return tableCards[c.number];
+        return myStatusByIndex.get(c.index) || "none";
+    };
     const step = (text, card, hint) => ({ text, cardNumber: card ? card.number : null, hint: hint || "" });
     const byKind = (kind) => cards.filter((c) => c.kind === kind);
 
@@ -224,9 +230,10 @@ const DayTwoTableBoard = memo(function DayTwoTableBoard({ table, tasks, taskStat
         return Array.from(set);
     }, [cards, myStatusByIndex, currentTaskIndex]);
 
+    const tableCards = table?.tableCards && typeof table.tableCards === "object" ? table.tableCards : null;
     const nextStep = useMemo(
-        () => computeNextStep({ cards, myStatusByIndex, hexByNumber, pairs, point0, myHexes }),
-        [cards, myStatusByIndex, hexByNumber, pairs, point0, myHexes]
+        () => computeNextStep({ cards, myStatusByIndex, hexByNumber, pairs, point0, myHexes, tableCards }),
+        [cards, myStatusByIndex, hexByNumber, pairs, point0, myHexes, tableCards]
     );
 
     const point0Card = cards.find((c) => c.kind === "point0") || null;
