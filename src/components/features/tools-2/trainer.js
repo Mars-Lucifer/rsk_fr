@@ -2362,7 +2362,9 @@ export default function TrainerPage({ goTo }) {
                             onClick={() => { window.location.href = "/cours"; }}>
                             Вернуться&nbsp;к&nbsp;урокам
                         </Button>
-                    ) : (
+                    ) : isDayTwo && !isAdmin ? null : (
+                        // День 2: у участника этой кнопки нет — она стирает его личный ход,
+                        // а день закрывает ведущий. Админ и колоды дня 1 видят её как раньше.
                         <Button
                             inverted
                             roundeful
