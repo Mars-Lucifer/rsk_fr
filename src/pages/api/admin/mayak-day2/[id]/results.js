@@ -20,12 +20,9 @@ export default async function handler(req, res) {
         try {
             const day = await getDayTwoDay(id);
             if (!day) return res.status(404).json({ success: false, error: "День не найден" });
+            // GET только читает: побочной записи в день больше нет (H4b).
             const results = await exportDayResults(day);
-            const updated = await mutateDayTwoDay(id, (current) => {
-                current.dayState = summarize(results);
-                return current;
-            });
-            return res.status(200).json({ success: true, data: { results, stage: computeStage(updated) } });
+            return res.status(200).json({ success: true, data: { results, stage: computeStage(day) } });
         } catch (error) {
             return res.status(400).json({ success: false, error: error.message || "Не удалось получить результаты" });
         }
@@ -38,6 +35,7 @@ export default async function handler(req, res) {
             }
             const day = await getDayTwoDay(id);
             if (!day) return res.status(404).json({ success: false, error: "День не найден" });
+            if (!day.session?.id) return res.status(400).json({ success: false, error: "Сначала создайте сессию (H4a: этап ещё не открыт)" });
             const results = await exportDayResults(day);
             const updated = await mutateDayTwoDay(id, (current) => {
                 current.results = results;

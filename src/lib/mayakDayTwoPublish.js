@@ -4,6 +4,8 @@
 
 import { renderDayTwoCardSvg } from "@/lib/mayakDayTwoCard";
 import { ensureSectionDir, readManifest, readSectionJson, writeManifest, writeSectionFile, writeSectionJson } from "@/lib/mayakContentStorage";
+import { getSectionFilePath } from "@/lib/mayakContentStorage";
+import { promises as fsp } from "fs";
 import { createDelegatedMayakSessionForAccess, grantMayakAdminRight, listMayakAdminRights } from "@/lib/mayakAdminRights";
 import { getMayakSessionById, updateMayakSession } from "@/lib/mayakSessions";
 import { readSessionReviews, readSessionRuntimeParticipants } from "@/lib/mayakSessionRuntime";
@@ -137,6 +139,20 @@ export async function writeDayToSection(day, sectionId) {
 
     for (const item of index) {
         await writeSectionFile(sectionId, "maps", `${item.number}.svg`, Buffer.from(renderDayTwoCardSvg(item), "utf-8"));
+    }
+
+    // H4c: если у карточки указан прикреплённый файл (шаблон дорожной карты и т.п.),
+    // копируем его в новый раздел из раздела-шаблона 8101-8200, иначе ссылка ведёт в никуда.
+    const TEMPLATE_SECTION = "8101-8200";
+    for (const item of index) {
+        if (!item.file) continue;
+        try {
+            const src = await getSectionFilePath(TEMPLATE_SECTION, "files", item.file);
+            const buf = await fsp.readFile(src);
+            await writeSectionFile(sectionId, "files", item.file, buf);
+        } catch {
+            // шаблона нет — оставляем ссылку, файл кладётся вручную через «Контент»
+        }
     }
 
     const existingMeta = await readSectionJson(sectionId, "meta.json", {});
