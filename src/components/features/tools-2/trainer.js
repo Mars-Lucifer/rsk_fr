@@ -164,6 +164,8 @@ export default function TrainerPage({ goTo }) {
     const [savedField, setSavedField] = useState(null);
 
     const isMobile = useMediaQuery("(max-width: 1023px)");
+    // День 2: до 1180px две колонки не помещаются — карта и стол идут друг под другом.
+    const isDayTwoNarrow = useMediaQuery("(max-width: 1179px)");
     const previewResizeStateRef = useRef(null);
     const previewResizeCleanupRef = useRef(null);
 
@@ -2078,7 +2080,7 @@ export default function TrainerPage({ goTo }) {
             {!isMobile && <TrainerControls {...trainerControlsProps} />}
             {/* День 2, широкий экран: блок «Стол» сразу под кнопками задания.
                 На мобильном он стоит под картой (см. dayTwoLayout). */}
-            {isDayTwo && !isMobile ? dayTwoBoard : null}
+            {isDayTwo && !isMobile && !isDayTwoNarrow ? dayTwoBoard : null}
 
             {sessionRuntimeError ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{sessionRuntimeError}</div> : null}
             {(isCurrentTaskPendingReview || isCurrentTaskRejected) ? (
@@ -2179,7 +2181,7 @@ export default function TrainerPage({ goTo }) {
     const dayTwoPreviewUrl = previewMode === "instruction" && instructionFileUrl ? instructionFileUrl : mapFileUrl;
     const dayTwoMapPanel = isDayTwo ? (
         dayTwoPreviewUrl && (previewMode === "instruction" || !isDayTwoMapHidden) ? (
-            <div className="min-h-[420px] flex-1">
+            <div className="flex-1" style={{ minHeight: 420 }}>
                 <InstructionPreviewPanel
                     previewFileUrl={dayTwoPreviewUrl}
                     previewTitle={previewTitle}
@@ -2213,21 +2215,23 @@ export default function TrainerPage({ goTo }) {
         </div>
     ) : null;
 
+    // Размеры колонок заданы прямо, а не редкими классами Tailwind: при сборке
+    // с несвежим кэшем стилей такие классы не попадают в CSS, и колонки ломаются.
     const dayTwoLayout = isDayTwo ? (
-        isMobile ? (
-            <div className="col-span-12 flex flex-col gap-4">
+        isMobile || isDayTwoNarrow ? (
+            <div className="col-span-12" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {dayTwoMapPanel}
                 {dayTwoBoard}
                 {dayTwoFieldsBlock}
                 {trainerOutputBlock}
             </div>
         ) : (
-            <div className="col-span-12 hidden h-full min-h-0 lg:flex gap-4 items-stretch">
-                <div className="flex min-w-0 flex-1 flex-col gap-4">
+            <div className="col-span-12" style={{ display: "flex", gap: 16, alignItems: "stretch", height: "100%", minHeight: 0 }}>
+                <div style={{ flex: "1 1 0%", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
                     {dayTwoMapPanel}
                     {dayTwoFieldsBlock}
                 </div>
-                <div className="flex w-[420px] shrink-0 flex-col">{trainerOutputBlock}</div>
+                <div style={{ flex: "0 0 440px", width: 440, display: "flex", flexDirection: "column" }}>{trainerOutputBlock}</div>
             </div>
         )
     ) : null;
