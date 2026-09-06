@@ -600,6 +600,12 @@ export function validateDay(day) {
         const words = countTaskWords(card?.task);
         if (words > 10 && kind !== "intro") problems.push(`${num}: задание ${words} слов`);
         if (String(card?.why || "").includes("\n")) problems.push(`${num}: «зачем» не одна строка`);
+        // правило «один человек, один продукт, одно действие» — те же проверки, что в md2json.py
+        ["why", "task", "submit", "done"].forEach((f) => {
+            if (String(card?.[f] || "").includes(";")) problems.push(`${num}: точка с запятой в «${f}»`);
+        });
+        if (!/^[А-ЯЁа-яё]+(йте|ите|ьте)(?![А-ЯЁа-яё])/.test(str(card?.task))) problems.push(`${num}: задание не начинается с глагола («Опишите…», «Соберите…»)`);
+        if (/(^|[^А-ЯЁа-яё])(потом|затем|вставля[а-яё]*)(?![А-ЯЁа-яё])/i.test(str(card?.done))) problems.push(`${num}: в «готово» инструкция на будущее — перенесите в заметки`);
         if (kind === "detail" && hexes.length !== 1) problems.push(`${num}: у детали должен быть один гекс`);
         if (kind === "node" && hexes.length !== 2) problems.push(`${num}: у узла должно быть два гекса`);
         if (TABLE_KINDS.has(kind) && hexes.length) problems.push(`${num}: у карты стола нет гексов`);
