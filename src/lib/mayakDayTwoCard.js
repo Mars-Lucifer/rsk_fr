@@ -91,7 +91,7 @@ function figure(kind, hexes, cy) {
         return s + hex(cx, cy, r, COL[0], "10", null, { width: 10, fill: "#EEEEEE" });
     }
     if (kind === "point0") {
-        return hex(cx, cy, 210, COL[0], "0", ["кому · боль ·", "что изменится"], { fill: "#F3F3F3" });
+        return hex(cx, cy, 210, COL[0], "0", ["кто пользуется ·", "что болит ·", "что изменится"], { fill: "#F3F3F3" });
     }
     if (kind === "pitch") {
         return `<circle cx="${cx}" cy="${cy}" r="200" fill="none" stroke="#1B4F9C" stroke-width="14"/><polygon points="${cx - 60},${cy - 110} ${cx - 60},${cy + 110} ${cx + 130},${cy}" fill="#1B4F9C"/>`;
