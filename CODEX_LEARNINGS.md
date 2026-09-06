@@ -13,6 +13,35 @@ Add only verified, reusable lessons. Skip one-off noise.
 
 ## Learnings
 
+### 2026-09-04 - Procedural Three.js props must not invoke useGLTF and Suspense; initial camera positioning on direct URL loads
+
+- Problem: in 3D views with mixed procedural and GLTF models, procedural models could remain blank on initial load if `useGLTF` was invoked unconditionally in the same component, and direct URL navigation to a specific item (`?ray=...`) resulted in mid-flight camera captures due to damping delays.
+- Root cause:
+  1. Calling `useGLTF` triggers Suspense and asynchronous Draco WASM decoder initialization even when procedural geometry is being rendered, dropping the component to fallback `null`.
+  2. With cylindrical damping camera animation, direct URL loads starting at `OVERVIEW` require seconds to interpolate to the target ray, causing headless tests or users to see a disoriented half-way view.
+- Fix:
+  1. Separate into `ProceduralProp` (instant synchronous Three.js group, rendered via `<primitive>` in idle mode) and `GLTFProp` (isolated inside `<Suspense fallback={null}>`).
+  2. In `CameraRig`, check `isFirstMount`: on direct deep-link load with a ray specified, initialize camera and target immediately to `goal`, while keeping smooth damping for subsequent user clicks.
+- Prevention: never wrap procedural Three.js assets in `useGLTF`/Suspense, and always snap camera to target on initial mount when deep-linking.
+
+### 2026-09-04 - Three.js clipping planes must not be initialized with constant=0 and R3F animation loops require mutable refs
+
+- Problem: 3D models displayed on pedestals in resting/idle mode (`isSolid`) were initially clipped away and invisible; additionally, during multi-phase transitions animation progress got trapped on frame 0 in `useFrame`.
+- Root cause:
+  1. `new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)` evaluates `-y + constant < 0` (i.e. $y > 0$). Because pedestal top sits at $y = 0.1$, all model vertices have $y > 0.1$ and were clipped out before `useFrame` or during idle state.
+  2. Reading and incrementing React `useState` within `useFrame` via `setT(t + dt)` reads the stale closure `t = 0` every frame, preventing time from advancing.
+- Fix:
+  1. Initialize `solidPlane` with `constant = 1000` (and `ghostPlane` with `-1000`), and set `clippingPlanes: isSolid ? [] : [solidPlane]` so resting models have clipping completely disabled.
+  2. Maintain mutable transition timing in `progressRef` (`progressRef.current += dt / duration`) inside `useFrame` and synchronize to state with `setT(progressRef.current)`.
+- Prevention: never initialize clipping planes with `constant = 0` when meshes sit above $y=0$, and always use `useRef` for delta accumulation inside animation loops.
+
+### 2026-09-04 - React Three Fiber in frameloop="demand" requires warmup frames and explicit invalidate on async model resolution
+
+- Problem: in `frameloop="demand"`, the 3D scene could stay blank on initial page load until an interactive DOM event occurred, even though the canvas mounted and GLTF models loaded.
+- Root cause: with camera starting at the target position, `CameraRig` detected arrival on frame 0 and stopped requesting frames before asynchronous `<Suspense>` GLTF Draco decompression resolved. In `demand` mode, `useFrame` only runs during an actively requested frame, so it went completely idle.
+- Fix: introduce a warmup counter in `CameraRig` rendering the first 25-30 frames on mount, and trigger `invalidate()` in `useEffect` whenever asynchronous models mount or props update.
+- Prevention: when using `frameloop="demand"` with suspenseful 3D assets, always provide warmup frame invalidation on mount and dispatch `invalidate()` on asset readiness.
+
 ### 2026-03-27 - MAYAK portal auth must gate on profile name completeness, not on auth alone
 
 - Problem: an already authorized platform user could still enter MAYAK with an empty profile name, which left certificate/history data without the required FIO.
