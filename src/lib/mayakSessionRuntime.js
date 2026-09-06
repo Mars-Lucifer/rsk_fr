@@ -6,6 +6,8 @@ import { completeMayakSession, getMayakSessionById } from "@/lib/mayakSessions";
 import { readJsonFile, withJsonFileLock, writeJsonFileAtomic } from "@/lib/jsonFileLock";
 import { convertToPdf, logLibreOffice } from "@/lib/libreofficeConverter";
 import { pickRandomMissionForRole } from "@/lib/mayakSecretMissions";
+// День 2: проверка внутри команды (партнёр по паре / соседняя пара / любой за столом); для обычных колод модуль отвечает null
+import { getDayTwoDeckInfo, dayTwoReviewers } from "@/lib/mayakDayTwoReview";
 
 const SESSION_RUNTIME_FILE = path.join(process.cwd(), "data", "mayak-session-runtime.json");
 const SESSION_FILES_ROOT = path.join(process.cwd(), "data", "mayak-session-files");
@@ -298,6 +300,7 @@ function serializeReviewSummary(sessionId, review) {
         participantName: review.participantName,
         participantTableNumber: review.participantTableNumber,
         reviewerTableNumber: review.reviewerTableNumber,
+        reviewerRule: review.reviewerRule || null,
         taskKey: review.taskKey,
         taskNumber: review.taskNumber,
         taskIndex: review.taskIndex,
@@ -632,6 +635,7 @@ export async function createMayakSessionReview({
     if (!taskKey) {
         throw new Error("Не удалось определить номер задания для проверки");
     }
+    const dayTwoDeck = await getDayTwoDeckInfo(session.sectionId);
 
     return mutateSessionRuntime(sessionId, (store, bucket) => {
         applyPendingReviewExpirations(bucket);
@@ -649,6 +653,8 @@ export async function createMayakSessionReview({
         const createdAt = new Date().toISOString();
         const nextReviewId = normalizeString(reviewId) || crypto.randomUUID();
         const reviewerTableNumber = getReviewerTableForParticipant(participant.tableNumber, normalizeTableNumber(session.tableCount));
+        // День 2: проверяет команда — конкретные люди своего стола, кольцо столов не используется
+        const dayTwoReview = dayTwoReviewers({ deck: dayTwoDeck, bucket, participant, taskNumber: normalizeString(taskNumber) });
         const reviewDurationSeconds = getReviewTimeoutSeconds(session);
         const review = {
             id: nextReviewId,
@@ -657,6 +663,7 @@ export async function createMayakSessionReview({
             participantName: participant.name,
             participantTableNumber: participant.tableNumber,
             reviewerTableNumber,
+            ...(dayTwoReview ? { reviewerUserIds: dayTwoReview.userIds, reviewerRule: dayTwoReview.rule, reviewerTableNumber: participant.tableNumber } : {}),
             taskKey,
             taskNumber: normalizeString(taskNumber),
             taskIndex: Number.isFinite(taskIndex) ? taskIndex : 0,
@@ -712,11 +719,19 @@ export async function resolveMayakSessionReview({ sessionId, reviewId, inspector
 
         const inspector = bucket.participants?.[inspectorUserId];
         const debugSession = isDebugSession(session);
-        if (!inspector || (!debugSession && !isReviewerRole(inspector.role))) {
-            throw new Error("Проверку может выполнить только инспектор");
-        }
-        if (!debugSession && inspector.inspectorTargetTable !== review.participantTableNumber) {
-            throw new Error("Этот инспектор не закреплён за выбранным столом");
+        const dayTwoReviewerIds = Array.isArray(review.reviewerUserIds) ? review.reviewerUserIds : null;
+        if (dayTwoReviewerIds) {
+            // День 2: принять может только назначенный проверяющий из своей команды
+            if (!inspector || !dayTwoReviewerIds.includes(inspectorUserId)) {
+                throw new Error("Эту работу принимает назначенный человек вашего стола");
+            }
+        } else {
+            if (!inspector || (!debugSession && !isReviewerRole(inspector.role))) {
+                throw new Error("Проверку может выполнить только инспектор");
+            }
+            if (!debugSession && inspector.inspectorTargetTable !== review.participantTableNumber) {
+                throw new Error("Этот инспектор не закреплён за выбранным столом");
+            }
         }
 
         const participant = bucket.participants?.[review.participantUserId];
@@ -796,14 +811,21 @@ export async function getMayakSessionRuntimeState({ sessionId, userId }) {
     // проверки = собственный стол участника, иначе — закреплённый стол инспектора.
     const debugSession = isDebugSession(session);
     const queueTargetTable = participant.inspectorTargetTable || (debugSession ? participant.tableNumber : null);
-    const inspectorQueue =
+    // День 2: очередь участника — заявки, где он назначен проверяющим; в кольцо дня 1 такие заявки не попадают
+    const dayTwoQueue = Object.values(bucket.reviews || {})
+        .filter((review) => review.status === "pending" && Array.isArray(review.reviewerUserIds) && review.reviewerUserIds.includes(userId))
+        .filter((review) => isReviewReadyForInspector(review))
+        .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+        .map((review) => serializeReviewSummary(sessionId, review));
+    const ringQueue =
         queueTargetTable && (debugSession || isReviewerRole(participant.role))
             ? Object.values(bucket.reviews || {})
-                  .filter((review) => review.status === "pending" && review.participantTableNumber === queueTargetTable)
+                  .filter((review) => review.status === "pending" && review.participantTableNumber === queueTargetTable && !Array.isArray(review.reviewerUserIds))
                   .filter((review) => isReviewReadyForInspector(review))
                   .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
                   .map((review) => serializeReviewSummary(sessionId, review))
             : [];
+    const inspectorQueue = dayTwoQueue.concat(ringQueue);
 
     const taskStates = Object.values(participant.tasks || {})
         .sort((a, b) => (Number(a.taskIndex) || 0) - (Number(b.taskIndex) || 0))
