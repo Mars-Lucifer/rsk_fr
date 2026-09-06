@@ -59,11 +59,13 @@ function hexPoints(cx, cy, r) {
 function hex(cx, cy, r, color, label, name, { width = 14, fill = "#FFFFFF" } = {}) {
     let s = `<polygon points="${hexPoints(cx, cy, r)}" fill="${fill}" stroke="${color}" stroke-width="${width}"/>`;
     const fs = Math.round(r * 0.7);
-    s += `<text x="${cx}" y="${cy + (name ? fs * 0.1 : fs * 0.35)}" font-size="${fs}" font-weight="700" fill="#111" text-anchor="middle">${esc(label)}</text>`;
+    // три строки подписи не помещаются под цифрой: блок сдвигается вверх на полстроки, две строки — как раньше
+    const fn = Math.round(r * 0.17);
+    const up = name ? ((name.length - 2) * (fn + 2)) / 2 : 0;
+    s += `<text x="${cx}" y="${cy + (name ? fs * 0.1 : fs * 0.35) - up}" font-size="${fs}" font-weight="700" fill="#111" text-anchor="middle">${esc(label)}</text>`;
     if (name) {
-        const fn = Math.round(r * 0.17);
         name.forEach((ln, i) => {
-            s += `<text x="${cx}" y="${cy + r * 0.12 + (i + 1) * (fn + 2)}" font-size="${fn}" font-weight="700" fill="#111" text-anchor="middle">${esc(ln)}</text>`;
+            s += `<text x="${cx}" y="${cy + r * 0.12 + (i + 1) * (fn + 2) - up}" font-size="${fn}" font-weight="700" fill="#111" text-anchor="middle">${esc(ln)}</text>`;
         });
     }
     return s;
