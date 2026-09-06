@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { LEVELS, RAYS } from "./zvezda.mjs";
-import { OVERVIEW, PEDESTAL, STAR, TOWER, crown, inlay, pedestalAt, plinth, rayAngle, rayCamera, raySector, starOutline, staveAngles, tiers, towerHeight } from "./platform.mjs";
+import { OVERVIEW, PEDESTAL, SECTOR_BLEED_RAMP, SECTOR_EDGE_BLEED, STAR, TOWER, crown, inlay, pedestalAt, plinth, rayAngle, rayCamera, raySector, sectorHalfWidth, starOutline, staveAngles, tiers, towerHeight } from "./platform.mjs";
 
 test("контур звезды: двенадцать вершин, внешние и внутренние чередуются", () => {
     const pts = starOutline();
@@ -123,11 +123,19 @@ test("жила идёт от основания маяка до тумбы и н
     });
 });
 
-test("камера луча смотрит на свою тумбу и стоит снаружи неё", () => {
+test("камера луча уводит тумбу в левую треть кадра и стоит снаружи неё", () => {
     RAYS.forEach((ray, i) => {
         const cam = rayCamera(i);
         const [px, , pz] = pedestalAt(i);
-        assert.ok(Math.abs(cam.target[0] - px) < 1e-9 && Math.abs(cam.target[2] - pz) < 1e-9, `${ray.id}: камера смотрит мимо тумбы`);
+        // Цель смещена от тумбы вбок — и ровно вбок: снос вдоль луча увёл бы кадр
+        // ближе или дальше вместо того, чтобы двигать его влево.
+        const dx = cam.target[0] - px;
+        const dz = cam.target[2] - pz;
+        const a = rayAngle(i);
+        const along = dx * Math.cos(a) + dz * Math.sin(a);
+        const across = dx * Math.sin(a) - dz * Math.cos(a);
+        assert.ok(Math.abs(along) < 1e-9, `${ray.id}: снос кадра ушёл вдоль луча`);
+        assert.ok(across > 0.5 && across < 1.5, `${ray.id}: снос кадра вбок вне диапазона (${across})`);
         assert.ok(Math.hypot(cam.position[0], cam.position[2]) > Math.hypot(px, pz), `${ray.id}: камера внутри звезды, маяк закроет кадр`);
         assert.ok(cam.position[1] > PEDESTAL.top, `${ray.id}: камера ниже столешницы`);
     });
@@ -155,3 +163,20 @@ test("сектор луча расширяется от тонкой полос�
     });
 });
 
+
+// Заливки соседних лучей не должны перекрываться: две прозрачные плоскости на одной высоте
+// дают мерцание, и видно его именно во впадине, где сходятся четыре цвета — два сектора и
+// две белые щеки плиты. Напуск на фаску за впадиной обязан расти медленнее, чем расходятся
+// сами рёбра лучей.
+test("напуск заливки не догоняет соседний луч во впадине", () => {
+    const xValley = STAR.inner * Math.cos(Math.PI / 6);
+    for (let d = 0; d <= 0.4; d += 0.01) {
+        const x = xValley + d;
+        const bleed = sectorHalfWidth(x) - Math.max(0, STAR.inner * Math.sin(Math.PI / 6) * (1 - d / (STAR.outer - xValley)));
+        // Половина расхождения рёбер двух соседних лучей на том же удалении.
+        const room = 0.5 * d;
+        assert.ok(bleed <= room + 1e-9, `на ${x.toFixed(2)} напуск ${bleed.toFixed(3)} шире зазора ${room.toFixed(3)}`);
+    }
+    assert.ok(SECTOR_EDGE_BLEED > STAR.bevel, "напуск должен перекрывать фаску, иначе край остаётся белым");
+    assert.ok(SECTOR_BLEED_RAMP > 2 * SECTOR_EDGE_BLEED, "разгон короче двойного напуска снова даёт наложение у впадины");
+});

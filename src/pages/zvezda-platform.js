@@ -1,10 +1,11 @@
 import Head from "next/head";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 
-import { CELLS, transitionTo } from "@/components/features/mayak-zvezda/model/artifacts.mjs";
+import { shortCell } from "@/components/features/mayak-zvezda/model/short/index.mjs";
 import { ACCENT } from "@/components/features/mayak-zvezda/model/platform.mjs";
+import { TOUR, TOUR_AUDIO, TOUR_RATE, tourCueIndexAt, tourCues, tourParts } from "@/components/features/mayak-zvezda/model/tour.mjs";
 import { LEVELS, RAYS } from "@/components/features/mayak-zvezda/model/zvezda.mjs";
 
 // Звезда-платформа: сцена на весь экран, интерфейс поверх.
@@ -24,11 +25,18 @@ export default function ZvezdaPlatform() {
     const [ray, setRay] = useState(null);
     // ?print=0.35 останавливает печать на заданном моменте — для проверки кадром.
     const [freeze, setFreeze] = useState(null);
-    // Наведение на тумбу подсвечивает её строку в списке справа. Подписей над предметами
-    // больше нет: они садились прямо на вещь и портили кадр. Связь «тумба ↔ строка» и есть
-    // замена подписи — она работает в обе стороны и ничего не загораживает.
-    const [hover, setHover] = useState(null);
+    // Сумерки — выбранный вариант сцены. Остальные пресеты никуда не делись и открываются
+    // адресом ?light=1..3, но переключателя в интерфейсе больше нет: выбор сделан.
+    const [light, setLight] = useState(4);
     const [ready, setReady] = useState(false);
+    // Экскурсия: дорожка ведёт, сцена идёт за ней. Состояние тура держится в ref, а не
+    // в адресе: в адрес пишется то, что показано, и запись каждого кадра тура забила бы
+    // историю переходами.
+    const [touring, setTouring] = useState(false);
+    // Какая глава звучит сейчас: подсветка в списке и подпись внизу.
+    const [cueIndex, setCueIndex] = useState(0);
+    const audioRef = useRef(null);
+    const cuesRef = useRef(null);
 
     useEffect(() => {
         if (!router.isReady) return;
@@ -38,8 +46,10 @@ export default function ZvezdaPlatform() {
         setRay(RAYS.some((x) => x.id === r) ? r : null);
         const f = router.query.print;
         setFreeze(f == null ? null : Math.max(0, Math.min(1, Number(f))));
+        const g = Number(router.query.light);
+        setLight(g >= 1 && g <= 4 ? g : 4);
         setReady(true);
-    }, [router.isReady, router.query.level, router.query.ray, router.query.print]);
+    }, [router.isReady, router.query.level, router.query.ray, router.query.print, router.query.light]);
 
     // Адрес обновляется без перезагрузки и без записи в историю: «назад» в браузере должен
     // уводить со страницы, а не отматывать двадцать кликов по лучам.
@@ -66,37 +76,101 @@ export default function ZvezdaPlatform() {
         [sync]
     );
 
+    // Пуск и стоп экскурсии. Аудио создаётся по первому нажатию: до жеста пользователя
+    // браузер его всё равно не проиграет, а держать заранее — лишний запрос на каждой
+    // загрузке страницы.
+    const stopTour = useCallback(() => {
+        const audio = audioRef.current;
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+        setTouring(false);
+    }, []);
+
+    // Дорожка заводится при первом обращении — и от «пуска», и от клика по главе. Раньше
+    // её создавал только «пуск», и глава, нажатая с холодного старта, молчала.
+    const ensureAudio = useCallback(() => {
+        let audio = audioRef.current;
+        if (audio) return audio;
+        audio = new Audio(TOUR_AUDIO);
+        audio.preload = "auto";
+        audio.playbackRate = TOUR_RATE;
+        audioRef.current = audio;
+        audio.addEventListener("ended", () => setTouring(false));
+        audio.addEventListener("timeupdate", () => {
+            if (!cuesRef.current) return;
+            const i = tourCueIndexAt(cuesRef.current, audio.currentTime);
+            const cue = cuesRef.current[i];
+            setCueIndex(i);
+            setLevel(cue.level);
+            setRay(cue.ray);
+        });
+        return audio;
+    }, []);
+
+    // Что бы ни попросили — играть с начала или с главы, — дождаться метаданных: до них
+    // неизвестна длительность, а по ней считаются метки.
+    const playFrom = useCallback(
+        (index) => {
+            const audio = ensureAudio();
+            const go = () => {
+                cuesRef.current = tourCues(audio.duration);
+                const cue = cuesRef.current[index];
+                audio.currentTime = cue.at + 0.05;
+                setCueIndex(index);
+                setLevel(cue.level);
+                setRay(cue.ray);
+                audio.play();
+                setTouring(true);
+            };
+            if (audio.readyState >= 1) go();
+            else audio.addEventListener("loadedmetadata", go, { once: true });
+        },
+        [ensureAudio]
+    );
+
+    const seekTour = useCallback((index) => playFrom(index), [playFrom]);
+    const startTour = useCallback(() => playFrom(0), [playFrom]);
+
     useEffect(() => {
         const onKeyDown = (e) => {
             if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-            if (e.key === "ArrowLeft") {
+            // WASD работает наравне со стрелками. Сравнение идёт по e.code, а не по e.key:
+            // code — это физическая клавиша, и на русской раскладке те же кнопки шлют «ц»,
+            // «ф», «ы», «в». По e.key пришлось бы держать таблицу букв двух алфавитов.
+            const key = { KeyW: "ArrowUp", KeyS: "ArrowDown", KeyA: "ArrowLeft", KeyD: "ArrowRight" }[e.code] ?? e.key;
+            if (key === "ArrowLeft") {
                 e.preventDefault();
                 const currIdx = ray ? RAYS.findIndex((r) => r.id === ray) : 0;
                 const prevIdx = (currIdx - 1 + RAYS.length) % RAYS.length;
                 pickRay(RAYS[prevIdx].id);
-            } else if (e.key === "ArrowRight") {
+            } else if (key === "ArrowRight") {
                 e.preventDefault();
                 const currIdx = ray ? RAYS.findIndex((r) => r.id === ray) : -1;
                 const nextIdx = (currIdx + 1) % RAYS.length;
                 pickRay(RAYS[nextIdx].id);
-            } else if (e.key === "Escape") {
+            } else if (key === "Escape") {
+                if (touring) stopTour();
                 pickRay(null);
-            } else if (e.key === "ArrowUp") {
+            } else if (key === "ArrowUp") {
                 e.preventDefault();
                 pickLevel(Math.min(6, level + 1));
-            } else if (e.key === "ArrowDown") {
+            } else if (key === "ArrowDown") {
                 e.preventDefault();
                 pickLevel(Math.max(1, level - 1));
             }
         };
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [ray, level, pickRay, pickLevel]);
+    }, [ray, level, pickRay, pickLevel, touring, stopTour]);
+
+    // Дорожка живёт дольше страницы, если её не остановить руками.
+    useEffect(() => () => audioRef.current?.pause(), []);
 
     const lv = LEVELS[level - 1];
-    const step = transitionTo(level);
     const rayInfo = ray ? RAYS.find((r) => r.id === ray) : null;
-    const cell = ray ? CELLS[ray][level] : null;
+    const cell = ray ? shortCell(ray, level) : null;
 
     return (
         <>
@@ -104,104 +178,95 @@ export default function ZvezdaPlatform() {
                 <title>ЗВЕЗДА · платформа</title>
             </Head>
             <div className="stage">
-                {ready && <Platform level={level} ray={ray} freeze={freeze} onPickRay={pickRay} onHoverRay={setHover} />}
+                {ready && <Platform level={level} ray={ray} light={light} freeze={freeze} onPickRay={pickRay} />}
 
                 <div className="hud">
                     <div className="tl">
-                        <p className="mono">// ЗВЕЗДА</p>
+                        {/* Подпись показывает выбранный луч. На обзоре её нет: строка «обзор,
+                            все шесть лучей» повторяла то, что и так видно на экране. */}
+                        {rayInfo && (
+                            <p className="mono where">
+                                <i style={{ background: ACCENT[ray] }} />
+                                {rayInfo.name}
+                            </p>
+                        )}
                         <h1>
                             {icz(lv)} · {lv.name}
                         </h1>
                         <p className="about">{lv.about}</p>
                     </div>
 
-                    <div className={"rays mono" + (ray ? " hidden" : "")}>
-                        {RAYS.map((r) => (
-                            <button
-                                key={r.id}
-                                onClick={() => pickRay(r.id)}
-                                onMouseEnter={() => setHover(r.id)}
-                                onMouseLeave={() => setHover(null)}
-                                className={hover === r.id ? "on" : ""}
-                                style={{ "--c": ACCENT[r.id] }}
-                            >
-                                <i />
-                                {r.name}
-                            </button>
-                        ))}
-                    </div>
-
                     <div className={"panel" + (ray ? " open" : "")} role="complementary" aria-hidden={!ray}>
                         {cell && (
                             <>
-                                <div className="panelNav">
-                                    <button className="back" onClick={() => pickRay(null)}>
-                                        ← к обзору
-                                    </button>
-                                    <div className="rayFlippers">
-                                        <button
-                                            className="flipBtn"
-                                            onClick={() => {
-                                                const idx = RAYS.findIndex((r) => r.id === ray);
-                                                const prev = RAYS[(idx - 1 + RAYS.length) % RAYS.length];
-                                                pickRay(prev.id);
-                                            }}
-                                            title="Предыдущий луч (←)"
-                                        >
-                                            ‹
-                                        </button>
-                                        <button
-                                            className="flipBtn"
-                                            onClick={() => {
-                                                const idx = RAYS.findIndex((r) => r.id === ray);
-                                                const next = RAYS[(idx + 1) % RAYS.length];
-                                                pickRay(next.id);
-                                            }}
-                                            title="Следующий луч (→)"
-                                        >
-                                            ›
-                                        </button>
-                                    </div>
-                                </div>
+                                {/* Кнопок возврата и перелистывания здесь нет: Esc уводит к обзору,
+                                    ← → переключают лучи, ↑ ↓ — уровни. */}
                                 <p className="mono kicker" style={{ color: ACCENT[ray] }}>
                                     {rayInfo.name} · {icz(lv)} {lv.name}
                                 </p>
                                 <h2>{cell.lead}</h2>
                                 <p className="about">{rayInfo.about}</p>
 
-                                <h3>Что должно быть</h3>
-                                <ul className={level === 1 ? "no" : "yes"}>
-                                    {cell.artifacts.map((a) => (
-                                        <li key={a}>{a}</li>
-                                    ))}
-                                </ul>
+                                <div className="card">
+                                    <h3>Что должно быть</h3>
+                                    <ul className={level === 1 ? "no" : "yes"}>
+                                        {cell.artifacts.map((a) => (
+                                            <li key={a}>
+                                                <i />
+                                                <span>{a}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
 
-                                <h3>Что измеряем</h3>
-                                <ul className="num">
-                                    {cell.indicators.map((i) => (
-                                        <li key={i}>{i}</li>
-                                    ))}
-                                </ul>
-
-                                {step && (
-                                    <p className="crit">
-                                        <b>Как сюда попадают.</b> {step.static}
-                                    </p>
-                                )}
+                                <div className="card">
+                                    <h3>Что измеряем</h3>
+                                    <ul className="num">
+                                        {cell.indicators.map((i) => (
+                                            <li key={i}>
+                                                <i style={{ background: ACCENT[ray] }} />
+                                                <span>{i}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </>
                         )}
                     </div>
 
+                    {/* Главы. Список — единственный способ увидеть, о чём сейчас речь, и
+                        уйти на нужный кусок: дорожка одна, резать её на файлы незачем —
+                        глава это одно число, секунда начала. */}
+                    <div className={"chapters" + (touring ? " on" : " idle")}>
+                        {tourParts().map((group) => (
+                            <div className="part" key={group.part}>
+                                <p className="mono partName">{group.part}</p>
+                                {group.items.map((item) => (
+                                    <button
+                                        key={item.index}
+                                        className={"chapter" + (item.index === cueIndex ? " on" : "") + (item.index < cueIndex ? " passed" : "")}
+                                        onClick={() => seekTour(item.index)}
+                                    >
+                                        {item.title}
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+
+                    {touring && <p className="caption">{TOUR[cueIndex].text}</p>}
+
                     <div className="bl">
+                        <button className="play" onClick={touring ? stopTour : startTour} title={touring ? "Остановить (Esc)" : "Экскурсия с озвучкой"}>
+                            {touring ? "■ стоп" : "▶ пуск"}
+                        </button>
                         {LEVELS.map((l) => (
                             <button key={l.n} onClick={() => pickLevel(l.n)} className={l.n === level ? "on" : ""} title={l.name}>
                                 {icz(l)}
                             </button>
                         ))}
                     </div>
-                    <p className={"br mono" + (ray ? " hidden" : "")}>
-                        маяк горит на {level} из {LEVELS.length} · клик по тумбе — подъехать · пустое место — назад
-                    </p>
+
                 </div>
             </div>
 
@@ -240,6 +305,16 @@ export default function ZvezdaPlatform() {
                 .tl .mono {
                     margin: 0 0 10px;
                 }
+                .where {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .where i {
+                    width: 7px;
+                    height: 7px;
+                    border-radius: 50%;
+                }
                 h1 {
                     margin: 0 0 6px;
                     font-size: 26px;
@@ -251,58 +326,20 @@ export default function ZvezdaPlatform() {
                     line-height: 1.5;
                     color: rgba(27, 33, 48, 0.55);
                 }
-                .rays {
-                    top: 30px;
-                    right: 34px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: flex-end;
-                    gap: 8px;
-                    transition: opacity 0.3s;
-                }
-                .rays.hidden {
-                    opacity: 0;
-                    pointer-events: none;
-                }
-                .rays button {
-                    display: flex;
-                    align-items: center;
-                    gap: 9px;
-                    padding: 0;
-                    border: 0;
-                    background: none;
-                    font-family: ui-monospace, Menlo, Consolas, monospace;
-                    font-size: 11px;
-                    letter-spacing: 0.08em;
-                    text-transform: uppercase;
-                    color: rgba(27, 33, 48, 0.5);
-                    cursor: pointer;
-                }
-                .rays button:hover,
-                .rays button.on {
-                    color: #1b2130;
-                }
-                .rays button.on i {
-                    box-shadow: 0 0 0 3px rgba(27, 33, 48, 0.08);
-                }
-                .rays i {
-                    width: 7px;
-                    height: 7px;
-                    border-radius: 50%;
-                    background: var(--c);
-                }
                 .panel {
                     top: 0;
                     right: 0;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
                     /* left гасится явно: у layout-шного aside он задан глобально, и при
                        заданной ширине left побеждает right — панель уезжала к левому краю. */
                     left: auto;
                     bottom: 0;
-                    width: min(440px, 92vw);
-                    padding: 30px 34px 40px;
+                    width: min(500px, 94vw);
+                    padding: 40px 38px;
                     overflow-y: auto;
-                    background: rgba(255, 255, 255, 0.86);
-                    backdrop-filter: blur(10px);
+                    background: rgba(252, 253, 254, 0.94);
                     border-left: 1px solid rgba(27, 33, 48, 0.08);
                     transform: translateX(100%);
                     transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -310,67 +347,36 @@ export default function ZvezdaPlatform() {
                 .panel.open {
                     transform: translateX(0);
                 }
-                .panelNav {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    margin: 0 0 18px;
-                }
-                .back {
-                    display: block;
-                    margin: 0;
-                    padding: 0;
-                    border: 0;
-                    background: none;
-                    color: rgba(27, 33, 48, 0.5);
-                    font-size: 13px;
-                    font-family: inherit;
-                    cursor: pointer;
-                }
-                .back:hover {
-                    color: #1b2130;
-                }
-                .rayFlippers {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                }
-                .flipBtn {
-                    display: inline-flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 28px;
-                    height: 28px;
-                    border-radius: 6px;
-                    border: 1px solid rgba(27, 33, 48, 0.12);
-                    background: rgba(255, 255, 255, 0.7);
-                    color: rgba(27, 33, 48, 0.65);
-                    font-size: 16px;
-                    font-weight: 600;
-                    line-height: 1;
-                    cursor: pointer;
-                    transition: all 0.15s ease;
-                }
-                .flipBtn:hover {
-                    background: #ffffff;
-                    color: #1b2130;
-                    border-color: rgba(27, 33, 48, 0.28);
-                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-                }
                 .kicker {
-                    margin: 0 0 8px;
+                    margin: 0 0 10px;
+                    font-size: 11.5px;
                 }
                 h2 {
-                    margin: 0 0 10px;
-                    font-size: 22px;
-                    font-weight: 500;
-                    line-height: 1.3;
+                    margin: 0 0 12px;
+                    /* Заголовок ломается по смыслу, а не по краю колонки: без этого в шапке
+                       регулярно оставалось висячее слово в последней строке. */
+                    text-wrap: balance;
+                    font-size: 27px;
+                    font-weight: 600;
+                    line-height: 1.22;
+                    letter-spacing: -0.01em;
                 }
                 .panel .about {
-                    margin-bottom: 22px;
+                    margin-bottom: 24px;
+                    font-size: 14.5px;
+                }
+                /* Карточка. Каждый список — свой блок на подложке: на сплошном полотне
+                   «что должно быть» и «что измеряем» сливались в один длинный столбец,
+                   и граница между предъявимым и измеримым пропадала. */
+                .card {
+                    padding: 16px 18px 6px;
+                    margin-bottom: 14px;
+                    border: 1px solid rgba(27, 33, 48, 0.07);
+                    border-radius: 16px;
+                    background: rgba(255, 255, 255, 0.6);
                 }
                 h3 {
-                    margin: 0 0 9px;
+                    margin: 0 0 6px;
                     font-family: ui-monospace, Menlo, Consolas, monospace;
                     font-size: 11px;
                     letter-spacing: 0.1em;
@@ -379,45 +385,73 @@ export default function ZvezdaPlatform() {
                     color: rgba(27, 33, 48, 0.42);
                 }
                 ul {
-                    margin: 0 0 22px;
+                    margin: 0;
                     padding: 0;
                     list-style: none;
+                    /* Лигатуры выключены: шрифт склеивает «<3» в сердечко, а «>7» в «›7».
+                       В индикаторах это не украшение — это подмена знака сравнения. */
+                    font-variant-ligatures: none;
                 }
                 li {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 11px 0;
+                    font-size: 14.5px;
+                    line-height: 1.35;
+                    color: rgba(27, 33, 48, 0.86);
+                    border-bottom: 1px solid rgba(27, 33, 48, 0.06);
+                }
+                li:last-child {
+                    border-bottom: 0;
+                }
+                /* Маркер — кружок, а не символ в строке: у знака ✓ базовая линия своя, и
+                   на двухстрочном пункте он уезжал от текста. Кружок стоит по центру строки
+                   независимо от её высоты. */
+                li span {
+                    /* Перенос по правилам, а не по ширине: браузер не оставляет одно слово
+                       в последней строке и не разрывает пару «тире + число». */
+                    text-wrap: pretty;
+                    hyphens: none;
+                }
+                li i {
+                    flex: 0 0 auto;
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 50%;
                     position: relative;
-                    padding-left: 22px;
-                    margin-bottom: 9px;
-                    font-size: 13.5px;
-                    line-height: 1.5;
-                    color: rgba(27, 33, 48, 0.8);
                 }
-                li::before {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
+                .yes li i {
+                    background: rgba(58, 172, 153, 0.14);
                 }
-                .yes li::before {
+                .yes li i::after {
                     content: "✓";
-                    color: #3aac99;
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 12px;
+                    color: #2f9e8a;
                 }
-                .no li::before {
+                .no li i {
+                    background: rgba(214, 83, 63, 0.14);
+                }
+                .no li i::after {
                     content: "✕";
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 11px;
                     color: #d6533f;
                 }
-                .num li::before {
-                    content: "◆";
-                    color: #448ac5;
-                    font-size: 9px;
-                    top: 3px;
-                }
-                .crit {
-                    margin: 0;
-                    padding: 12px 14px;
-                    border-left: 2px solid #448ac5;
-                    background: rgba(68, 138, 197, 0.07);
-                    font-size: 13px;
-                    line-height: 1.5;
-                    color: rgba(27, 33, 48, 0.7);
+                .num li i {
+                    width: 10px;
+                    height: 10px;
+                    margin: 0 6px;
+                    opacity: 0.85;
                 }
                 .bl {
                     bottom: 30px;
@@ -436,23 +470,98 @@ export default function ZvezdaPlatform() {
                     cursor: pointer;
                     border-radius: 4px;
                 }
+                /* Главы стоят слева столбцом: справа панель клетки, снизу шкала уровней,
+                   а левый край всё равно пустой — сцена там уходит за кадр. */
+                .chapters {
+                    top: 132px;
+                    left: 34px;
+                    width: 228px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 14px;
+                    /* Подложка обязательна: список лежит поверх сцены, и без неё серый текст
+                       на белой плите не читается — а на тёмном полу читается уже другой. */
+                    padding: 16px 18px;
+                    border-radius: 16px;
+                    border: 1px solid rgba(27, 33, 48, 0.06);
+                    background: rgba(252, 253, 254, 0.9);
+                    transition: opacity 0.35s;
+                }
+                /* До запуска список приглушён: он не должен спорить с самой сценой, но и
+                   прятать его нельзя — с него начинают, когда нужен конкретный кусок. */
+                .chapters.idle {
+                    opacity: 0.45;
+                }
+                .chapters.idle:hover {
+                    opacity: 1;
+                }
+                .part {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                }
+                .partName {
+                    margin: 0 0 4px;
+                    font-size: 10px;
+                }
+                .chapter {
+                    /* Глобальный стиль кнопок в шапке проекта делает их flex по центру, и
+                       одного text-align мало: выравнивание задаётся раскладкой, а не текстом. */
+                    display: block;
+                    width: 100%;
+                    padding: 3px 0;
+                    border: 0;
+                    background: none;
+                    text-align: left;
+                    font-family: inherit;
+                    font-size: 13px;
+                    line-height: 1.3;
+                    color: rgba(27, 33, 48, 0.42);
+                    cursor: pointer;
+                    transition: color 0.2s;
+                }
+                .chapter:hover {
+                    color: rgba(27, 33, 48, 0.8);
+                }
+                .chapter.passed {
+                    color: rgba(27, 33, 48, 0.3);
+                }
+                .chapter.on {
+                    color: #1b2130;
+                    font-weight: 600;
+                }
+                /* Подпись к тому, что звучит. Не расшифровка слово в слово — сжатие фразы:
+                   читать субтитр целиком и одновременно смотреть сцену нельзя. */
+                .caption {
+                    left: 34px;
+                    right: auto;
+                    bottom: 84px;
+                    max-width: 560px;
+                    margin: 0;
+                    padding: 12px 16px;
+                    border-radius: 14px;
+                    border: 1px solid rgba(27, 33, 48, 0.06);
+                    background: rgba(252, 253, 254, 0.92);
+                    font-size: 15px;
+                    line-height: 1.45;
+                    color: rgba(27, 33, 48, 0.72);
+                    text-wrap: pretty;
+                }
+                .play {
+                    /* Кнопка пуска шире цифровых: она не член ряда уровней, а вход в другой
+                       режим, и путать их нельзя. */
+                    width: auto !important;
+                    padding: 0 12px;
+                    margin-right: 10px;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                }
                 .bl button.on {
                     border-color: #1b2130;
                     color: #1b2130;
                     background: #fff;
                 }
-                .br.hidden {
-                    opacity: 0;
-                }
-                .br {
-                    transition: opacity 0.3s;
-                    bottom: 30px;
-                    right: 34px;
-                    margin: 0;
-                    max-width: 420px;
-                    text-align: right;
-                    line-height: 1.6;
-                }
+
             `}</style>
         </>
     );
