@@ -1,7 +1,8 @@
 import { requireMayakAdmin } from "@/lib/mayakAdminAuth";
-import { computeStage, createDayTwoDay, listDayTwoDays } from "@/lib/mayakDayTwoStore";
+import { computeStage, copyDayTwoDay, createDayTwoDay, listDayTwoDays } from "@/lib/mayakDayTwoStore";
 
 // День 2: список дней и создание дня из брифа (колода — из шаблона).
+// POST {copyFrom: <id>} — копия существующего дня без даты, раздела и сессии (H4d).
 export default async function handler(req, res) {
     if (!requireMayakAdmin(req, res)) {
         return;
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
         try {
             const body = req.body && typeof req.body === "object" ? req.body : {};
-            const day = await createDayTwoDay(body);
+            const day = body.copyFrom ? await copyDayTwoDay(String(body.copyFrom)) : await createDayTwoDay(body);
             return res.status(200).json({ success: true, data: day });
         } catch (error) {
             return res.status(400).json({ success: false, error: error.message || "Не удалось создать день" });

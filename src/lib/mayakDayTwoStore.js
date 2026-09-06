@@ -42,7 +42,7 @@ export async function getDayTwoDay(id) {
     return store.days.find((day) => day.id === normalizedId) || null;
 }
 
-export async function createDayTwoDay(brief = {}) {
+async function insertDay(brief, cards = null) {
     const now = new Date().toISOString();
     const day = {
         id: crypto.randomUUID(),
@@ -51,6 +51,7 @@ export async function createDayTwoDay(brief = {}) {
         updatedAt: now,
         cardsUpdatedAt: now,
     };
+    if (Array.isArray(cards)) day.cards = cards;
     await withJsonFileLock(DAYS_FILE, async () => {
         const store = await readJsonFile(DAYS_FILE, createEmptyStore());
         store.days = Array.isArray(store?.days) ? store.days : [];
@@ -58,6 +59,30 @@ export async function createDayTwoDay(brief = {}) {
         await writeJsonFileAtomic(DAYS_FILE, store);
     });
     return day;
+}
+
+export async function createDayTwoDay(brief = {}) {
+    return insertDay(brief);
+}
+
+// H4d: копия дня — бриф (без даты: её ставит админ), столы, папка, логотип и
+// колода. Раздел, сессия, снимок, треки, заметки и отметки не копируются.
+export async function copyDayTwoDay(sourceId) {
+    const source = await getDayTwoDay(sourceId);
+    if (!source) throw new Error("День для копирования не найден");
+    const cards = (Array.isArray(source.cards) ? source.cards : []).map((card) => normalizeCard(JSON.parse(JSON.stringify(card))));
+    return insertDay(
+        {
+            org: source.org,
+            date: "",
+            tables: source.tables,
+            folder_url: source.folder_url,
+            logo: source.logo,
+            allowed_files: source.allowed_files,
+            fromTemplate: false,
+        },
+        cards
+    );
 }
 
 // Произвольное изменение дня под блокировкой файла: mutator получает копию

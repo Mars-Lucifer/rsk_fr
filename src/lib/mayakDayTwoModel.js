@@ -694,6 +694,26 @@ export function briefProblems(day) {
     return problems;
 }
 
+// H4e: предупреждения брифа — не блокируют этап, но подсказывают, что участники
+// не поймут формулировку из одного-двух слов.
+export const BRIEF_MIN_WORDS = 3;
+
+export function briefWarnings(day) {
+    const warnings = [];
+    const tables = Array.isArray(day?.tables) ? day.tables : [];
+    tables.forEach((table) => {
+        [
+            ["user", "кому"],
+            ["pain", "боль"],
+            ["after6m", "через полгода"],
+        ].forEach(([key, label]) => {
+            const text = str(table?.[key]);
+            if (text && countTaskWords(text) < BRIEF_MIN_WORDS) warnings.push(`стол ${table?.n}, «${label}»: слишком коротко, участники не поймут`);
+        });
+    });
+    return warnings;
+}
+
 function isPublishedFresh(day) {
     const published = day?.published;
     if (!published?.sectionId || !day?.sectionId || published.sectionId !== day.sectionId) return false;
@@ -797,6 +817,7 @@ export function computeStage(day, now = Date.now()) {
         stages: DAY_TWO_STAGE_TITLES.map((title, i) => ({ n: i + 1, title, done: done[i] })),
         checks,
         briefProblems: brief,
+        briefWarnings: briefWarnings(day),
     };
 }
 

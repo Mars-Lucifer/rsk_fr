@@ -274,6 +274,7 @@ export async function exportDayResults(day) {
         kindName: DAY_TWO_KIND_NAMES[kindOf(review.taskNumber)] || kindOf(review.taskNumber),
         title: titleOf(review.taskNumber),
         table: Number(review.participantTableNumber) || 0,
+        userId: review.participantUserId || "",
         participantName: review.participantName || "",
         status: review.status,
         accepted: ACCEPTED.has(review.status),
@@ -307,6 +308,21 @@ export async function exportDayResults(day) {
         });
     }
 
+    // H4h: разрез по участнику — все его заявки по номеру карточки, статусы как есть.
+    const byParticipant = participants
+        .slice()
+        .sort((a, b) => (Number(a.tableNumber) || 0) - (Number(b.tableNumber) || 0) || String(a.name || "").localeCompare(String(b.name || ""), "ru"))
+        .map((p) => ({
+            userId: p.userId,
+            name: p.name || "",
+            table: Number(p.tableNumber) || 0,
+            role: p.role || "",
+            items: items
+                .filter((item) => item.userId && item.userId === p.userId)
+                .sort((a, b) => a.taskNumber.localeCompare(b.taskNumber) || a.createdAt.localeCompare(b.createdAt))
+                .map((item) => ({ number: item.taskNumber, kind: item.kind, kindName: item.kindName, title: item.title, status: item.status, text: item.text, file: item.file })),
+        }));
+
     return {
         at: new Date().toISOString(),
         session: { id: session.id, name: session.name, status: session.status, tableCount: session.tableCount, expiresAt: session.expiresAt },
@@ -315,5 +331,6 @@ export async function exportDayResults(day) {
         accepted: items.filter((item) => item.accepted).length,
         roadmapAccepted: tables.filter((t) => t.roadmap?.accepted).length,
         tables,
+        byParticipant,
     };
 }

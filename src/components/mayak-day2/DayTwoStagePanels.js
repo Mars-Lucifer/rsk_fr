@@ -13,9 +13,11 @@ import {
     TRACK_MARKS,
     countTaskWords,
     formatMsk,
+    plural,
     sessionEarliestAt,
     trackDates,
 } from "@/lib/mayakDayTwoModel";
+import { tableFolderUrl } from "@/lib/mayakDayTwoTexts";
 
 export const ui = {
     input: "!w-full !rounded-[0.95rem] !border-2 !border-stone-700/80 !bg-white !px-4 !py-3 !text-sm !text-(--color-black) !shadow-[inset_0_1px_2px_rgba(15,23,42,0.06)] outline-none transition placeholder:!text-[#94a3b8] focus:!border-black",
@@ -40,11 +42,12 @@ const HINT_FIELDS = [
     ["o2", "О — формат"],
 ];
 
-function Field({ label, children, className = "" }) {
+function Field({ label, children, className = "", sample = "" }) {
     return (
         <label className={`block rounded-[0.95rem] border-2 border-stone-300 bg-white px-3 py-2 ${className}`.trim()}>
             <div className={ui.label}>{label}</div>
             <div className="mt-2">{children}</div>
+            {sample ? <div className="mt-1 text-xs text-[#94a3b8]">Образец: {sample}</div> : null}
         </label>
     );
 }
@@ -114,7 +117,7 @@ function LinkRow({ title, href, extra = null, big = false }) {
 
 // ---------- 1. Бриф ----------
 
-export function BriefPanel({ day, problems, onSave, onTemplate, busy }) {
+export function BriefPanel({ day, problems, warnings = [], onSave, onTemplate, busy }) {
     const [draft, setDraft] = useState(() => briefDraft(day));
     useEffect(() => {
         setDraft(briefDraft(day));
@@ -126,7 +129,7 @@ export function BriefPanel({ day, problems, onSave, onTemplate, busy }) {
     return (
         <div className="space-y-3">
             <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Организация">
+                <Field label="Организация" sample="Профсоюз образования">
                     <input className={ui.input} value={draft.org} onChange={(e) => setDraft({ ...draft, org: e.target.value })} placeholder="Профсоюз образования" />
                 </Field>
                 <Field label="Дата дня (обязательна)">
@@ -144,19 +147,19 @@ export function BriefPanel({ day, problems, onSave, onTemplate, busy }) {
                     <div key={table.n} className="rounded-[1rem] border border-(--color-gray-plus-50) bg-[#f8fafc] p-3">
                         <div className="text-sm font-black text-(--color-black)">Стол {table.n}</div>
                         <div className="mt-2 grid gap-2 md:grid-cols-5">
-                            <Field label="Продукт">
+                            <Field label="Продукт" sample="Моя подписка">
                                 <input className={ui.input} value={table.product} onChange={(e) => setTable(index, "product", e.target.value)} />
                             </Field>
-                            <Field label="Кому">
+                            <Field label="Кому" sample="молодой педагог, первый год в профсоюзе">
                                 <input className={ui.input} value={table.user} onChange={(e) => setTable(index, "user", e.target.value)} />
                             </Field>
-                            <Field label="Боль">
+                            <Field label="Боль" sample="не знает, что уже оплатил взносами">
                                 <input className={ui.input} value={table.pain} onChange={(e) => setTable(index, "pain", e.target.value)} />
                             </Field>
-                            <Field label="Через полгода">
+                            <Field label="Через полгода" sample="открывает подписку и видит сумму за год">
                                 <input className={ui.input} value={table.after6m} onChange={(e) => setTable(index, "after6m", e.target.value)} />
                             </Field>
-                            <Field label="Адрес продукта">
+                            <Field label="Адрес продукта" sample="http://ctr5.ru/1109/2/">
                                 <input className={ui.input} value={table.url} onChange={(e) => setTable(index, "url", e.target.value)} placeholder="http://ctr5.ru/1109/1/" />
                             </Field>
                         </div>
@@ -164,6 +167,16 @@ export function BriefPanel({ day, problems, onSave, onTemplate, busy }) {
                 ))}
             </div>
             {problems.length ? <div className={ui.warn}>Не хватает: {problems.join("; ")}</div> : <div className={ui.ok}>Бриф заполнен</div>}
+            {warnings.length ? (
+                <div className={ui.warn}>
+                    <div className="font-bold">Предупреждения (не блокируют)</div>
+                    <ul className="mt-1 list-disc pl-5">
+                        {warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
                 <button type="button" className={ui.primary} disabled={busy} onClick={() => onSave(draft)}>
                     Сохранить бриф
@@ -560,6 +573,83 @@ export function LiveDayPanel({ day, live, origin, onRefresh, busy }) {
     );
 }
 
+// Площадка столов (H4f): папки на ctr5, адреса продуктов, промпт сборщику.
+// Промпты запрашиваются с сервера при открытии панели, чтобы «Скопировать» было
+// синхронным кликом (буфер обмена не любит копирование после await).
+export function TablesSitePanel({ day, loadPrompt }) {
+    const tables = Array.isArray(day?.tables) ? day.tables : [];
+    const folder = day?.folder_url ? (day.folder_url.endsWith("/") ? day.folder_url : `${day.folder_url}/`) : "";
+    const [prompts, setPrompts] = useState({});
+    const [shown, setShown] = useState(null);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let cancelled = false;
+        setPrompts({});
+        setError("");
+        tables.forEach((table) => {
+            Promise.resolve(loadPrompt(table.n))
+                .then((data) => {
+                    if (!cancelled) setPrompts((current) => ({ ...current, [String(table.n)]: data?.prompt || "" }));
+                })
+                .catch((err) => {
+                    if (!cancelled) setError(err instanceof Error ? err.message : "Не удалось загрузить промпт");
+                });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [day?.id, day?.updatedAt]);
+
+    return (
+        <div className="space-y-3 rounded-[1rem] border border-(--color-gray-plus-50) bg-[#f8fafc] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-black text-(--color-black)">Площадка столов</div>
+                {folder ? (
+                    <>
+                        <a href={folder} target="_blank" rel="noreferrer" className={ui.small}>
+                            Папка столов
+                        </a>
+                        <a href={`${folder}priemka.html`} target="_blank" rel="noreferrer" className={ui.small}>
+                            Семь шагов
+                        </a>
+                    </>
+                ) : (
+                    <span className={ui.hint}>В брифе нет папки столов (folder_url) — ссылки на папки и семь шагов появятся после её заполнения.</span>
+                )}
+            </div>
+            {error ? <div className={ui.bad}>{error}</div> : null}
+            <div className="grid gap-2 md:grid-cols-3">
+                {tables.map((table) => {
+                    const url = tableFolderUrl(day, table.n);
+                    const prompt = prompts[String(table.n)] || "";
+                    return (
+                        <div key={table.n} className="rounded-[0.9rem] border border-(--color-gray-plus-50) bg-white p-3">
+                            <div className="text-sm font-black text-(--color-black)">
+                                Стол {table.n} <span className="text-xs font-medium text-[#64748b]">· {table.product || "продукт не задан"}</span>
+                            </div>
+                            <div className="mt-1 break-all font-mono text-xs text-(--color-black)">{url || "адрес продукта не задан"}</div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {url ? (
+                                    <a href={url} target="_blank" rel="noreferrer" className={ui.small}>
+                                        Папка стола
+                                    </a>
+                                ) : null}
+                                <CopyButton text={prompt} label={prompt ? "Скопировать промпт" : "Промпт загружается…"} />
+                                <button type="button" className={ui.small} disabled={!prompt} onClick={() => setShown(shown === table.n ? null : table.n)}>
+                                    {shown === table.n ? "Скрыть" : "Показать"}
+                                </button>
+                            </div>
+                            {shown === table.n ? <pre className="mt-2 max-h-[320px] overflow-auto whitespace-pre-wrap rounded-[0.6rem] bg-[#f8fafc] p-2 text-xs">{prompt}</pre> : null}
+                        </div>
+                    );
+                })}
+            </div>
+            <div className={ui.hint}>Сборщик стола отдаёт промпт агенту в пустой папке и прикладывает три узла файлами. Доступ к серверу (пользователь, папка, пароль) в промпте нет — его говорит ведущий.</div>
+        </div>
+    );
+}
+
 // ---------- 7. Выгрузка ----------
 
 function ReviewItem({ item }) {
@@ -602,10 +692,55 @@ function NoteEditor({ label, value, onSave, busy }) {
     );
 }
 
-export function ExportPanel({ day, live, onSnapshot, onSaveNote, busy }) {
+function ParticipantRow({ person }) {
+    const [open, setOpen] = useState(false);
+    const items = Array.isArray(person.items) ? person.items : [];
+    return (
+        <div className="rounded-[0.9rem] border border-(--color-gray-plus-50) bg-white">
+            <button type="button" className="flex w-full flex-wrap items-center gap-2 px-3 py-2 text-left text-sm" onClick={() => setOpen((value) => !value)}>
+                <span className="font-black text-(--color-black)">{person.name || "без имени"}</span>
+                <span className="text-[#64748b]">· стол {person.table || "—"}</span>
+                {person.role ? <span className="text-[#64748b]">· {person.role}</span> : null}
+                <span className="ml-auto text-xs text-[#64748b]">
+                    {items.length} {plural(items.length, "заявка", "заявки", "заявок")} · {open ? "свернуть" : "открыть"}
+                </span>
+            </button>
+            {open ? (
+                <div className="space-y-2 border-t border-(--color-gray-plus-50) p-3">
+                    {items.length ? (
+                        items.map((item, i) => (
+                            <div key={`${item.number}-${i}`} className={`rounded-[0.75rem] border border-(--color-gray-plus-50) bg-white px-3 py-2 ${statusClass(item.status)}`}>
+                                <div className="text-xs text-[#64748b]">
+                                    <b>{item.kindName || DAY_TWO_KIND_NAMES[item.kind] || item.kind}</b> · карточка {item.number}
+                                    {item.title ? ` · ${item.title}` : ""} · <i>{statusLabel(item.status)}</i>
+                                </div>
+                                <div className="mt-1 whitespace-pre-wrap text-sm">{item.text || <span className="text-[#94a3b8]">без текста</span>}</div>
+                                {item.file?.url ? (
+                                    <div className="mt-1 text-xs">
+                                        Файл:{" "}
+                                        <a className="underline" href={item.file.url} target="_blank" rel="noreferrer">
+                                            {item.file.name}
+                                        </a>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ))
+                    ) : (
+                        <div className={ui.hint}>Заявок нет.</div>
+                    )}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+export function ExportPanel({ day, live, origin = "", onSnapshot, onSaveNote, busy }) {
     const snapshot = day?.results;
     const data = snapshot || live;
     const notes = day?.notes || {};
+    const [view, setView] = useState("tables");
+    const publicUrl = snapshot && day?.resultsSecret ? `${origin}/api/mayak/day2/itogi?day=${encodeURIComponent(day.id)}&k=${encodeURIComponent(day.resultsSecret)}` : "";
+    const byParticipant = Array.isArray(data?.byParticipant) ? data.byParticipant : null;
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -614,8 +749,39 @@ export function ExportPanel({ day, live, onSnapshot, onSaveNote, busy }) {
                 </button>
                 {snapshot ? <span className={ui.ok}>Снимок от {formatMsk(Date.parse(snapshot.at))} (МСК) хранится в дне и переживёт удаление сессии</span> : <span className={ui.warn}>Снимка нет: платформа удалит результаты при завершении сессии и через 48 часов</span>}
             </div>
+            {publicUrl ? (
+                <LinkRow
+                    title="Публичная страница итогов — по ссылке, без входа"
+                    href={publicUrl}
+                    extra={
+                        <>
+                            <a href={`${publicUrl}&download=1`} className={ui.small}>
+                                Скачать HTML для ctr5
+                            </a>
+                            <span className={ui.hint}>эту страницу можно положить на ctr5 в папку /1109/itogi/ (страницы столов — по ссылкам «Стол N» с &amp;download=1, файлы stolN.html)</span>
+                        </>
+                    }
+                />
+            ) : null}
             {!data ? <div className={ui.hint}>Нажмите «Обновить» на этапе 6 или сделайте снимок — здесь появятся результаты по столам.</div> : null}
-            {(data?.tables || []).map((table) => (
+            {data ? (
+                <div className="flex flex-wrap gap-2">
+                    <button type="button" className={view === "tables" ? ui.primary : ui.secondary} onClick={() => setView("tables")}>
+                        По столам
+                    </button>
+                    <button type="button" className={view === "people" ? ui.primary : ui.secondary} onClick={() => setView("people")}>
+                        По участникам
+                    </button>
+                </div>
+            ) : null}
+            {data && view === "people" ? (
+                byParticipant ? (
+                    <div className="space-y-2">{byParticipant.map((person) => <ParticipantRow key={person.userId || person.name} person={person} />)}</div>
+                ) : (
+                    <div className={ui.warn}>В этом снимке нет разреза по участникам — обновите снимок результатов.</div>
+                )
+            ) : null}
+            {view === "tables" ? (data?.tables || []).map((table) => (
                 <div key={table.table} className="rounded-[1rem] border border-(--color-gray-plus-50) bg-[#f8fafc] p-3">
                     <div className="text-base font-black text-(--color-black)">
                         Стол {table.table} <span className="text-sm font-medium text-[#64748b]">· {table.members.map((m) => m.name).join(", ") || "без участников"}</span>
@@ -647,7 +813,7 @@ export function ExportPanel({ day, live, onSnapshot, onSaveNote, busy }) {
                         </div>
                     </div>
                 </div>
-            ))}
+            )) : null}
         </div>
     );
 }

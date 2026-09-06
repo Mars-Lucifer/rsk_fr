@@ -20,6 +20,7 @@ import {
     MailingPanel,
     SectionPanel,
     SessionPanel,
+    TablesSitePanel,
     TracksPanel,
     ui,
 } from "@/components/mayak-day2/DayTwoStagePanels";
@@ -187,6 +188,14 @@ export default function AdminMayakDayTwoPage() {
         }
     };
 
+    // H4d: копия дня — бриф, столы, папка, колода; дата пустая, раздел и сессия не переносятся.
+    const copyDay = async (id) => {
+        const created = await run(() => api(`${API}/days`, { method: "POST", body: { copyFrom: id } }), "День скопирован: поставьте дату в брифе");
+        if (created?.id) await selectDay(created.id);
+    };
+
+    const loadPrompt = (tableN) => api(`${API}/${day.id}/texts?table=${encodeURIComponent(tableN)}`);
+
     const publish = (sectionId) =>
         run(async () => {
             const result = await api(`${API}/${day.id}/publish`, { method: "POST", body: { sectionId } });
@@ -277,17 +286,18 @@ export default function AdminMayakDayTwoPage() {
                             {loading ? <div className="p-3 text-sm text-[#64748b]">Загрузка…</div> : null}
                             {!loading && days.length === 0 ? <div className="p-3 text-sm text-[#64748b]">Дней пока нет — создайте первый.</div> : null}
                             {days.map((item) => (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    onClick={() => selectDay(item.id)}
-                                    className={`block w-full rounded-[0.9rem] px-3 py-2 text-left transition ${item.id === selectedId ? "bg-[#0f766e] text-white" : "hover:bg-[#f1f5f9]"}`}>
-                                    <div className="text-sm font-bold">{item.org || "Без названия"}</div>
-                                    <div className={`text-xs ${item.id === selectedId ? "text-white/80" : "text-[#64748b]"}`}>
-                                        {formatDate(item.date)} · этап {item.stage} · {DAY_TWO_STAGE_TITLES[item.stage - 1]}
-                                        {item.sectionId ? ` · ${item.sectionId}` : ""}
-                                    </div>
-                                </button>
+                                <div key={item.id} className={`flex items-start gap-1 rounded-[0.9rem] transition ${item.id === selectedId ? "bg-[#0f766e] text-white" : "hover:bg-[#f1f5f9]"}`}>
+                                    <button type="button" onClick={() => selectDay(item.id)} className="block min-w-0 flex-1 px-3 py-2 text-left">
+                                        <div className="text-sm font-bold">{item.org || "Без названия"}</div>
+                                        <div className={`text-xs ${item.id === selectedId ? "text-white/80" : "text-[#64748b]"}`}>
+                                            {formatDate(item.date)} · этап {item.stage} · {DAY_TWO_STAGE_TITLES[item.stage - 1]}
+                                            {item.sectionId ? ` · ${item.sectionId}` : ""}
+                                        </div>
+                                    </button>
+                                    <button type="button" title="Скопировать день" disabled={busy} onClick={() => copyDay(item.id)} className={`my-2 mr-2 shrink-0 rounded-[0.6rem] border px-2 py-1 text-[11px] font-semibold ${item.id === selectedId ? "border-white/40 text-white" : "border-(--color-gray-plus-50) text-[#64748b]"}`}>
+                                        Скопировать
+                                    </button>
+                                </div>
                             ))}
                         </section>
                     </aside>
@@ -297,6 +307,18 @@ export default function AdminMayakDayTwoPage() {
                             <section className="rounded-[1.5rem] border border-(--color-gray-plus-50) bg-white p-6 text-sm text-[#64748b] shadow-sm">Выберите день слева или создайте новый.</section>
                         ) : (
                             <>
+                                <section className="flex flex-wrap items-center gap-3 rounded-[1.25rem] border border-(--color-gray-plus-50) bg-white px-4 py-3 shadow-sm">
+                                    <div className="min-w-0">
+                                        <div className="text-base font-black text-(--color-black)">{day.org || "Без названия"}</div>
+                                        <div className="text-xs text-[#64748b]">
+                                            {formatDate(day.date)}
+                                            {day.sectionId ? ` · раздел ${day.sectionId}` : ""} · {(day.cards || []).length} карточек · столов {(day.tables || []).length}
+                                        </div>
+                                    </div>
+                                    <button type="button" className={`${ui.secondary} ml-auto`} disabled={busy} onClick={() => copyDay(day.id)}>
+                                        Скопировать день
+                                    </button>
+                                </section>
                                 <section className="rounded-[1.5rem] border-2 border-[#0f766e] bg-[#f0fdfa] p-4 shadow-sm">
                                     <div className={ui.label}>Следующий шаг · этап {stage.stage} из 9 · {DAY_TWO_STAGE_TITLES[stage.stage - 1]}</div>
                                     <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -315,13 +337,18 @@ export default function AdminMayakDayTwoPage() {
                                     const common = { n, title: item.title, done: item.done, open, current: stage.stage === n, onToggle: () => setOpenStage(open ? 0 : n) };
                                     return (
                                         <StageBox key={n} {...common}>
-                                            {n === 1 ? <BriefPanel day={day} problems={stage.briefProblems} busy={busy} onSave={(draft) => patchDay(draft, "Бриф сохранён")} onTemplate={() => patchDay({ fromTemplate: true }, "Колода собрана из шаблона")} /> : null}
+                                            {n === 1 ? <BriefPanel day={day} problems={stage.briefProblems} warnings={stage.briefWarnings} busy={busy} onSave={(draft) => patchDay(draft, "Бриф сохранён")} onTemplate={() => patchDay({ fromTemplate: true }, "Колода собрана из шаблона")} /> : null}
                                             {n === 2 ? <DeckPanel day={day} dayId={day.id} checks={stage.checks} busy={busy} onSaveCards={(cards) => patchDay({ cards }, "Колода сохранена")} onTemplate={() => patchDay({ fromTemplate: true }, "Колода собрана из шаблона")} /> : null}
                                             {n === 3 ? <SectionPanel day={day} checks={stage.checks} suggestedSectionId={suggestedSectionId} busy={busy} onPublish={publish} /> : null}
                                             {n === 4 ? <SessionPanel day={day} origin={origin} busy={busy} now={now} onCreate={createSession} /> : null}
                                             {n === 5 ? <MailingPanel day={day} origin={origin} busy={busy} onToggleMailed={(mailed) => patchDay({ mailed }, mailed ? "Отмечено: разослано" : "Отметка снята")} /> : null}
-                                            {n === 6 ? <LiveDayPanel day={day} live={live} origin={origin} busy={busy} onRefresh={refreshLive} /> : null}
-                                            {n === 7 ? <ExportPanel day={day} live={live} busy={busy} onSnapshot={snapshot} onSaveNote={saveNote} /> : null}
+                                            {n === 6 ? (
+                                                <div className="space-y-3">
+                                                    <LiveDayPanel day={day} live={live} origin={origin} busy={busy} onRefresh={refreshLive} />
+                                                    <TablesSitePanel day={day} loadPrompt={loadPrompt} />
+                                                </div>
+                                            ) : null}
+                                            {n === 7 ? <ExportPanel day={day} live={live} origin={origin} busy={busy} onSnapshot={snapshot} onSaveNote={saveNote} /> : null}
                                             {n === 8 ? <FinishPanel day={day} busy={busy} onComplete={complete} /> : null}
                                             {n === 9 ? <TracksPanel day={day} busy={busy} onToggle={toggleTrack} /> : null}
                                         </StageBox>

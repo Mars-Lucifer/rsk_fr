@@ -1,3 +1,5 @@
+import crypto from "crypto";
+
 import { requireMayakAdmin } from "@/lib/mayakAdminAuth";
 import { computeStage, getDayTwoDay, mutateDayTwoDay } from "@/lib/mayakDayTwoStore";
 import { exportDayResults } from "@/lib/mayakDayTwoPublish";
@@ -5,6 +7,8 @@ import { exportDayResults } from "@/lib/mayakDayTwoPublish";
 // День 2: результаты сессии по столам. GET — живая выгрузка из платформы
 // (попутно запоминает, сколько столов сдали дорожную карту); POST {snapshot:true}
 // — сохранить копию результатов внутрь дня, чтобы пережить удаление сессии.
+// При первом снимке день получает resultsSecret — ключ публичной страницы итогов
+// /api/mayak/day2/itogi?day=<id>&k=<secret> (H4g).
 function summarize(results) {
     return { at: results.at, tablesTotal: results.tables.length, roadmapAccepted: results.roadmapAccepted, participants: results.participants };
 }
@@ -40,6 +44,7 @@ export default async function handler(req, res) {
             const updated = await mutateDayTwoDay(id, (current) => {
                 current.results = results;
                 current.dayState = summarize(results);
+                if (!current.resultsSecret) current.resultsSecret = crypto.randomBytes(16).toString("hex");
                 return current;
             });
             return res.status(200).json({ success: true, data: { day: updated, stage: computeStage(updated) } });
