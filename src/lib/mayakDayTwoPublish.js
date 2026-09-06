@@ -64,6 +64,15 @@ function contentTypeOf(card) {
 
 // Запись index.json для карточки; base — прежняя запись того же номера, чтобы
 // не потерять поля, которых у дня нет (как gen_deck.py делал через setdefault).
+// Адрес инструмента карточки: шаблон хранит {folder}agent.html, день даёт folder_url.
+export function resolveToolUrl(url, day) {
+    const raw = String(url || "");
+    if (!raw.includes("{folder}")) return raw;
+    const folder = String(day?.folder_url || "").trim();
+    if (!folder) return "";
+    return raw.replace("{folder}", folder.endsWith("/") ? folder : `${folder}/`);
+}
+
 export function buildIndexCard(card, number, day, base = {}) {
     const num = String(number);
     return {
@@ -77,8 +86,9 @@ export function buildIndexCard(card, number, day, base = {}) {
         sourceLink: "",
         toolLink1: day.folder_url || "",
         toolName1: day.folder_url ? "Папка стола на ctr5" : "",
-        toolLink2: card.tool?.url || "",
-        toolName2: card.tool?.name || "",
+        // {folder} в адресе инструмента шаблона → папка столов из брифа (folder_url); без папки ссылка не пишется
+        toolLink2: resolveToolUrl(card.tool?.url, day),
+        toolName2: resolveToolUrl(card.tool?.url, day) ? card.tool?.name || "" : "",
         contentType: contentTypeOf(card),
         map: `${num}.svg`,
         mapText: "Карта",
