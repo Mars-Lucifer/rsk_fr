@@ -61,6 +61,27 @@ export function tableRoadmap(day, tableN) {
     return str(snapshotTable(day, tableN)?.roadmap?.text);
 }
 
+// Семь шагов приёмки и заготовка дорожной карты, собранные нейросетью (H7) —
+// лежат в заметках стола day.notes[N].acceptance_steps / roadmap_rows.
+export function tableAcceptanceSteps(day, tableN) {
+    const steps = day?.notes?.[String(tableN)]?.acceptance_steps;
+    return Array.isArray(steps) ? steps.map(str).filter(Boolean) : [];
+}
+
+export function tableRoadmapRows(day, tableN) {
+    const rows = day?.notes?.[String(tableN)]?.roadmap_rows;
+    return Array.isArray(rows) ? rows.filter((row) => row && typeof row === "object").map((row) => ({ track: str(row.track), what: str(row.what), who: str(row.who), check: str(row.check) })) : [];
+}
+
+function acceptanceStepsHtml(steps) {
+    return `<h2>Семь шагов приёмки</h2><ol>${steps.map((step) => `<li>${esc(step)}</li>`).join("")}</ol>`;
+}
+
+function roadmapRowsHtml(rows) {
+    const body = rows.map((row) => `<tr><td>${esc(row.track)}</td><td>${esc(row.what)}</td><td>${esc(row.who)}</td><td>${esc(row.check)}</td></tr>`).join("");
+    return `<h2>Дорожная карта — заготовка «что проверить»</h2><table class="tbl"><tr><th>Трек</th><th>Что сделано</th><th>Кто</th><th>Как проверим</th></tr>${body}</table>`;
+}
+
 // Промпт сборщику стола — шаблон portal/1109/agent.html (text(n)) с подстановками
 // дня. Пользователя, папку и пароль сервера в текст не вставляем: их говорит ведущий.
 export function buildAssemblerPrompt(day, tableN) {
@@ -200,15 +221,26 @@ export function renderTableHtml(day, tableN, { backHref } = {}) {
     if (backHref) body.push(`<div class="nav"><a href="${esc(backHref)}">← Все столы и дорожные карты</a></div>`);
     const point0 = tablePoint0(day, n);
     if (point0) body.push(`<div class="p0"><b>Точка 0</b><br>${nl2br(point0)}</div>`);
+    const steps = tableAcceptanceSteps(day, n);
+    if (steps.length) body.push(acceptanceStepsHtml(steps));
+    // Заготовка карты (H7) — под заявками «Дорожная карта»; если их нет — в конце.
+    const rows = tableRoadmapRows(day, n);
+    let rowsHtml = rows.length ? roadmapRowsHtml(rows) : "";
+    const flushRows = () => {
+        if (rowsHtml) body.push(rowsHtml);
+        rowsHtml = "";
+    };
     let current = null;
     all.forEach((item) => {
         if (item.kind !== current) {
+            if (current === "roadmap") flushRows();
             body.push(`<h2>${esc(DAY_TWO_KIND_NAMES[item.kind] || item.kind)}</h2>`);
             current = item.kind;
         }
         body.push(reviewBlock(item));
     });
     if (!all.length) body.push('<p class="muted">Заявок нет.</p>');
+    flushRows();
     const accepted = all.filter((item) => ACCEPTED.has(item.status)).length;
     body.push(`<p class="lead">Заявок ${all.length}, принято ${accepted}.</p>`);
     return page(`Стол ${n} · итоги`, body.join(""));

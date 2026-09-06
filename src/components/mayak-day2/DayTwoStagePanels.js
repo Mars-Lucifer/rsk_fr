@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+    BRIEF_TEXT_MAX,
     DAY_TWO_KIND_NAMES,
     DAY_TWO_TRACKS,
     DEFAULT_PARTICIPANT_LIMIT,
@@ -17,7 +18,7 @@ import {
     sessionEarliestAt,
     trackDates,
 } from "@/lib/mayakDayTwoModel";
-import { tableFolderUrl } from "@/lib/mayakDayTwoTexts";
+import { tableAcceptanceSteps, tableFolderUrl, tableRoadmapRows } from "@/lib/mayakDayTwoTexts";
 
 export const ui = {
     input: "!w-full !rounded-[0.95rem] !border-2 !border-stone-700/80 !bg-white !px-4 !py-3 !text-sm !text-(--color-black) !shadow-[inset_0_1px_2px_rgba(15,23,42,0.06)] outline-none transition placeholder:!text-[#94a3b8] focus:!border-black",
@@ -115,13 +116,112 @@ function LinkRow({ title, href, extra = null, big = false }) {
     );
 }
 
+// ---------- Нейросеть: отчёт проверки и промпты (H5–H7) ----------
+
+const AI_PROMPT_NAMES = [
+    ["brief", "Бриф → столы"],
+    ["cards", "Столы → карточки"],
+    ["texts", "Столы → семь шагов и карта"],
+];
+
+function AiReport({ report, title = "Проверка" }) {
+    if (!Array.isArray(report) || !report.length) return null;
+    const passed = report.filter((row) => row.ok).length;
+    return (
+        <div className="rounded-[1rem] border border-(--color-gray-plus-50) bg-white p-3">
+            <div className={ui.label}>
+                {title} · прошли {passed} из {report.length}
+            </div>
+            <ul className="mt-2 space-y-1 text-sm">
+                {report.map((row, i) => (
+                    <li key={`${row.label}-${i}`} className={row.ok ? "text-[#166534]" : "text-[#b91c1c]"}>
+                        {row.ok ? "✓" : "×"} {row.label}
+                        {row.ok ? "" : ` — ${(row.problems || []).join("; ")}`}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+function PromptsEditor({ loadAiPrompt, saveAiPrompt, onClose }) {
+    const [texts, setTexts] = useState({});
+    const [saved, setSaved] = useState({});
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let cancelled = false;
+        AI_PROMPT_NAMES.forEach(([name]) => {
+            Promise.resolve(loadAiPrompt(name))
+                .then((data) => {
+                    if (cancelled) return;
+                    setTexts((current) => ({ ...current, [name]: data?.text || "" }));
+                    setSaved((current) => ({ ...current, [name]: data?.text || "" }));
+                })
+                .catch((err) => {
+                    if (!cancelled) setError(err instanceof Error ? err.message : "Не удалось загрузить промпт");
+                });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const save = async (name, label) => {
+        setError("");
+        try {
+            const data = await saveAiPrompt(name, texts[name] || "");
+            setTexts((current) => ({ ...current, [name]: data?.text || "" }));
+            setSaved((current) => ({ ...current, [name]: data?.text || "" }));
+            setMessage(`Промпт «${label}» сохранён`);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Не удалось сохранить промпт");
+        }
+    };
+
+    return (
+        <div className="space-y-3 rounded-[1rem] border-2 border-stone-300 bg-[#f8fafc] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-black text-(--color-black)">Промпты нейросети</div>
+                <span className={ui.hint}>Файлы data/mayak-day2/prompts/*.md: мастер меняет формулировку, не код. Столы, карточку и точку 0 нейросеть получает отдельно, JSON-строкой.</span>
+                <button type="button" className={`${ui.small} ml-auto`} onClick={onClose}>
+                    Закрыть
+                </button>
+            </div>
+            {message ? <div className={ui.ok}>{message}</div> : null}
+            {error ? <div className={ui.bad}>{error}</div> : null}
+            {AI_PROMPT_NAMES.map(([name, label]) => (
+                <Field key={name} label={`${label} · ${name}.md`}>
+                    <textarea className={`${ui.input} min-h-[160px] resize-y font-mono !text-xs`} value={texts[name] ?? ""} onChange={(e) => setTexts((current) => ({ ...current, [name]: e.target.value }))} placeholder="Загрузка…" />
+                    <div className="mt-2">
+                        <button type="button" className={ui.small} disabled={texts[name] == null || texts[name] === saved[name]} onClick={() => save(name, label)}>
+                            Сохранить
+                        </button>
+                    </div>
+                </Field>
+            ))}
+        </div>
+    );
+}
+
 // ---------- 1. Бриф ----------
 
-export function BriefPanel({ day, problems, warnings = [], onSave, onTemplate, busy }) {
+export function BriefPanel({ day, problems, warnings = [], onSave, onTemplate, onAiBrief, busy }) {
     const [draft, setDraft] = useState(() => briefDraft(day));
+    const [aiReport, setAiReport] = useState(null);
     useEffect(() => {
         setDraft(briefDraft(day));
     }, [day?.id, day?.updatedAt]);
+    useEffect(() => {
+        setAiReport(null);
+    }, [day?.id]);
+
+    const briefLength = draft.briefText.length;
+    const aiBrief = async () => {
+        const result = await onAiBrief(draft.briefText);
+        if (result?.report) setAiReport(result.report);
+    };
 
     const setTable = (index, key, value) =>
         setDraft((current) => ({ ...current, tables: current.tables.map((table, i) => (i === index ? { ...table, [key]: value } : table)) }));
@@ -142,6 +242,16 @@ export function BriefPanel({ day, problems, warnings = [], onSave, onTemplate, b
                     <input className={ui.input} value={draft.logo} onChange={(e) => setDraft({ ...draft, logo: e.target.value })} placeholder="http://ctr5.ru/media/logo.png" />
                 </Field>
             </div>
+            <Field label={`Реплики заказчика · ${briefLength} из ${BRIEF_TEXT_MAX} знаков`}>
+                <textarea className={`${ui.input} min-h-[120px] resize-y ${briefLength > BRIEF_TEXT_MAX ? "!border-[#dc2626]" : ""}`} value={draft.briefText} onChange={(e) => setDraft({ ...draft, briefText: e.target.value })} placeholder="Переписка, стенограмма встречи, заметки — что заказчик говорил о продуктах и людях" />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button type="button" className={ui.small} disabled={busy || !draft.briefText.trim() || briefLength > BRIEF_TEXT_MAX} onClick={aiBrief}>
+                        Собрать столы нейросетью
+                    </button>
+                    <span className={ui.hint}>Нейросеть заполнит три стола по промпту «Бриф → столы» (этап 2 → «Промпты ИИ») и сохранит реплики в дне; адреса продуктов не трогает. Проверка: ровно три стола, все поля заполнены и не длиннее 120 знаков.</span>
+                </div>
+            </Field>
+            <AiReport report={aiReport} title="Столы от нейросети" />
             <div className="space-y-2">
                 {draft.tables.map((table, index) => (
                     <div key={table.n} className="rounded-[1rem] border border-(--color-gray-plus-50) bg-[#f8fafc] p-3">
@@ -196,13 +306,14 @@ function briefDraft(day) {
         date: day?.date || "",
         folder_url: day?.folder_url || "",
         logo: day?.logo || "",
+        briefText: day?.briefText || "",
         tables: tables.map((table, i) => ({ n: table.n || i + 1, product: table.product || "", user: table.user || "", pain: table.pain || "", after6m: table.after6m || "", url: table.url || "" })),
     };
 }
 
 // ---------- 2. Колода ----------
 
-function CardEditor({ card, onSave, onClose, busy }) {
+function CardEditor({ card, onSave, onClose, onAi, busy }) {
     const [draft, setDraft] = useState(() => ({ ...card, hint: { ...(card.hint || {}) }, tool: { ...(card.tool || { name: "", url: "" }) } }));
     const set = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
     const words = countTaskWords(draft.task);
@@ -252,6 +363,11 @@ function CardEditor({ card, onSave, onClose, busy }) {
                 <button type="button" className={ui.primary} disabled={busy} onClick={() => onSave(draft)}>
                     Сохранить карточку
                 </button>
+                {onAi ? (
+                    <button type="button" className={ui.secondary} disabled={busy} onClick={() => onAi(card.num)}>
+                        Переписать эту карточку
+                    </button>
+                ) : null}
                 <button type="button" className={ui.secondary} onClick={onClose}>
                     Закрыть
                 </button>
@@ -260,9 +376,10 @@ function CardEditor({ card, onSave, onClose, busy }) {
     );
 }
 
-export function DeckPanel({ day, dayId, checks, onSaveCards, onTemplate, busy }) {
+export function DeckPanel({ day, dayId, checks, onSaveCards, onTemplate, onAiCard, onAiCards, aiProgress, loadAiPrompt, saveAiPrompt, busy }) {
     const [openNum, setOpenNum] = useState(null);
     const [previewNum, setPreviewNum] = useState(null);
+    const [promptsOpen, setPromptsOpen] = useState(false);
     const [jsonOpen, setJsonOpen] = useState(false);
     const [jsonText, setJsonText] = useState("");
     const [jsonError, setJsonError] = useState("");
@@ -339,7 +456,7 @@ export function DeckPanel({ day, dayId, checks, onSaveCards, onTemplate, busy })
                     </table>
                 </div>
             )}
-            {openNum ? <CardEditor key={openNum} card={cards.find((card) => card.num === openNum)} onSave={saveCard} onClose={() => setOpenNum(null)} busy={busy} /> : null}
+            {openNum ? <CardEditor key={`${openNum}-${day?.cardsUpdatedAt || ""}`} card={cards.find((card) => card.num === openNum)} onSave={saveCard} onClose={() => setOpenNum(null)} onAi={onAiCard} busy={busy} /> : null}
             {previewNum ? (
                 <div className="rounded-[1rem] border border-(--color-gray-plus-50) bg-white p-3">
                     <div className="flex items-center justify-between">
@@ -361,11 +478,24 @@ export function DeckPanel({ day, dayId, checks, onSaveCards, onTemplate, busy })
                     </ul>
                 </div>
             )}
+            {aiProgress && aiProgress.done < aiProgress.total ? (
+                <div className={ui.warn}>
+                    Нейросеть переписывает: карточка {aiProgress.done + 1} из {aiProgress.total} (№ {aiProgress.num})
+                </div>
+            ) : null}
+            <AiReport report={aiProgress?.report} title="Карточки: зелёные переписаны, красные остались прежними" />
             <div className="flex flex-wrap gap-2">
+                <button type="button" className={ui.secondary} disabled={busy || cards.length === 0} onClick={onAiCards}>
+                    Переписать карточки под продукты (нейросеть)
+                </button>
+                <button type="button" className={ui.secondary} onClick={() => setPromptsOpen((value) => !value)}>
+                    Промпты ИИ
+                </button>
                 <button type="button" className={ui.secondary} onClick={() => setJsonOpen((value) => !value)}>
                     Загрузить JSON
                 </button>
             </div>
+            {promptsOpen ? <PromptsEditor loadAiPrompt={loadAiPrompt} saveAiPrompt={saveAiPrompt} onClose={() => setPromptsOpen(false)} /> : null}
             {jsonOpen ? (
                 <div className="space-y-2">
                     <div className={ui.hint}>Вставьте JSON дня (mayak-day2/1) или массив карточек — он заменит колоду. Проверки покажут проблемы, править можно здесь же.</div>
@@ -576,7 +706,7 @@ export function LiveDayPanel({ day, live, origin, onRefresh, busy }) {
 // Площадка столов (H4f): папки на ctr5, адреса продуктов, промпт сборщику.
 // Промпты запрашиваются с сервера при открытии панели, чтобы «Скопировать» было
 // синхронным кликом (буфер обмена не любит копирование после await).
-export function TablesSitePanel({ day, loadPrompt }) {
+export function TablesSitePanel({ day, loadPrompt, onAiTexts, busy }) {
     const tables = Array.isArray(day?.tables) ? day.tables : [];
     const folder = day?.folder_url ? (day.folder_url.endsWith("/") ? day.folder_url : `${day.folder_url}/`) : "";
     const [prompts, setPrompts] = useState({});
@@ -623,6 +753,8 @@ export function TablesSitePanel({ day, loadPrompt }) {
                 {tables.map((table) => {
                     const url = tableFolderUrl(day, table.n);
                     const prompt = prompts[String(table.n)] || "";
+                    const steps = tableAcceptanceSteps(day, table.n);
+                    const rows = tableRoadmapRows(day, table.n);
                     return (
                         <div key={table.n} className="rounded-[0.9rem] border border-(--color-gray-plus-50) bg-white p-3">
                             <div className="text-sm font-black text-(--color-black)">
@@ -639,13 +771,53 @@ export function TablesSitePanel({ day, loadPrompt }) {
                                 <button type="button" className={ui.small} disabled={!prompt} onClick={() => setShown(shown === table.n ? null : table.n)}>
                                     {shown === table.n ? "Скрыть" : "Показать"}
                                 </button>
+                                {onAiTexts ? (
+                                    <button type="button" className={ui.small} disabled={busy} onClick={() => onAiTexts(table.n)}>
+                                        Семь шагов и заготовка карты нейросетью
+                                    </button>
+                                ) : null}
                             </div>
                             {shown === table.n ? <pre className="mt-2 max-h-[320px] overflow-auto whitespace-pre-wrap rounded-[0.6rem] bg-[#f8fafc] p-2 text-xs">{prompt}</pre> : null}
+                            {steps.length ? (
+                                <div className="mt-2">
+                                    <div className={ui.label}>Семь шагов приёмки</div>
+                                    <ol className="mt-1 list-decimal pl-5 text-xs leading-5">
+                                        {steps.map((step, i) => (
+                                            <li key={i}>{step}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            ) : null}
+                            {rows.length ? (
+                                <div className="mt-2 overflow-x-auto">
+                                    <div className={ui.label}>Заготовка дорожной карты</div>
+                                    <table className="mt-1 w-full text-xs">
+                                        <thead className="text-left text-[#64748b]">
+                                            <tr>
+                                                <th className="pr-2">Трек</th>
+                                                <th className="pr-2">Что сделано</th>
+                                                <th className="pr-2">Кто</th>
+                                                <th>Как проверим</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rows.map((row) => (
+                                                <tr key={row.track} className="border-t border-(--color-gray-plus-50) align-top">
+                                                    <td className="py-1 pr-2 whitespace-nowrap">{row.track}</td>
+                                                    <td className="py-1 pr-2">{row.what}</td>
+                                                    <td className="py-1 pr-2">{row.who}</td>
+                                                    <td className="py-1">{row.check}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : null}
                         </div>
                     );
                 })}
             </div>
-            <div className={ui.hint}>Сборщик стола отдаёт промпт агенту в пустой папке и прикладывает три узла файлами. Доступ к серверу (пользователь, папка, пароль) в промпте нет — его говорит ведущий.</div>
+            <div className={ui.hint}>Сборщик стола отдаёт промпт агенту в пустой папке и прикладывает три узла файлами. Доступ к серверу (пользователь, папка, пароль) в промпте нет — его говорит ведущий. Семь шагов и заготовка карты от нейросети хранятся в заметках стола и попадают на публичную страницу стола.</div>
         </div>
     );
 }

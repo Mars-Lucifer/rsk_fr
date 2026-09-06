@@ -697,6 +697,8 @@ export function briefProblems(day) {
 // H4e: предупреждения брифа — не блокируют этап, но подсказывают, что участники
 // не поймут формулировку из одного-двух слов.
 export const BRIEF_MIN_WORDS = 3;
+// Реплики заказчика для сборки столов нейросетью (H5): предел длины текста.
+export const BRIEF_TEXT_MAX = 10000;
 
 export function briefWarnings(day) {
     const warnings = [];

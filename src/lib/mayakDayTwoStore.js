@@ -118,12 +118,21 @@ function normalizeTracks(input, tables) {
     return base;
 }
 
+// Заметки стола: правки копий (roadmap, point0) и, если нейросеть их собрала (H7),
+// семь шагов приёмки acceptance_steps и заготовка карты roadmap_rows.
 function normalizeNotes(input) {
     if (!input || typeof input !== "object") return {};
     const notes = {};
     Object.keys(input).forEach((key) => {
         const item = input[key] && typeof input[key] === "object" ? input[key] : {};
-        notes[String(key)] = { roadmap: str(item.roadmap), point0: str(item.point0) };
+        const note = { roadmap: str(item.roadmap), point0: str(item.point0) };
+        const steps = Array.isArray(item.acceptance_steps) ? item.acceptance_steps.map(str).filter(Boolean) : [];
+        if (steps.length) note.acceptance_steps = steps;
+        const rows = Array.isArray(item.roadmap_rows)
+            ? item.roadmap_rows.filter((row) => row && typeof row === "object").map((row) => ({ track: str(row.track), what: str(row.what), who: str(row.who), check: str(row.check) }))
+            : [];
+        if (rows.length) note.roadmap_rows = rows;
+        notes[String(key)] = note;
     });
     return notes;
 }
@@ -132,7 +141,7 @@ function normalizeNotes(input) {
 // сессии отсюда не меняются — их пишут publish и session.
 export async function updateDayTwoDay(id, patch = {}) {
     return mutateDayTwoDay(id, (day) => {
-        ["org", "date", "folder_url", "logo", "allowed_files"].forEach((key) => {
+        ["org", "date", "folder_url", "logo", "allowed_files", "briefText"].forEach((key) => {
             if (typeof patch[key] === "string") day[key] = patch[key].trim();
         });
         if (Array.isArray(patch.tables)) {

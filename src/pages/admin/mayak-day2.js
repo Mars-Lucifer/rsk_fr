@@ -75,6 +75,7 @@ export default function AdminMayakDayTwoPage() {
     const [now, setNow] = useState(() => Date.now());
     const [newForm, setNewForm] = useState({ org: "", date: "" });
     const [origin, setOrigin] = useState("");
+    const [aiProgress, setAiProgress] = useState(null);
 
     const stage = useMemo(() => (day ? computeStage(day, now) : null), [day, now]);
 
@@ -92,6 +93,7 @@ export default function AdminMayakDayTwoPage() {
         const data = await api(`${API}/${id}`);
         setDay(data.day);
         setLive(null);
+        setAiProgress(null);
         setOpenStage(data.stage?.stage || 1);
         if (!data.day.sectionId) {
             api(`${API}/${id}/publish`)
@@ -195,6 +197,44 @@ export default function AdminMayakDayTwoPage() {
     };
 
     const loadPrompt = (tableN) => api(`${API}/${day.id}/texts?table=${encodeURIComponent(tableN)}`);
+
+    // H5–H7: сборка нейросетью. Карточки переписываются по одной — так виден ход
+    // «карточка N из 19» и один запрос не упирается в таймаут прокси.
+    const aiBrief = (text) => run(() => api(`${API}/${day.id}/ai`, { method: "POST", body: { action: "brief", text } }), "Столы собраны нейросетью и прошли проверку");
+
+    const aiCard = async (num) => {
+        const result = await run(() => api(`${API}/${day.id}/ai`, { method: "POST", body: { action: "card", num } }));
+        if (result) {
+            setAiProgress({ done: 1, total: 1, num, report: result.report });
+            setMessage(result.report.every((row) => row.ok) ? "Карточка переписана" : "Карточка не прошла проверку и осталась прежней");
+        }
+    };
+
+    const aiCards = async () => {
+        const cards = (day.cards || []).map((card) => ({ num: card.num, title: card.title }));
+        const report = [];
+        setBusy(true);
+        setError("");
+        for (let i = 0; i < cards.length; i += 1) {
+            setAiProgress({ done: i, total: cards.length, num: cards[i].num, report: report.slice() });
+            try {
+                const result = await api(`${API}/${day.id}/ai`, { method: "POST", body: { action: "card", num: cards[i].num } });
+                setDay(result.day);
+                report.push(...result.report);
+            } catch (err) {
+                report.push({ num: cards[i].num, label: `${cards[i].num} · ${cards[i].title}`, ok: false, problems: [err instanceof Error ? err.message : "сбой"] });
+            }
+        }
+        setAiProgress({ done: cards.length, total: cards.length, num: null, report });
+        setMessage(`Переписано ${report.filter((row) => row.ok).length} из ${cards.length} карточек`);
+        setBusy(false);
+        await loadDays().catch(() => {});
+    };
+
+    const aiTexts = (tableN) => run(() => api(`${API}/${day.id}/ai`, { method: "POST", body: { action: "texts", table: tableN } }), "Семь шагов и заготовка карты сохранены в заметках стола");
+
+    const loadAiPrompt = (name) => api(`${API}/prompts?name=${encodeURIComponent(name)}`);
+    const saveAiPrompt = (name, text) => api(`${API}/prompts?name=${encodeURIComponent(name)}`, { method: "PUT", body: { text } });
 
     const publish = (sectionId) =>
         run(async () => {
@@ -337,15 +377,15 @@ export default function AdminMayakDayTwoPage() {
                                     const common = { n, title: item.title, done: item.done, open, current: stage.stage === n, onToggle: () => setOpenStage(open ? 0 : n) };
                                     return (
                                         <StageBox key={n} {...common}>
-                                            {n === 1 ? <BriefPanel day={day} problems={stage.briefProblems} warnings={stage.briefWarnings} busy={busy} onSave={(draft) => patchDay(draft, "Бриф сохранён")} onTemplate={() => patchDay({ fromTemplate: true }, "Колода собрана из шаблона")} /> : null}
-                                            {n === 2 ? <DeckPanel day={day} dayId={day.id} checks={stage.checks} busy={busy} onSaveCards={(cards) => patchDay({ cards }, "Колода сохранена")} onTemplate={() => patchDay({ fromTemplate: true }, "Колода собрана из шаблона")} /> : null}
+                                            {n === 1 ? <BriefPanel day={day} problems={stage.briefProblems} warnings={stage.briefWarnings} busy={busy} onSave={(draft) => patchDay(draft, "Бриф сохранён")} onTemplate={() => patchDay({ fromTemplate: true }, "Колода собрана из шаблона")} onAiBrief={aiBrief} /> : null}
+                                            {n === 2 ? <DeckPanel day={day} dayId={day.id} checks={stage.checks} busy={busy} onSaveCards={(cards) => patchDay({ cards }, "Колода сохранена")} onTemplate={() => patchDay({ fromTemplate: true }, "Колода собрана из шаблона")} onAiCard={aiCard} onAiCards={aiCards} aiProgress={aiProgress} loadAiPrompt={loadAiPrompt} saveAiPrompt={saveAiPrompt} /> : null}
                                             {n === 3 ? <SectionPanel day={day} checks={stage.checks} suggestedSectionId={suggestedSectionId} busy={busy} onPublish={publish} /> : null}
                                             {n === 4 ? <SessionPanel day={day} origin={origin} busy={busy} now={now} onCreate={createSession} /> : null}
                                             {n === 5 ? <MailingPanel day={day} origin={origin} busy={busy} onToggleMailed={(mailed) => patchDay({ mailed }, mailed ? "Отмечено: разослано" : "Отметка снята")} /> : null}
                                             {n === 6 ? (
                                                 <div className="space-y-3">
                                                     <LiveDayPanel day={day} live={live} origin={origin} busy={busy} onRefresh={refreshLive} />
-                                                    <TablesSitePanel day={day} loadPrompt={loadPrompt} />
+                                                    <TablesSitePanel day={day} loadPrompt={loadPrompt} onAiTexts={aiTexts} busy={busy} />
                                                 </div>
                                             ) : null}
                                             {n === 7 ? <ExportPanel day={day} live={live} origin={origin} busy={busy} onSnapshot={snapshot} onSaveNote={saveNote} /> : null}
