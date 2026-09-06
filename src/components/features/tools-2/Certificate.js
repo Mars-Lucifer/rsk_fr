@@ -86,7 +86,6 @@ export function buildCertificateDateText(dateInput = new Date()) {
       day: "numeric",
     })
     .replace(/\s\u0433\.?$/, "")
-    .replace(/ Рі\.?$/, "")
     .trim();
 
   return `${formatted} г. - 12 академических часов`;

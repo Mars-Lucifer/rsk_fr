@@ -17,7 +17,15 @@ Related files:
 - `AGENTS.md` defines the required workflow for Codex work in this repo.
 - `CODEX_LEARNINGS.md` stores reusable pitfalls and prevention rules.
 - `docs/mayak-refactor-status.md` stores MAYAK refactor progress/status.
+- `docs/mayak-access-contour.md` describes the external-access contour: delegated
+  access rights, session links (inspector / plain / master / dashboard), entry
+  accounting, and the master link — read it first for any token/entry work.
 - `docs/local-product-context/README.md` explains the broader MAYAK product intent.
+
+Визуальная проверка гайда: у `/mayak-guide` и `/mayak-guide-3d` числа камеры,
+раскрытия и раскладки калибровочные — правятся по кадру, а не по коду. Снимать
+через MCP `playwright` (свой headless-браузер), а не через preview-панель:
+свёрнутая панель не композитит кадры, и это выглядит как поломка страницы.
 
 ## Work Organization: One Workstream = One Branch
 
@@ -243,8 +251,29 @@ Main portal/user-facing areas observed in this repo:
 - `/cours/*`
 - `/tools/mayak-oko`
 - `/admin` MAYAK admin hub
-- `/rosdk/confrencia` Conference delegate selection protocol form
-- `/rosdk/confrencia/admin` Admin panel for delegate protocols
+- `/conferencia` Regional-branch delegate package: form generates protocol, attendance list and consent, then collects signed scans
+- `/conferencia/admin` Admin panel for received packages
+
+Conference package notes (code lives under `src/lib/rosdk-confrencia/`, despite the route being `/conferencia`):
+- the branch fills the page **during the meeting**, one block per agenda step: registration → delegate → votes → scans. Each block yields its document the moment its data lands (`readyDocuments`), so the attendance list exists before the delegate is known and the protocol comes last — it prints turnout and delegate details;
+- the submission is therefore partial by design: `POST /api/conferencia/submissions` creates it from step 1 only, `POST /api/conferencia/submissions/[id]/step` adds the delegate and the votes. `validation.js` exposes one parser per step; `parseSubmissionInput` composes all three for the self-check;
+- step state is derived from which generated documents exist, not from a separate column — see `STEPS` in `slots.js`;
+- only one turnout threshold is actually enforced: at least `MIN_PRESENT_MEMBERS` (5) present. Branches have no membership roll, so `parseRegistrationInput` sets `totalMembers = attendees.length` and the "more than half of those on record" rule is trivially true — `requiredQuorum` survives as a helper the runtime never calls;
+- editing the attendance list after the vote annuls the protocol: `votesAreStale` compares the stored ballots against the new turnout, and the step handler zeroes the votes and passes `protocolDocx: null` so `updateSubmission` drops the path. Refusing the edit instead would deadlock the branch — new ballots are validated against the very turnout it is trying to change;
+- `documents.js` builds four DOCX documents with the `docx` package: protocol, attendance list and delegate consent for the branch, plus the delegate registry the Mandate Commission prints from the admin panel. The wording follows the Orgcomittee's `.doc` blanks verbatim;
+- a built-in blank can be replaced from the admin panel: `templates.js` stores the uploaded `.docx` under `data/templates/` (gitignored) and substitutes `{{field}}` marks straight in `word/document.xml` via JSZip. Marks split across Word runs are reassembled per paragraph; a table row containing `{{attendees.*}}` / `{{rows.*}}` repeats per item. The admin downloads a placeholder sample built from the same code, so the field list never drifts from the generator;
+- `slots.js` is the shared, dependency-free description of every generated and uploaded file, imported by both the form and the API. `DELEGATE_SCAN_SLOTS` pins the passport scans to the delegate block — the last block holds only the meeting photo;
+- generated blanks are never downloaded automatically: every block shows its DOCX button from the start, disabled until the block is saved. Browsers were blocking the automatic download and the branch could not tell whether anything had happened;
+- `validation.js` owns the legal thresholds and the anti-nonsense rules: the delegate needs at least 2/3 of those present, ballots must add up to the turnout, one person cannot appear twice in the attendance list, and every contact is either an 11-digit phone or an e-mail. Full names are two or three Russian words — patronymics are common but not universal. The meeting date may run one day ahead of the server (`MEETING_DATE_SLACK_DAYS`): a morning meeting in Kamchatka is still "tomorrow" for a UTC server;
+- `format.js` declines the subject name into the prepositional case for the blanks — the directory stores nominative, the protocol needs «в Псковской области»;
+- one branch sends one package: `MAX_SUBMISSIONS_PER_REGION` is 1, and a saved block stays on screen as the same form — disabled — with the pencil in its header reopening it. Nothing switches tabs after a save;
+- the delegate's passport and address reach the blanks as assembled strings (`passport_data`, `delegate_address`). The raw fields behind them live in the `delegate_fields` JSON column, added through the `ADDED_COLUMNS` migration list, because a disabled form has to show what was typed, field by field;
+- the admin panel has two tabs, not three: links, responsibles, package readiness and the per-region ZIP sit in one table (`RegionLinks.jsx`, details row from `SubmissionDetails.jsx`), because the same subject used to be looked up twice;
+- `Combobox.jsx` replaces the native `<datalist>`: it opens on click even when the field is filled, and the same list backs the delegate's registration address (prefilled from the branch subject until edited by hand);
+- `data/rsk.sqlite` and `data/uploads/` hold passport data and scans — gitignored, never commit them;
+- the public `submissions/[id]/document` endpoint serves generated blanks only. It has no auth — knowing the id from the address bar is enough — so uploaded scans, passport spreads among them, are reachable through the admin routes alone;
+- uploads are named by the slot plus an extension chosen server-side (`safeExtension`): the client's file name never reaches the disk, and a camera capture with no name falls back to its mime type;
+- `node scripts/check-conferencia-package.mjs` covers thresholds, attendance list, DOCX generation and archive assembly — all of it pure, no database. `node scripts/check-conferencia-flow.mjs` walks the whole branch path against a throwaway `CONFERENCIA_DATA_DIR`: personal link resumed from another device, the per-region limit under a race, and the protocol being annulled when the attendance list is edited after the vote.
 
 Shared navigation is defined in:
 - `src/components/layout/Aside/Nav.js`

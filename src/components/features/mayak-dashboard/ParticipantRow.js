@@ -1,7 +1,7 @@
 import { memo } from "react";
 
 import styles from "./dashboard.module.css";
-import { ROLE_OPTIONS, roleLabel } from "./dashboardConstants";
+import { ROLE_OPTIONS, YA_PHASE_LABELS, roleLabel } from "./dashboardConstants";
 import { StarIcon, CloseIcon, EyeOffIcon } from "./icons";
 
 function ParticipantRow({
@@ -134,6 +134,9 @@ function ParticipantRow({
                     </td>
                     <td className={styles.tdProgress}>
                         <div className={styles.progressCellWrap}>
+                            <span className={styles.phaseLabel} title="Фаза части «Я»: у каждой своя цель">
+                                {YA_PHASE_LABELS[participant.ya?.phase] || "Старт"}
+                            </span>
                             <span className={styles.progressText}>
                                 {approvedCount}/{targetCount}
                             </span>
@@ -147,7 +150,11 @@ function ParticipantRow({
                         </div>
                     </td>
                 </>
-            ) : null}
+            ) : (
+                // Распорка режима «Мы»: забирает остаток ширины, роль остаётся
+                // прижатой к имени (см. .weTableScroll в dashboard.module.css).
+                <td aria-hidden="true" />
+            )}
         </tr>
     );
 }

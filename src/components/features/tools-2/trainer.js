@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import Header from "@/components/layout/Header";
+import HowTo from "@/components/features/mayak-guide/HowTo";
 import Buffer from "./addons/popup";
 import RankingTestPopup from "./addons/RankingTestPopup";
 import MayakServicesPanel from "./MayakServicesPanel";
@@ -340,6 +341,17 @@ export default function TrainerPage({ goTo }) {
     });
 
     const [showBypassMenu, setShowBypassMenu] = useState(false);
+
+    // Разбор «Как это работает» открыт. GuideTour сообщает об этом событием:
+    // пропуск окна инспектора в демо действует только на время разбора, а не на
+    // весь админ-вход — иначе владелец байпаса не мог проверить настоящий
+    // поток отправки.
+    const [isTourActive, setIsTourActive] = useState(false);
+    useEffect(() => {
+        const onTour = (event) => setIsTourActive(Boolean(event?.detail?.open));
+        window.addEventListener("mayak-guide-tour", onTour);
+        return () => window.removeEventListener("mayak-guide-tour", onTour);
+    }, []);
     const [bypassPosition, setBypassPosition] = useState(() => {
         if (typeof window !== "undefined") {
             try {
@@ -1027,7 +1039,12 @@ export default function TrainerPage({ goTo }) {
         type,
         userType,
         who,
-        sessionUploadRequired: isSessionMode,
+        // Во время разбора в демо-режиме мастера отправка инспектору не
+        // требуется: сдавать некому, и «Завершить» без этого условия не
+        // завершал задание — таймер тикал в ожидании загрузки, которой не
+        // будет. Вне разбора админ-вход ведёт себя как обычный участник:
+        // владелец байпаса проверяет настоящий поток, включая окно инспектора.
+        sessionUploadRequired: isSessionMode && !(isAdmin && isTourActive),
         isCurrentTaskApproved: ["approved", "expired", "rework_expired"].includes(
             (Array.isArray(sessionRuntimeState?.participant?.taskStates)
                 ? sessionRuntimeState.participant.taskStates.find((task) => Number(task.taskIndex) === currentTaskIndex) || null
@@ -1036,6 +1053,8 @@ export default function TrainerPage({ goTo }) {
     });
 
     const {
+        downloadCertificateStrict,
+        downloadLogsStrict,
         handleDownloadCertificate,
         handleDownloadLogs,
         handleSaveSessionCompletion,
@@ -1883,6 +1902,9 @@ export default function TrainerPage({ goTo }) {
                             ))}
                         </Switcher>
                     </div>
+                    {/* data-tour="fields": вводный шаг разбора подсвечивает все семь полей
+                        разом, а не первое — обёртка объединяет обе группы. */}
+                    <div data-tour="fields" className="flex flex-col gap-[1.25rem]">
                     <div className="flex flex-col gap-[0.5rem]">
                         <div className="flex justify-between items-center">
                             <span className="big">Цели и целевая направленность</span>
@@ -1919,6 +1941,7 @@ export default function TrainerPage({ goTo }) {
                                 savedField={savedField}
                             />
                         ))}
+                    </div>
                     </div>
                 </div>
                 <div className="mt-4 flex w-full flex-col gap-2">
@@ -2042,14 +2065,16 @@ export default function TrainerPage({ goTo }) {
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
                 {isContestMode && <ContestLessonStepper />}
+                {/* Высота и радиус — как у соседних icon-кнопок (40px / 12px): три формы
+                    в одном ряду (круглые пилюли, квадраты, овалы) читались как беспорядок. */}
                 {effectiveTableNumber ? (
-                    <div className="inline-flex items-center justify-center !rounded-full border border-slate-200 bg-white !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
+                    <div className="inline-flex items-center justify-center !rounded-xl border border-slate-200 bg-white !px-3 !h-10 leading-none text-sm font-semibold text-slate-700 whitespace-nowrap">
                         Стол №{effectiveTableNumber}
                     </div>
                 ) : null}
                 {selectedRole && (
                     <div style={{ position: "relative" }} className="role-tooltip-wrap">
-                        <div className="inline-flex items-center justify-center !rounded-full border border-blue-200 bg-blue-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-blue-700 whitespace-nowrap cursor-default">
+                        <div className="inline-flex items-center justify-center !rounded-xl border border-blue-200 bg-blue-50 !px-3 !h-10 leading-none text-sm font-semibold text-blue-700 whitespace-nowrap cursor-default">
                             {selectedRole}
                         </div>
                         <div
@@ -2092,20 +2117,20 @@ export default function TrainerPage({ goTo }) {
                     <button
                         type="button"
                         onClick={() => setShowBypassMenu((prev) => !prev)}
-                        className="inline-flex items-center justify-center gap-1 !rounded-full border border-amber-200 !bg-amber-100 hover:!bg-amber-200 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold !text-amber-700 cursor-pointer transition-colors !shadow-none !w-auto !flex-initial flex-shrink-0 whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-1 !rounded-xl border border-amber-200 !bg-amber-100 hover:!bg-amber-200 !px-3 !h-10 leading-none text-sm font-semibold !text-amber-700 cursor-pointer transition-colors !shadow-none !w-auto !flex-initial flex-shrink-0 whitespace-nowrap"
                     >
                         <span className="leading-none">⚙️</span>
                         <span className="leading-none">Отладка</span>
                     </button>
                 )}
                 {sessionRuntimeState?.participant?.yaDirection && (
-                    <div className="inline-flex items-center justify-center !rounded-full border border-teal-200 bg-teal-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-teal-700 whitespace-nowrap capitalize cursor-default">
+                    <div className="inline-flex items-center justify-center !rounded-xl border border-teal-200 bg-teal-50 !px-3 !h-10 leading-none text-sm font-semibold text-teal-700 whitespace-nowrap capitalize cursor-default">
                         Направление: {sessionRuntimeState.participant.yaDirection}
                     </div>
                 )}
                 {jokerBalance > 0 && (
                     <div
-                        className="inline-flex items-center justify-center gap-1 !rounded-full border border-rose-200 bg-rose-50 !px-3 !py-1.5 !h-8 leading-none text-sm font-semibold text-rose-700 whitespace-nowrap cursor-default"
+                        className="inline-flex items-center justify-center gap-1 !rounded-xl border border-rose-200 bg-rose-50 !px-3 !h-10 leading-none text-sm font-semibold text-rose-700 whitespace-nowrap cursor-default"
                         title="Звёзды-джокеры: мгновенно засчитывают задание части «Мы» без инспектора">
                         <svg className="w-4 h-4 flex-shrink-0 text-red-500 fill-red-500 drop-shadow-[0_0_3px_rgba(239,68,68,0.6)]" viewBox="0 0 24 24">
                             <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
@@ -2114,13 +2139,14 @@ export default function TrainerPage({ goTo }) {
                     </div>
                 )}
                 <div className="flex items-center gap-2 ml-auto">
+                    {/* «?» стоит в правом блоке, после «Отладки»: слева от него — состояние
+                        сессии (стол, роль), справа — действия. Разбор — действие. */}
+                    <HowTo screen="trainer" tasks={tasks} onPickTask={goToTask} minIndex={allowedMinIndex} maxIndex={allowedMaxIndex} />
                     {!isContestMode && (
                         <Button
                             icon
-                            roundeful
                             disabled={timerState.isRunning}
-                            className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                            className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
                             onClick={handleOpenHistory}
                             title={timerState.isRunning ? "Недоступно во время выполнения задания" : "История запросов"}>
                             <TimeIcon className="w-[18px] h-[18px] text-slate-700 block" />
@@ -2129,10 +2155,8 @@ export default function TrainerPage({ goTo }) {
                     {isAdmin && (
                         <Button
                             icon
-                            roundeful
                             disabled={timerState.isRunning}
-                            className={`!rounded-full !w-8 !h-8 !p-0 flex items-center justify-center !bg-slate-100 border border-slate-200 hover:!bg-slate-200 ${timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}`}
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                            className={timerState.isRunning ? "!opacity-40 !cursor-not-allowed !pointer-events-none" : ""}
                             onClick={handleAdminResetSession}
                             title={timerState.isRunning ? "Недоступно во время выполнения задания" : "Сбросить сессию (админ)"}>
                             <svg className="w-[18px] h-[18px] text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -2147,7 +2171,7 @@ export default function TrainerPage({ goTo }) {
                         <Button
                             inverted
                             roundeful
-                            className="inline-flex items-center justify-center !rounded-full !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                            className="inline-flex items-center justify-center !rounded-xl !px-3 !h-10 leading-none !text-sm whitespace-nowrap"
                             onClick={() => { window.location.href = "/cours"; }}>
                             Вернуться&nbsp;к&nbsp;урокам
                         </Button>
@@ -2155,7 +2179,7 @@ export default function TrainerPage({ goTo }) {
                         <Button
                             inverted
                             roundeful
-                            className="inline-flex items-center justify-center !rounded-full !bg-(--color-red-noise) !text-(--color-red) !py-1.5 !px-3 !h-8 leading-none !text-sm whitespace-nowrap"
+                            className="inline-flex items-center justify-center !rounded-xl !bg-(--color-red-noise) !text-(--color-red) !px-3 !h-10 leading-none !text-sm whitespace-nowrap"
                             onClick={handleCompleteSession}>
                             Завершить&nbsp;сессию
                         </Button>
@@ -2178,7 +2202,12 @@ export default function TrainerPage({ goTo }) {
                     certificateLoading={completionLoading}
                     onOpenTesting={handleOpenCompletionTesting}
                     onOpenSurvey={handleOpenCompletionSurvey}
-                    onGetCertificate={handleGetCompletionCertificate}
+                    // Строгие версии: при ошибке бросают, попап не помечает файл
+                    // скачанным и участник пробует ещё раз, а не уходит с пустыми
+                    // руками. Завершение уже не качает сертификат и лог повторно.
+                    onDownloadCertificate={downloadCertificateStrict}
+                    onDownloadLog={downloadLogsStrict}
+                    onFinishSession={() => handleSaveSessionCompletion({ artifactsAlreadyDownloaded: true })}
                 />
             )}
 
@@ -2205,7 +2234,11 @@ export default function TrainerPage({ goTo }) {
                 {showBuffer && <Buffer onClose={handleCloseBuffer} onInsert={handleInsertFromBuffer} onUpdate={handleUpdateBuffer} buffer={buffer} currentField={currentField} />}
                 <InstructionImageModal instructionModal={instructionModal} onClose={handleCloseInstructionModal} />
             </div>
+            {/* Пока идёт разбор в демо-режиме мастера, завершение обходится без
+                окон вообще: сдавать инспектору некому, а сводка «задание выполнено»
+                только прерывала разбор. Вне разбора всё как у участника. */}
             {showCompletionPopup &&
+                !(isAdmin && isTourActive) &&
                 (isSessionMode && !isIntroTask(currentTaskIndex) ? (
                     <SessionTaskReviewPopup
                         taskData={currentTaskData}

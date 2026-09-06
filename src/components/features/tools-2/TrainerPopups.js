@@ -279,7 +279,31 @@ export const SecondQuestionnairePopup = memo(function SecondQuestionnairePopup({
     );
 });
 
-export const ThirdQuestionnairePopup = memo(function ThirdQuestionnairePopup({ onClose, testingDone, surveyDone, onOpenTesting, onOpenSurvey, onGetCertificate, certificateLoading }) {
+export const ThirdQuestionnairePopup = memo(function ThirdQuestionnairePopup({ onClose, testingDone, surveyDone, onOpenTesting, onOpenSurvey, onDownloadCertificate, onDownloadLog, onFinishSession, certificateLoading }) {
+    // Сертификат и лог скачиваются по отдельности, и сессия не завершается,
+    // пока не скачаны оба: раньше одна кнопка качала всё пачкой и тут же
+    // закрывала сессию — если браузер молча съел одно из скачиваний, участник
+    // оставался без файла и без шанса повторить.
+    const [certDone, setCertDone] = useState(false);
+    const [logDone, setLogDone] = useState(false);
+    const [busy, setBusy] = useState("");
+
+    const runDownload = async (kind, action, mark) => {
+        setBusy(kind);
+        try {
+            await action();
+            mark(true);
+        } catch (error) {
+            console.error(`Не удалось скачать (${kind}):`, error);
+            alert(error?.message || "Не удалось сформировать файл. Попробуйте ещё раз.");
+        } finally {
+            setBusy("");
+        }
+    };
+
+    const downloadsReady = testingDone && surveyDone;
+    const readyToFinish = downloadsReady && certDone && logDone;
+
     return (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
             <div className="relative bg-white p-6 rounded-lg max-w-md w-full shadow-2xl border border-gray-200 pointer-events-auto">
@@ -300,8 +324,24 @@ export const ThirdQuestionnairePopup = memo(function ThirdQuestionnairePopup({ o
                         className={surveyDone ? "!bg-green-100 !text-green-600 !cursor-default flex-1" : testingDone ? "!bg-blue-500 !text-white hover:!bg-blue-600 flex-1" : "!bg-gray-200 !text-gray-400 !cursor-not-allowed flex-1"}>
                         {surveyDone ? "Анкета заполнена" : "Анкета обратной связи"}
                     </Button>
-                    <Button onClick={onGetCertificate} disabled={!surveyDone || certificateLoading} className={surveyDone ? "!bg-[#0088cc] !text-white hover:!bg-[#006daa] flex-1" : "!bg-gray-200 !text-gray-400 !cursor-not-allowed flex-1"}>
-                        {certificateLoading ? "Подготовка..." : "Получить сертификат"}
+                    <Button
+                        onClick={() => runDownload("certificate", onDownloadCertificate, setCertDone)}
+                        disabled={!downloadsReady || busy === "certificate"}
+                        className={certDone ? "!bg-green-100 !text-green-600 flex-1" : downloadsReady ? "!bg-[#0088cc] !text-white hover:!bg-[#006daa] flex-1" : "!bg-gray-200 !text-gray-400 !cursor-not-allowed flex-1"}>
+                        {busy === "certificate" ? "Подготовка..." : certDone ? "Сертификат скачан ✓" : "Скачать сертификат"}
+                    </Button>
+                    <Button
+                        onClick={() => runDownload("log", onDownloadLog, setLogDone)}
+                        disabled={!downloadsReady || busy === "log"}
+                        className={logDone ? "!bg-green-100 !text-green-600 flex-1" : downloadsReady ? "!bg-[#0088cc] !text-white hover:!bg-[#006daa] flex-1" : "!bg-gray-200 !text-gray-400 !cursor-not-allowed flex-1"}>
+                        {busy === "log" ? "Подготовка..." : logDone ? "Лог скачан ✓" : "Скачать лог"}
+                    </Button>
+                    <Button
+                        onClick={onFinishSession}
+                        disabled={!readyToFinish || certificateLoading}
+                        title={readyToFinish ? "" : "Сначала скачайте сертификат и лог"}
+                        className={readyToFinish ? "!bg-blue-600 !text-white hover:!bg-blue-700 flex-1" : "!bg-gray-200 !text-gray-400 !cursor-not-allowed flex-1"}>
+                        {certificateLoading ? "Завершение..." : "Завершить сессию"}
                     </Button>
                 </div>
             </div>

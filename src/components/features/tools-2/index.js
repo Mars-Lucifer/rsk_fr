@@ -5,6 +5,7 @@ import { getKeyFromCookies } from "./actions";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import HowTo from "@/components/features/mayak-guide/HowTo";
 import LinkIcon from "@/assets/general/link.svg";
 import TimeIcon from "@/assets/general/time.svg";
 import ResetIcon from "@/assets/general/ResetIcon.svg";
@@ -379,6 +380,7 @@ export default function IndexPage({ goTo }) {
         <>
             <Header>
                 <Header.Heading>МАЯК ОКО</Header.Heading>
+                <HowTo screen="index" />
                 <Button icon active onClick={() => goTo("trainer")}>
                     <CourseIcon />
                 </Button>
@@ -434,7 +436,7 @@ export default function IndexPage({ goTo }) {
                             </div>
 
                             {/* Остальная часть формы */}
-                            <div className="flex flex-col gap-[1.25rem]">
+                            <div data-tour="fields" className="flex flex-col gap-[1.25rem]">
                                 <div className="flex flex-col gap-[0.5rem]">
                                     <div className="flex justify-between items-center">
                                         <span className="big">Цели и целевая направленность</span>
@@ -499,7 +501,7 @@ export default function IndexPage({ goTo }) {
                                 {copied ? "Скопировано!" : "Скопировать"}
                             </Button>
 
-                            <div className="flex flex-wrap lg:flex-nowrap gap-[0.5rem]">
+                            <div data-tour="services" className="flex flex-wrap lg:flex-nowrap gap-[0.5rem]">
                                 {!isMiscAccordionOpen &&
                                     (defaultLinks[type] || [])
                                         .slice()

@@ -1,7 +1,28 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import JSZip from "jszip";
-import { readStoredFile } from "./storage.js";
+import { GENERATED_SLOTS, UPLOAD_SLOTS } from "./slots.js";
+import { buildSubmissionWorkbook } from "./registry.js";
+
+export { GENERATED_SLOTS, UPLOAD_SLOTS };
+
+const CONTENT_TYPES = {
+  ".pdf": "application/pdf",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+// Читаем файл напрямую: модуль не должен тянуть слой БД ради fs.readFile.
+function readFile(filePath) {
+  return fs.readFile(filePath).catch(() => null);
+}
+
+export function contentTypeFor(filePath) {
+  return CONTENT_TYPES[path.extname(filePath).toLowerCase()] ?? "application/octet-stream";
+}
 
 export function downloadName(submission, extension) {
   const safeRegion = slug(submission.region);
@@ -9,53 +30,82 @@ export function downloadName(submission, extension) {
   return `protocol-${safeRegion}-${safeDelegate}.${extension}`;
 }
 
-export async function sendFileResponse(res, filePath, contentType, name) {
-  const buffer = await readStoredFile(filePath);
+/**
+ * `inline` нужен превью в админке: с `attachment` браузер не рисует картинку
+ * в <img>, вместо миниатюры остаётся альт.
+ */
+export async function sendFileResponse(res, filePath, contentType, name, inline = false) {
+  const buffer = await readFile(filePath);
 
   if (!buffer) {
     return res.status(404).json({ error: "Файл не найден." });
   }
 
   res.setHeader("Content-Type", contentType);
+  res.setHeader(
+    "Content-Disposition",
+    `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(name)}`
+  );
+  res.setHeader("Content-Length", String(buffer.byteLength));
+  return res.status(200).send(buffer);
+}
+
+async function buildZip(submission, slots) {
+  const zip = new JSZip();
+  let added = 0;
+
+  for (const { slot, archiveName } of slots) {
+    const filePath = submission.files?.[slot];
+    if (!filePath) {
+      continue;
+    }
+
+    const buffer = await readFile(filePath);
+    if (!buffer) {
+      continue;
+    }
+
+    const extension = path.extname(archiveName) || path.extname(filePath);
+    const name = path.extname(archiveName) ? archiveName : `${archiveName}${extension}`;
+    zip.file(name, buffer);
+    added += 1;
+  }
+
+  return added > 0 ? zip : null;
+}
+
+async function sendZip(res, zip, name) {
+  const buffer = await zip.generateAsync({ type: "nodebuffer" });
+
+  res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
   res.setHeader("Content-Length", String(buffer.byteLength));
   return res.status(200).send(buffer);
 }
 
-export async function sendArchiveResponse(res, submission) {
-  const zip = new JSZip();
-  const docx = await readStoredFile(submission.docxPath);
-  const pdf = submission.pdfPath ? await readStoredFile(submission.pdfPath) : null;
-  const photo = submission.photoPath ? await readStoredFile(submission.photoPath) : null;
+/** Комплект бланков для печати — то, что РО скачивает на шаге 2. */
+export async function sendGeneratedPackageResponse(res, submission) {
+  const zip = await buildZip(submission, GENERATED_SLOTS);
 
-  if (!docx) {
-    return res.status(404).json({ error: "DOCX не найден." });
+  if (!zip) {
+    return res.status(404).json({ error: "Документы не найдены." });
   }
 
-  zip.file("submission.json", JSON.stringify(submission, null, 2));
-  zip.file("protocol.docx", docx);
-
-  if (pdf) {
-    zip.file("signed.pdf", pdf);
-  }
-
-  if (photo) {
-    const photoExt = path.extname(submission.photoPath) || ".jpg";
-    zip.file(`photo${photoExt}`, photo);
-  }
-
-  const buffer = await zip.generateAsync({ type: "nodebuffer" });
-
-  res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(downloadName(submission, "zip"))}`);
-  res.setHeader("Content-Length", String(buffer.byteLength));
-  return res.status(200).send(buffer);
+  return sendZip(res, zip, downloadName(submission, "zip"));
 }
 
-export async function ensureFileInsideUploads(filePath) {
-  const resolved = path.resolve(filePath);
-  await fs.access(resolved);
-  return resolved;
+/** Полный архив заявки для Оргкомитета: бланки, сканы, фото и метаданные. */
+export async function sendArchiveResponse(res, submission) {
+  const zip = await buildZip(submission, [...GENERATED_SLOTS, ...UPLOAD_SLOTS]);
+
+  if (!zip) {
+    return res.status(404).json({ error: "Файлы заявки не найдены." });
+  }
+
+  // Таблица вместо сырого JSON: Оргкомитет открывает архив в Excel, не в редакторе.
+  zip.file("0-заявка.xlsx", buildSubmissionWorkbook(submission));
+
+  return sendZip(res, zip, downloadName(submission, "zip"));
 }
 
 function slug(value) {

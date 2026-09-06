@@ -2,31 +2,34 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 
-import Tags from "@/components/ui/Tags";
 import Button from "@/components/ui/Button";
 import Header from "@/components/layout/Header";
-import Card from "@/components/ui/Card";
-import MayakDelegatedAdminPanel from "@/components/pages/profile/MayakDelegatedAdminPanel";
-import LocalProfileMockSwitcher from "@/components/pages/profile/LocalProfileMockSwitcher";
-import Setts from "@/assets/general/setts.svg";
+// import MayakDelegatedAdminPanel from "@/components/pages/profile/MayakDelegatedAdminPanel";
+import PortalProfileEditor from "@/components/features/auth/PortalProfileEditor";
 import LinkIcon from "@/assets/general/link.svg";
+
+// Карандаш рисуем на месте: в наборе иконок его нет, а заводить ассет ради
+// одной кнопки дороже, чем шесть строк разметки.
+function PencilIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M11.3 2.7a1.7 1.7 0 0 1 2.4 2.4l-7.5 7.5-3.2.8.8-3.2 7.5-7.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
 import { getPortalOrganizationId, getPortalOrganizationLabel } from "@/lib/portalProfile";
-import { fetchPortalProfileClient, isMissingPortalProfilePayload } from "@/lib/portalProfileClient";
+import { fetchPortalProfileClient, isMissingPortalProfilePayload, primePortalProfileCache } from "@/lib/portalProfileClient";
 import { saveUserData } from "@/utils/auth";
 
 const PROFILE_EMPTY_LABEL = "\u041D\u0435\u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u043E";
-const FULL_NAME_EMPTY_LABEL = "\u0424\u0418\u041E \u043D\u0435 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D\u043E";
-const USERNAME_EMPTY_LABEL = "username \u043E\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u0435\u0442";
-const REGION_EMPTY_LABEL = "\u0420\u0435\u0433\u0438\u043E\u043D \u043D\u0435 \u0437\u0430\u043F\u043E\u043B\u043D\u0435\u043D";
 const ORGANIZATION_EMPTY_LABEL = "\u041E\u0442\u0441\u0443\u0442\u0441\u0442\u0432\u0443\u0435\u0442";
 const PROFILE_LOADING_LABEL = "\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C \u043F\u0440\u043E\u0444\u0438\u043B\u044C...";
 const LOGOUT_CONFIRM_LABEL = "\u0412\u044B \u0443\u0432\u0435\u0440\u0435\u043D\u044B, \u0447\u0442\u043E \u0445\u043E\u0442\u0438\u0442\u0435 \u0432\u044B\u0439\u0442\u0438?";
-const ROLE_LABELS = {
-    teacher: "\u0421\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A",
-    student: "\u0421\u0442\u0443\u0434\u0435\u043D\u0442",
-    moder: "\u041C\u043E\u0434\u0435\u0440\u0430\u0442\u043E\u0440",
-    admin: "\u0410\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0442\u043E\u0440",
-};
+const SAVE_PROFILE_LABEL = "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F";
+// \u0411\u043B\u043E\u043A \u043C\u0430\u0442\u0435\u0440\u0438\u0430\u043B\u043E\u0432 \u041C\u0410\u042F\u041A \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u0441\u043D\u044F\u0442 \u0441\u043E \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B, \u0441\u043C. \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439 \u0443 \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0438.
+const SHOW_MAYAK_MATERIALS = false;
+// Блок «Переходы» снят со страницы, см. комментарий у разметки.
+const SHOW_PROFILE_SHORTCUTS = false;
 
 const MAYAK_FILE_LABELS = {
     certificate: "Сертификат",
@@ -109,9 +112,26 @@ function sortMayakArtifactsNewestFirst(items = []) {
     });
 }
 
-export default function ProfileIndexPage({ goTo }) {
-    const [userData, setUserData] = useState(null);
-    const [hydrated, setHydrated] = useState(false);
+export default function ProfileIndexPage({ goTo, initialEditing = false, initialProfile = null }) {
+    // Профиль приезжает с сервера: первый кадр уже с данными, дальше клиент
+    // только освежает их. Заодно кладём в кэш, чтобы соседние экраны не ходили
+    // за тем же ответом заново.
+    const [userData, setUserData] = useState(() => {
+        if (initialProfile) {
+            primePortalProfileCache(initialProfile);
+        }
+        return initialProfile;
+    });
+    const [hydrated, setHydrated] = useState(Boolean(initialProfile));
+    const [isEditing, setIsEditing] = useState(initialEditing || isMissingPortalProfilePayload(initialProfile));
+
+    // ?tab=settings приходит после router.isReady, то есть уже вторым рендером —
+    // начальное значение useState его не увидит.
+    useEffect(() => {
+        if (initialEditing) {
+            setIsEditing(true);
+        }
+    }, [initialEditing]);
     const [mayakArtifacts, setMayakArtifacts] = useState([]);
     const [artifactsLoading, setArtifactsLoading] = useState(true);
     const [artifactsError, setArtifactsError] = useState("");
@@ -146,6 +166,23 @@ export default function ProfileIndexPage({ goTo }) {
 
         const fetchProfile = async () => {
             try {
+                // Профиль уже приехал с сервера — второй запрос не нужен и
+                // вреден: его ответ приходит через секунду и перезаписывает
+                // форму, стирая то, что человек успел выбрать (регион слетал
+                // обратно на сохранённый). Догружаем только материалы.
+                if (initialProfile && !isMissingPortalProfilePayload(initialProfile)) {
+                    saveUserData({
+                        email: initialProfile?.data?.email || "",
+                        username: initialProfile?.data?.NameIRL || initialProfile?.data?.username || "",
+                        firstName: initialProfile?.data?.NameIRL || "",
+                        lastName: initialProfile?.data?.Surname || "",
+                        patronymic: initialProfile?.data?.Patronymic || "",
+                    });
+                    await fetchMayakArtifacts();
+                    setHydrated(true);
+                    return;
+                }
+
                 const data = await fetchPortalProfileClient({ force: true });
                 if (!data) {
                     clearCookies();
@@ -154,8 +191,11 @@ export default function ProfileIndexPage({ goTo }) {
                 }
 
                 if (isMissingPortalProfilePayload(data)) {
+                    // Профиль без ФИО/организации сразу открываем в правке:
+                    // без этих полей МАЯК не пускает дальше.
+                    setUserData(data);
+                    setIsEditing(true);
                     setHydrated(true);
-                    goTo("settings");
                     return;
                 }
 
@@ -178,7 +218,7 @@ export default function ProfileIndexPage({ goTo }) {
         };
 
         fetchProfile();
-    }, [goTo, router]);
+    }, [goTo, router, initialProfile]);
 
     const handleLogout = async () => {
         const confirmed = window.confirm(LOGOUT_CONFIRM_LABEL);
@@ -222,11 +262,6 @@ export default function ProfileIndexPage({ goTo }) {
     }
 
     const profileName = userData.data.NameIRL && userData.data.Surname ? `${userData.data.NameIRL} ${userData.data.Surname}` : PROFILE_EMPTY_LABEL;
-    const profileFullName =
-        userData.data.NameIRL || userData.data.Surname || userData.data.Patronymic
-            ? `${userData.data.NameIRL} ${userData.data.Surname} ${userData.data.Patronymic}`
-            : FULL_NAME_EMPTY_LABEL;
-    const roleLabel = ROLE_LABELS[userData.data.Type] || "\u041E\u0448\u0438\u0431\u043A\u0430 \u0434\u0430\u043D\u043D\u044B\u0445";
     const organizationLinkId = getPortalOrganizationId(userData);
     const organizationDisplayName = getPortalOrganizationLabel(userData);
 
@@ -237,66 +272,89 @@ export default function ProfileIndexPage({ goTo }) {
                 <Button red className={"w-fit! shadow-none!"} onClick={handleLogout}>
                     {"\u0412\u044B\u0439\u0442\u0438"}
                 </Button>
-                <Button icon onClick={() => goTo("settings")}>
-                    <Setts />
-                </Button>
             </Header>
 
-            <div className="hero" style={{ gridTemplateRows: "repeat(3, auto)" }}>
-                <Card className="col-span-5 max-[900px]:col-span-12 h-fit">
-                    <Card.Heading>
-                        <div className="flex gap-[1rem] w-full items-start">
-                            <div className="flex flex-col gap-[0.75rem] flex-1 ">
-                                <h4>{profileFullName}</h4>
-                                <div className="flex gap-[0.5rem] flex-wrap">
-                                    <Tags
-                                        tags={[
-                                            { name: userData.data?.username || USERNAME_EMPTY_LABEL, color: "blue" },
-                                            { name: roleLabel, color: "blue", icon: "coin" },
-                                            { name: userData.data?.Region || REGION_EMPTY_LABEL, color: "blue" },
-                                        ]}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </Card.Heading>
-                </Card>
+            {/* Предел ширины — только для профиля, .hero общий на весь портал.
+                На широком мониторе форма растягивалась во всю ширину: поля по
+                полметра, а глазу не за что зацепиться. */}
+            <div className="w-full mx-auto" style={{ maxWidth: "80rem" }}>
+            {/* Просмотр и правка — одна форма: раньше профиль показывал карточку
+                с тегами, а поля жили на отдельном экране, и человек видел два
+                разных представления одних и тех же данных. */}
+            <PortalProfileEditor
+                mode="full"
+                profilePayload={userData}
+                readOnly={!isEditing}
+                showRole
+                submitLabel={SAVE_PROFILE_LABEL}
+                headerSlot={
+                    <button
+                        type="button"
+                        onClick={() => setIsEditing((prev) => !prev)}
+                        title={isEditing ? "Отменить правку" : "Редактировать профиль"}
+                        className="flex items-center gap-[0.5rem] px-[0.75rem]! py-[0.5rem]! rounded-[0.5rem] shrink-0 w-fit!"
+                        style={{ border: "1.5px solid var(--color-gray-plus-50)", background: "transparent", color: "var(--color-gray-black)", cursor: "pointer" }}>
+                        {isEditing ? null : <PencilIcon />}
+                        <span className="text-sm">{isEditing ? "Отменить" : "Редактировать"}</span>
+                    </button>
+                }
+                onSaved={(payload) => {
+                    setUserData(payload);
+                    setIsEditing(false);
+                }}
+            />
 
-                <div className="col-span-7 max-[900px]:col-span-12 flex flex-col gap-[1rem] h-fit">
-                    <div className="block-wrapper col-span-12 max-[900px]:col-span-12">
-                        <h6>{"\u041E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u0438 \u043A\u043E\u043C\u0430\u043D\u0434\u0430"}</h6>
+            <div className="hero" style={{ gridTemplateRows: "repeat(3, auto)" }}>
+                {/* Блок «Переходы» скрыт: организация и команда уже названы в форме
+                    выше, а ссылка на их страницы дублировала то же самое третьей
+                    строкой. Разметка оставлена целиком, включать обратно сменой
+                    флага SHOW_PROFILE_SHORTCUTS. */}
+                {SHOW_PROFILE_SHORTCUTS && (organizationLinkId || userData.data.team_id) ? (
+                    <div className="block-wrapper col-span-12">
+                        <h6>{"\u041F\u0435\u0440\u0435\u0445\u043E\u0434\u044B"}</h6>
                         <div className="flex flex-col gap-[0.75rem]">
                             {organizationLinkId ? (
                                 <Link href={`/organizations/${organizationLinkId}`}>
-                                    <div className="group cursor-pointer flex items-center justify-between w-full">
-                                        <p className="flex-1 link">{organizationDisplayName || ORGANIZATION_EMPTY_LABEL}</p>
-                                        <LinkIcon className="stroke-(--color-gray-white) group-hover:stroke-black" style={{ transition: "stroke .3s ease-in-out" }} />
+                                    <div className="group cursor-pointer flex items-center justify-between gap-[1rem] w-full">
+                                        {/* \u041F\u043E\u0434\u043F\u0438\u0441\u044C \u0441\u043B\u0435\u0432\u0430 \u043E\u0431\u044A\u044F\u0441\u043D\u044F\u0435\u0442, \u043A\u0443\u0434\u0430 \u0432\u0435\u0434\u0451\u0442 \u0441\u0442\u0440\u043E\u043A\u0430:
+                                            \u0433\u043E\u043B\u043E\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u0447\u0438\u0442\u0430\u043B\u043E\u0441\u044C \u043A\u0430\u043A \u043F\u043E\u043B\u0435 \u043F\u0440\u043E\u0444\u0438\u043B\u044F,
+                                            \u0430 \u043D\u0435 \u043A\u0430\u043A \u0441\u0441\u044B\u043B\u043A\u0430 \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443. */}
+                                        <span className="small text-(--color-gray-black) shrink-0">{"\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0446\u0438\u0438"}</span>
+                                        <p className="link truncate">{organizationDisplayName || ORGANIZATION_EMPTY_LABEL}</p>
+                                        <LinkIcon className="stroke-(--color-gray-white) group-hover:stroke-black shrink-0" style={{ transition: "stroke .3s ease-in-out" }} />
                                     </div>
                                 </Link>
-                            ) : (
-                                <div className="flex items-center justify-between w-full">
-                                    <p className="flex-1 text-(--color-gray-black)">{organizationDisplayName || ORGANIZATION_EMPTY_LABEL}</p>
-                                </div>
-                            )}
+                            ) : null}
 
                             {userData.data.team_id ? (
                                 <>
-                                    <hr className="w-full border-solid border-[1.5px] border-(--color-gray-plus)" />
+                                    {organizationLinkId ? <hr className="w-full border-solid border-[1.5px] border-(--color-gray-plus)" /> : null}
 
                                     <Link href={`/teams/${userData.data.team_id}`}>
-                                        <div className="group flex items-center justify-between w-full">
-                                            <p className="flex-1 link">{userData.data.team || ORGANIZATION_EMPTY_LABEL}</p>
-                                            <LinkIcon className="stroke-(--color-gray-white) group-hover:stroke-black" style={{ transition: "stroke .3s ease-in-out" }} />
+                                        <div className="group cursor-pointer flex items-center justify-between gap-[1rem] w-full">
+                                            <span className="small text-(--color-gray-black) shrink-0">{"\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u044B"}</span>
+                                            <p className="link truncate">{userData.data.team || ORGANIZATION_EMPTY_LABEL}</p>
+                                            <LinkIcon className="stroke-(--color-gray-white) group-hover:stroke-black shrink-0" style={{ transition: "stroke .3s ease-in-out" }} />
                                         </div>
                                     </Link>
                                 </>
                             ) : null}
                         </div>
                     </div>
-                </div>
+                ) : null}
 
-                <MayakDelegatedAdminPanel />
+                {/* Админ-права МАЯК скрыты: у обычного участника блок висит на
+                    «Загружаем доступы МАЯК...» и ничем не заканчивается —
+                    доступов у него нет и не будет. Разметка и сам компонент
+                    оставлены целиком, включать обратно снятием комментария. */}
+                {/* <MayakDelegatedAdminPanel /> */}
 
+                {/* Материалы МАЯК скрыты до возврата к этой части: блок висел
+                    пустым, потому что артефакты копятся в двух разных местах
+                    (data/results.json и mayak-user-history.json), и что из них
+                    показывать в профиле — ещё не решено. Разметка оставлена
+                    целиком, включать обратно сменой флага выше. */}
+                {SHOW_MAYAK_MATERIALS ? (
                 <div className="block-wrapper col-span-12 max-[900px]:col-span-12 flex flex-col gap-[1rem]">
                     <div className="flex items-center justify-between gap-[1rem] flex-wrap">
                         <h6>{"Материалы МАЯК"}</h6>
@@ -344,8 +402,8 @@ export default function ProfileIndexPage({ goTo }) {
                         </div>
                     ) : null}
                 </div>
-
-                <LocalProfileMockSwitcher />
+                ) : null}
+            </div>
             </div>
         </>
     );

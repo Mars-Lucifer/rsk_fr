@@ -32,6 +32,11 @@ const mix = (a, b, t) => a + (b - a) * t;
 // Курсор ловят хотспоты сцены: фишка на поле иначе перекрывала бы кольцо предмета.
 const noRaycast = () => null;
 
+// Обратно к обычному лучу — для своей фишки в живом режиме. Ставится именно функция,
+// а не undefined: undefined в этот проп записывается как есть, меш остаётся без метода
+// пересечения и молча выпадает из raycast — фишка выглядит кликабельной и не кликается.
+const meshRaycast = THREE.Mesh.prototype.raycast;
+
 function meepleGeometry() {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VB} ${VB}"><path d="${MEEPLE_D}"/></svg>`;
     // path.toShapes(), а не SVGLoader.createShapes(): второй объявлен устаревшим и на
@@ -65,7 +70,13 @@ function trayAt(index) {
     return { x: MEEPLE_TRAY.x + index * MEEPLE_TRAY.dx, z: MEEPLE_TRAY.z };
 }
 
-export const Meeples3D = forwardRef(function Meeples3D({ position = [0, 0, 0] }, ref) {
+// То же место наружу: живому столу нужно вернуть в лоток одну фишку, а не все шесть.
+export const meepleTray = trayAt;
+
+// В демонстрации фишки курсор не ловят вовсе. В живом режиме своя фишка — предмет,
+// который берут в руку: она одна и становится выбираемой, чужие остаются реквизитом.
+// Поэтому ловушка курсора включается вместе с onPick и только на своём мипле.
+export const Meeples3D = forwardRef(function Meeples3D({ position = [0, 0, 0], mine = null, selected = false, onPick = null }, ref) {
     const geometry = useMemo(() => meepleGeometry(), []);
     const materials = useMemo(
         () => MEEPLE_COLORS.map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05 })),
@@ -73,6 +84,7 @@ export const Meeples3D = forwardRef(function Meeples3D({ position = [0, 0, 0] },
     );
 
     const meshes = useRef([]);
+    const rings = useRef([]);
     const anim = useRef(MEEPLE_COLORS.map(() => null));
     const at = useRef(MEEPLE_COLORS.map((_, index) => trayAt(index)));
 
@@ -111,6 +123,14 @@ export const Meeples3D = forwardRef(function Meeples3D({ position = [0, 0, 0] },
         // медленнее сценария и оказываются на ячейках позапрошлого хода.
         const catchUp = delta > 0.5;
 
+        // Кольцо своей фишки лежит на сукне и следует за ней по горизонтали, но не
+        // повторяет дугу шага: подпрыгивающая метка на столе читается как ещё один предмет.
+        for (let index = 0; index < rings.current.length; index += 1) {
+            const ring = rings.current[index];
+            const mesh = meshes.current[index];
+            if (ring && mesh) ring.position.set(mesh.position.x, 0.001, mesh.position.z);
+        }
+
         for (let index = 0; index < anim.current.length; index += 1) {
             const move = anim.current[index];
             if (!move) continue;
@@ -141,20 +161,68 @@ export const Meeples3D = forwardRef(function Meeples3D({ position = [0, 0, 0] },
 
     return (
         <group position={position}>
-            {MEEPLE_COLORS.map((color, index) => (
-                <mesh
-                    key={color}
-                    ref={(node) => {
-                        meshes.current[index] = node;
-                    }}
-                    geometry={geometry}
-                    material={materials[index]}
-                    position={[trayAt(index).x, 0, trayAt(index).z]}
-                    raycast={noRaycast}
-                    castShadow
-                    receiveShadow
-                />
-            ))}
+            {MEEPLE_COLORS.map((color, index) => {
+                const isMine = onPick && index === mine;
+                return (
+                    <group key={color}>
+                        <mesh
+                            ref={(node) => {
+                                meshes.current[index] = node;
+                            }}
+                            geometry={geometry}
+                            material={materials[index]}
+                            position={[trayAt(index).x, 0, trayAt(index).z]}
+                            raycast={isMine ? meshRaycast : noRaycast}
+                            onPointerOver={
+                                isMine
+                                    ? (event) => {
+                                          event.stopPropagation();
+                                          document.body.style.cursor = "pointer";
+                                      }
+                                    : undefined
+                            }
+                            onPointerOut={
+                                isMine
+                                    ? () => {
+                                          document.body.style.cursor = "";
+                                      }
+                                    : undefined
+                            }
+                            onClick={
+                                isMine
+                                    ? (event) => {
+                                          event.stopPropagation();
+                                          onPick(index);
+                                      }
+                                    : undefined
+                            }
+                            castShadow
+                            receiveShadow
+                        />
+                        {/* Кольцо под своей фишкой: без него в шестёрке одинаковых миплов
+                            свой не находится, а после выбора не видно, чей сейчас ход.
+                            Кольцо ездит за фишкой тем же кадром, что и она сама. */}
+                        {isMine && (
+                            <mesh
+                                ref={(node) => {
+                                    rings.current[index] = node;
+                                }}
+                                rotation={[-Math.PI / 2, 0, 0]}
+                                position={[trayAt(index).x, 0.001, trayAt(index).z]}
+                                raycast={noRaycast}>
+                                <ringGeometry args={[0.017, selected ? 0.025 : 0.021, 32]} />
+                                <meshBasicMaterial
+                                    color={selected ? "#ffffff" : "#f4d9a2"}
+                                    transparent
+                                    opacity={selected ? 0.95 : 0.6}
+                                    depthWrite={false}
+                                    side={THREE.DoubleSide}
+                                />
+                            </mesh>
+                        )}
+                    </group>
+                );
+            })}
         </group>
     );
 });

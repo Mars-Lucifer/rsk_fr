@@ -576,14 +576,35 @@
     overflow: hidden;
 }
 
+/* Таблица тянется на всю высоту блока, поэтому её шесть строк распределяются
+   так же, как шесть строк индекса справа (grid 1fr) — ряды стоят вровень,
+   без разрыва между колонками. */
 .weTableScroll .participantTable {
     table-layout: fixed;
     width: 100%;
+    height: 100%;
 }
 
-.weTableScroll .participantTable th:last-child,
-.weTableScroll .participantTable td:last-child {
-    width: 92px;
+.weTableScroll .participantTable tbody tr {
+    height: calc(100% / 6);
+}
+
+/* Имя занимает ровно столько, сколько нужно длинному ФИО, роль идёт сразу за
+   ним, остаток ширины забирает пустая колонка-распорка — иначе роль уезжала
+   к правому краю панели и отрывалась от имени. */
+.weTableScroll .participantTable th:nth-child(1),
+.weTableScroll .participantTable td:nth-child(1) {
+    width: 58%;
+}
+
+.weTableScroll .participantTable th:nth-child(2),
+.weTableScroll .participantTable td:nth-child(2) {
+    width: 120px;
+}
+
+.weTableScroll .participantTable th:nth-child(3),
+.weTableScroll .participantTable td:nth-child(3) {
+    width: auto;
 }
 
 .weTableScroll .tdName {
@@ -611,12 +632,15 @@
 /* Блок направлений: независим от строк участников, тянется на высоту панели и
    равномерно распределяет 6 строк. Фиксированная ширина — чтобы влезали 6 звёзд
    рядом с полными ФИО в узкой (½ экрана) панели. */
+/* Сетка «шапка + 6 равных строк» повторяет ритм таблицы участников (тоже 6
+   строк на стол), поэтому строки индекса стоят вровень с участниками, а не
+   собираются в отдельную колонку со своим интервалом. */
 .weDirectionsBlock {
-    flex: 0 0 208px;
+    flex: 0 0 300px;
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+    display: grid;
+    grid-template-rows: auto repeat(6, 1fr);
+    align-content: stretch;
     padding: 4px 0 8px;
     border-left: 1px solid var(--border-color);
     padding-left: 12px;
@@ -637,14 +661,21 @@
     grid-template-columns: minmax(0, 1fr) 96px;
     align-items: center;
     column-gap: 8px;
-    padding: 2px 0;
-    min-height: 26px;
+    padding: 0;
+    min-height: 0;
 }
 
+.weDirectionsBlock .weDirectionLabel {
+    white-space: normal;
+}
+
+/* Названия направлений показываем целиком: «Единое цифровое пространство»
+   переносится на вторую строку, но не режется многоточием. */
 .weDirectionRow .weDirectionLabel {
-    overflow: hidden;
-    text-overflow: ellipsis;
     font-size: 12px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .weDirectionRow .dirStarsRow {
@@ -678,6 +709,24 @@
     color: var(--text-primary);
     width: 44px;
     flex-shrink: 0;
+}
+
+/* Название фазы перед счётчиком: «Старт 2/4», «Форматы 3/6». Без него счётчик
+   читается как общее число заданий и не сходится с итогом стола. */
+.phaseLabel {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    width: 108px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.personRowBig .phaseLabel {
+    font-size: 13px;
+    width: 132px;
 }
 
 .progressBarTrack {

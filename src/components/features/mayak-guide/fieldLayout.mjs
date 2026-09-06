@@ -63,16 +63,30 @@ export const PLANS = [
 // Четыре такта по девять задач дают 36 карт — стопки кончаются одновременно с полем.
 export const CARDS_PER_DECK = 6;
 
+// Наборов заданий в обороте два, и это разные колоды, а не одна в двух качествах:
+// «ВУЗЫ» (карты №6xx, кейсы вузов) и «ФЕДЕРАЦИЯ» (№4xx, регионы и ведомства). Поле,
+// жетоны и звёзды у них общие — различаются только лица карт, поэтому набор задаётся
+// одним каталогом. У «Федерации» в разделе есть седьмая, шуточная карта; в раздачу она
+// не идёт и лежит рядом файлом -mood.
+export const MY_DECKS = {
+    vuz: { id: "vuz", name: "ВУЗЫ", dir: "/mayak-guide/deck-my", cards: CARDS_PER_DECK },
+    fed: { id: "fed", name: "Федерация", dir: "/mayak-guide/deck-my-fed", cards: CARDS_PER_DECK },
+};
+
 // Стопки этапа «МЫ»: шесть разделов колоды заданий по направлениям.
-// back — обложка направления из набора «Маяк ВУЗЫ», faces — лица заданий.
-export const MY_STACKS = DIRS.map((dir) => ({
-    id: dir.id,
-    name: dir.name,
-    color: dir.color,
-    at: dir.deck,
-    back: `/mayak-guide/deck-my/${dir.id}-back.png`,
-    faces: Array.from({ length: CARDS_PER_DECK }, (_, i) => `/mayak-guide/deck-my/${dir.id}-${i + 1}.jpg`),
-}));
+export function myStacks(deckId = "vuz") {
+    const deck = MY_DECKS[deckId] || MY_DECKS.vuz;
+    return DIRS.map((dir) => ({
+        id: dir.id,
+        name: dir.name,
+        color: dir.color,
+        at: dir.deck,
+        back: `${deck.dir}/${dir.id}-back.png`,
+        faces: Array.from({ length: deck.cards }, (_, i) => `${deck.dir}/${dir.id}-${i + 1}.jpg`),
+    }));
+}
+
+export const MY_STACKS = myStacks();
 
 // Трек индекса цифровой зрелости: строка — направление, столбец — закрытая задача.
 // Числа не подобраны на глаз, а обмерены по растру поля «МЫ»: клетки трека — светло-серые

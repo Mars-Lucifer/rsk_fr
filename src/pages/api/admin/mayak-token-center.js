@@ -42,7 +42,7 @@ function mapLegacyToken(token) {
         usageLimit,
         usedCount,
         remainingAttempts: Math.max(0, usageLimit - usedCount),
-        status: token.isActive === false ? "inactive" : usedCount >= usageLimit ? "exhausted" : "active",
+        status: token.isActive === false ? "inactive" : token.isExpired ? "expired" : usedCount >= usageLimit ? "exhausted" : "active",
         createdAt: token.createdAt || null,
         updatedAt: token.updatedAt || null,
         sourceRef: {

@@ -127,7 +127,7 @@ export default function MayakDelegatedAdminPanel() {
                 throw new Error(payload.error || "Не удалось создать токен");
             }
 
-            setMessage("Токен создан и будет действовать 24 часа.");
+            setMessage("Токен создан и будет действовать 48 часов.");
             setSessionName("");
             await loadOverview();
         } catch (createError) {

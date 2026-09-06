@@ -1,6 +1,21 @@
+import path from "node:path";
 import { isAdminSession } from "@/lib/rosdk-confrencia/admin";
 import { getStoredSubmission } from "@/lib/rosdk-confrencia/storage";
-import { downloadName, sendFileResponse } from "@/lib/rosdk-confrencia/files";
+import {
+  GENERATED_SLOTS,
+  UPLOAD_SLOTS,
+  contentTypeFor,
+  sendFileResponse,
+} from "@/lib/rosdk-confrencia/files";
+
+const SLOTS = [...GENERATED_SLOTS, ...UPLOAD_SLOTS];
+
+/** Старые ссылки админки: docx/pdf/photo -> слоты новой схемы. */
+const LEGACY_ALIASES = {
+  docx: "protocolDocx",
+  pdf: "protocolScan",
+  photo: "photo",
+};
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -18,51 +33,22 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Заявка не найдена." });
   }
 
-  if (type === "docx") {
-    return sendFileResponse(
-      res,
-      submission.docxPath,
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      downloadName(submission, "docx"),
-    );
+  const slot = LEGACY_ALIASES[type] ?? type;
+  const descriptor = SLOTS.find((item) => item.slot === slot);
+  const filePath = descriptor && submission.files?.[slot];
+
+  if (!filePath) {
+    return res.status(404).json({ error: "Файл не найден." });
   }
 
-  if (type === "pdf" && submission.pdfPath) {
-    const pathLower = submission.pdfPath.toLowerCase();
-    const isPdf = pathLower.endsWith(".pdf");
-    const isPng = pathLower.endsWith(".png");
-    let contentType = "image/jpeg";
-    let ext = "jpg";
-    if (isPdf) {
-      contentType = "application/pdf";
-      ext = "pdf";
-    } else if (isPng) {
-      contentType = "image/png";
-      ext = "png";
-    }
-    return sendFileResponse(
-      res,
-      submission.pdfPath,
-      contentType,
-      downloadName(submission, ext),
-    );
-  }
+  const parsed = path.parse(descriptor.archiveName);
+  const extension = path.extname(filePath) || parsed.ext;
 
-  if (type === "photo" && submission.photoPath) {
-    const pathLower = submission.photoPath.toLowerCase();
-    const isPng = pathLower.endsWith(".png");
-    const isWebp = pathLower.endsWith(".webp");
-    let contentType = "image/jpeg";
-    let ext = "jpg";
-    if (isPng) {
-      contentType = "image/png";
-      ext = "png";
-    } else if (isWebp) {
-      contentType = "image/webp";
-      ext = "webp";
-    }
-    return sendFileResponse(res, submission.photoPath, contentType, downloadName(submission, ext));
-  }
-
-  return res.status(404).json({ error: "Файл не найден." });
+  return sendFileResponse(
+    res,
+    filePath,
+    contentTypeFor(filePath),
+    `${parsed.name}-${submission.region}${extension}`,
+    req.query.inline === "1",
+  );
 }
